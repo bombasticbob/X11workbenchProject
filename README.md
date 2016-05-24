@@ -24,3 +24,6 @@ source tree, issues, wiki, and online documentation will be here on github.
 
 For licensing information, see LICENSING.
 
+For build information, see BUILD
+
+
