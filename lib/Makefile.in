@@ -100,13 +100,14 @@ libX11WorkbenchToolkit_a_AR = $(AR) $(ARFLAGS)
 libX11WorkbenchToolkit_a_LIBADD =
 am_libX11WorkbenchToolkit_a_OBJECTS = pixmap_helper.$(OBJEXT) \
 	window_helper.$(OBJEXT) font_helper.$(OBJEXT) \
-	edit_window.$(OBJEXT) frame_window.$(OBJEXT) \
-	dialog_window.$(OBJEXT) dialog_impl.$(OBJEXT) \
-	dialog_controls.$(OBJEXT) dialog_support.$(OBJEXT) \
-	menu.$(OBJEXT) menu_bar.$(OBJEXT) menu_popup.$(OBJEXT) \
-	conf_help.$(OBJEXT) file_help.$(OBJEXT) draw_text.$(OBJEXT) \
-	window_dressing.$(OBJEXT) platform_helper.$(OBJEXT) \
-	text_object.$(OBJEXT) clipboard_helper.$(OBJEXT)
+	edit_window.$(OBJEXT) child_frame.$(OBJEXT) \
+	frame_window.$(OBJEXT) dialog_window.$(OBJEXT) \
+	dialog_impl.$(OBJEXT) dialog_controls.$(OBJEXT) \
+	dialog_support.$(OBJEXT) menu.$(OBJEXT) menu_bar.$(OBJEXT) \
+	menu_popup.$(OBJEXT) conf_help.$(OBJEXT) file_help.$(OBJEXT) \
+	draw_text.$(OBJEXT) window_dressing.$(OBJEXT) \
+	platform_helper.$(OBJEXT) text_object.$(OBJEXT) \
+	clipboard_helper.$(OBJEXT)
 libX11WorkbenchToolkit_a_OBJECTS =  \
 	$(am_libX11WorkbenchToolkit_a_OBJECTS)
 AM_V_P = $(am__v_P_@AM_V@)
@@ -274,23 +275,24 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 noinst_LIBRARIES = libX11WorkbenchToolkit.a
 libX11WorkbenchToolkit_a_SOURCES = pixmap_helper.c window_helper.c \
-	font_helper.c edit_window.c frame_window.c dialog_window.c \
-	dialog_impl.c dialog_controls.c dialog_support.c menu.c \
-	menu_bar.c menu_popup.c conf_help.c file_help.c draw_text.c \
-	window_dressing.c platform_helper.c text_object.c \
-	clipboard_helper.c ../include/pixmap_helper.h \
-	../include/edit_window.h ../include/window_helper.h \
-	../include/font_helper.h ../include/frame_window.h \
-	../include/dialog_window.h ../include/dialog_controls.h \
-	../include/dialog_support.h ../include/menu.h \
-	../include/menu_bar.h ../include/menu_popup.h \
-	../include/conf_help.h ../include/file_help.h \
-	../include/draw_text.h ../include/window_dressing.h \
-	../include/platform_helper.h ../include/text_object.h \
-	../xpm/icon_app.xpm ../xpm/icon_bang.xpm \
-	../xpm/icon_barney.xpm ../xpm/icon_bear.xpm \
-	../xpm/icon_death.xpm ../xpm/icon_finger.xpm \
-	../xpm/icon_ok.xpm ../xpm/icon_skull.xpm ../xpm/icon_splat.xpm \
+	font_helper.c edit_window.c child_frame.c frame_window.c \
+	dialog_window.c dialog_impl.c dialog_controls.c \
+	dialog_support.c menu.c menu_bar.c menu_popup.c conf_help.c \
+	file_help.c draw_text.c window_dressing.c platform_helper.c \
+	text_object.c clipboard_helper.c ../include/pixmap_helper.h \
+	../include/edit_window.h ../include/child_frame.h \
+	../include/window_helper.h ../include/font_helper.h \
+	../include/frame_window.h ../include/dialog_window.h \
+	../include/dialog_controls.h ../include/dialog_support.h \
+	../include/menu.h ../include/menu_bar.h \
+	../include/menu_popup.h ../include/conf_help.h \
+	../include/file_help.h ../include/draw_text.h \
+	../include/window_dressing.h ../include/platform_helper.h \
+	../include/text_object.h ../xpm/icon_app.xpm \
+	../xpm/icon_bang.xpm ../xpm/icon_barney.xpm \
+	../xpm/icon_bear.xpm ../xpm/icon_death.xpm \
+	../xpm/icon_finger.xpm ../xpm/icon_ok.xpm \
+	../xpm/icon_skull.xpm ../xpm/icon_splat.xpm \
 	../xpm/icon_stop.xpm ../xpm/icon_triangle.xpm \
 	../xpm/icon_warn.xpm ../xpm/icon_what.xpm \
 	../xpm/icon_what_bold.xpm ../xpm/icon_wtf.xpm \
@@ -370,6 +372,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/child_frame.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/clipboard_helper.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/conf_help.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dialog_controls.Po@am__quote@

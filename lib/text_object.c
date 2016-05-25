@@ -14,7 +14,7 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2013 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+    Copyright (c) 2010-2016 by Bob Frazier (aka 'Big Bad Bombastic Bob')
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied

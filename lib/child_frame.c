@@ -1,14 +1,14 @@
-//////////////////////////////////////////////////////////////////////////////////////////
-//                  _  _  _                 _             _                             //
-//         ___   __| |(_)| |_    __      __(_) _ __    __| |  ___ __      __  ___       //
-//        / _ \ / _` || || __|   \ \ /\ / /| || '_ \  / _` | / _ \\ \ /\ / / / __|      //
-//       |  __/| (_| || || |_     \ V  V / | || | | || (_| || (_) |\ V  V /_| (__       //
-//        \___| \__,_||_| \__|_____\_/\_/  |_||_| |_| \__,_| \___/  \_/\_/(_)\___|      //
-//                           |_____|                                                    //
-//                                                                                      //
-//                     a window into which you can type text                            //
-//                                                                                      //
-//////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////
+//        _     _ _     _      __                                  //
+//    ___| |__ (_) | __| |    / _|_ __ __ _ _ __ ___   ___   ___   //
+//   / __| '_ \| | |/ _` |   | |_| '__/ _` | '_ ` _ \ / _ \ / __|  //
+//  | (__| | | | | | (_| |   |  _| | | (_| | | | | | |  __/| (__   //
+//   \___|_| |_|_|_|\__,_|___|_| |_|  \__,_|_| |_| |_|\___(_)___|  //
+//                      |_____|                                    //
+//                                                                 //
+//        a window that exists as a tab in a frame window          //
+//                                                                 //
+/////////////////////////////////////////////////////////////////////
 
 /*****************************************************************************
 
@@ -52,21 +52,34 @@
 #include <strings.h>
 
 #include "window_helper.h"
-#include "edit_window.h"
+#include "frame_window.h"
+#include "child_frame.h"
 
 
-WBEditWindow *WBCreateEditWindow(WBFrameWindow *pOwner, XFontStruct *pFont,
-                                 const char *szFocusMenu, const WBFWMenuHandler *pHandlerArray,
-                                 int fFlags)
+int WBInitChildFrame(WBChildFrame *pChildFrame, WBFrameWindow *pOwner, XFontStruct *pFont,
+                     const char *szFocusMenu, const WBFWMenuHandler *pHandlerArray,
+                     WBWinEvent pUserCallback, int fFlags)
 {
-  return NULL;
+  return -1; // for now
 }
 
-void WBDestroyEditWindow(WBEditWindow *pEditWindow)
+void WBDestroyChildFrame(WBChildFrame *pChildFrame)
 {
 }
 
-WBEditWindow *WBEditWindowFromWindowID(Window wID)
+void WBSetEditWindowMenu(WBChildFrame *pChildFrame, const char *szFocusMenu)
+{
+}
+
+void WBSetChildFrameMenuHandlers(WBChildFrame *pChildFrame, const WBFWMenuHandler *pHandlerArray)
+{
+}
+
+void WBSetChildFrameDisplayName(WBChildFrame *pChildFrame, const char *szDisplayName)
+{
+}
+
+WBChildFrame *WBChildFrameFromWindowID(Window wID)
 {
   return NULL;
 }

@@ -16,7 +16,7 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2013 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+    Copyright (c) 2010-2016 by Bob Frazier (aka 'Big Bad Bombastic Bob')
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
@@ -116,7 +116,7 @@
   * COPYRIGHT
   *
   *    X11workbench - X11 programmer's 'work bench' application and toolkit\n
-  *    Copyright (c) 2010-2013 by Bob Frazier (aka 'Big Bad Bombastic Bob')\n
+  *    Copyright (c) 2010-2016 by Bob Frazier (aka 'Big Bad Bombastic Bob')\n
   *                             all rights reserved\n
   *
   *  DISCLAIMER:  The X11workbench application and toolkit software are supplied
@@ -788,9 +788,21 @@
   * A special case of a frame window is a dialog frame window.  See \ref DLGCreateDialogWindow()
 */
 
-/** \defgroup edit_window Edit Window APIs and Structures
+/** \defgroup child_frame Child frame Window API
+  * \ingroup frame
   *
-  * Edit windows are child windows, typically owned by a frame window, in which
+  * The 'Child Frame' API for the X11workbench Toolkit identifies those functions that implement
+  * 'Child Frame' windows.  A Child Frame window is a child window that is registered with the containing
+  * frame window and typically displays a tab on the frame window for easy access.  It also has its
+  * own menu and menu handlers.  Typically another window type will 'derive' from this.\n
+  *
+  * \sa \ref edit_window
+*/
+
+/** \defgroup edit_window Edit Window APIs and Structures
+  * \ingroup frame
+  *
+  * Edit windows are 'Child Frame' windows, owned by a frame window, in which
   * text is edited and menu callbacks are processed.\n
   * The edited text is typically associated with a file name.  An Edit Window
   * uses the \ref TEXT_OBJECT object (structure) to manage its state.

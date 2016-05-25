@@ -12,7 +12,7 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2013 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+    Copyright (c) 2010-2016 by Bob Frazier (aka 'Big Bad Bombastic Bob')
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
@@ -72,7 +72,7 @@
 #include "icon_app.xpm"   /* application icon that's the same size as the others, 36x36 */
 
 
-#define NO_SPLASH /* temporary, later put it as a configure option */
+#define NO_SPLASH /* temporary, later put it as a configure option - need to get 'gleam' to work better */
 
 #define STRING  "Hello, world"
 #define BORDER  32 /* was 1 */
@@ -136,7 +136,18 @@ static Display       *pX11Display = NULL;            /* X server connection */
 static WBFrameWindow *pMainFrame = NULL;
 static XColor         clrGreen;
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//   _____                          __        ___           _                 ____  _                   _         //
+//  |  ___| __ __ _ _ __ ___   ___  \ \      / (_)_ __   __| | _____      __ / ___|| |_ _ __ _   _  ___| |_ ___   //
+//  | |_ | '__/ _` | '_ ` _ \ / _ \  \ \ /\ / /| | '_ \ / _` |/ _ \ \ /\ / / \___ \| __| '__| | | |/ __| __/ __|  //
+//  |  _|| | | (_| | | | | | |  __/   \ V  V / | | | | | (_| | (_) \ V  V /   ___) | |_| |  | |_| | (__| |_\__ \  //
+//  |_|  |_|  \__,_|_| |_| |_|\___|    \_/\_/  |_|_| |_|\__,_|\___/ \_/\_/   |____/ \__|_|   \__,_|\___|\__|___/  //
+//                                                                                                                //
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // application menu and the application menu handler structure 'main_menu_handlers'
+
+// application menu - what I see when there's no open document
 static char szAppMenu[]="1\n"
                         "_File\tpopup\t2\n"
                         "_Tools\tpopup\t5\n"
@@ -158,6 +169,7 @@ static char szAppMenu[]="1\n"
                         "_Options\tIDM_TOOLS_OPTIONS\tDisplay Options Editor\n"
                         "\n";
 
+// edit menu - what I see when there's a child frame active
 static char szEditMenu[]="1\n"
                         "_File\tpopup\t2\n"
                         "_Edit\tpopup\t4\n"
@@ -194,6 +206,10 @@ static char szEditMenu[]="1\n"
                         "_Options\tIDM_TOOLS_OPTIONS\tDisplay Options Editor\n"
                         "\n";
 
+// menu handler, similar to what MFC does
+// in theory I can swap in a new menu handler when the window focus changes
+// this is the DEFAULT handler, when no 'child frame' has the focus
+
 FW_MENU_HANDLER_BEGIN(main_menu_handlers)
   FW_MENU_HANDLER_ENTRY("IDM_FILE_EXIT",FileExitHandler,NULL)
   FW_MENU_HANDLER_ENTRY("IDM_FILE_NEW",FileNewHandler,NULL)
@@ -206,13 +222,14 @@ FW_MENU_HANDLER_BEGIN(main_menu_handlers)
 FW_MENU_HANDLER_END
 
 
+
 // end of global variables
 
 
 
 static void usage(void)
 {
-  fputs("X11workbench - Copyright (c) 2013 by S.F.T. Inc. - all rights reserved\n"
+  fputs("X11workbench - Copyright (c) 2010-2016 by S.F.T. Inc. - all rights reserved\n"
         "Usage:  X11workbench [options] filename [filename [...]]\n"
         "where   'filename' represents one or more files or workspaces to be opened on startup\n"
         "\n"
@@ -249,8 +266,8 @@ static void get_min_window_height_width(int *piMinHeight, int *piMinWidth)
 
 ///////////////////////////////////////////////
 // do_main - initialization, loop, termination
+//        (the classic top-down model)
 ///////////////////////////////////////////////
-
 
 int do_main(int argc, char *argv[], char *envp[])
 {
@@ -358,12 +375,14 @@ int iDebugDumpConfig = 0;
 
 #ifndef NO_SPLASH
   DLGSplashScreen(splash_xpm,
-//                  "Copyright " UTF8_COPYRIGHT " 2013 by Big Bad Bombastic Bob\nAll Rights Reserved",  //test string with unicode char in it U+00A9
-                  "Copyright (c) 2013 by Big Bad Bombastic Bob\nAll Rights Reserved", // 1 or 2 lines only
+//                  "Copyright " UTF8_COPYRIGHT " 2010-2016 by Big Bad Bombastic Bob\nAll Rights Reserved",  // text string with unicode char in it U+00A9
+                  "Copyright (c) 2010-2016 by Big Bad Bombastic Bob\nAll Rights Reserved", // 1 or 2 lines only
                   WhitePixel(pX11Display, DefaultScreen(pX11Display))); // white text
 #endif // NO_SPLASH
 
   get_min_window_height_width(&iMinHeight, &iMinWidth);
+
+  // I will need to center the new window, so figure out how to do that
 
   WBInitSizeHints(&xsh,        // pointer to XSizeHints
                   pX11Display, // Display pointer
@@ -398,6 +417,7 @@ int iDebugDumpConfig = 0;
   }
 
   // assign menu handlers to the frame window (this does the callback functions for me)
+  // this is part of the frame window functionality for the DEFAULT menu
 
   FWSetMenuHandlers(pMainFrame, main_menu_handlers);
 
@@ -575,6 +595,16 @@ int iRval = 0;
   return iRval;  // let default processing happen if zero, else 'processed'
 }
 
+
+////////////////////////////////////////////////////////////////////////////
+//   __  __                     ____      _ _ _                _          //
+//  |  \/  | ___ _ __  _   _   / ___|__ _| | | |__   __ _  ___| | _____   //
+//  | |\/| |/ _ \ '_ \| | | | | |   / _` | | | '_ \ / _` |/ __| |/ / __|  //
+//  | |  | |  __/ | | | |_| | | |__| (_| | | | |_) | (_| | (__|   <\__ \  //
+//  |_|  |_|\___|_| |_|\__,_|  \____\__,_|_|_|_.__/ \__,_|\___|_|\_\___/  //
+//                                                                        //
+////////////////////////////////////////////////////////////////////////////
+
 static int FileExitHandler(XClientMessageEvent *pEvent)
 {
   // TODO:  'OnExit' processing for open files (files to be saved, etc.)
@@ -587,6 +617,9 @@ static int FileExitHandler(XClientMessageEvent *pEvent)
 static int FileNewHandler(XClientMessageEvent *pEvent)
 {
   Window wIDOwner = pMainFrame ? pMainFrame->wID : -1;
+
+  // create a new child frame within the main frame
+  // this should be pretty straightforward as I implement it properly
 
   DLGMessageBox(MessageBox_OK | MessageBox_Warning, wIDOwner,
                 "File New",
@@ -894,6 +927,14 @@ static void SetSignalHandlers()
 
 
 
+////////////////////////////////////////////////////////////////
+//    ____            _            _     _   _      _         //
+//   / ___|___  _ __ | |_ _____  _| |_  | | | | ___| |_ __    //
+//  | |   / _ \| '_ \| __/ _ \ \/ / __| | |_| |/ _ \ | '_ \   //
+//  | |__| (_) | | | | ||  __/>  <| |_  |  _  |  __/ | |_) |  //
+//   \____\___/|_| |_|\__\___/_/\_\\__| |_| |_|\___|_| .__/   //
+//                                                   |_|      //
+////////////////////////////////////////////////////////////////
 
 // CONTEXT SENSITIVE HELP NOTES using DOXYGEN GENERATED DOCS
 
@@ -1361,6 +1402,16 @@ char *pRval;
   return pRval;
 }
 
+
+
+////////////////////////////////////////////////////////////////////
+//   __  __    _    _   _   _          _   _ _____ __  __ _       //
+//  |  \/  |  / \  | \ | | | |_ ___   | | | |_   _|  \/  | |      //
+//  | |\/| | / _ \ |  \| | | __/ _ \  | |_| | | | | |\/| | |      //
+//  | |  | |/ ___ \| |\  | | || (_) | |  _  | | | | |  | | |___   //
+//  |_|  |_/_/   \_\_| \_|  \__\___/  |_| |_| |_| |_|  |_|_____|  //
+//                                                                //
+////////////////////////////////////////////////////////////////////
 
 static char * InternalMan2Html(const char *szTerm, const char *szText)
 {

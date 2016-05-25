@@ -18,7 +18,7 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2013 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+    Copyright (c) 2010-2016 by Bob Frazier (aka 'Big Bad Bombastic Bob')
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
@@ -2051,13 +2051,13 @@ void WBProcessExposeEvent(XExposeEvent *pEvent);  // paint optimization
   * \param paType Pointer to an atom indicating the requested data type ('None' for ANY), and returning the actual data type
   * \param piFormat pointer to the returned format (0, 8, 16, or 32)
   * \param pnData the size of the returned data (# of items, based on *piFormat)
-  * \return a pointer to the actual data (must use XFree() to de-allocate the resource)
+  * \return a pointer to the actual data (must use 'free()' to de-allocate the resource)
   *
   * This function will obtain the clipboard data associated with the specified data type, or
   * whichever data it finds first if 'None' is specified as 'paType'.  Some substitutions may occur,
   * such as 'XA_TEXT' vs 'UTF8' (for example), if data in the requested format is not available.
   * The returned value is a pointer to the actual data of size '*pnData' 'items' (which have a bit
-  * length as specified by '*piFormat').  You must call 'XFree()' to release the resource once you are done with it.
+  * length as specified by '*piFormat').  You must call 'free()' to release the resource once you are done with it.
 */
 void * WBGetClipboardData(Display *pDisplay, Atom *paType, int *piFormat, unsigned long *pnData);
 
@@ -2069,7 +2069,7 @@ void * WBGetClipboardData(Display *pDisplay, Atom *paType, int *piFormat, unsign
   * \param iFormat the data format (0, 8, 16, or 32)
   * \param pData a pointer to the data to be assigned (can be NULL, indicating you want to clear it)
   * \param nData the size of the data (# of items, based on iFormat)
-  * \return a pointer to the actual data (must use XFree() to de-allocate the resource)
+  * \return a value of zero on success, or non-zero on error
   *
   * This function assigns the clipboard data for the specified type ('aType') and format ('iFormat')
   * to the data specified by 'pData' and 'nData'.
@@ -2087,13 +2087,13 @@ int WBSetClipboardData(Display *pDisplay, Atom aType, int iFormat, const void *p
   * \param paType Pointer to an atom indicating the requested data type ('None' for ANY), and returning the actual data type
   * \param piFormat pointer to the returned format (0, 8, 16, or 32)
   * \param pnData the size of the returned data (# of items, based on *piFormat)
-  * \return a pointer to the actual data (must use XFree() to de-allocate the resource)
+  * \return a pointer to the actual data (must use 'free()' to de-allocate the resource)
   *
   * This function will obtain the selection data associated with the target and specified data type, or
   * whichever data it finds first if 'None' is specified as 'paType'.  Some substitutions may occur,
   * such as 'XA_TEXT' vs 'UTF8' (for example), if data in the requested format is not available.
   * The returned value is a pointer to the actual data of size '*pnData' 'items' (which have a bit
-  * length as specified by '*piFormat').  You must call 'XFree()' to release the resource once you are done with it.
+  * length as specified by '*piFormat').  You must call 'free()' to release the resource once you are done with it.
 */
 void * WBGetSelectionData(Display *pDisplay, Atom aSelection, Atom *paType, int *piFormat, unsigned long *pnData);
 
@@ -2107,7 +2107,7 @@ void * WBGetSelectionData(Display *pDisplay, Atom aSelection, Atom *paType, int 
   * \param iFormat the data format (0, 8, 16, or 32)
   * \param pData a pointer to the data to be assigned (can be NULL, indicating you want to clear it)
   * \param nData the size of the data (# of items, based on iFormat)
-  * \return a pointer to the actual data (must use XFree() to de-allocate the resource)
+  * \return a value of zero on success, or non-zero on error
   *
   * This function assigns the selection data for the specified target 'aSelection' and type ('aType') and
   * format ('iFormat') to the data specified by 'pData' and 'nData'.

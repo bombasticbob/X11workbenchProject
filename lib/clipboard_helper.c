@@ -14,7 +14,7 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2013 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+    Copyright (c) 2010-2016 by Bob Frazier (aka 'Big Bad Bombastic Bob')
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
@@ -99,6 +99,7 @@ typedef struct _ClipboardTask_ // only for getting data; setting data done immed
   // state-related things
   int fState;    // flag to indicate status
   Atom aProp;    // the property associated with this task
+  WB_UINT64 ullTime; // timestamp for various timeouts (reserved)
 
 } CLIPBOARD_TASK;
 
@@ -392,7 +393,7 @@ CLIPBOARD_TASK *pRunList = NULL; // what I'm running at the moment
 CLIPBOARD_TASK *pDoneList = NULL; // things that get free'd up later
 CLIPBOARD_DATA *pD, *pD2;
 Window wWindow = None;
-XEvent evt;
+XEvent evt, evt2;
 Atom aType;
 // NOTE:  Atoms in 'window_helper.h' won't be defined, see headers above
 Atom aINCR, aWBCLIP, aCLIPBOARD, aTEXT, aC_STRING, aCOMPOUND_TEXT, aTARGETS, aMULTIPLE,
@@ -543,6 +544,10 @@ Atom aPIXMAP    = XA_PIXMAP;
     {
       int bDoneAndSignal = 0; // this flag tells me to place the item in the 'done queue' and signal the owner
 
+      /////////////////////////////////////////////////////////////////
+      // PROCESS RUN LIST - CHECK 'CANCEL STATE' FIRST
+      /////////////////////////////////////////////////////////////////
+     
       // check 'fState' - if it's negative, the task has been canceled or was an error I didn't catch before
       
       if((int)WBInterlockedRead((unsigned int *)&(pT->fState)) < 0) // error state - these will be moved to 'done list'
@@ -550,6 +555,9 @@ Atom aPIXMAP    = XA_PIXMAP;
         bDoneAndSignal = 1; // if marked 'error' the request was canceled and it needs to be deleted
         // this will flow through and signal the caller
       }
+      /////////////////////////////////////////////////////////////////
+      // CONTINUE NORMAL PROCESSING (NOT CANCELED)
+      /////////////////////////////////////////////////////////////////
       else if(pT->fType == 0) // get clipboard data
       {
         /////////////////////////////////////////////////////////////////
@@ -721,7 +729,19 @@ null_data_me_own:
             WB_ERROR_PRINT("TEMPORARY: %s line %d - XConvertSelection, fState set to 1\n", __FUNCTION__, __LINE__);
 
             pT->fState = 1; // this tells me I'm waiting for the first reply
+            pT->ullTime = WBGetTimeIndex(); // the time I sent the message
           }
+        }
+        else if(pT->fState == 1)  // XConvertSelection sent, no reply yet
+        {
+          // TODO:  if I am in state 1 and too much time has passed, do I want to cancel the
+          //        request and signal a failure??  or do I want to re-issue the
+          //        XConvertSelection request?
+
+          // if((WBGetTimeIndex() - pT->ullTime) > some limit)
+          // { do something, re-send request, whatever }
+
+          // NOTE:  if the thing gets canceled by the caller, it will get a state of '-1'
         }
 
         /////////////////////////////////////////////////////////////////
@@ -732,11 +752,17 @@ null_data_me_own:
         // SET CLIPBOARD DATA - copy data, assign to data list
         /////////////////////////////////////////////////////////////////
 
+        // NOTE:  I don't need to worry about the state here, since all I'm going
+        //        to do is set up a copy of the data, own the clipboard, and tell
+        //        everyone/thing I completed the task.  So it's almost synchronous
+
 
         // COPY TO BUFFER OPERATION
-        // TODO:  XA_STRING uses XStoreBuffer (etc.) directly, no owner, buffer 0
+        // TODO:  'cut buffer' XA_STRING selection uses XStoreBuffer (etc.) directly
 
         // walk the data chain looking for a match, and remove it if it matches.
+        // (I'm going to replace it right away and the data and struct are together)
+
         pD = pCBDHead;
         pD2 = NULL;
 
@@ -887,7 +913,7 @@ null_data_me_own:
               pD2->pNext = pD;
             }
 
-#if 1
+#if 0 /* this is a debug-only feature - remove when it's working properly */
             {
               char *p1;
               WB_ERROR_PRINT("TEMPORARY:  %s - walking clipboard data\n", __FUNCTION__);
@@ -1114,6 +1140,10 @@ null_data_me_own:
 
       if(evt.type == SelectionClear)
       {
+        /////////////////////////////////////////////////////////////////
+        // SELECTION CLEAR EVENT
+        /////////////////////////////////////////////////////////////////
+
         // I'm being asked NOT to own the clipboard, so first check that I'm still the owner
 
         Window wOwn = XGetSelectionOwner(pDisplay, evt.xselectionclear.selection);
@@ -1159,20 +1189,24 @@ null_data_me_own:
 
             free(pD); // free up the memory [that's all I need to do]
 
-//            break;
             pD = pD2;  // this continues searching correctly
-            if(!pD)
+
+            if(!pD) // null means empty chain
             {
               break; // I am done
             }
           }
 
-          pD2 = pD;
-          pD = pD->pNext;
+          pD2 = pD;        // the new 'prev' item
+          pD = pD->pNext;  // "next" item in chain
         }
       }
       else if(evt.type == SelectionRequest)  // copy FROM me
       {
+        /////////////////////////////////////////////////////////////////
+        // SELECTION REQUEST EVENT
+        /////////////////////////////////////////////////////////////////
+
         pD = pCBDHead;
 
         while(pD && pD->aSelection != evt.xselectionrequest.selection)
@@ -1257,30 +1291,39 @@ null_data_me_own:
           WB_ERROR_PRINT("%s - sending 'None' for XChangeProperty\n", __FUNCTION__);
         }
 
+        /////////////////////////////////////////////////////////////////
+        // EVENT REPLY TO REQUESTOR
+        /////////////////////////////////////////////////////////////////
+
         // now I need to reply to the message to say I did it
-        {
-          XEvent evt2;
+        // if I do _NOT_ do this in a timely manner, other applications
+        // will be affected in a very... bad... way!
 
-          evt2.xselection.type = SelectionNotify;
-          evt2.xselection.display = evt.xselectionrequest.display;
-          evt2.xselection.requestor = evt.xselectionrequest.requestor;
-          evt2.xselection.property = evt.xselectionrequest.property;
-          evt2.xselection.selection = evt.xselectionrequest.selection;
-          evt2.xselection.target = evt.xselectionrequest.target;
-          evt2.xselection.time = evt.xselectionrequest.time;
+        memset(&evt2, 0, sizeof(evt2));
 
-	        XFlush(evt2.xselection.display);
+        evt2.xselection.type = SelectionNotify;
+        evt2.xselection.display = evt.xselectionrequest.display;
+        evt2.xselection.requestor = evt.xselectionrequest.requestor;
+        evt2.xselection.property = evt.xselectionrequest.property;
+        evt2.xselection.selection = evt.xselectionrequest.selection;
+        evt2.xselection.target = evt.xselectionrequest.target;
+        evt2.xselection.time = evt.xselectionrequest.time;
 
-	        /* send the response event */
-	        XSendEvent(evt2.xselection.display, evt.xselectionrequest.requestor,
-	                   0, 0, &evt2);
-	        XFlush(evt2.xselection.display);
+        XFlush(evt2.xselection.display);
 
-          WB_ERROR_PRINT("TEMPORARY:  %s - reply message sent\n", __FUNCTION__);
-        }
+        /* send the response event */
+        XSendEvent(evt2.xselection.display, evt.xselectionrequest.requestor,
+                   0, 0, &evt2);
+        XFlush(evt2.xselection.display);
+
+        WB_ERROR_PRINT("TEMPORARY:  %s - reply message sent\n", __FUNCTION__);
       }
       else if(evt.type == SelectionNotify)
       {
+        /////////////////////////////////////////////////////////////////
+        // SELECTION NOTIFY EVENT
+        /////////////////////////////////////////////////////////////////
+
         int bDoneAndSignal = 0; // this flag tells me to place the item in the 'done queue' and signal the owner
 
         // now go through my 'run list' and work on whatever is here
@@ -1394,9 +1437,6 @@ null_data_me_own:
 
                       pT->fState = 3; // mark 'data complete' (for debugging, later, maybe)
 
-//                      WBDebugPrint("TEMPORARY:  %s - %d bytes of CB data:  \"%s\"\n",
-//                                   __FUNCTION__, iLen, (const char *)pT->pData);
-
                       bDoneAndSignal = 1;
                     }
                     else
@@ -1449,6 +1489,10 @@ null_data_me_own:
 
           if(bDoneAndSignal)
           {
+            /////////////////////////////////////////////////////////////////
+            // TASK IS COMPLETE - SIGNAL THE CALLER
+            /////////////////////////////////////////////////////////////////
+
             WB_ERROR_PRINT("TEMPORARY:  %s line %d - put thingy in done list, signal caller\n", __FUNCTION__, __LINE__);
 
             // after copying the data, remove it from the 'run' list
@@ -1613,10 +1657,14 @@ null_data_me_own:
     }
   }
 
+  XFlush(pDisplay);
+  XSync(pDisplay, False);
+
   // and finally, unlock that mutex!
   WBMutexUnlock(&xClipboardMutex); // not locked now
 
   // now remove any data items I might be cacheing
+
   while(pCBDHead) // this one is likely to have data in it
   {
     CLIPBOARD_DATA *pD = pCBDHead;
@@ -1624,15 +1672,28 @@ null_data_me_own:
 
     if(pDisplay && wWindow != None)
     {
-      if(XGetSelectionOwner(pDisplay, pD->aSelection) == wWindow)
+      if(pD->aSelection != None && 
+         XGetSelectionOwner(pDisplay, pD->aSelection) == wWindow)
       {
         XSetSelectionOwner(pDisplay, pD->aSelection, None, CurrentTime);
+      }
+      else if(pD->aSelection == None)
+      {
+        if(XGetSelectionOwner(pDisplay, aCLIPBOARD) == wWindow)
+        {
+          XSetSelectionOwner(pDisplay, aCLIPBOARD, None, CurrentTime);
+        }
+        else if(XGetSelectionOwner(pDisplay, XA_PRIMARY) == wWindow)
+        {
+          XSetSelectionOwner(pDisplay, XA_PRIMARY, None, CurrentTime);
+        }
       }
     }
 
     free(pD); // this one is very simple
   }
 
+  // OK no longer owning the clipboard, so now it's time to 
 
   if(pDisplay)
   {

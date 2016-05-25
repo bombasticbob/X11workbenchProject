@@ -7,13 +7,14 @@
 //                                   |_____|                                                //
 //                                                                                          //
 //    a top-level window that can have menus, toolbars, a status bar, and a client area     //
+//               (multiple-document versions have tabs and child frames)                    //
 //                                                                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2013 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+    Copyright (c) 2010-2016 by Bob Frazier (aka 'Big Bad Bombastic Bob')
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
@@ -207,6 +208,7 @@ typedef struct __WB_FW_MENU_HANDLER_
 
 } WBFWMenuHandler;
 
+
 /** \typedef WBFrameWindow
   * \struct __WB_FRAME_WINDOW__
   * \ingroup frame_window
@@ -230,7 +232,7 @@ typedef struct __WB_FW_MENU_HANDLER_
     int iClientWidth;                    // The current width of the frame window's client area
     int iClientHeight;                   // The current height of the frame window's client area
 
-    const WBFWMenuHandler *pMenuHandler; // pointer to the default menu handler structure array
+    int fFlags;                          // Various bit flags
 
   } WBFrameWindow;
   * \endcode
@@ -246,6 +248,8 @@ typedef struct __WB_FRAME_WINDOW__
   int iClientWidth;                    ///< The current width of the frame window's client area
   int iClientHeight;                   ///< The current height of the frame window's client area
 
+  int fFlags;                          ///< Various bit flags
+
 } WBFrameWindow;
 
 /** \ingroup frame_window
@@ -257,6 +261,7 @@ enum WBFrameWindowFlags
 
   WBFrameWindow_APP_WINDOW = 1,   ///< set this flag for application top-level window and whenever it is destroyed the application will exit
   WBFrameWindow_VISIBLE    = 2,   ///< set this to make window immediately visible
+  WBFrameWindow_NO_TABS    = 4,   ///< set this to disable tabs (single child frame only)
 
   WBFrameWindow_MAX = 0x80000000L ///< maximum flag value (for reference only)
 };
@@ -329,7 +334,7 @@ void FWDestroyFrameWindow2(WBFrameWindow *pFrameWindow); // destroys it using th
   * Assigns the menu handlers for the frame window.  The array will be copied, and the copy will be
   * used internally.  These handlers are always checked, but only after the 'contained' window's handlers.
   *
-  * \sa \ref frame_menu
+  * \sa \link frame_menu \endlink
 */
 void FWSetMenuHandlers(WBFrameWindow *pFrameWindow, const WBFWMenuHandler *pHandlerArray);
 
@@ -372,6 +377,9 @@ int FWGetNumContWindows(const WBFrameWindow *pFrameWindow);
   * \param pFrameWindow A const pointer to a WBFrameWindow structure for the frame window
   * \param iIndex The 'tab order' index of the 'contained' window.  The first window is '0'.  A negative value implies the 'current focus' window
   * \returns The Window ID of the 'contained' window corresponding to the index, or 'None' on error
+  *
+  * Use this function to get the Window ID of a 'contained' (child frame) window.  To get more information
+  * about contained 'Child Frame' window, see \sa \link child_frames \endlink
 */
 Window FWGetContainedWindowByIndex(const WBFrameWindow *pFrameWindow, int iIndex);
 
@@ -420,7 +428,7 @@ void FWSetFocusWindow(WBFrameWindow *pFrameWindow, Window idCont);
 void FWSetFocusWindowIndex(WBFrameWindow *pFrameWindow, int iIndex);
 
 
-
+#if 0
 /** \ingroup frame_window
   * \brief Handles 'selection' events for frame windows
   *
@@ -435,6 +443,7 @@ void FWSetFocusWindowIndex(WBFrameWindow *pFrameWindow, int iIndex);
   * function returns 0 for such events.
 */
 int FWDoSelectionEvents(WBFrameWindow *pFrameWindow, Window wID, Window wIDMenu, XEvent *pEvent);
+#endif // 0
 
 
 #ifdef __cplusplus

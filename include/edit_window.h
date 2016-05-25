@@ -13,7 +13,7 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2013 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+    Copyright (c) 2010-2016 by Bob Frazier (aka 'Big Bad Bombastic Bob')
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
@@ -50,6 +50,8 @@
 
 #include "text_object.h"
 #include "frame_window.h"
+#include "child_frame.h"
+
 
 /** \file edit_window.h
   * \brief Edit Window API functions
@@ -124,43 +126,33 @@ extern "C" {
   * \code
   typedef struct __WBEditWindow__
   {
-    Window wSelf;                     // window identifier for self
-    Window wOwner;                    // window identifier for owner
-    XFontStruct *pFont;               // default font for the window
+    WBChildFrame childframe;          // elements common to a 'child frame' (derived object)
 
-    // NOTE:
-    int iTop;                         // 0-based position of the top of the viewport (in lines)
-    int iHeight;                      // 0-based height of the viewport (in lines)
-    int iLeft;                        // 0-based position of the left of the viewport (in characters)
-    int iWidth;                       // 0-based width of the viewport (in characters)
-    int iFlags;                       // various flags associated with the window (reserved)
+    char *szFileName;                 // malloc'd name of file associated with this edit window (NULL if none)
 
-    int iTabIndex;                    // Current tab index (for tabbed versions; -1 for "no tabs")
     int nTextObjects;                 // Total number of items in aTextObjects
     int nMaxTextObjects;              // Max number of items in aTextObjects
+
     TEXT_OBJECT *aTextObjects[2];     // 'TEXT_OBJECT' array
 
   } WBEditWindow;
   * \endcode
   *
+  * Additional 'Child Frame' API functions can be called directly by using a type cast from 'WBEditWindow *'
+  * to 'WBChildFrame *', or by using the 'WBChildWindowFromWindowID()' function.
+  *
   * \sa \link TEXT_OBJECT \endlink
 */
 typedef struct __WBEditWindow__
 {
-  Window wSelf;                     ///< window identifier for self
-  Window wOwner;                    ///< window identifier for owner
-  XFontStruct *pFont;               ///< default font for the window
+  WBChildFrame childframe;          ///< elements common to a 'child frame' (derived object)
 
-  int iTop;                         ///< 0-based position of the top of the viewport (in lines)
-  int iHeight;                      ///< 0-based height of the viewport (in lines)
-  int iLeft;                        ///< 0-based position of the left of the viewport (in characters)
-  int iWidth;                       ///< 0-based width of the viewport (in characters)
-  int iFlags;                       ///< various flags associated with the window (reserved)
+  char *szFileName;                 ///< malloc'd name of file associated with this edit window (NULL if none)
 
-  int iTabIndex;                    ///< Current tab index (for tabbed versions; -1 for "no tabs")
   int nTextObjects;                 ///< Total number of items in aTextObjects
   int nMaxTextObjects;              ///< Max number of items in aTextObjects
-  TEXT_OBJECT *aTextObjects[2];     ///< 'TEXT_OBJECT' array
+
+  TEXT_OBJECT *aTextObjects[2];     ///< 'TEXT_OBJECT' array (TODO:  just make this a pointer instead?)
 
 } WBEditWindow;
 
@@ -168,37 +160,20 @@ typedef struct __WBEditWindow__
 /** \ingroup edit_window
   * \brief Create an Edit Window
   *
-  * \param wOwner The Window ID of the owning window
-  * \param iTop the client position for the top of the edit window
-  * \param iLeft the client position for the left of the edit window
-  * \param iWidth the width of the edit window
-  * \param iHeight the height of the edit window
+  * \param pOwner A pointer to the owning WBFrameWindow.  Can not be NULL.
+  * \param pFont The desired font, or NULL to use the default
+  * \param szFocusMenu A const pointer to a text-based menu resource describing the menu that should appear when the Child Frame's tab has the focus.  Can be NULL if none.
+  * \param pHandlerArray A const pointer to an array of WBFWMenuHandler structures for the 'focus' menu handler.  Can be NULL if none.
+  * \param fFlags A bitwise 'or' of the desired flags associated with this Edit Window.  See 'WBChildFrame_FLAGS'
   * \returns a pointer to a WBEditWindow object describing the new edit window, or NULL on error
   *
   * This function allows you to create an Edit Window that is a regular child of a frame window or
   * dialog box, as a 'single document' handler.  To create a window that uses the maximum available
   * space within the client area of the parent, specify '-1' for iTop, iLeft, iWidth, and iHeight.
 */
-WBEditWindow *WBCreateEditWindow(Window wOwner, int iTop, int iLeft, int iWidth, int iHeight);
-
-/** \ingroup edit_window
-  * \brief Create an Edit Window as a 'tab' for a multi-document Frame Window
-  *
-  * \param pFrameWindow A pointer to a WBFrameWindow structure for the owning frame window
-  * \param szFocusMenu A const pointer to a text-based menu resource describing the menu that should appear when the edit window's tab has the focus
-  * \param pHandlerArray A const pointer to an array of WBFWMenuHandler structures for the 'focus' menu handler, or NULL if none
-  * \returns a pointer to a WBEditWindow object describing the new edit window, or NULL on error
-  *
-  * This function allows you to create an Edit Window that is a 'tab' (contained window) of a multi-document frame
-  * window, specifying a custom menu and menu handler that is in effect whenever this window has the focus.  The edit
-  * window will automatically be added to the frame window's list of 'contained' windows.\n
-  * The function will return NULL on error.  There is no need to destroy the object manually since the frame
-  * window will automatically perform any necessary cleanup.  However, manually destroying the window will
-  * propogate to the frame window as well, cleaning up any allocated objects.
-  *
-  * \sa \ref WBSetEditWindowMenuHandlers
-*/
-WBEditWindow *WBCreateEditTab(WBFrameWindow *pFrameWindow, const char *szFocusMenu, const WBFWMenuHandler *pHandlerArray);
+WBEditWindow *WBCreateEditWindow(WBFrameWindow *pOwner, XFontStruct *pFont,
+                                 const char *szFocusMenu, const WBFWMenuHandler *pHandlerArray,
+                                 int fFlags);
 
 
 /** \ingroup edit_window
@@ -209,27 +184,17 @@ WBEditWindow *WBCreateEditTab(WBFrameWindow *pFrameWindow, const char *szFocusMe
 */
 void WBDestroyEditWindow(WBEditWindow *pEditWindow);
 
-/** \ingroup edit_window
-  * \brief Function to assign menu handlers to an edit window
-  *
-  * \param pEditWindow The pointer to the WBFrameWindow structure for the desired frame window
-  * \param szFocusMenu A const pointer to a text-based menu resource describing the menu that should appear when the edit window's tab has the focus
-  *
-  * Assigns the (new) menu for the edit window.  The text will be copied, and the copy will be
-  * used internally, and free'd as necessary.  Only valid when the owner is a Frame Window.
-*/
-void WBSetEditWindowMenu(WBEditWindow *pEditWindow, const char *szFocusMenu);
 
 /** \ingroup edit_window
-  * \brief Function to assign menu handlers to an edit window
+  * \brief Obtain the associated WBEditWindow structure pointer for a Window ID
   *
-  * \param pEditWindow The pointer to the WBFrameWindow structure for the desired frame window
-  * \param pHandlerArray A pointer to an array of WBFWMenuHandler structures - see \ref FW_MENU_HANDLER_ENTRY
+  * \param wID A valid Window ID
+  * \returns A pointer to the associated WBEditWindow structure (if it is a WBEditWindow), or NULL on error
   *
-  * Assigns the (new) menu handlers for the edit window.  The array will be copied, and the copy will be
-  * used internally, and free'd as necessary.  Only valid when the owner is a Frame Window.
+  * Use this function to safely obtain the correct WBEditWindow structure for a given Window ID.
 */
-void WBSetEditWindowMenuHandlers(WBEditWindow *pEditWindow, const WBFWMenuHandler *pHandlerArray);
+WBEditWindow *WBEditWindowFromWindowID(Window wID);
+
 
 #ifdef __cplusplus
 };

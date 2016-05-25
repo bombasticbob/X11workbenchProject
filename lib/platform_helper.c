@@ -13,7 +13,7 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2013 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+    Copyright (c) 2010-2016 by Bob Frazier (aka 'Big Bad Bombastic Bob')
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
@@ -2258,7 +2258,7 @@ int iRval = -1;
     // and I'll use the increment/decrement interlock functions and wait loops to
     // monitor the signaling.
 
-    *pCond = 1; // forces any waiting threads to return now
+    *pCond = 0;
 
     iRval = 0; // success!
 #endif // WIN32
@@ -2297,7 +2297,7 @@ void WBCondFree(WB_COND *pCond)
     // and I'll use the increment/decrement interlock functions and wait loops to
     // monitor the signaling.
 
-    *pCond = 0;
+    *pCond = 1; // forces a waiting thread to signal (though only one will probably do it)
   }
 #endif // WIN32
 }

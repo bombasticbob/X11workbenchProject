@@ -13,7 +13,7 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2013 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+    Copyright (c) 2010-2016 by Bob Frazier (aka 'Big Bad Bombastic Bob')
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
@@ -64,6 +64,7 @@
 #include "window_helper.h"
 #include "pixmap_helper.h"  // pixmap helpers, including pre-defined icons
 #include "frame_window.h"
+#include "child_frame.h"
 #include "conf_help.h"
 #include "draw_text.h"
 
@@ -79,16 +80,24 @@ typedef struct __FRAME_WINDOW__
   WBFWMenuHandler *pMenuHandler;     // pointer to the current menu handler structure array (internally allocated)
   WBFWMenuHandler *pDefMenuHandler;  // pointer to default menu handler (assigned by 'FWSetMenuHandlers()')
 
-  Window *pwContents;                // malloc'd array of 'contents' window IDs (determines tab order)
+//  Window *pwContents;                // malloc'd array of 'contents' window IDs (determines tab order)
+
+  int nChildFrames;                  // total number of child frames
+  int nMaxChildFrames;               // max # of child frames within the current array
+  WBChildFrame **ppChildFrames;      // Pointer to type-abstracted array of child frames
                                      // ctrl+alt+pageup/pagedown to navigate from one tab to another
-  int nContents, nMaxContents;       // size and extent of 'pwContents' when not NULL
+  // NOTE:  'ppChildFrames' is a contiguous array, without any NULLs in between
+
+  int nFocusTab;                     // which tab has the focus?  normally 0
+  int nLeftTab, nRightTab;           // left and right tab indices, same order as in ppChildFrames (0 if no tabs)
+
   char *szTitle;                     // title bar string (malloc'd)
 
   char *pDefaultMenuResource;        // menu resource for 'default' menu
 
-  int (* pFWCallback)(Window wID, XEvent *pEvent);
+  int (* pFWCallback)(Window wID, XEvent *pEvent); // registered callback function (for various things)
 
-  struct __FRAME_WINDOW__ *pNext;    // next in chain
+  struct __FRAME_WINDOW__ *pNext;    // next in chain (internal use)
 
 } FRAME_WINDOW;
 
@@ -105,22 +114,27 @@ static void __internal_destroy_frame_window(FRAME_WINDOW *pTemp)
 {
   int i1;
 
-  if(pTemp->pwContents)
+  if(pTemp->ppChildFrames)
   {
-    for(i1=0; i1 < pTemp->nContents && i1 < pTemp->nMaxContents; i1++)
+    for(i1=0; i1 < pTemp->nChildFrames && i1 < pTemp->nMaxChildFrames; i1++)
     {
       WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Frame,
                      "%s - Destroy contents %d\n",
                      __FUNCTION__, i1 + 1);
 
-      if(pTemp->pwContents[i1] > 0)
+      if(pTemp->ppChildFrames[i1])
       {
-        WBDestroyWindow(pTemp->pwContents[i1]);
+        // validate the pointer
+#warning this is potentially unsafe code...
+
+        WBDestroyWindow(pTemp->ppChildFrames[i1]->wSelf); // TODO:  improve this
       }
     }
 
-    free(pTemp->pwContents);
-    pTemp->pwContents = NULL;
+    free(pTemp->ppChildFrames);
+    pTemp->ppChildFrames = NULL;
+    pTemp->nChildFrames = 0; // by convention
+    pTemp->nMaxChildFrames = 0; // this too
   }
 
   if(pTemp->szTitle)
@@ -136,7 +150,6 @@ static void __internal_destroy_frame_window(FRAME_WINDOW *pTemp)
   }
 
 }
-
 
 void WBFrameWindowExit()
 {
@@ -502,12 +515,23 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 
         break;
 
-      case ClientMessage:  // menus, etc.
-         WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
-                         "%s - CLIENT MESSAGE\n", __FUNCTION__);
+      case ClientMessage:  // menus, etc. (they generate the 'ClientMessage')
+
+        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
+                       "%s - CLIENT MESSAGE\n", __FUNCTION__);
 
         if(pEvent->xclient.message_type == aMENU_COMMAND)
         {
+          //////////////////////////////////////////////////////////////////////////
+          //                                _                     _ _             //
+          //   _ __ ___   ___ _ __  _   _  | |__   __ _ _ __   __| | | ___ _ __   //
+          //  | '_ ` _ \ / _ \ '_ \| | | | | '_ \ / _` | '_ \ / _` | |/ _ \ '__|  //
+          //  | | | | | |  __/ | | | |_| | | | | | (_| | | | | (_| | |  __/ |     //
+          //  |_| |_| |_|\___|_| |_|\__,_| |_| |_|\__,_|_| |_|\__,_|_|\___|_|     //
+          //                                                                      //
+          //////////////////////////////////////////////////////////////////////////
+
+
           // check the container window that has the current focus, and THEN
           // check the frame window for an appropriate handler
 
@@ -559,6 +583,15 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
         }
         else if(pEvent->xclient.message_type == aMENU_UI_COMMAND)
         {
+          //////////////////////////////////////////////////////////////////////////////////////
+          //                                _   _ ___   _                     _ _             //
+          //   _ __ ___   ___ _ __  _   _  | | | |_ _| | |__   __ _ _ __   __| | | ___ _ __   //
+          //  | '_ ` _ \ / _ \ '_ \| | | | | | | || |  | '_ \ / _` | '_ \ / _` | |/ _ \ '__|  //
+          //  | | | | | |  __/ | | | |_| | | |_| || |  | | | | (_| | | | | (_| | |  __/ |     //
+          //  |_| |_| |_|\___|_| |_|\__,_|  \___/|___| |_| |_|\__,_|_| |_|\__,_|_|\___|_|     //
+          //                                                                                  //
+          //////////////////////////////////////////////////////////////////////////////////////
+
           // check 'contained' window for an appropriate UI handler before passing
           // it off to the frame window's handler
 
@@ -600,17 +633,28 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
                   WBMenu *pMenu;
                   WBMenuItem *pItem;
 
-#if !defined(__SIZEOF_POINTER__) // TODO find a better way
-#define __SIZEOF_POINTER_ 0
+                  // important detail - the 'data.l' array is assumed to have 32-bit values in it,
+                  // regardless of how its definition and 64/32-bitness affects the actual data storage.
+                  // In effect, only the lower 32-bits is valid.  Hence, I must combine two 32-bit values
+                  // together in order to make a 64-bit pointer.  For consistency I always use 2 values
+                  // per pointer to pass the information via the message structure.  otherwise it gets
+                  // complicated and I really don't like complicated.  it causes mistakes, errors, crashes...
+
+#if !defined(__SIZEOF_POINTER__) // TODO find a better way to deal with pointer size
+#define __SIZEOF_POINTER__ 0
 #endif
 #if __SIZEOF_POINTER__ == 4 /* to avoid warnings in 32-bit linux */
                   pMenu = (WBMenu *)pEvent->xclient.data.l[1];
                   pItem = (WBMenuItem *)pEvent->xclient.data.l[3];
-#else
+#else // assume 64-bit pointers here, and if they truncate, should NOT get any warnings... well that's the idea
                   pMenu = (WBMenu *)((unsigned long long)pEvent->xclient.data.l[1] | ((unsigned long long)pEvent->xclient.data.l[2] << 32));
                   pItem = (WBMenuItem *)((unsigned long long)pEvent->xclient.data.l[3] | ((unsigned long long)pEvent->xclient.data.l[4] << 32));
 #endif
-                  // TODO:  validate pointers
+                  // TODO:  validate pointers, otherwise a posted message might crash me (like a vulnerability)
+
+#warning this code potentially has a vulnerability in it
+
+                  // if(!WBIsValidMenu(pMenu) || !WBIsValidMenuItem(pItem)) { do not do it }
 
                   return pHandler->UIcallback(pMenu, pItem);
                 }
@@ -744,7 +788,9 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
       case SelectionClear:
       case SelectionNotify:
 
-        return FWDoSelectionEvents(&(pFrameWindow->wbFW), wID, wIDMenu, pEvent);
+        return 0; // NOT handled (default handler might want to handle them, but not me)
+
+//        return FWDoSelectionEvents(&(pFrameWindow->wbFW), wID, wIDMenu, pEvent);  <-- no longer needed
     }
   }
 
@@ -830,6 +876,9 @@ void FWSetFocusWindowIndex(WBFrameWindow *pFrameWindow, int iIndex)
 {
 }
 
+
+
+#if 0 /* these are handled separately - don't do this */
 
 // CLIPBOARD / SELECTION EVENTS
 //
@@ -974,4 +1023,6 @@ FRAME_WINDOW *pFW = (FRAME_WINDOW *)pFrameWindow;
 
   return 0; // for now
 }
+
+#endif // 0
 
