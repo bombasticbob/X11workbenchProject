@@ -179,7 +179,7 @@ void * CHOpenConfFile(const char *szAppName, int iFlags);
 /** \ingroup conf_help
   * \brief close configuration file opened by \ref CHOpenConfFile(), but does NOT free memory resources
   *
-  * \param hFile The configuration file object returned by \ref CHpenConfFile()
+  * \param hFile The configuration file object returned by \ref CHOpenConfFile()
   *
   * Use this function to close the configuration file that was opened by \ref CHOpenConfFile()\n
   * Memory resources will NOT be freed (values will remain cached as needed).  Use this function to simply
@@ -190,7 +190,7 @@ void CHCloseConfFile(void * hFile);
 /** \ingroup conf_help
   * \brief destroy configuration file opened by \ref CHOpenConfFile(), freeing memory resources (but not the files)
   *
-  * \param hFile The configuration file object returned by \ref CHpenConfFile()
+  * \param hFile The configuration file object returned by \ref CHOpenConfFile()
   *
   * This function will close the configuration file and destroy the cached information created by \ref CHOpenConfFile()
   * but does not physically destroy the file on disk.
@@ -497,10 +497,11 @@ const char *CHFindEndOfXMLTag(const char *pTagContents);
   * returned by this function.
   */
 char *CHGetFileMimeType(const char *szFileName);
+
 /** \ingroup conf_help
   * \brief Get the default application for a particular MIME type
   *
-  * \param szFileName A const pointer to a character string containing the MIME type
+  * \param szMimeType A const pointer to a character string containing the MIME type
   * \returns 'malloc'd pointer to a zero-byte terminated character string containing the default application name
   *
   * In the case of a '.desktop' file name being returned, use CHGetDesktopFileInfo() to obtain the actual path name
@@ -514,7 +515,7 @@ char *CHGetMimeDefaultApp(const char *szMimeType);
 /** \ingroup conf_help
   * \brief Get the default application for a particular MIME type
   *
-  * \param szFileName A const pointer to a character string containing the desktop file name
+  * \param szDesktopFile A const pointer to a character string containing the desktop file name
   * \param szInfo A const pointer to a character string containing the tag for the desired information
   * \returns 'malloc'd pointer to a zero-byte terminated character string containing the desired information
   *

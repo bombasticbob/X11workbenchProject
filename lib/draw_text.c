@@ -490,9 +490,9 @@ int nMaxChars;
 
 int DTGetTextWidth(XFontStruct *pFont, const char *szUTF8, int nLength)
 {
-XRectangle rctInk, rctLog;
+//XRectangle rctInk, rctLog;
 XFontSet fSet;
-int iRval, iLen;
+int iRval;//, iLen;
 
   if(nLength <= 0)
   {
@@ -930,7 +930,7 @@ static int InternalCalcIdealBounds(XFontStruct *pFont, DT_WORDS *pWords, int iTa
 int iFontWidth, iFontHeight, iLineSpacing;  // average font width/height and line spacing
 int iHPos, iHPos0, iMaxLen, iLines;
 int i1, i2, i3;
-const char *p1;
+//const char *p1;
 WB_RECT rctBounds, rctSource;
 DT_WORD *pW, *pW2;
 
@@ -1565,7 +1565,7 @@ int iAvgChar
 void DTDrawMultiLineText(XFontStruct *pFont, const char *szText, Display *pDisplay, GC gc, Drawable dw,
                          int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment)
 {
-int i1, i2, i3, iH, iH2, iW2, iFontWidth, iFontHeight;
+int i1, i2, i3, iH, iH2, /*iW2,*/ iFontWidth, iFontHeight;
 DT_WORDS *pWords;
 DT_WORD *pW;
 WB_RECT rcDest;

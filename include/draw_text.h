@@ -49,7 +49,7 @@
   * \brief Utilities for copying and drawing text, determining text extents, and so on
   *
   * X11 Work Bench Toolkit Toolkit API
-*/
+**/
 
 
 #ifndef _DRAW_TEXT_H_INCLUDED_
@@ -70,13 +70,13 @@ extern "C" {
 /** \ingroup text
   * \brief A simple utility that returns a malloc'd copy of a 0-byte terminated string
   *
-  * \param szStr A pointer to the original ASCII string (0-byte terminated)
+  * \param pSrc A pointer to the original ASCII string (0-byte terminated)
   * \return a 'malloc'd copy of the string (0-byte terminated)
   *
   * This function creates a 'malloc'd copy of szStr, up to the 0-byte.  The returned string
   * ALWAYS ends in a zero byte.  The caller must deallocate the returned pointer using 'free()'.\n
   * The function returns NULL on error.
-*/
+**/
 char *WBCopyString(const char *pSrc);
 
 /** \ingroup text
@@ -90,7 +90,7 @@ char *WBCopyString(const char *pSrc);
   * found, whichever happens first.  The returned string ALWAYS ends in a zero byte.
   * The caller must deallocate the returned pointer using 'free()'.\n
   * The function returns NULL on error.
-*/
+**/
 char *WBCopyStringN(const char *pSrc, unsigned int nMaxChars);
 
 /** \ingroup text
@@ -105,7 +105,7 @@ char *WBCopyStringN(const char *pSrc, unsigned int nMaxChars);
   * have to be a malloc'd string.  The function will overwrite the first pointer with malloc'd copy of the result
   * of concatenating the two strings.\n
   * On error, the function does NOT modify ppDest and aborts the concatenate operation.
-*/
+**/
 void WBCatString(char **ppDest, const char *pSrc);
 
 /** \ingroup text
@@ -122,8 +122,8 @@ void WBCatString(char **ppDest, const char *pSrc);
   * of concatenating the two strings.  The string 'pSrc' will be concatenated up to 'nMaxChars' or until a 0-byte is
   * found, whichever happens first.\n
   * On error, the function does NOT modify pszStr1 and aborts the concatenate operation.
-*/
-void WBCatStringN(char **pDest, const char *pSrc, unsigned int nMaxChars);
+**/
+void WBCatStringN(char **ppDest, const char *pSrc, unsigned int nMaxChars);
 
 /** \ingroup text
   * \brief De-Quote a string 'in place', that is modifying the original string by removing quotes
@@ -133,7 +133,7 @@ void WBCatStringN(char **pDest, const char *pSrc, unsigned int nMaxChars);
   * Often you need to be able to remove quote characters from a string in a standardized manner.  This
   * function handles just about every standard quoting method available, including the use of double-quotes
   * to indicate a quote within a quoted string, the use of single or double quotes, etc.
-*/
+**/
 void WBDeQuoteString(char *pszStr);      // de-quote a string in place
 
 /** \ingroup text
@@ -142,19 +142,19 @@ void WBDeQuoteString(char *pszStr);      // de-quote a string in place
   * \param pSrc A const pointer to an ASCII string
   * \param nMaxChars The maximum number of characters in the buffer
   * \returns The total number of lines (including blank lines)
-  */
+**/
 int WBStringLineCount(const char *pSrc, unsigned int nMaxChars);
 
 /** \ingroup text
   * \brief De-Quote a string 'in place', that is modifying the original string by removing quotes
   *
   * \param pSrc A const pointer to an ASCII string
-  * \param nMaxChars A pointer to an integer containing maximum number of characters in the buffer
-  * \returns A pointer to the next line, the character just following a <CRLF>, <LF>, <CR>, or <LFCR> sequence.
+  * \param pnMaxChars A pointer to an integer containing maximum number of characters in the buffer
+  * \returns A pointer to the next line, the character just following a \<CRLF\>, \<LF\>, \<CR\>, or \<LFCR\> sequence.
   *
   * This function will also update the number of characters in the buffer stored in '*pnMaxChars'.  If 'pnMaxChars'
   * is NULL, the string buffer is assumed to terminate with a zero-byte.
-  */
+**/
 const char *WBStringNextLine(const char *pSrc, unsigned int *pnMaxChars);
 
 
@@ -179,7 +179,7 @@ const char *WBStringNextLine(const char *pSrc, unsigned int *pnMaxChars);
   * This function scans a UTF-8 string and returns the length as a UTF-16 string if it contains ANY
   * multi-byte characters _AND_ can be properly converted.  It returns 0 if it's pure ASCII, and
   * a value of -1 if it cannot be properly converted, and -2 if it is simply 'malformed'.
-*/
+**/
 int WBIsMultiByte(const char *pszStr);
 
 
@@ -279,8 +279,8 @@ enum DTAlignment
     int nLength;            // length of text element (in bytes)
     int iWidth;             // width of text in pixels (based on font size) (NA for tabs, LF, valid for white space)
     int iHeight;            // height of text in pixels (based on font size) (NA for tabs, LF, valid for white space)
-    int iIsTab;             // indicates that the text consists of tabs (nLength for # of tabs, pText is NULL)
-    int iIsLineFeed;        // indicates a line feed (CR, CRLF, LF, or LFCR) (nLength for # of line feeds, pText is NULL)
+    int iIsTab;             // indicates that the text consists of tabs (nLength for number of tabs, pText is NULL)
+    int iIsLineFeed;        // indicates a line feed (CR, CRLF, LF, or LFCR) (nLength for number of line feeds, pText is NULL)
     int iIsWhiteSpace;      // indicates that it is 'white space' (regular or special character) (nLength, width, height applies)
     int iX;                 // Relative 'X' pixel position for the beginning of this element (when pre-rendered, else -1)
     int iY;                 // Relative 'Y' pixel position for the beginning of this element (when pre-rendered, else -1)
@@ -297,8 +297,8 @@ typedef struct __DT_WORD__
   int nLength;            ///< length of text element (in bytes)
   int iWidth;             ///< width of text in pixels (based on font size) (NA for tabs, LF, valid for white space)
   int iHeight;            ///< height of text in pixels (based on font size) (NA for tabs, LF, valid for white space)
-  int iIsTab;             ///< indicates that the text consists of tabs (nLength for # of tabs, pText is NULL)
-  int iIsLineFeed;        ///< indicates a line feed (CR, CRLF, LF, or LFCR) (nLength for # of line feeds, pText is NULL)
+  int iIsTab;             ///< indicates that the text consists of tabs (nLength for number of tabs, pText is NULL)
+  int iIsLineFeed;        ///< indicates a line feed (CR, CRLF, LF, or LFCR) (nLength for number of line feeds, pText is NULL)
   int iIsWhiteSpace;      ///< indicates that it is 'white space' (regular or special character) (nLength, width, height applies)
   int iX;                 ///< Relative 'X' pixel position for the beginning of this element (when pre-rendered, else -1)
   int iY;                 ///< Relative 'Y' pixel position for the beginning of this element (when pre-rendered, else -1)
@@ -357,11 +357,11 @@ int DTGetTextWidth(XFontStruct *pFont, const char *szUTF8, int nLength);
   *
   * \param pRefFont A pointer to an XFontStruct (NULL implies system default font)
   * \param szText A pointer to a (0-byte terminated) ASCII string that may span multiple lines
-  * \param geomBounds A pointer to a \ref WBGeom structure that defines a bounding rectangle
+  * \param geomBounds A pointer to a \ref WB_GEOM structure that defines a bounding rectangle
   *
   * sometimes you want to adjust text size to fit within a particular rectangle.  This function
   * determines how to do that by adjusting the font size.
-*/
+**/
 XFontStruct *DTCalcIdealFont(XFontStruct *pRefFont, const char *szText, WB_GEOM *geomBounds);
 
 
@@ -371,9 +371,8 @@ XFontStruct *DTCalcIdealFont(XFontStruct *pRefFont, const char *szText, WB_GEOM 
   * \param pFont A pointer to an XFontStruct (NULL implies system default font)
   * \param szText A pointer to a (0-byte terminated) ASCII string that may span multiple lines
   * \param iTabWidth A positive integer in 'characters', or negative integer in pixels, indicating tab width
-  * \param iTabOrgin An unsigned integer indicating the tab origin, using the same units as iTabWidth, corresponding to the first character.
-  * \param prcSource A pointer to the 'source' bounding rectangle in which the text is intended to fit.
-  * If NULL, the function will ALWAYS return non-zero and return the raw text extents without trying to fit it into a particular bounding rectangle.
+  * \param iTabOrigin An unsigned integer indicating the tab origin, using the same units as iTabWidth, corresponding to the first character.
+  * \param prcSource A pointer to the 'source' bounding rectangle in which the text is intended to fit. (If NULL, the function will ALWAYS return non-zero and return the raw text extents without trying to fit it into a particular bounding rectangle.)
   * \param prcDest A pointer to the 'destination' bounding rectangle, based on the actual text size, and fit according to iAlignment flags.
   * \param iAlignment The desired text alignment, one or more of the DTAlignment bit flags
   * \returns zero if the text will fit within prcSource, -1 error, or 1 to indicate that prcDest is larger than prcSource
@@ -398,17 +397,18 @@ int DTCalcIdealBounds(XFontStruct *pFont, const char *szText, int iTabWidth, uns
   *
   * \param pFont A pointer to the font to use for drawing text (NULL implies system default font)
   * \param szText A pointer to a (0-byte terminated) ASCII string that may span multiple lines
-  * \param gc The graphics context for the drawable
-  * \param dw The drawable (Window or Pixmap, typically)
+  * \param pDisplay the display associated with the GC and Drawable.
+  * \param gc The graphics context for the Drawable
+  * \param dw The Drawable (Window or Pixmap, typically)
   * \param iTabWidth The width of a tab, negative for pixels, positive for avg char width
   * \param iTabOrigin The 'origin point' for tabulation corresponding to the first character in the string
   * \param prcBounds A pointer to the bounding rectangle
   * \param iAlignment The desired text alignment, one or more of the DTAlignment bit flags
   *
-  * draw single-line text within the specified bounds rectangle on the specified
-  * drawable using the specified GC, adjusting for tab width and text alignment.
-  * If the text cannot fit within the bounding rectangle, it will be truncated.
-  * If you want the text to wrap, use 'DTDrawMultiLineText'
+  * This function draws single-line text within the specified bounds rectangle on the specified
+  * drawable using the specified GC, adjusting for tab width and text alignment.\n
+  * If the text cannot fit within the bounding rectangle, it will be truncated.\n
+  * If you want the text to wrap, use DTDrawMultiLineText()
   *
   * NOTE:  tabs begin at the 'left most' text position, adjusted by 'iTabOrigin'.
 **/
@@ -421,14 +421,15 @@ void DTDrawSingleLineText(XFontStruct *pFont, const char *szText, Display *pDisp
   *
   * \param pFont A pointer to the font to use for drawing text (NULL implies system default font)
   * \param szText A pointer to a (0-byte terminated) ASCII string that may span multiple lines
+  * \param pDisplay the display associated with the GC and Drawable.
   * \param gc The graphics context for the drawable
-  * \param dw The drawable (Window or Pixmap, typically)
+  * \param dw The Drawable (Window or Pixmap, typically)
   * \param iTabWidth The width of a tab, negative for pixels, positive for avg char width
   * \param iTabOrigin The 'origin point' for tabulation corresponding to the first character in the string
   * \param prcBounds A pointer to the bounding rectangle
   * \param iAlignment The desired text alignment, one or more of the DTAlignment bit flags
   *
-  * draw multi-line text within the specified bounds rectangle on the specified
+  * This function draws multi-line text within the specified bounds rectangle on the specified
   * drawable using the specified GC, adjusting for tab width and text alignment.
   *
   * NOTE:  tabs begin at the 'left most' position, adjusted by 'iTabOrigin'.
@@ -458,9 +459,9 @@ DT_WORDS * DTGetWordsFromText(XFontStruct *pFont, const char *szText, int iAlign
   * \brief Pre-render a 'DT_WORDS' structure for subsequent display
   *
   * \param pFont A pointer to an XFontStruct to be used, or NULL for the system default font
-  * \param dtWords A pointer to the DT_WORDS structure.  This structure can be part of a linked list.
+  * \param pWords A pointer to the DT_WORDS structure.  This structure can be part of a linked list.
   * \param iTabWidth A positive integer in 'characters', or negative integer in pixels, indicating tab width
-  * \param iTabOrgin An unsigned integer indicating the tab origin, using the same units as iTabWidth, corresponding to the first character.
+  * \param iTabOrigin An unsigned integer indicating the tab origin, using the same units as iTabWidth, corresponding to the first character.
   * \param prcBounds A pointer to the bounding rectangle (advisory with respect to available width and height, based on iAlignment)
   * \param iAlignment The desired text alignment, one or more of the DTAlignment bit flags
   *
@@ -479,13 +480,17 @@ void DTPreRender(XFontStruct *pFont, DT_WORDS *pWords, int iTabWidth, int iTabOr
   * \brief Using pre-rendered 'DT_WORDS' structure, display
   *
   * \param pFont A pointer to an XFontStruct to be used, or NULL for the system default font
-  * \param szText A 0-byte terminated UFT8 string containing the text to be rendered
-  * \return A 'malloc'd pointer to a DT_WORDS structure (variable length).  use 'free()' to de-allocate
-  * the memory block.
+  * \param pWords A pointer to the DT_WORDS structure.  This structure can be part of a linked list.
+  * \param pDisplay the display associated with the GC and Drawable.
+  * \param gc The graphics context for the Drawable
+  * \param dw The Drawable (Window or Pixmap, typically)
+  * \param iHScrollBy The amount to 'horizontally scroll by' (in 'units' of prcBounds)
+  * \param iVScrollBy The amount to 'vertically scroll by' (in 'units' of prcBounds)
+  * \param prcBounds A pointer to the bounding rectangle (advisory with respect to available width and height, based on iAlignment)
+  * \param iAlignment The desired text alignment, one or more of the DTAlignment bit flags
   *
-  * The 'DT_WORDS' structure is intended to be used to cache rendering information, particularly for
-  * a large block of text that may be calculation-expensive to re-render.  Call 'DTPreRender()' and
-  * 'DTRender()' to manage rendering with the DT_WORDS structure.
+  * This function will scan the DT_WORDS structure 'pWords', and using the other parameters,
+  * render the text within the 'prcBounds' rectangle on the specified Drawable.
   *
 **/
 void DTRender(XFontStruct *pFont, const DT_WORDS *pWords, Display *pDisplay, GC gc, Drawable dw,

@@ -227,6 +227,10 @@ operates.
      Look for the package's source code in directory DIR.  Usually
      `configure' can determine that directory automatically.
 
+'--enable-release'
+     Make a 'release' version instead of a 'debug' version.
+
+
 `configure' also accepts some other, not widely useful, options.  Run
 `configure --help' for more details.
 
@@ -241,6 +245,6 @@ these 4 programs in the order mentioned above, as follows:
 
   aclocal && autoheader && autoconf && automake --add-missing --copy
 
-and you will regenerate all of the necessary files.  See README
+and you will regenerate all of the necessary files.  See BUILD
 
 

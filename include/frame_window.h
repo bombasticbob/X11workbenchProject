@@ -64,7 +64,7 @@ extern "C" {
   * Frame Windows are top-level windows that have a border, title bar, and (optionally)
   * a menu or other means of user interaction (like toolbars).  This file contains the
   * API functions generally needed to create, modify, and destroy Frame Windows.
-*/
+**/
 
 /** \ingroup frame
   * \defgroup frame_window Frame Window - APIs and Structures
@@ -117,7 +117,7 @@ extern "C" {
   * for the 'focus' window whenever the frame window is re-sized.  The focus window will
   * need to respond to re-size events and re-draw itself as needed.
   *
-*/
+**/
 
 /** \ingroup frame
   * \defgroup frame_menu Frame Window - Menus
@@ -160,7 +160,7 @@ extern "C" {
   *
   *
   *
-*/
+**/
 
 
 
@@ -185,25 +185,26 @@ extern "C" {
   {
     unsigned long lMenuID;                       // menu ID (< 0x10000L) or const pointer to string
 
-    int (* callback)(XClientMessageEvent *);     // menu callback (gets pointer to the 'XClientEvent')
+    int (* callback)(XClientMessageEvent *);     // menu callback (gets pointer to the 'XClientMessageEvent')
     int (* UIcallback)(WBMenu *, WBMenuItem *);  // menu 'UI' callback to handle displaying menu states
                                                  // A return value of '0' displays normally, -1 disables
                                                  // Other return values are reserved
   } WBFWMenuHandler;
   * \endcode
   *
-  * \sa \link FW_MENU_HANDLER_ENTRY \endlink
-*/
+  * \sa \ref FW_MENU_HANDLER_ENTRY
+**/
 typedef struct __WB_FW_MENU_HANDLER_
 {
   unsigned long lMenuID;                       ///< menu ID (< 0x10000L) or const pointer to string
 
-  int (* callback)(XClientMessageEvent *);     ///< menu callback (gets pointer to the 'XClientEvent')
+  int (* callback)(XClientMessageEvent *);     ///< menu callback (gets pointer to the 'XClientMessageEvent')
 
   /** \brief menu 'UI' callback to handle displaying menu states.
     *
     * A return value of '0' displays normaly, -1 disables.\n
-    * Other return values are reserved. */
+    * Other return values are reserved.
+  **/
   int (* UIcallback)(WBMenu *, WBMenuItem *);
 
 } WBFWMenuHandler;
@@ -226,37 +227,45 @@ typedef struct __WB_FW_MENU_HANDLER_
   {
     unsigned int ulTag;                  // tag indicating I'm a frame window
     Window wID;                          // Window id for the frame window
-    int iFlags;                          // bitmask of attribute flags (see \ref WBFrameWindowFlags enumeration)
+    int iFlags;                          // bitmask of attribute flags (see \ref WBFrameWindow_FLAGS enumeration)
+
     int iClientX;                        // The current X position of the frame window's client area
     int iClientY;                        // The current Y position of the frame window's client area
     int iClientWidth;                    // The current width of the frame window's client area
     int iClientHeight;                   // The current height of the frame window's client area
 
-    int fFlags;                          // Various bit flags
+    int iFirstTab;                       // The first visible tab index (0 if none)
+    int iTabWidth;                       // The width of each tab (in pixels)
+    int iNumTabs;                        // The total number of visible tabs
 
   } WBFrameWindow;
   * \endcode
   *
-*/
+**/
 typedef struct __WB_FRAME_WINDOW__
 {
   unsigned int ulTag;                  ///< tag indicating I'm a frame window
   Window wID;                          ///< Window id for the frame window
-  int iFlags;                          ///< bitmask of attribute flags (see \ref WBFrameWindowFlags enumeration)
+  int iFlags;                          ///< bitmask of attribute flags (see \ref WBFrameWindow_FLAGS enumeration)
+
   int iClientX;                        ///< The current X position of the frame window's client area (relative to the window)
   int iClientY;                        ///< The current Y position of the frame window's client area (relative to the window)
   int iClientWidth;                    ///< The current width of the frame window's client area
   int iClientHeight;                   ///< The current height of the frame window's client area
 
-  int fFlags;                          ///< Various bit flags
+  int iFirstTab;                       ///< The first visible tab index (0 if none)
+  int iTabWidth;                       ///< The width of each tab (in pixels)
+  int iNumTabs;                        ///< The total number of visible tabs
 
 } WBFrameWindow;
 
 /** \ingroup frame_window
-  * \enum WBFrameWindowFlags
+  * \enum WBFrameWindow_FLAGS
   * \brief Frame Window type and status flags
-*/
-enum WBFrameWindowFlags
+  *
+  * Assign zero or more of these flags to the 'iFlags' parameter in the call to FWCreateFrameWindow()
+**/
+enum WBFrameWindow_FLAGS
 {
 
   WBFrameWindow_APP_WINDOW = 1,   ///< set this flag for application top-level window and whenever it is destroyed the application will exit
@@ -266,47 +275,190 @@ enum WBFrameWindowFlags
   WBFrameWindow_MAX = 0x80000000L ///< maximum flag value (for reference only)
 };
 
+
+// WBChildFrame is defined HERE to avoid circular header file dependencies
+
+/** \typedef WBChildFrame
+  * \struct __WBChildFrame__
+  * \ingroup child_frame
+  * \brief Structure that defines a Child Frame within a Frame Window
+  *
+  * The WBFWMenuHandler structure is designed to be initialized via macros, so
+  * that a set of callback functions can then be easily used to handle menu events.
+  * If no menu handler is present for a menu item, or if the menu UI handler is
+  * NOT NULL and returns a non-zero value, the menu item will be disabled and
+  * displayed accordingly.  It will not be possible to use its hotkey nor select it.
+  * Otherwise, the menu will be displayed normally and be selectable, and its hotkey
+  * will be able to activate it.
+  *
+  * \code
+  typedef struct __WBChildFrame__
+  {
+    unsigned int ulTag;               // tag indicating I'm a 'Child Frame' window
+    Window wID;                       // window identifier for the 'Child Frame' window
+    WBFrameWindow *pOwner;            // a pointer to the WBFrameWindow owner
+    XFontStruct *pFont;               // default font for the window
+
+    int iTop;                         // 0-based position of the top of the current viewport (in lines or pixels)
+    int iHeight;                      // 0-based height of the current viewport (in lines or pixels)
+    int iLeft;                        // 0-based position of the left of the current viewport (in characters or pixels)
+    int iWidth;                       // 0-based width of the current viewport (in characters or pixels)
+
+    int iXExtent;                     // X extent for the display surface (determines scrolling behavior)
+    int iYExtent;                     // Y extent for the display surface (determines scrolling behavior)
+
+    int iHScrollMin;                  // min horizontal scroll (-1 if none)
+    int iHScrollPos;                  // position for horizontal scroll (-1 if none)
+    int iHScrollMax;                  // max horizontal scroll (-1 if none)
+
+    int iVScrollMin;                  // min vertical scroll (-1 if none)
+    int iVScrollPos;                  // position for vertical scroll (-1 if none)
+    int iVScrollMax;                  // max vertical scroll (-1 if none)
+
+    int iSplit;                       // reserved - position for 'split'
+
+    int iSplitScrollMin;              // min 'split' scroll (-1 if none)
+    int iSplitScrollPos;              // position for 'split' scroll (-1 if none)
+    int iSplitScrollMax;              // max 'split' scroll (-1 if none)
+
+    int iTabIndex;                    // Current tab index (for tabbed versions; -1 for "no tabs") - set by owner
+    int fFlags;                       // various bitflags defining features.
+
+    char *szDisplayName;              // display name shown in tab and title bar.  You should not alter this member.
+
+    WBWinEvent pUserCallback;         // message callback function pointer (can be NULL)
+
+    struct __WBChildFrame__ *pNext;   // 'Next Object' pointer in an internally stored linked list
+
+  } WBChildFrame;
+  * \endcode
+  *
+  * \sa \ref frame "Frame Windows"
+  *
+  * NOTE:  you should not attempt to modify any of these structure members directly.  Use the appropriate
+  *        API functions to modify their values.  If this were C++, these members would be marked 'protected'.
+**/
+typedef struct __WBChildFrame__
+{
+  unsigned int ulTag;               ///< tag indicating I'm a 'Child Frame' window
+  Window wID;                       ///< window identifier for the 'Child Frame' window
+  WBFrameWindow *pOwner;            ///< a pointer to the WBFrameWindow owner
+  XFontStruct *pFont;               ///< default font for the window
+
+  int iTop;                         ///< 0-based position of the top of the current viewport (in lines or pixels)
+  int iHeight;                      ///< 0-based height of the current viewport (in lines or pixels)
+  int iLeft;                        ///< 0-based position of the left of the current viewport (in characters or pixels)
+  int iWidth;                       ///< 0-based width of the current viewport (in characters or pixels)
+
+  int iXExtent;                     ///< X extent for the display surface (determines scrolling behavior)
+  int iYExtent;                     ///< Y extent for the display surface (determines scrolling behavior)
+
+  int iHScrollMin;                  ///< min horizontal scroll (-1 if none)
+  int iHScrollPos;                  ///< position for horizontal scroll (-1 if none)
+  int iHScrollMax;                  ///< max horizontal scroll (-1 if none)
+
+  int iVScrollMin;                  ///< min vertical scroll (-1 if none)
+  int iVScrollPos;                  ///< position for vertical scroll (-1 if none)
+  int iVScrollMax;                  ///< max vertical scroll (-1 if none)
+
+  int iSplit;                       ///< reserved - position for 'split'
+
+  int iSplitScrollMin;              ///< min 'split' scroll (-1 if none)
+  int iSplitScrollPos;              ///< position for 'split' scroll (-1 if none)
+  int iSplitScrollMax;              ///< max 'split' scroll (-1 if none)
+
+  int iTabIndex;                    ///< Current tab index (for tabbed versions; -1 for "no tabs") - set by owner
+  int fFlags;                       ///< various bitflags defining features.  See WBChildFrame_FLAGS enum.
+
+  char *szDisplayName;              ///< display name shown in tab and title bar.  You should not alter this member.
+
+  WBWinEvent pUserCallback;         ///< message callback function pointer (can be NULL)
+
+  struct __WBChildFrame__ *pNext;   ///< 'Next Object' pointer in an internally stored linked list
+
+} WBChildFrame;
+
+
+
+/** \enum WBChildFrame_FLAGS
+  * \ingroup child_frame
+  * \brief enumeration for 'fFlags' member of WBChildFrame
+  *
+**/
+enum WBChildFrame_FLAGS 
+{
+  WBChildFrame_NO_TAB = 1,        ///< does not use MDI tabs [intended for SDI interface]
+  WBChildFrame_PIXELS = 2,        ///< use PIXELS instead of characters and lines to define the viewport
+  WBChildFrame_VSPLIT = 4,        ///< RESERVED - 'splitter' window with vertical sizeable 'split'
+  WBChildFrame_HSPLIT = 8,        ///< RESERVED - 'splitter' window with horizontal sizeable 'split'
+  WBChildFrame_SPLIT_MASK = 12,   ///< RESERVED - bit mask for 'splitter' flags
+  WBChildFrame_SPLIT_NOSIZE = 16, ///< RESERVED - bit set if split cannot be sized with the mouse
+};
+
+
+
+
 /** \ingroup frame_window
   * \brief Create a frame window
   *
   * \param szTitle A zero-byte terminated ASCII string that defines the window title
   * \param idIcon An integer identifier coresponding to a registered icon resource
-  * \param szMenuResource A zero-byte terminated ASCII definition of the menu for this window
+  * \param szMenuResource A zero-byte terminated ASCII definition of the menu for this window.  Pass 'NULL' for this parameter if you do not want a menu.
   * \param iX An integer identifying the x-coordinate for the window, or -1 for default
   * \param iY An integer identifying the y-coordinate for the window, or -1 for default
   * \param iWidth An integer identifying the width of the window, or -1 for default
   * \param iHeight An integer identifying the height of the window, or -1 for default
   * \param pUserCallback A WBWinEvent callback function that receives event notifications for the window
-  * \param iFlags An integer with one or more bit flags that alters the parameters for the frame window
+  * \param iFlags An integer with one or more bit flags that alters the parameters for the frame window.  See \ref WBFrameWindow_FLAGS
   * \return A pointer to a WBFrameWindow object.  The caller should not destroy this object, nor directly
   *         reference it after the window has been destroyed.
   *
-  * Use this function to create a basic frame window
-*/
+  * Use this function to create a basic frame window.  A frame window has a title, icon, menu, and
+  * can contain one or more 'Child Frames'.  The menu is optional, and support for multiple 'tab'
+  * child frames is also optional, depending on the bit flags set in 'iFlags'.
+**/
 WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *szMenuResource,
                                    int iX, int iY, int iWidth, int iHeight,
                                    WBWinEvent pUserCallback, int iFlags);
 
 /** \ingroup frame_window
   * \brief Force a frame window to recalculate its layout, which may involve resizing multiple contained windows
-*/
+  *
+  * \param wID The Window ID of the WBFrameWindow (typically will be called within a message handler, such as a window re-size)
+  *
+  * Forces the frame window to recalculate its layout (i.e. size of menus, tabs, and 'child frame' windows) and propogate
+  * that information to all 'owned' windows and objects it contains.
+**/
 void FWRecalcLayout(Window wID);  // recalculate layout information (propagates to contained windows)
 
 /** \ingroup frame_window
   * \brief assign a new WBWinEvent callback function for a frame window
-*/
+  *
+  * \param pFW A pointer to the WBFrameWindow structure
+  * \param pCallBack A function pointer of type \ref WBWinEvent for the user-defined event handler callback.  Can be NULL.
+  *
+  * Use this function to assign the event handler callback for the frame window.
+**/
 void FWSetUserCallback(WBFrameWindow *pFW, WBWinEvent pCallBack);
   // assigns the user-defined callback function (one only).  Not all messages pass through the callback
 
 
 /** \ingroup frame_window
-  * \brief Convenience function to obtain the WBFrameWindow pointer for a frame window's Window id
-*/
+  * \brief Obtain the associated WBFrameWindow structure pointer for a frame window's Window ID
+  *
+  * \param wID A valid Window ID
+  * \returns A pointer to the associated WBFrameWindow structure (if it is a WBFrameWindow), or NULL on error
+  *
+  * Use this function to safely obtain the correct WBFrameWindow structure for a given Window ID.
+**/
 static __inline__ WBFrameWindow *FWGetFrameWindowStruct(Window wID)  // for frame windows, returns the frame window struct
 {
   WBFrameWindow *pRval = (WBFrameWindow *)WBGetWindowData(wID, 0);  // offset 0 for window-specific structs
+
   if(pRval && pRval->ulTag == FRAME_WINDOW_TAG)
+  {
     return(pRval);
+  }
 
   return(NULL);
 }
@@ -314,15 +466,21 @@ static __inline__ WBFrameWindow *FWGetFrameWindowStruct(Window wID)  // for fram
 /** \ingroup frame_window
   * \brief Function to destroy a frame window based on the Window id
   *
-  * after calling this function the WBFrameWindow struct is no longer valid
-*/
+  * \param wID The Window ID associated with the WBFrameWindow to destroy
+  *
+  * Use this function to destroy a WBFrameWindow based on it's ID.  After calling this function
+  * the WBFrameWindow struct is no longer valid
+**/
 void FWDestroyFrameWindow(Window wID);  // destroys frame window using the Window ID (frees the struct also)
 
 /** \ingroup frame_window
   * \brief Function to destroy a frame window based on the WBFrameWindow structure
   *
-  * after calling this function the WBFrameWindow struct is no longer valid
-*/
+  * \param pFrameWindow The pointer to the WBFrameWindow structure for the desired frame window
+  *
+  * Use this function to destroy a WBFrameWindow based on the WBFrameWindow struct pointer value.
+  * After calling this function the WBFrameWindow struct is no longer valid
+**/
 void FWDestroyFrameWindow2(WBFrameWindow *pFrameWindow); // destroys it using the struct pointer
 
 /** \ingroup frame_window
@@ -332,10 +490,11 @@ void FWDestroyFrameWindow2(WBFrameWindow *pFrameWindow); // destroys it using th
   * \param pHandlerArray A pointer to an array of WBFWMenuHandler structures - see \ref FW_MENU_HANDLER_ENTRY
   *
   * Assigns the menu handlers for the frame window.  The array will be copied, and the copy will be
-  * used internally.  These handlers are always checked, but only after the 'contained' window's handlers.
+  * used internally.  These handlers are checked for matching entries after checking the 'contained' window's
+  * handlers for the WBChildFrame that has the current focus.
   *
-  * \sa \link frame_menu \endlink
-*/
+  * \sa \ref frame_menu "Frame Menus"
+**/
 void FWSetMenuHandlers(WBFrameWindow *pFrameWindow, const WBFWMenuHandler *pHandlerArray);
 
 /** \ingroup frame_menu
@@ -343,7 +502,7 @@ void FWSetMenuHandlers(WBFrameWindow *pFrameWindow, const WBFWMenuHandler *pHand
   * \brief Use this macro to begin definition of a WBFWMenuHandler array
   *
   * \param X the name of the menu handler array variable
-  */
+**/
 #define FW_MENU_HANDLER_BEGIN(X) static const WBFWMenuHandler X[] = {
 /** \ingroup frame_menu
   * \def FW_MENU_HANDLER_ENTRY
@@ -352,12 +511,12 @@ void FWSetMenuHandlers(WBFrameWindow *pFrameWindow, const WBFWMenuHandler *pHand
   * \param X A menu identifier expressed as an ASCII string or ID
   * \param Y A callback function pointer, or NULL - see WBFWMenuHandler::callback
   * \param Z A UI callback functino pointer, or NULL - see WBFWMenuHandler::UIcallback
-  */
+**/
 #define FW_MENU_HANDLER_ENTRY(X,Y,Z) { (unsigned long)X, Y, Z },
 /** \ingroup frame_menu
   * \def FW_MENU_HANDLER_END
   * \brief Use this macro to complete the definition of a WBFWMenuHandler array
-  */
+**/
 #define FW_MENU_HANDLER_END {0, 0, 0} };
 
 
@@ -368,7 +527,7 @@ void FWSetMenuHandlers(WBFrameWindow *pFrameWindow, const WBFWMenuHandler *pHand
   *
   * \param pFrameWindow A const pointer to a WBFrameWindow structure for the frame window
   * \returns The total number of 'contained' windows, or -1 on error
-*/
+**/
 int FWGetNumContWindows(const WBFrameWindow *pFrameWindow);
 
 /** \ingroup frame_window
@@ -376,47 +535,47 @@ int FWGetNumContWindows(const WBFrameWindow *pFrameWindow);
   *
   * \param pFrameWindow A const pointer to a WBFrameWindow structure for the frame window
   * \param iIndex The 'tab order' index of the 'contained' window.  The first window is '0'.  A negative value implies the 'current focus' window
-  * \returns The Window ID of the 'contained' window corresponding to the index, or 'None' on error
+  * \returns A pointer to the WBChildFrame for the 'contained' window corresponding to the index, or 'NULL' on error
   *
   * Use this function to get the Window ID of a 'contained' (child frame) window.  To get more information
-  * about contained 'Child Frame' window, see \sa \link child_frames \endlink
-*/
-Window FWGetContainedWindowByIndex(const WBFrameWindow *pFrameWindow, int iIndex);
+  * about contained 'Child Frame' window, see \ref child_frame "Child Frames"
+**/
+WBChildFrame * FWGetContainedWindowByIndex(const WBFrameWindow *pFrameWindow, int iIndex);
 
 /** \ingroup frame_menu
   * \def FWGetFocusWindow
   * \brief A macro to aid code readability, returning the Window ID of the contained window that has the focus
   *
   * \param pFW The WBFrameWindow structure pointer
-  */
+**/
 #define FWGetFocusWindow(pFW) FWGetContainedWindowByIndex(pFW, -1)
 
 /** \ingroup frame_window
   * \brief Adds a 'contained' window and returns the tab order index
   *
   * \param pFrameWindow A pointer to a WBFrameWindow structure for the frame window
-  * \param idNew The Window ID for the window that is to become part of the 'contents' for the frame window
+  * \param pNew A pointer to the WBChildFrame for the window that is to become part of the 'contents' for the frame window
   * \returns The tab order index of the window, or -1 on error
-*/
-int FWAddContainedWindow(WBFrameWindow *pFrameWindow, Window idNew);
+**/
+int FWAddContainedWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pNew);
 
 /** \ingroup frame_window
   * \brief Removes a 'contained' window from a frame window (does not destroy the window)
   *
   * \param pFrameWindow A pointer to a WBFrameWindow structure for the frame window
-  * \param idCont The Window ID for the window that is to be removed from the 'contents' for the frame window
+  * \param pCont A pointe to the WBChildFrame for the window that is to be removed from the 'contents' for the frame window
   * \returns void
-*/
-void FWRemoveContainedWindow(WBFrameWindow *pFrameWindow, Window idCont);
+**/
+void FWRemoveContainedWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pCont);
 
 /** \ingroup frame_window
   * \brief Sets the focus to a specific contained window using the Window ID
   *
   * \param pFrameWindow A pointer to a WBFrameWindow structure for the frame window
-  * \param idCont The Window ID for the window that is to be assigned the focus
+  * \param pCont A pointer to the WBChildFrame for the window that is to be assigned the focus.
   * \returns void
-*/
-void FWSetFocusWindow(WBFrameWindow *pFrameWindow, Window idCont);
+**/
+void FWSetFocusWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pCont);
 
 /** \ingroup frame_window
   * \brief Sets the focus to a specific contained window using its tab order index
@@ -424,8 +583,32 @@ void FWSetFocusWindow(WBFrameWindow *pFrameWindow, Window idCont);
   * \param pFrameWindow A pointer to a WBFrameWindow structure for the frame window
   * \param iIndex The 'tab order' index of the 'contained' window that is to receive the focus
   * \returns void
-*/
+**/
 void FWSetFocusWindowIndex(WBFrameWindow *pFrameWindow, int iIndex);
+
+
+// DEFAULT COLORS
+
+/** \ingroup frame_window
+  * \brief Get the default foreground color
+  *
+  * \returns XColor representing default foreground color
+**/
+XColor FWGetDefaultFG(void);
+
+/** \ingroup frame_window
+  * \brief Get the default background color
+  *
+  * \returns XColor representing default background color
+**/
+XColor FWGetDefaultBG(void);
+
+/** \ingroup frame_window
+  * \brief Get the default border color
+  *
+  * \returns XColor representing default border color
+**/
+XColor FWGetDefaultBD(void);
 
 
 #if 0
@@ -441,7 +624,7 @@ void FWSetFocusWindowIndex(WBFrameWindow *pFrameWindow, int iIndex);
   * This function performs basic 'selection event' processing.  It is normally called
   * internally for default handling of selection events whenever the specified callback
   * function returns 0 for such events.
-*/
+**/
 int FWDoSelectionEvents(WBFrameWindow *pFrameWindow, Window wID, Window wIDMenu, XEvent *pEvent);
 #endif // 0
 

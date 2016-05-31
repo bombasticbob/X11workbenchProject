@@ -3,7 +3,6 @@ X11workbench_SOURCES = X11workbench.c X11workbench.h refactor.c refactor.h
 X11workbench_SOURCES += application_icon.xpm splash.xpm
 X11workbench_SOURCES += doxy_comments.dox doxy.txt
 
-
 AM_CPPFLAGS = $(X_CFLAGS) -DGLOBAL_XPATH="\"$(GLOBAL_XPATH)/etc\"" -DGLOBAL_PATH="\"$(sysconfdir)\""
 
 
@@ -27,7 +26,7 @@ endif
 man1_MANS = @MAN_PAGES@
 
 # Extra distribution files
-EXTRA_DIST = X11workbench.1 X11workbench.interix $(man1_MANS)
+EXTRA_DIST = BUILD X11workbench.1 X11workbench.interix $(man1_MANS)
 
 # comment out this section to include external 'man2html' perl script
 ## man2html distribution files - man2html version 3.0.1 license under GPLv2

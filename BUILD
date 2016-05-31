@@ -23,91 +23,42 @@ determine an appropriate workaround, please contact the author.
   ARCHIVE:  TBD
     https://downloads.sourceforge.net/project/x11workbench/ARCHIVE/X11workbench-1.0.tar.gz
 
+  github:
+    https://github.com/bombasticbob/X11workbenchProject
+
+  documentation:
+    https://bombasticbob.github.io/X11workbench
+
   website: 
     http://www.mrp3.com/
 
-Debian Linux:  install a standard X11 distribution, along with the
-               'build-essential' package, 'xorg-dev', and the autotools
-               packages 'autoconf' 'automake' and 'autotools-dev'
+For Debian Linux and derivatives (like Ubuntu, Mint):
+  Install a standard X11 distribution, along with the following packages
+      build-essential
+      xorg-dev
+      autoconf
+      automake
+      autotools-dev
 
-
-FreeBSD notes:  run depends:   x11/libXpm and x11/xorg-clients
-                build depends: devel/autotools  (meta-port)
-
-
-
-MOTIVATION AND PHILOSOPHY
--------------------------
-
-'DLL Hell' is starting to creep into the non-windows world of Linux
-and BSD.  Additionally, the edit controls offered by Qt and GTK just
-don't do the kinds of things that PROGRAMMERS need.  And though these
-toolkits are cross-platform (being open source), getting a cross-platform
-version of them working on a NEW platform is extremely difficult.
-
-Also there appears to be a general LACK of really good open source
-integrated development packages for the C and C++ languages.  If you
-want developers to write code for Linux or BSD for X11, you need to
-provide them with tools that enable them to easily do so, or the cost
-for porting existing applications will be too high.
-
-Without mentioning names, certain open source packages restrict you
-to specific toolkits, don't have decent C or C++ support, or really
-stink when it comes to creating a simple dialog box.  Other commercial
-tools also stink when it comes to their over-complexity and lack of
-editor features that I personally find extremely important.  If I am
-going to pay for something I want it to be usable by ME.
-
-It also needs to be VERY simple to distribute X11 applications.  The
-current GUI toolkits, with their EXCESSIVELY LONG LISTS of shared library
-pre-requisites and run requirements, make it "that much more difficult"
-for the developer that wants his C or C++ application to run on a
-non-Windows platform.  And you can't simply assume that all of those
-packages will already be installed, either.
-
-By using X11 client libraries as the ONLY required subsystem necessary
-to run the application, you avoid the need of adapting a large amount
-of 3rd party code to your environment, MOST of which won't even be used
-by your application!  After all, I wouldn't need all of the gtk multimedia
-and font support just to write THIS application.
-
-The difficulty arises when you look at just how 'low level' X11 really is.
-All of the things you take for granted in developing an application for
-a GUI remind you of why toolkits like Qt and gtk exist.
-
-X11workbench has its own built-in lightweight toolkit that's designed
-specifically for X11workbench.  You are, of course, free to use it in
-your own code.  Since it was designed specifically for X11workbench,
-it's as lean and mean as it can be.  The down side, of course, is the
-amount of time it took for me to develop it.
-
-To make X11workbench as expandable and compatible as possible, the
-interface it uses for 'plug-in' extensions is as broadly compatible
-as possible.
-
-Accessibility features are limited to font selection and keyboard
-hot-keys.  Great care has been taken to support keyboard-based
-shortcuts for every menu option, so operation WITHOUT a mouse is
-not only possible, it may even be better.
+For FreeBSD (using the 'ports' system)
+  run depends:   x11/libXpm and x11/xorg-clients
+  build depends: devel/autotools  (meta-port)
 
 
 
+BUILDING
+--------
 
-INSTALLATION
-------------
-
-See 'INSTALL' file included with this distribution
-
-Prior to installation, you may have to use the 'autotools' to create
+Prior to building, you may have to use the 'autotools' to create
 or re-create some necessary files.  Specifically, you need the aclocal,
 autoheader, autoconf, and automake programs.
 
 To do so, enter the following commands:
 
-aclocal
-autoheader
-autoconf
-automake --add-missing --copy
+  aclocal
+  autoheader
+  autoconf
+  automake --add-missing --copy
 
 (on some operating systems the program names may differ slightly, such
  as on FreeBSD, since the program names may reflect the version)
@@ -116,11 +67,43 @@ You should also run 'autoscan' at least once and do what it says.
 
 Following this step, run
 
-./configure
+  ./configure
 
 and then
 
-make
+  make
+
+
+DEBUG VS RELEASE
+----------------
+
+The 'DEBUG' build is the default configuration when you use 'configure'
+without any arguments.  To make a RELEASE build, do the following:
+
+  ./configure --enable-release
+
+  make clean
+  make
+
+You can then re-build the debug version using the following:
+
+  ./configure
+
+  make clean
+  make
+
+
+INSTALLATION
+------------
+
+See the 'INSTALL' file included with this distribution.
+
+Once you have built a 'release' version, you can install it provided
+that you have appropriate privileges on your operating system.
+
+To install the various files 'as-is' (after being built):
+
+  make install
 
 
 

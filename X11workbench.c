@@ -66,8 +66,6 @@
 #include "conf_help.h"
 #include "draw_text.h"
 
-#include "splash.xpm" // splash pixmap
-
 #include "application_icon.xpm" /* 19x19 icon presented to the OS for alt-tab etc. */
 #include "icon_app.xpm"   /* application icon that's the same size as the others, 36x36 */
 
@@ -79,6 +77,11 @@
 #define FONT    "fixed"
 
 #define APP_NAME "X11workbench"
+
+
+#ifndef NO_SPLASH
+#include "splash.xpm" // splash pixmap
+#endif // NO_SPLASH
 
 
 // function prototypes
@@ -414,6 +417,12 @@ int iDebugDumpConfig = 0;
 
     WBExit();
     return 2;
+  }
+
+  {
+    const char *pNothing = szEditMenu; // to avoid certain warnings - remove later
+    
+    pNothing = pNothing;
   }
 
   // assign menu handlers to the frame window (this does the callback functions for me)
@@ -954,7 +963,7 @@ static char * InternalMan2Html(const char *szTerm, const char *szText);
 void DoContextSensitiveHelp(const char *szTerm)
 {
 char szDocFilePath[PATH_MAX * 2], szName[PATH_MAX];
-char *p1, *p2, *p3, *p5;
+char *p1, *p2, *p3;//, *p5;
 const char *p4;
 void *pSettings, *pDirList;
 int i1;

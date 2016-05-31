@@ -327,7 +327,7 @@ int iRval = -1, iLen;
 
 int CHGetResourceString(Display *pDisplay, const char *szIdentifier, char *szData, int cbData)
 {
-int iRval = -1, iFormat;
+int iRval = -1;//, iFormat;
 //unsigned long cbData0;
 //void *pData;
 //Atom a_XSETTINGS_Sn, a_XSETTINGS_SETTINGS, a_MANAGER;
@@ -1548,12 +1548,12 @@ void CHSettingsRefresh(Display *pDisplay)
 // NOTE:  so far gnome-settings-manager doesn't provide anything really useful except the theme name
 //        and everything else is either cloned from or implemented as the old-style resource manager
 
-int i1, iFormat, iRval, nItems, cbSize, cbNameLen, cbStrLen;
+int i1, iFormat, /*iRval,*/ nItems, cbSize, cbNameLen, cbStrLen;
 unsigned long cbData0;
 void *pData;
 char *pCur, *pDataEnd, *pXSCur, *pXSEnd;
-Atom a_XSETTINGS_Sn, a_XSETTINGS_SETTINGS, aType, aFormat;
-Atom aTARGET, a_MANAGER;
+Atom a_XSETTINGS_Sn, a_XSETTINGS_SETTINGS, aType;
+//Atom aTARGET, a_MANAGER, aFormat;
 //Atom XA_CLIPBOARD, XA_CLIPBOARD_MANAGER;
 XSETTINGS_HEADER *pHdr;
 XSETTINGS_DATAHDR *pDHdr;
@@ -1824,10 +1824,12 @@ char tbuf[256];
 
   // if I'm debuggin I'll want a copy of what's there
 
+#ifndef NO_DEBUG
   WB_IF_DEBUG_LEVEL(DebugLevel_WARN | DebugSubSystem_Settings)
   {
     CHDumpConfig();
   }
+#endif // !NO_DEBUG
 }
 
 static void __settings_cleanup(void)
@@ -2503,6 +2505,7 @@ int i1;
 // DEBUG FUNCTIONS
 /////////////////////
 
+#ifndef NO_DEBUG
 void CHDumpConfig()
 {
 int i1, nSettings;
@@ -2558,4 +2561,5 @@ int i1, nSettings;
 
 }
 
+#endif // !NO_DEBUG
 

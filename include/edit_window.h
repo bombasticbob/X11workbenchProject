@@ -141,7 +141,7 @@ extern "C" {
   * Additional 'Child Frame' API functions can be called directly by using a type cast from 'WBEditWindow *'
   * to 'WBChildFrame *', or by using the 'WBChildWindowFromWindowID()' function.
   *
-  * \sa \link TEXT_OBJECT \endlink
+  * \sa \ref TEXT_OBJECT
 */
 typedef struct __WBEditWindow__
 {

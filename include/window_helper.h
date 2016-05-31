@@ -138,7 +138,7 @@ extern "C" {
   */
 extern const char *sz_xcall_func;
 /** \ingroup debug
-  * \brief debug helper variable indicating the line # of the function calling into the X11 library
+  * \brief debug helper variable indicating the line number of the function calling into the X11 library
   */
 extern int i_xcall_line;
 /** \ingroup debug
@@ -547,11 +547,9 @@ void WBDebugDumpGC(Display *pDisplay, GC hGC);
 **/
 void WBDebugDumpEvent(XEvent *pEvent);
 
-#ifdef DEBUG /* explicit DEBUG build */
-#ifdef NO_DEBUG
-#undef NO_DEBUG
-#endif // NO_DEBUG
-#endif // DEBUG
+
+
+// NOTE:  The debug code will be included when NO_DEBUG is *NOT* defined
 
 #ifdef NO_DEBUG /* assign this to disable debugging - most likely a -D in Makefile */
 #define WB_DEBUG_PRINT(...)
@@ -1658,7 +1656,7 @@ int WBKeyEventProcessKey(const XKeyEvent *pEvent, char *pBuf, int *pcbLen, int *
   // message_type == aWM_CHAR
   // data.l[0] is return frmo WBKeyEventProcessKey
   // data.l[1] is *piAltCtrlShift from WBKeyEventProcessKey
-  // data.l[2] is # of characters decoded into data.l[3..4]
+  // data.l[2] is number of characters decoded into data.l[3..4]
   // data.l[3..4] (as char[]) is decode buffer (at least 8 chars long, possibly 16 for 64-bit)
 
 
@@ -2050,7 +2048,7 @@ void WBProcessExposeEvent(XExposeEvent *pEvent);  // paint optimization
   * \param pDisplay the Display pointer for the selection (NULL for default)
   * \param paType Pointer to an atom indicating the requested data type ('None' for ANY), and returning the actual data type
   * \param piFormat pointer to the returned format (0, 8, 16, or 32)
-  * \param pnData the size of the returned data (# of items, based on *piFormat)
+  * \param pnData the size of the returned data (number of items, based on *piFormat)
   * \return a pointer to the actual data (must use 'free()' to de-allocate the resource)
   *
   * This function will obtain the clipboard data associated with the specified data type, or
@@ -2068,7 +2066,7 @@ void * WBGetClipboardData(Display *pDisplay, Atom *paType, int *piFormat, unsign
   * \param aType an atom indicating the data type
   * \param iFormat the data format (0, 8, 16, or 32)
   * \param pData a pointer to the data to be assigned (can be NULL, indicating you want to clear it)
-  * \param nData the size of the data (# of items, based on iFormat)
+  * \param nData the size of the data (number of items, based on iFormat)
   * \return a value of zero on success, or non-zero on error
   *
   * This function assigns the clipboard data for the specified type ('aType') and format ('iFormat')
@@ -2086,7 +2084,7 @@ int WBSetClipboardData(Display *pDisplay, Atom aType, int iFormat, const void *p
   * \param aSelection an Atom for the 'selection' data to acquire (usually 'CLIPBOARD' or XA_PRIMARY)
   * \param paType Pointer to an atom indicating the requested data type ('None' for ANY), and returning the actual data type
   * \param piFormat pointer to the returned format (0, 8, 16, or 32)
-  * \param pnData the size of the returned data (# of items, based on *piFormat)
+  * \param pnData the size of the returned data (number of items, based on *piFormat)
   * \return a pointer to the actual data (must use 'free()' to de-allocate the resource)
   *
   * This function will obtain the selection data associated with the target and specified data type, or
@@ -2106,7 +2104,7 @@ void * WBGetSelectionData(Display *pDisplay, Atom aSelection, Atom *paType, int 
   * \param aType an atom indicating the data type
   * \param iFormat the data format (0, 8, 16, or 32)
   * \param pData a pointer to the data to be assigned (can be NULL, indicating you want to clear it)
-  * \param nData the size of the data (# of items, based on iFormat)
+  * \param nData the size of the data (number of items, based on iFormat)
   * \return a value of zero on success, or non-zero on error
   *
   * This function assigns the selection data for the specified target 'aSelection' and type ('aType') and

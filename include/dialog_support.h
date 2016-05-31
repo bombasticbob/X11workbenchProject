@@ -87,14 +87,17 @@ typedef struct __LISTINFO__
   void *aItems[1];                    // array of item data (remainder of struct)
 } LISTINFO;
 \endcode
-  * \sa  \ref __LISTINFO__, \ref DLGInitControlListInfo()
-*/
+  *
+  * \sa  __LISTINFO__  DLGInitControlListInfo()
+  *
+**/
+
 /** \ingroup dlglist
   * \struct __LISTINFO__
   * \brief Structure containing data for list-related dialog controls
   *
   * \sa  \ref LISTINFO
-*/
+**/
 typedef struct __LISTINFO__
 {
   int nItems,              ///< current number of valid entries in 'aItems'
@@ -109,12 +112,12 @@ typedef struct __LISTINFO__
     *
     * typically this will call 'malloc' followed by 'memcpy' to construct a new pointer\n
     * if this is NULL, the caller-supplied pointer is assigned to 'aItems' as-is
-  */
+  **/
   void *(*pfnAllocator)(const void *, int);
   /** \brief destructor to call for each item that's removed
     *
     * typically this will point to 'free()'.  if it is NULL, the caller-supplied pointer is ignored on cleanup
-  */
+  **/
   void (*pfnDestructor)(void *);
   /** \brief display callback function to paint the entry on the display surface
     *
@@ -122,7 +125,7 @@ typedef struct __LISTINFO__
     * the provided GC.  The 'pControl' 'pData' and 'iSelected' parameters reference the
     * WBDialogControl, the list entry's data pointer, and a boolean 'selection' flag, respectively.\n
     * Typically this will be on of the listbox 'DisplayItem' API functions.
-  */
+  **/
   void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, GC gcPaint, WB_GEOM *pGeom);
 
   /** \brief Optional sort comparison function.  NULL implies 'strcmp' */

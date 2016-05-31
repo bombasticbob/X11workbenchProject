@@ -1278,7 +1278,7 @@ char *pRval = WBTempFile0(szExt);
 WB_PROCESS_ID WBRunAsyncPipeV(WB_FILE_HANDLE hStdIn, WB_FILE_HANDLE hStdOut, WB_FILE_HANDLE hStdErr,
                               const char *szAppName, va_list va)
 {
-const char *pArg, *pPath;
+const char *pArg;//, *pPath;
 char *pCur, *p1, *pAppName = NULL;
 char **argv;
 int i1, nItems, cbItems;
@@ -2147,11 +2147,107 @@ WB_THREAD WBThreadGetCurrent(void)
 #endif // WIN32
 }
 
+
+#if 0 /* this code reserved for future use - implement it or remove it */
+
+#ifdef WIN32
+
+// special WIN32 version of it
+
+#else // WIN32
+
+// call my own thread proc that calls the user thread proc
+// which lets me set some stuff up.  this will require a locked
+// set of buffers for that purpose.  This sets them up.
+
+struct __WB_THREAD_PARM__
+{
+  struct __WB_THREAD_PARM__ *pNext;
+
+  void *(*function)(void *);
+  void *pParam;
+};
+
+
+volatile unsigned int dwThreadParmSpinLock = 0; // spinlock on THIS using WBInterlockedExchange
+
+struct __WB_THREAD_PARM__ aTP[16] = 
+{
+  { &(aTP[1]), NULL, 0 }, // this initializer creates a 'chain'
+  { &(aTP[2]), NULL, 0 },
+  { &(aTP[3]), NULL, 0 },
+  { &(aTP[4]), NULL, 0 },
+  { &(aTP[5]), NULL, 0 },
+  { &(aTP[6]), NULL, 0 },
+  { &(aTP[7]), NULL, 0 },
+  { &(aTP[8]), NULL, 0 },
+  { &(aTP[9]), NULL, 0 },
+  { &(aTP[19]), NULL, 0 },
+  { &(aTP[11]), NULL, 0 },
+  { &(aTP[12]), NULL, 0 },
+  { &(aTP[13]), NULL, 0 },
+  { &(aTP[14]), NULL, 0 },
+  { &(aTP[15]), NULL, 0 },
+  { NULL, NULL, 0 }
+};
+
+struct __WB_THREAD_PARM__ *pTPHead = &(aTP[0]); // the head of the 'free' list
+
+static void *WBInternalThreadProc(void *pParam)
+{
+void *pRval = NULL;
+struct __WB_THREAD_PARM__ *pParm = (struct __WB_THREAD_PARM__ *)pParam;
+void *(*function2)(void *);
+void *pParam2;
+
+
+  if(!pParam)
+  {
+    return NULL;
+  }
+
+  function2 = pParm->function;
+  pParam2 = pParm->pParam;
+
+  // do a spinlock, rather than owning a global mutex
+  while(WBInterlockedExchange(&dwThreadParmSpinLock, 1))
+  {
+    usleep(100);
+  }
+
+  // spin lock ok, mess with aTP
+
+  pParm->pNext = pTPHead; // place this entry at the beginning of the free list
+  pTPHead = pParm;
+
+  WBInterlockedExchange(&dwThreadParmSpinLock, 0); // un-spin-lock
+
+  if(function2)
+  {
+    signal(SIGTSTP,SIG_IGN); // thread ignores the signal
+
+    pRval = function2(pParam2);
+  }
+
+  return pRval;
+}
+
+#endif // 0
+
+#endif // !WIN32
+
+
+
 WB_THREAD WBThreadCreate(void *(*function)(void *), void *pParam)
 {
 #ifdef WIN32
 #else  // WIN23
   WB_THREAD thrdRval = (WB_THREAD)INVALID_HANDLE_VALUE;
+
+  // TODO:  call my own thread startup proc, passing a struct that contains
+  //        'function' and 'pParam' as the param.  use a linked list of
+  //        pre-allocated buffers for that.
+  // see possible implementation, above
 
   if(!pthread_create(&thrdRval, NULL, function, pParam))
   {
@@ -2518,7 +2614,7 @@ int iRval = -1;
 }
 
 
-unsigned int WBInterlockedDecrement(unsigned int *pValue)
+unsigned int WBInterlockedDecrement(volatile unsigned int *pValue)
 {
 unsigned int iRval;
 
@@ -2532,7 +2628,7 @@ unsigned int iRval;
   return iRval;
 }
 
-unsigned int WBInterlockedIncrement(unsigned int *pValue)
+unsigned int WBInterlockedIncrement(volatile unsigned int *pValue)
 {
 unsigned int iRval;
 
@@ -2546,7 +2642,7 @@ unsigned int iRval;
   return iRval;
 }
 
-unsigned int WBInterlockedExchange(unsigned int *pValue, unsigned int nNewVal)
+unsigned int WBInterlockedExchange(volatile unsigned int *pValue, unsigned int nNewVal)
 {
 unsigned int iRval;
 
@@ -2560,7 +2656,7 @@ unsigned int iRval;
   return iRval;
 }
 
-unsigned int WBInterlockedRead(unsigned int *pValue)
+unsigned int WBInterlockedRead(volatile unsigned int *pValue)
 {
 unsigned int iRval;
 

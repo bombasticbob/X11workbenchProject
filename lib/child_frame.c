@@ -8,6 +8,8 @@
 //                                                                 //
 //        a window that exists as a tab in a frame window          //
 //                                                                 //
+//           (part of the 'frame window' support API)              //
+//                                                                 //
 /////////////////////////////////////////////////////////////////////
 
 /*****************************************************************************
@@ -52,36 +54,334 @@
 #include <strings.h>
 
 #include "window_helper.h"
-#include "frame_window.h"
+#include "font_helper.h"
 #include "child_frame.h"
 
 
-int WBInitChildFrame(WBChildFrame *pChildFrame, WBFrameWindow *pOwner, XFontStruct *pFont,
+static WBChildFrame *pChildFrames = NULL;  // pointer to linked list of 'Child Frame' windows
+
+
+int FWInitChildFrame(WBChildFrame *pChildFrame, WBFrameWindow *pOwner, XFontStruct *pFont,
                      const char *szFocusMenu, const WBFWMenuHandler *pHandlerArray,
                      WBWinEvent pUserCallback, int fFlags)
 {
-  return -1; // for now
+WBChildFrame *pC;
+XSetWindowAttributes xswa;  /* Temporary Set Window Attribute struct */
+Display *pDisplay = WBGetDefaultDisplay();
+int iRval = -1;
+
+
+  if(!pChildFrame || !pOwner || pOwner->wID == None)
+  {
+    // TODO:  validate 'pOwner' as a valid WBFrameWindow ??  
+
+    WB_ERROR_PRINT("%s - invalid pointers or owner window does not exist\n", __FUNCTION__);
+
+    return -1;
+  }
+
+  // FIRST, attach the child frame to my list o' child frames, making sure
+  // that it is not already there [if it is assume this was called twice]
+  // while I'm at it, zero out the structure BEFORE I assign 'pNext'
+
+  if(!pChildFrames)
+  {
+    // zero out entire structure beforehand
+    bzero(pChildFrame, sizeof(*pChildFrame));
+
+    pChildFrames = pChildFrame;
+    pChildFrame->pNext = NULL; // make sure
+  }
+  else
+  {
+    pC = pChildFrames;
+
+    while(pC->pNext)
+    {
+      if(pC == pChildFrame) // just in case
+      {
+        WB_ERROR_PRINT("%s - unexpected error condition, did you call this function before?\n", __FUNCTION__);
+
+        return -2;
+      }
+
+      pC = pC->pNext;
+    }
+
+    if(pC)
+    {
+      // zero out entire structure beforehand
+      bzero(pChildFrame, sizeof(*pChildFrame));
+
+      pC->pNext = pChildFrame;
+      pChildFrame->pNext = NULL;
+    }
+    else
+    {
+      // internal error, flag it for now and return "fail"
+      WB_ERROR_PRINT("%s - unexpected condition, returning error\n", __FUNCTION__);
+
+      return -3;
+    }
+  }
+
+  // if the owner is valid, but NOT tabbed, and it already has
+  // a WBChildFrame, then I fail to create this one.
+
+  if((WBFrameWindow_NO_TABS & pOwner->iFlags)) // window has NO tabs
+  {
+    if(FWGetNumContWindows(pOwner)) // error *OR* > 0, doesn't matter
+    {
+      FWDestroyChildFrame(pChildFrame); // this unhooks everything (alloc'd things are zero'd by bzero)
+
+      return -4; // can't create, SDI
+    }
+  }
+
+
+  // NEXT, set up all of the various 'things' in the structure that are simple assignments
+  pChildFrame->ulTag = CHILD_FRAME_TAG;
+
+  if(!pFont)
+  {
+    pChildFrame->pFont = NULL;
+  }
+  else
+  {
+    pChildFrame->pFont = WBCopyFont(pFont);
+  }
+
+
+  // Next, I need to create the window via 'WBCreateWindow()'
+
+  bzero(&xswa, sizeof(xswa));
+
+  xswa.border_pixel = FWGetDefaultBD().pixel;
+  xswa.background_pixel = FWGetDefaultBG().pixel;
+  xswa.colormap = DefaultColormap(pDisplay, DefaultScreen(pDisplay));
+  xswa.bit_gravity = CenterGravity;
+
+  pChildFrame->wID = WBCreateWindow(pDisplay, pOwner->wID, FWChildFrameEvent, "ChildFrame",
+                                    pOwner->iClientX, pOwner->iClientY,
+                                    pOwner->iClientWidth, pOwner->iClientHeight,
+                                    1, InputOutput,
+                                    CWBorderPixel | CWBackPixel | CWColormap | CWBitGravity,
+                                    &xswa);
+
+  if(pChildFrame->wID == None)
+  {
+    FWDestroyChildFrame(pChildFrame);
+    return -6; // could not create the window
+  }
+
+  // immediately identify this window's data struct using window data
+  WBSetWindowData(pChildFrame->wID, 0, (void *)pChildFrame); // window data is pointer to this struct
+  pChildFrame->pUserCallback = pUserCallback;
+
+
+  // create the default graphics context using the frame's color info
+  WBCreateWindowDefaultGC(pChildFrame->wID, FWGetDefaultFG().pixel, FWGetDefaultBG().pixel);
+
+  // now allow specific kinds of input messages
+  XSelectInput(pDisplay, pChildFrame->wID,
+               WB_STANDARD_INPUT_MASK | WB_MOUSE_INPUT_MASK | WB_KEYBOARD_INPUT_MASK);
+
+
+  // FINALLY, inform the frame window, which will set up some other stuff for me
+
+  pChildFrame->pOwner = pOwner;
+  iRval = FWAddContainedWindow(pOwner, pChildFrame); // TODO:  make THIS assign the owner pointer?
+
+  if(iRval) // error?
+  {
+    FWDestroyChildFrame(pChildFrame); // this frees up all of the resources
+  }
+
+  // TODO:  other things
+
+  return iRval;
 }
 
-void WBDestroyChildFrame(WBChildFrame *pChildFrame)
+void FWDestroyChildFrame(WBChildFrame *pChildFrame)
+{
+WBChildFrame *pC, *pC2;
+
+
+  if(!pChildFrame)
+  {
+    return;
+  }
+
+  // FIRST, unlink this object from the child frame list
+
+  if(pChildFrames) // just in case
+  {
+    pC2 = NULL;
+    pC = pChildFrames;
+
+    while(pC)
+    {
+      if(pC == pChildFrame) // just in case
+      {
+        if(pC2)
+        {
+          pC2->pNext = pC->pNext; // remove from link list
+        }
+        else
+        {
+          pChildFrames = pC->pNext; // it was the head of the chain
+        }
+
+        pC->pNext = NULL;
+
+        break;
+      }
+
+      pC2 = pC;
+      pC = pC->pNext;
+    }
+  }
+
+  // next, tell the owner to remove me from the list
+
+  if(pChildFrame->pOwner)
+  {
+    FWRemoveContainedWindow(pChildFrame->pOwner, pChildFrame);
+  }
+
+
+  // FINALLY, free the window
+  WBDestroyWindow(pChildFrame->wID);
+
+  // and any resources that were malloc'd must also be free'd
+
+  if(pChildFrame->szDisplayName)
+  {
+    free(pChildFrame->szDisplayName);
+  }
+
+  if(pChildFrame->pFont)
+  {
+    XFreeFont(WBGetDefaultDisplay(), pChildFrame->pFont);
+  }
+
+  bzero(pChildFrame, sizeof(*pChildFrame)); // zero it out [so I don't re-free things if I call something twice]
+
+}
+
+void FWSetChildFrameMenu(WBChildFrame *pChildFrame, const char *szFocusMenu)
 {
 }
 
-void WBSetEditWindowMenu(WBChildFrame *pChildFrame, const char *szFocusMenu)
+void FWSetChildFrameMenuHandlers(WBChildFrame *pChildFrame, const WBFWMenuHandler *pHandlerArray)
 {
 }
 
-void WBSetChildFrameMenuHandlers(WBChildFrame *pChildFrame, const WBFWMenuHandler *pHandlerArray)
+void FWSetChildFrameDisplayName(WBChildFrame *pChildFrame, const char *szDisplayName)
 {
 }
 
-void WBSetChildFrameDisplayName(WBChildFrame *pChildFrame, const char *szDisplayName)
+void FWSetChildFrameExtent(WBChildFrame *pChildFrame, int iXExtent, int iYExtent)
 {
+  // NOTE:  see (and maybe call) FWChildFrameRecalcLayout, below
 }
 
-WBChildFrame *WBChildFrameFromWindowID(Window wID)
+
+void FWChildFrameRecalcLayout(WBChildFrame *pChildFrame)
 {
-  return NULL;
+WBFrameWindow *pOwner;
+int iL, iT, iW, iH;
+
+
+  if(!pChildFrame) // TODO:  properly validate this (anal retentive if DEBUG build)
+  {
+    return;
+  }
+
+  pOwner = pChildFrame->pOwner;
+
+  if(!pOwner) // irrelevant if NULL.  TODO:  properly validate this (anal retentive if DEBUG build)
+  {
+    return;
+  }
+
+  iL = pOwner->iClientX;
+  iT = pOwner->iClientY;
+  iW = pOwner->iClientWidth;
+  iH = pOwner->iClientHeight;
+
+// re-calculate these members of the WBChildFrame structure, as needed
+
+//  pChildFrame->iLeft = iL converted to correct units and scrolled;
+//  pChildFrame->iTop = iT converted to correct units and scrolled;  
+//  pChildRrame->iWidth = iW converted to correct units;
+//  pChildFrame->iHeight = iH converted to correct units;
+    
+
+
+
+  // TODO:  anything ELSE that I need to do when re-calculating the layout, scrollbars, whatever
+  //        just apply that to iL, iT, iW, iH so that it reflects the correct viewpoirt in pixels
+  //        minus any border, decorations, scrollbars, whatever, with 0,0 being top,left
+
+
+  // NOW, tell the user callback function (if any) what's happening.
+  // I must assume that the owning frame is valid and has already re-calc'd its layout
+
+  if(pChildFrame->pUserCallback)
+  {
+    Display *pDisplay;
+    XClientMessageEvent evt;
+
+    pDisplay = WBGetWindowDisplay(pChildFrame->wID);
+
+    bzero(&evt, sizeof(evt));
+    evt.type = ClientMessage;
+
+    evt.display = pDisplay;
+    evt.window = pChildFrame->wID;
+    evt.message_type = aRESIZE_NOTIFY;
+    evt.format = 32;  // always
+    evt.data.l[0] = iL;
+    evt.data.l[1] = iT;
+    evt.data.l[2] = iL + iW; // right
+    evt.data.l[3] = iT + iH; // bottom
+
+    pChildFrame->pUserCallback(evt.window, &evt);
+  }  
 }
+
+
+// DEFAULT WINDOW EVENT HANDLER FOR CHILD FRAME
+
+int FWChildFrameEvent(Window wID, XEvent *pEvent)
+{
+int iRval = 0;
+WBChildFrame *pC;
+
+  pC = FWGetChildFrameStruct(wID);
+
+  if(!pC)
+  {
+    return 0;
+  }
+
+  // TODO:  messages I handle myself, before any user callbacks
+  //        (and perhaps messages that I don't pass to the callback at all)
+
+  if(pC->pUserCallback)
+  {
+    iRval = pC->pUserCallback(wID, pEvent);
+  }  
+
+  if(!iRval)
+  {
+    // TODO:  default handling of messages NOT handled by user callback
+
+  }
+
+  return iRval;
+}
+
 
 

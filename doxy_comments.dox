@@ -43,7 +43,10 @@
   BSD-like license.  See COPYING and README files for more information.
 
 
-  Additional information at http://sourceforge.net/projects/X11workbench
+  Additional information at:
+    http://sourceforge.net/projects/X11workbench
+    http://github.com/bombasticbob/X11workbenchProject
+    http://www.mrp3.com/
 
 ******************************************************************************/
 
@@ -154,7 +157,7 @@
 /** \page mainpage_1a X11workbench Toolkit - Design Goals
   * \details
   *
-  * \b Design \b Goals\n
+  * \b Design \b Goals
   *
   * \par Minimal dependencies
   * You shouldn't have to install a bozillian libraries or development files.\n
@@ -316,7 +319,8 @@
   * or use a '\#define' with a descriptive name, or use BOTH.  A '\#define' placed in the code within a
   * function is acceptable as long as it's only used within that function.\n
   *
-  * \b GOOD \b AND \b BAD \b CODE \b EXAMPLES:\n
+  * \b GOOD \b AND \b BAD \b CODE \b EXAMPLES:
+  *
   * \code
 
   // ----------
@@ -388,7 +392,13 @@
   * For more information on the X11workbench application or the X11workbench Toolkit, visit
   *
   * http://sourceforge.net/projects/x11workbench\n
+  * http://github.com/bombasticbob/X11workbenchProject
   * http://www.mrp3.com/
+  *
+  *
+  * The latest official on-line documentation can be found at:
+  *
+  * http://bombasticbob.github.io/X11workbench
   *
   */
 

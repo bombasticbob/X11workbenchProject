@@ -372,7 +372,7 @@ LDADD = ./lib/libX11WorkbenchToolkit.a
 man1_MANS = @MAN_PAGES@
 
 # Extra distribution files
-EXTRA_DIST = X11workbench.1 X11workbench.interix $(man1_MANS)
+EXTRA_DIST = BUILD X11workbench.1 X11workbench.interix $(man1_MANS)
 @NO_OPT_FALSE@NO_OPT_FLAGS = 
 
 # comment out this section to include external 'man2html' perl script

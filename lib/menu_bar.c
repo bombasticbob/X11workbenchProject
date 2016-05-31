@@ -520,6 +520,7 @@ Window wID = pSelf->wSelf;
   }
 }
 
+#if 0 /* currently not used, reserved, consider removing it if not needed */
 static int MBMenuHandleMenuItemUI(Display *pDisplay, WBMenuBarWindow *pSelf, WBMenu *pMenu, WBMenuItem *pItem)
 {
   XClientMessageEvent evt;
@@ -553,6 +554,7 @@ static int MBMenuHandleMenuItemUI(Display *pDisplay, WBMenuBarWindow *pSelf, WBM
 
   return WBWindowDispatch(pSelf->wOwner, (XEvent *)&evt); // 'send event'
 }
+#endif // 0
 
 
 // this next callback is assigned via WBRegisterWindowCallback

@@ -50,7 +50,7 @@
   * This file contains definitions, stubs, workarounds, and any kind of
   * platform-specific wrapper function or locally implemented library
   * definition that is needed to make this system work on a given platform.
-*/
+**/
 
 
 
@@ -73,11 +73,23 @@
 
 #include <pthread.h> /* make sure this is included for POSIX */
 
+
+// DEBUG vs RELEASE code
+
+#ifdef DEBUG /* explicit DEBUG build */
+#ifdef NO_DEBUG
+#undef NO_DEBUG
+#endif // NO_DEBUG
+#endif // DEBUG
+
+// NOTE:  The debug code will be included when NO_DEBUG is *NOT* defined
+
+
 /** \ingroup platform
   * \brief INVALID HANDLE VALUE equivalent
   *
   * This definition generically refers to an INVALID HANDLE
-  */
+**/
 #define INVALID_HANDLE_VALUE ((int)-1)
 
 // jump optimization macros - gcc only
@@ -90,14 +102,14 @@
   * \brief Platform abstract 64-bit integer
   *
   * This definition identifies the data type for a 64-bit integer
-  */
+**/
 #define WB_INT64 long long
 
 /** \ingroup platform
   * \brief Platform abstract unsigned 64-bit integer
   *
   * This definition identifies the data type for an unsigned 64-bit integer
-  */
+**/
 #define WB_UINT64 unsigned long long
 
 //#else // !defined _LONGLONG, unlikely
@@ -109,14 +121,14 @@
   * \brief Platform abstract 32-bit integer
   *
   * This definition identifies the data type for a 32-bit integer
-  */
+**/
 #define WB_INT32 int
 
 /** \ingroup platform
   * \brief Platform abstract unsigned 32-bit integer
   *
   * This definition identifies the data type for an unsigned 32-bit integer
-  */
+**/
 #define WB_UINT32 unsigned int
 
 
@@ -126,35 +138,35 @@
   * \brief MODULE HANDLE equivalent
   *
   * This 'typedef' refers to a MODULE
-  */
+**/
 typedef void * WB_MODULE;
 
 /** \ingroup platform
   * \brief THREAD HANDLE equivalent
   *
   * This 'typedef' refers to a THREAD
-  */
+**/
 typedef pthread_t WB_THREAD;
 
 /** \ingroup platform
   * \brief PROC ADDRESS equivalent
   *
   * This 'typedef' refers to a PROC ADDRESS as exported from a shared library
-  */
+**/
 typedef void (* WB_PROCADDRESS)(void);
 
 /** \ingroup platform
   * \brief THREAD LOCAL STORAGE 'key' equivalent
   *
   * This 'typedef' refers to a THREAD LOCAL STORAGE key, identifying a storage slot
-  */
+**/
 typedef pthread_key_t   WB_THREAD_KEY;
 
 /** \ingroup platform
   * \brief CONDITION HANDLE equivalent (similar to an 'event')
   *
   * This 'typedef' refers to a CONDITION, a triggerable synchronization resource
-  */
+**/
 typedef unsigned int WB_COND; // defined as 'unsigned int' because of pthread_cond problems under Linux
 //typedef pthread_cond_t  WB_COND;
 
@@ -162,7 +174,7 @@ typedef unsigned int WB_COND; // defined as 'unsigned int' because of pthread_co
   * \brief MUTEX HANDLE equivalent
   *
   * This 'typedef' refers to a MUTEX, a lockable synchronization object
-  */
+**/
 typedef pthread_mutex_t WB_MUTEX;
 
 
@@ -178,7 +190,7 @@ typedef pthread_mutex_t WB_MUTEX;
   * \brief PACKED definition
   *
   * This assignes the 'packed' attribute; i.e. byte-level alignment
-  */
+**/
 #define __PACKED__ /* platform dependent; actual def must be a blank or doxygen barphs on it */
 
 #else // !__DOXYGEN__
@@ -247,13 +259,49 @@ typedef HANDLE WB_MUTEX;        // equivalent to a mutex handle
 #define XPM_ATTRIBUTES XpmAttributes
 #define XPM_CREATE_PIXMAP_FROM_DATA(A,B,C,D,E,F) XpmCreatePixmapFromData(A,B,C,D,E,F)
 
-#else // HAVE_XPM
+#else // HAVE_XPM or __DOXYGEN__
 
-/** \ingroup platform
-  * \brief Internal XPM helper structure
+/** \ingroup pixmap
+  * \typedef typedef struct _XPM_ATTRIBUTES_ XPM_ATTRIBUTES
+  * \brief Compatibility structure for use with MyLoadPixmapFromData() whenever libXpm is not in use.
   *
-  * This structure is used internally when libXpm is not available
-  */
+  * When libXpm is in use, XPM_ATTRIBUTES becomes a #define for XpmAttributes, the structure used
+  * by XpmCreatePixmapFromData().  Because so many elements are not needed, MyLoadPixmapFromData()
+  * uses this scaled-down version when libXpm is not available.
+  *
+  * When libXpm is NOT in use, the follow structure is defined:
+  *
+\code
+
+  typedef struct _XPM_ATTRIBUTES_
+  {
+    int width;    // The width of the returned pixmaps
+    int height;   // height of the returned pixmaps
+    int depth;    // depth of the returned 'image' pixmap.  The mask pixmap always has a depth of '1'.
+
+  } XPM_ATTRIBUTES;
+
+\endcode
+  *
+  * When libXpm IS in use, the following macro is defined:
+  *
+\code
+
+  #define XPM_ATTRIBUTES XpmAttributes
+
+\endcode
+  *
+**/
+
+/** \ingroup pixmap
+  * \struct _XPM_ATTRIBUTES_
+  * \brief Compatibility structure for use with MyLoadPixmapFromData() whenever libXpm is not in use.
+  *
+  * This structure is a scaled-down version of the standard X11 structure 'XpmAttributes', and is defined
+  * ONLY when libXpm is not in use (that is, the configure script did not discover it).  Only those
+  * structure members that are needed by this toolkit have been defined.\n
+  * For more information, see \ref XPM_ATTRIBUTES and \ref MyLoadPixmapFromData()
+**/
 typedef struct _XPM_ATTRIBUTES_
 {
   // I only need certain information from MyLoadPixmapFromData(), so that's all I'm doing with this structure
@@ -264,11 +312,26 @@ typedef struct _XPM_ATTRIBUTES_
 
 } XPM_ATTRIBUTES;
 
-/** \ingroup platform
-  * \brief Internal XPM helper function to load a pixmap
+
+/** \ingroup pixmap
+  * \fn int MyLoadPixmapFromData(Display *pDisplay, Window wID, char *aData[], Pixmap *pPixmap, Pixmap *pMask, XPM_ATTRIBUTES *pAttr)
+  * \brief Alternate for XpmCreatePixmapFromData() when libXpm is not present
   *
-  * This function is used whenever libXpm is not available, via the macro XPM_CREATE_PIXMAP_FROM_DATA
-  */
+  * \param pDisplay A pointer to the display to use when creating the pixmaps
+  * \param wID A window used as a 'drawable' reference when creating the pixmaps
+  * \param aData An 'xpm' pixmap array, using the standard format generated by utilities like 'gimp'
+  * \param pPixmap Pointer to the variable to receive the Pixmap.  If the function fails, this will be 'None'
+  * \param pMask Pointer to the variable to receive the transparency mask Pixmap.  This may be 'None' if there is no transparency mask
+  * \param pAttr Pointer to the 'XPM_ATTRIBUTES' structure, which is a subset of the XpmAttributes structure used by XpmCreatePixmapFromData()
+  * \return A value of zero on success (same as XpmSuccess, returned by XpmCreatePixmapFromData() on success).
+  *
+  * This function is an alternate for XpmCreatePixmapFromData() when libXpm is not present.  It provides similar functionality,
+  * although there are some significant differences, particularly with the use of XPM_ATTRIBUTES as an actual structure and
+  * not just a '\#define'.  When libXpm is compiled in, XPM_ATTRIBUTES becomes a macro that is defined as XpmAttributes, the structure
+  * used by XpmCreatePixmapFromData().  There are a large number of members in this structure that are not useful for the purpose of
+  * this function, and so a scaled-down version is used when MyLoadPixmapFromData is being invoked.\n
+  * You should use libXpm when it is present on your system, as this function has not been fully tested on all platforms.
+**/
 int MyLoadPixmapFromData(Display *pDisplay, Window wID, char *aData[],
                          Pixmap *pPixmap, Pixmap *pMask, XPM_ATTRIBUTES *pAttr);
 
@@ -286,84 +349,11 @@ int MyLoadPixmapFromData(Display *pDisplay, Window wID, char *aData[],
   *
   * This macro abstracts calls to XpmCreatePixmapFromData() by allowing an internal function to be called
   * whenever libXpm is not available for this purpose.
-  */
+**/
 #define XPM_CREATE_PIXMAP_FROM_DATA(A,B,C,D,E,F) MyLoadPixmapFromData(A,B,C,D,E,F)
 
 
 #endif
-
-// documentation for XPM_CREATE_PIXMAP_FROM_DATA
-
-/** \ingroup platform
-  * \def XPM_CREATE_PIXMAP_FROM_DATA
-  * \brief Wrapper for XpmCreatePixmapFromData
-  *
-  * This macro wraps the functionality of XpmCreatePixmapFromData so that when libXpm
-  * is not present, an alternate function \ref MyLoadPixmapFromData() can be used
-  * in its place.  Use of the libXpm function is preferred, and the configure script
-  * is set up to detect it and use it whenever it is present.
-  *
-**/
-
-/** \ingroup pixmap
-  * \fn int MyLoadPixmapFromData(Display *pDisplay, Window wID, char *aData[], Pixmap *pPixmap, Pixmap *pMask, XPM_ATTRIBUTES *pAttr)
-  * \brief Alternate for XpmCreatePixmapFromData() when libXpm is not present
-  *
-  * \param pDisplay A pointer to the display to use when creating the pixmaps
-  * \param wID A window used as a 'drawable' reference when creating the pixmaps
-  * \param aData An 'xpm' pixmap array, using the standard format generated by utilities like 'gimp'
-  * \param pPixmap Pointer to the variable to receive the Pixmap.  If the function fails, this will be 'None'
-  * \param pMask Pointer to the variable to receive the transparency mask Pixmap.  This may be 'None' if there is no transparency mask
-  * \param pAttr Pointer to the 'XPM_ATTRIBUTES' structure, which is a subset of the XpmAttributes structure used by XpmCreatePixmapFromData()
-  * \return A value of zero on success (same as XpmSuccess, returned by XpmCreatePixmapFromData() on success).
-  *
-  * This function is an alternate for XpmCreatePixmapFromData() when libXpm is not present.  It provides similar functionality,
-  * although there are some significant differences, particularly with the use of XPM_ATTRIBUTES as an actual structure and
-  * not just a '#define'.  When libXpm is compiled in, XPM_ATTRIBUTES becomes a macro that is defined as XpmAttributes, the structure
-  * used by XpmCreatePixmapFromData().  There are a large number of members in this structure that are not useful for the purpose of
-  * this function, and so a scaled-down version is used when MyLoadPixmapFromData is being invoked.\n
-  * You should use libXpm when it is present on your system, as this function has not been fully tested on all platforms.
-**/
-
-/** \ingroup pixmap
-  * \struct _XPM_ATTRIBUTES_
-  * \brief Compatibility structure for use with MyLoadPixmapFromData() whenever libXpm is not in use.
-  *
-  * For more information, see \ref XPM_ATTRIBUTES and \ref MyLoadPixmapFromData()
-**/
-
-/** \ingroup pixmap
-  * \typedef typedef struct _XPM_ATTRIBUTES_ XPM_ATTRIBUTES
-  * \brief Compatibility structure for use with MyLoadPixmapFromData() whenever libXpm is not in use.
-  *
-  * When libXpm is in use, XPM_ATTRIBUTES becomes a #define for XpmAttributes, the structure used by XpmCreatePixmapFromData().
-  * Because so many elements are not needed, MyLoadPixmapFromData() uses this scaled-down version when libXpm is not available.
-  *
-  * When libXpm is NOT in use, the follow structure is defined:\n
-  *
-\code
-
-  typedef struct _XPM_ATTRIBUTES_
-  {
-    // I only need certain information from MyLoadPixmapFromData(), so that's all I'm doing with this structure
-
-    int width,    // width of the returned pixmaps
-        height,   // height of the returned pixmaps
-        depth;    // depth of the returned 'image' pixmap.  The mask pixmap always has a depth of '1'.
-
-  } XPM_ATTRIBUTES;
-
-\endcode
-  *
-  * When libXpm IS in use, the follownig macro is defined:\n
-  *
-\code
-
-  #define XPM_ATTRIBUTES XpmAttributes
-
-\endcode
-  *
-**/
 
 
 // some helpful macros that need to be universal without being in a different header
@@ -611,7 +601,7 @@ char * WBRunResult(const char *szAppName, ...);
 /** \ingroup process
   * \brief Run an application synchronously, returning 'stdout' output in a character buffer.
   *
-  * \param szInBuf A const pointer to 0-byte terminated string/buffer containing the input for piped data.
+  * \param szStdInBuf A const pointer to 0-byte terminated string/buffer containing the input for piped data.
   * \param szAppName A const pointer to a character string containing the path to the application
   * \returns A malloc'd pointer to a buffer containing the 'stdout' output from the application.
   *
@@ -774,7 +764,7 @@ void * WBThreadGetLocal(WB_THREAD_KEY keyVal);
   * \brief Get 'thread local' data identified by 'keyVal'
   *
   * \param keyVal the 'WB_THREAD_KEY' identifier of the thread local data - see WBThreadAllocLocal()
-  * \param pVal the value to assign for thread local data
+  * \param pValue the value to assign for thread local data
   *
   * Assign (set) the data associated with a thread local storage slot
 **/
@@ -967,7 +957,7 @@ int WBCondWaitMutex(WB_COND *pCond, WB_MUTEX *pMtx, int nTimeout);
   * guaranteeing that at the time the value is decremented, no other thread is allowed
   * to read or modify the value until the function returns.
 **/
-unsigned int WBInterlockedDecrement(unsigned int *pValue);
+unsigned int WBInterlockedDecrement(volatile unsigned int *pValue);
 
 
 /** \ingroup threads
@@ -980,7 +970,7 @@ unsigned int WBInterlockedDecrement(unsigned int *pValue);
   * guaranteeing that at the time the value is incremented, no other thread is allowed
   * to read or modify the value until the function returns.
 **/
-unsigned int WBInterlockedIncrement(unsigned int *pValue);
+unsigned int WBInterlockedIncrement(volatile unsigned int *pValue);
 
 
 /** \ingroup threads
@@ -995,7 +985,7 @@ unsigned int WBInterlockedIncrement(unsigned int *pValue);
   * to read or modify the value until the function returns.  The previous value is returned
   * by the function, effectively 'exchanging' the value with one that you specify.
 **/
-unsigned int WBInterlockedExchange(unsigned int *pValue, unsigned int nNewVal);
+unsigned int WBInterlockedExchange(volatile unsigned int *pValue, unsigned int nNewVal);
 
 
 /** \ingroup threads
@@ -1009,7 +999,7 @@ unsigned int WBInterlockedExchange(unsigned int *pValue, unsigned int nNewVal);
   * to modify the value.  Once read, the value can still change; however, the value
   * as-read will be 'atomic' i.e. not a partially changed value.
 **/
-unsigned int WBInterlockedRead(unsigned int *pValue);
+unsigned int WBInterlockedRead(volatile unsigned int *pValue);
 
 
 

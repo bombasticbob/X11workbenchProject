@@ -148,6 +148,7 @@ static void CheckInitScrollColors(void)
 
 
 
+#if 0 /* this function not currently used.  consider removeing it in a refactor */
 static char ilog2n(unsigned char y)
 {
   if(y & 0x08)
@@ -161,7 +162,9 @@ static char ilog2n(unsigned char y)
   else
     return 0;
 }
+#endif // 0
 
+#if 0 /* this function not currently used.  consider removeing it in a refactor */
 static char ilog2c(unsigned char y)
 {
   if(y & 0xf0)
@@ -169,7 +172,9 @@ static char ilog2c(unsigned char y)
 
   return ilog2n(y);
 }
+#endif // 0
 
+#if 0 /* this function not currently used.  consider removeing it in a refactor */
 static int ilog2s(unsigned short y)
 {
   if(y & 0xff00)
@@ -179,7 +184,9 @@ static int ilog2s(unsigned short y)
 
   return ilog2c((unsigned char)y);
 }
+#endif // 0
 
+#if 0 /* this function not currently used.  consider removeing it in a refactor */
 static int ilog2(unsigned int y)
 {
   if(y & 0xffff0000)
@@ -189,7 +196,9 @@ static int ilog2(unsigned int y)
 
   return ilog2s((unsigned short)y);
 }
+#endif // 0
 
+#if 0 /* this function not currently used.  consider removeing it in a refactor */
 static int ilog2ll(WB_UINT64 y)
 {
   if(y & 0xffffffff00000000LL)
@@ -199,12 +208,13 @@ static int ilog2ll(WB_UINT64 y)
 
   return ilog2((unsigned int)y);
 }
+#endif // 0
 
 void WBCalcHScrollBar(WB_SCROLLINFO *pScrollInfo, WB_GEOM *pgeomClient, int iVScrollWidth,
                       int iHScrollHeight, int nListItems, int nPos)
 {
-int iKnobSize, iKnobPos, iBarHeight, iBarWidth;
-int i1, i2;
+int /*iKnobSize, iKnobPos,*/ iBarHeight, iBarWidth;
+//int i1, i2;
 
   iBarHeight = pgeomClient->height;
   iBarWidth = pgeomClient->width;
@@ -504,7 +514,7 @@ void WBDraw3DBorderRect(Display *pDisplay, Window wID, GC gc, WB_GEOM *pgeomBord
 {
 XPoint xpt[4];
 XColor clr;
-unsigned long lBorderColorAvg;
+//unsigned long lBorderColorAvg;
 int iR, iG, iB;
 
 
@@ -587,8 +597,8 @@ int iR, iG, iB;
 void WBDrawDashedRect(Display *pDisplay, Window wID, GC gc, WB_GEOM *pgeomRect, unsigned long lColor)
 {
 static const char dash_list[4]={1,2,2,1};
-int i1;
-XGCValues val;
+//int i1;
+//XGCValues val;
 GC gc2;
 
 
@@ -703,7 +713,7 @@ void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Window wID
                        GC gc, WB_GEOM *pgeomClient)
 {
 //WB_GEOM geomBar, geomLeft, geomRight, geomKnob;
-XPoint xpt[5];
+//XPoint xpt[5];
 
   CheckInitScrollColors();
 

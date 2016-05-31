@@ -99,7 +99,7 @@ static void FileListControlDisplayProc(WBDialogControl *pList, void *pData, int 
                                          int iX, int iY, int iWidth, int iHeight, \
                                          const char *szClassName, const char *szTitle)
 
-#define BEGIN_CREATE_CONTROL(X) Atom aThis = a##X
+#define BEGIN_CREATE_CONTROL(X) Atom aThis = a##X; { aThis = aThis; }
 
 DEFINE_CREATE_CONTROL(FRAME_CONTROL)
 DEFINE_CREATE_CONTROL(TEXT_CONTROL)
@@ -169,7 +169,9 @@ static int GetWBDialogControlStructSize(Atom aClass)
 
 int DLGControlDefaultCallback(Window wID, XEvent *pEvent)
 {
+#ifndef NO_DEBUG
   Display *pDisplay = WBGetWindowDisplay(wID);
+#endif // NO_DEBUG
   WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
   int iRval;
 
@@ -890,7 +892,7 @@ BEGIN_CREATE_CONTROL(PUSHBUTTON_CONTROL);
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
+//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_PushButton;
@@ -942,7 +944,7 @@ BEGIN_CREATE_CONTROL(DEFPUSHBUTTON_CONTROL);
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
+//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_DefPushButton;
@@ -995,7 +997,7 @@ BEGIN_CREATE_CONTROL(CANCELBUTTON_CONTROL);
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
+//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_CancelButton;
@@ -1047,7 +1049,7 @@ BEGIN_CREATE_CONTROL(RADIOBUTTON_CONTROL);
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
+//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_RadioButton;
@@ -1098,7 +1100,7 @@ BEGIN_CREATE_CONTROL(FIRSTRADIOBUTTON_CONTROL);
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
+//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_FirstRadioButton;
@@ -1150,7 +1152,7 @@ BEGIN_CREATE_CONTROL(CHECKBUTTON_CONTROL);
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
+//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_CheckButton;
@@ -1201,7 +1203,7 @@ BEGIN_CREATE_CONTROL(TRISTATEBUTTON_CONTROL);
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
+//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_TriStateButton;
@@ -1250,7 +1252,7 @@ IMPLEMENT_CREATE_CONTROL(HSCROLL_CONTROL)
 {
 BEGIN_CREATE_CONTROL(HSCROLL_CONTROL);
 
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
+//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
 
   return NULL;  // for now
@@ -1261,7 +1263,7 @@ IMPLEMENT_CREATE_CONTROL(VSCROLL_CONTROL)
 {
 BEGIN_CREATE_CONTROL(VSCROLL_CONTROL);
 
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
+//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
 
   return NULL;  // for now
@@ -1272,7 +1274,7 @@ IMPLEMENT_CREATE_CONTROL(SLIDER_CONTROL)
 {
 BEGIN_CREATE_CONTROL(SLIDER_CONTROL);
 
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
+//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
 
   return NULL;  // for now
@@ -1283,7 +1285,7 @@ IMPLEMENT_CREATE_CONTROL(KNOB_CONTROL)
 {
 BEGIN_CREATE_CONTROL(KNOB_CONTROL);
 
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
+//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
 
   return NULL;  // for now
@@ -1298,7 +1300,7 @@ BEGIN_CREATE_CONTROL(LIST_CONTROL);
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
+//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
   pDialogControl->ulFlags |= CONTROL_SupportListInfo;
 
@@ -1360,7 +1362,7 @@ BEGIN_CREATE_CONTROL(LIST_CONTROL);
 
 static int combo_callback(Window wID, XEvent *pEvent)
 {
-  Display *pDisplay = WBGetWindowDisplay(wID);
+//  Display *pDisplay = WBGetWindowDisplay(wID);
   WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
 
 
@@ -1407,7 +1409,7 @@ BEGIN_CREATE_CONTROL(COMBO_CONTROL);
   WBComboControl *pPrivate = (WBComboControl *)pDialogControl;
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
+//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
   pDialogControl->ulFlags |= CONTROL_SupportListInfo;
 
@@ -1480,7 +1482,7 @@ BEGIN_CREATE_CONTROL(TREE_CONTROL);
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
+//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
   pDialogControl->ulFlags |= CONTROL_SupportListInfo;
 
@@ -1547,7 +1549,10 @@ IMPLEMENT_CREATE_CONTROL(COMBOTREE_CONTROL)
 {
 BEGIN_CREATE_CONTROL(COMBOTREE_CONTROL);
 
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
+//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
+
+  int (*x)(Window wID, XEvent *pEvent) = NULL; // warning avoidance
+  x = combo_tree_callback;                     // warning avoidance
 
 
   return NULL;  // for now
@@ -1672,7 +1677,7 @@ IMPLEMENT_CREATE_CONTROL(TAB_CONTROL)
 {
 BEGIN_CREATE_CONTROL(TAB_CONTROL);
 
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
+//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
 
   return NULL;  // for now
@@ -1761,8 +1766,8 @@ static int edit_callback(Window wID, XEvent *pEvent)
   Display *pDisplay = WBGetWindowDisplay(wID);
   WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
   WBEditControl *pPrivate = (WBEditControl *)pDialogControl;
-  char tbuf[32];
-  int nChar = sizeof(tbuf);
+//  char tbuf[32];
+//  int nChar = sizeof(tbuf);
 
 
   if(pDialogControl && pEvent->type == Expose)
@@ -2105,8 +2110,8 @@ static int list_callback(Window wID, XEvent *pEvent)
   Atom aNotification = None;
   Display *pDisplay = WBGetWindowDisplay(wID);
   WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
-  char tbuf[32];
-  int nChar = sizeof(tbuf);
+//  char tbuf[32];
+//  int nChar = sizeof(tbuf);
   LISTINFO *pListInfo = NULL;
   WB_DIALOG_PROP *pProp;
 
@@ -2577,7 +2582,7 @@ static int list_callback(Window wID, XEvent *pEvent)
 
 static int file_list_callback(Window wID, XEvent *pEvent)
 {
-Display *pDisplay = WBGetWindowDisplay(wID);
+//Display *pDisplay = WBGetWindowDisplay(wID);
 WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
 char *p1;
 const char *p2;
@@ -2731,8 +2736,8 @@ static int tree_callback(Window wID, XEvent *pEvent)
   Atom aNotification = None;
   Display *pDisplay = WBGetWindowDisplay(wID);
   WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
-  char tbuf[32];
-  int nChar = sizeof(tbuf);
+//  char tbuf[32];
+//  int nChar = sizeof(tbuf);
 
 
   if(pDialogControl && pEvent->type == Expose)
@@ -2800,7 +2805,7 @@ static int tree_callback(Window wID, XEvent *pEvent)
 
 static int path_tree_callback(Window wID, XEvent *pEvent)
 {
-Display *pDisplay = WBGetWindowDisplay(wID);
+//Display *pDisplay = WBGetWindowDisplay(wID);
 WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
 char *p1;
 void *pV;
@@ -2906,7 +2911,7 @@ static int EditDoCharEvent(XClientMessageEvent *pEvent, Display *pDisplay,
                            Window wID, WBDialogControl *pSelf)
 {
 WBEditControl *pPrivate = (WBEditControl *)pSelf;
-int iRval = 0, iACS, iKey, nChar, iLen;
+int iRval = 0, iACS, iKey, nChar;//, iLen;
 char *pBuf, *pData;
 Window wIDParent;
 WB_RECT rctTemp;
@@ -3563,7 +3568,7 @@ WB_RECT rctTemp;
         }
         else if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_CTRL) // CTRL+insert (copy)
         {
-          Window wIDParent = WBGetParentWindow(wID);
+//          Window wIDParent = WBGetParentWindow(wID);
           char *pData = pPrivate->xTextObject.vtable->get_sel_text(&(pPrivate->xTextObject), NULL);
 
           if(pData)
@@ -3720,7 +3725,7 @@ int iX, iY;
 static int ListDoCharEvent(XClientMessageEvent *pEvent, Display *pDisplay,
                            Window wID, WBDialogControl *pSelf)
 {
-int iRval = 0, iACS, iKey, nChar, iLen;
+int iRval = 0, iACS, iKey, nChar;//, iLen;
 char *pBuf;
 
 
@@ -3868,12 +3873,12 @@ static int StaticDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
   int /*i1, i2,*/ iHPos, iVPos;
   XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
   XFontStruct *pOldFont, *pFont;
-  XPoint xpt[3];
   GC gc; // = WBGetWindowDefaultGC(wID);
   XGCValues xgc;
   WB_GEOM geomPaint, geomBorder;
   int iType;
-  char tbuf[128];
+//  XPoint xpt[3];
+//  char tbuf[128];
 
 
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
@@ -4105,12 +4110,12 @@ WBEditControl *pPrivate = (WBEditControl *)pSelf;
 int /*i1, i2,*/ iHPos, iVPos;
 XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
 XFontStruct *pOldFont, *pFont;
-XPoint xpt[3];
 GC gc; // = WBGetWindowDefaultGC(wID);
 XGCValues xgc;
 WB_GEOM geomPaint, geomBorder;
-int iType;
-char tbuf[128];
+//XPoint xpt[3];
+//int iType;
+//char tbuf[128];
 
 
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
@@ -4279,14 +4284,14 @@ char tbuf[128];
 static int ButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                                Window wID, WBDialogControl *pSelf)
 {
-  int /*i1,*/ i2, iHPos, iVPos;
+  int /*i1,*/ i2, iHPos;//, iVPos;
   XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
   XFontStruct *pOldFont, *pFont;
-  XPoint xpt[3];
   GC gc; // = WBGetWindowDefaultGC(wID);
   XGCValues xgc;
   WB_GEOM geomPaint, geomBorder;
-  char tbuf[128];
+//  XPoint xpt[3];
+//  char tbuf[128];
 
 
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
@@ -4369,7 +4374,7 @@ static int ButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
   if(pSelf->pCaption)
   {
     const char *szText = pSelf->pCaption;
-    int iU1=0, iU2=0;
+//    int iU1=0, iU2=0;
 
 ////    if(i1 == pSelf->iSelected)  // selected item
 //    {
@@ -4478,14 +4483,14 @@ static int ButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 static int PushButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                                    Window wID, WBDialogControl *pSelf)
 {
-  int /*i1,*/ i2, iHPos, iVPos;
+  int /*i1,*/ i2, iHPos;//, iVPos;
   XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
   XFontStruct *pOldFont, *pFont;
-  XPoint xpt[3];
   GC gc; // = WBGetWindowDefaultGC(wID);
   XGCValues xgc;
   WB_GEOM geomPaint, geomBorder;
-  char tbuf[128];
+//  XPoint xpt[3];
+//  char tbuf[128];
 
 
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
@@ -4588,7 +4593,7 @@ static int PushButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
   if(pSelf->pCaption)
   {
     const char *szText = pSelf->pCaption;
-    int iU1=0, iU2=0;
+//    int iU1=0, iU2=0;
 
 //    if(i1 == pSelf->iSelected)  // selected item
 //    {
@@ -4705,19 +4710,19 @@ static int PushButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                              Window wID, WBDialogControl *pSelf)
 {
-  int i1, /*i2,*/ iHPos, iVPos, iVScrollWidth, iHScrollHeight;
+  int i1, /*i2,*/ iHPos, /*iVPos,*/ iVScrollWidth, iHScrollHeight;
+  int /* iType,*/ nHeight, nItemHeight;
   XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
   XFontStruct *pOldFont, *pFont;
-  XPoint xpt[3];
   GC gc; // = WBGetWindowDefaultGC(wID);
   XGCValues xgc;
   Region rgnTemp;
   WB_GEOM geomPaint, geomBorder;
-  int iType, nHeight, nItemHeight;
-  char tbuf[128];
   WB_SCROLLINFO *pScrollInfo;
   LISTINFO *pListInfo;
   WB_DIALOG_PROP *pProp;
+//  XPoint xpt[3];
+//  char tbuf[128];
 
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
                  "%s - Expose %d (%08xH)\n", __FUNCTION__, (int)wID, (int)wID);
@@ -4948,7 +4953,7 @@ static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 static void FileListControlDisplayProc(WBDialogControl *pList, void *pData, int iSelected, GC gc, WB_GEOM *pGeom)
 {
   int iHPos, iVPos;
-  XFontStruct *pOldFont, *pFont, *pFont2;
+  XFontStruct *pOldFont, *pFont;//, *pFont2;
   XGCValues xgc;
   Window wID = pList->wID;
   Display *pDisplay = WBGetWindowDisplay(wID);
@@ -5025,7 +5030,7 @@ static void FileListControlDisplayProc(WBDialogControl *pList, void *pData, int 
        !((const char *)pData)[3])
     {
       XPoint aPoints[4];
-      int i1;
+//      int i1;
       // draw a left arrow using the highlight color
 
       XSetForeground(pDisplay, gc, iSelected ? pList->clrBG.pixel : pList->clrHBG.pixel);

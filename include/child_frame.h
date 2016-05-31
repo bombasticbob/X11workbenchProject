@@ -9,6 +9,8 @@
 //                                                                   //
 //         a window that exists as a tab in a frame window           //
 //                                                                   //
+//           (part of the 'frame window' support API)                //
+//                                                                   //
 ///////////////////////////////////////////////////////////////////////
 
 /*****************************************************************************
@@ -60,7 +62,19 @@
   * The Child Frame also provides for horizontal and vertical scrolling of the display
   * surface, as needed, varying the display region.\n
   * A derived window will need to register the appropriate callbacks, and have the
-  * '
+  * 'WBChildFrame' structure as the first member of its own structure.  When the derived
+  * window creates the structure, it must initialize its own structure first, and then
+  * call FWInitChildFrame() to complete the process.  And when the drived window is destroyed,
+  * it must call FWDestroyChildFrame() to complete the 'destruction' process.\n
+  * The behavior of a Child Frame is like a 'base class' in C++, with a kind of polymorphism
+  * and abstraction used by the containing WBFrameWindow to manage focus, tabs, and layout changes.\n
+  * The Child Frame then handles scrolling and 'menu change on focus change', so that each type of
+  * Child Frame can have its own menu.  The Frame Window will change the displayed menu according to
+  * the Child Frame that has the current focus, and display a default menu when there is no Child Frame.\n
+  * A derived Child Frame maintains its own data as well as handling events.  So, rather than abstracting
+  * the data from the Child Frame, this toolkit combines them (as it is simpler to do so).  If you need
+  * extra levels of abstraction, just create more 'derived' versions from your own designs, and abstract
+  * the 'next level up'.\n
 */
 
 
@@ -69,87 +83,14 @@ extern "C" {
 #endif // __cplusplus
 
 
-/** \typedef WBChildFrame
-  * \struct __WBChildFrame__
-  * \ingroup child_frame
-  * \brief Structure that defines a Child Frame within a Frame Window
-  *
-  * The WBFWMenuHandler structure is designed to be initialized via macros, so
-  * that a set of callback functions can then be easily used to handle menu events.
-  * If no menu handler is present for a menu item, or if the menu UI handler is
-  * NOT NULL and returns a non-zero value, the menu item will be disabled and
-  * displayed accordingly.  It will not be possible to use its hotkey nor select it.
-  * Otherwise, the menu will be displayed normally and be selectable, and its hotkey
-  * will be able to activate it.
-  *
-  * \code
-  typedef struct __WBChildFrame__
-  {
-    Window wSelf;                     // window identifier for self
-    Window wOwner;                    // window identifier for owner
-    XFontStruct *pFont;               // default font for the window
+// SEE frame_window.h for WBChildFrame definition
 
-    int iTop;                         // 0-based position of the top of the current viewport (in lines or pixels)
-    int iHeight;                      // 0-based height of the current viewport (in lines or pixels)
-    int iLeft;                        // 0-based position of the left of the current viewport (in characters or pixels)
-    int iWidth;                       // 0-based width of the current viewport (in characters or pixels)
-
-    int iTabIndex;                    // Current tab index (for tabbed versions; -1 for "no tabs")
-    int fFlags;                       // various bitflags defining features.
-
-    char *szDisplayName;              // display name shown in tab and title bar.  You should not alter this member.
-
-    WBWinEvent pUserCallback;         // message callback function pointer (can be NULL)
-
-    struct __WBChildFrame__ *pNext;   // 'Next Object' pointer in an internally stored linked list
-
-  } WBChildFrame;
-  * \endcode
-  *
-  * \sa \link frame \endlink
-  *
-  * NOTE:  you should not attempt to modify any of these structure members directly.  Use the appropriate
-  *        API functions to modify their values.  If this were C++, these members would be marked 'protected'.
-*/
-typedef struct __WBChildFrame__
-{
-  Window wSelf;                     ///< window identifier for self
-  Window wOwner;                    ///< window identifier for owner (must be a WBFrameWindow)
-  XFontStruct *pFont;               ///< default font for the window
-
-  int iTop;                         ///< 0-based position of the top of the current viewport (in lines or pixels)
-  int iHeight;                      ///< 0-based height of the current viewport (in lines or pixels)
-  int iLeft;                        ///< 0-based position of the left of the current viewport (in characters or pixels)
-  int iWidth;                       ///< 0-based width of the current viewport (in characters or pixels)
-
-  int iTabIndex;                    ///< Current tab index (for tabbed versions; -1 for "no tabs")
-  int fFlags;                       ///< various bitflags defining features.  See WBChildFrame_FLAGS enum.
-
-  char *szDisplayName;              ///< display name shown in tab and title bar.  You should not alter this member.
-
-  WBWinEvent pUserCallback;         ///< message callback function pointer (can be NULL)
-
-  struct __WBChildFrame__ *pNext;   ///< 'Next Object' pointer in an internally stored linked list
-
-} WBChildFrame;
-
-
-/** \enum WBChildFrame_FLAGS
-  * \ingroup child_frame
-  * \brief enumeration for 'fFlags' member of WBChildFrame
-*/  
-enum WBChildFrame_FLAGS 
-{
-  WBChildFrame_NO_TAB = 1,  ///< does not use tabs [intended for SDI interface]
-  WBChildFrame_PIXELS = 2,  ///< use PIXELS instead of characters and lines to define the viewport
-};
-
-
+#define CHILD_FRAME_TAG (*((const unsigned int *)"FWCF"))
 
 /** \ingroup child_frame
   * \brief Initialize a child frame (assumed to be a base 'class' for the window)
   *
-  * \param pChildFrame a pointer to the WBChildFrame associated with the window
+  * \param pChildFrame a pointer to the WBChildFrame associated with the window.  Can not be NULL.
   * \param pOwner A pointer to the owning WBFrameWindow.  Can not be NULL.
   * \param pFont The desired font, or NULL to use the default
   * \param szFocusMenu A const pointer to a text-based menu resource describing the menu that should appear when the Child Frame's tab has the focus.  Can be NULL if none.
@@ -165,15 +106,17 @@ enum WBChildFrame_FLAGS
   * A child frame is not created directly.  Instead, create the 'derived' version's structure, and initialize
   * the structure for the derived behavior, with the WBChildFrame structure as the first element.  Then initialize
   * the WBChildFrame structure with this function, which will create the child frame window ID and register it with
-  * the specified WBFrameWindow Window ID.\n
+  * the specified WBFrameWindow.\n
   * Failure to call this function will prevent the 'Child Frame' functionality from working correctly, and will not
   * register the relationship between the Window ID and the WBChildFrame structure.
   *
-  * NOTE:  To create a stand-alone 'derived' Child Frame, first create a minimal frame window, and then disable 'tabs'.
+  * NOTE:  To create a stand-alone 'derived' Child Frame, first create a minimal frame window, with disabled 'tabs'.
+  * Then, create the Child Frame 'derived' window using WBInitChildFrame().  Only one will be allowed.\n
+  * NOTE 2:  If WBInitChildFrame() returns a non-zero value, do NOT call WBDestroyChildFrame() on that WBChildFrame .
   *
-  * \sa \link frame \endlink
+  * \sa \ref frame "Frame Windows"
 */
-int WBInitChildFrame(WBChildFrame *pChildFrame, WBFrameWindow *pOwner, XFontStruct *pFont,
+int FWInitChildFrame(WBChildFrame *pChildFrame, WBFrameWindow *pOwner, XFontStruct *pFont,
                      const char *szFocusMenu, const WBFWMenuHandler *pHandlerArray,
                      WBWinEvent pUserCallback, int fFlags);
 
@@ -185,7 +128,7 @@ int WBInitChildFrame(WBChildFrame *pChildFrame, WBFrameWindow *pOwner, XFontStru
   *
   * Call this function to destroy the actual window and de-reference
 */
-void WBDestroyChildFrame(WBChildFrame *pChildFrame);
+void FWDestroyChildFrame(WBChildFrame *pChildFrame);
 
 /** \ingroup child_frame
   * \brief Function to assign the menu resource to a Child Frame
@@ -196,18 +139,18 @@ void WBDestroyChildFrame(WBChildFrame *pChildFrame);
   * Assigns the (new) menu for the Child Frame.  The text will be copied, and the copy will be
   * used internally, and free'd as necessary.  Only valid when the owner is a Frame Window.
 */
-void WBSetEditWindowMenu(WBChildFrame *pChildFrame, const char *szFocusMenu);
+void FWSetChildFrameMenu(WBChildFrame *pChildFrame, const char *szFocusMenu);
 
 /** \ingroup child_frame
   * \brief Function to assign menu handlers to a Child Frame
   *
   * \param pChildFrame The pointer to the WBChildFrame structure for the desired Child Frame window
-  * \param pHandlerArray A pointer to an array of WBFWMenuHandler structures - \sa \link FW_MENU_HANDLER_ENTRY \endlink
+  * \param pHandlerArray A pointer to an array of WBFWMenuHandler structures - \sa \ref FW_MENU_HANDLER_ENTRY
   *
   * Assigns the (new) menu handlers for the Child Frame.  The array will be copied, and the copy will be
   * used internally, and free'd as necessary.
 */
-void WBSetChildFrameMenuHandlers(WBChildFrame *pChildFrame, const WBFWMenuHandler *pHandlerArray);
+void FWSetChildFrameMenuHandlers(WBChildFrame *pChildFrame, const WBFWMenuHandler *pHandlerArray);
 
 /** \ingroup child_frame
   * \brief Assign the display name
@@ -218,7 +161,45 @@ void WBSetChildFrameMenuHandlers(WBChildFrame *pChildFrame, const WBFWMenuHandle
   * Assigns the display name for the Child Frame, to appear in the tab and (optionally) in the frame window's title bar
   * whenever the Child Frame has the focus.
 */
-void WBSetChildFrameDisplayName(WBChildFrame *pChildFrame, const char *szDisplayName);
+void FWSetChildFrameDisplayName(WBChildFrame *pChildFrame, const char *szDisplayName);
+
+/** \ingroup child_frame
+  * \brief Set the X,Y extent for the child frame (notifies everything)
+  *
+  * \param pChildFrame The pointer to the WBChildFrame structure for the desired Child Frame window
+  * \param iXExtent the 'X' extent of the display surface
+  * \param iYExtent the 'Y' extent of the display surface
+  *
+  * Use this function to assign the X and Y extents for the display surface on a Child Frame window.  Calling
+  * this function will set up the scrolling behavior as well as notifying 'everything' of the changes, such
+  * as re-painting the window or re-sizing something.
+*/
+void FWSetChildFrameExtent(WBChildFrame *pChildFrame, int iXExtent, int iYExtent);
+
+
+/** \ingroup child_frame
+  * \brief Child frame notification callback (called by frame window)
+  *
+  * \param pChildFrame The pointer to the WBChildFrame structure for the desired Child Frame window
+  *
+  * The frame window will call this function whenever the layout changes, including at the point the
+  * child frame is added to the frame window.  Internally, it will call the user-defined event handler
+  * function with an event type of 'ClientMessage' and message type \ref RESIZE_NOTIFY
+*/
+void FWChildFrameRecalcLayout(WBChildFrame *pChildFrame);
+
+
+/** \ingroup child_frame
+  * \brief Default event handler for Child Frame window
+  *
+  * \param wID A valid Window ID for a Child Frame window
+  * \param pEvent A pointer to the XEvent structure
+  * \returns An integer value, in which zero indicates "not handled", and non-zero indicates "handled"
+  *
+  * Use this function to safely obtain the correct WBChildFrame structure for a given Window ID.
+*/
+int FWChildFrameEvent(Window wID, XEvent *pEvent);
+
 
 
 /** \ingroup child_frame
@@ -229,7 +210,17 @@ void WBSetChildFrameDisplayName(WBChildFrame *pChildFrame, const char *szDisplay
   *
   * Use this function to safely obtain the correct WBChildFrame structure for a given Window ID.
 */
-WBChildFrame *WBChildFrameFromWindowID(Window wID);
+static __inline__ WBChildFrame *FWGetChildFrameStruct(Window wID)
+{
+  WBChildFrame *pRval = (WBChildFrame *)WBGetWindowData(wID, 0);  // offset 0 for window-specific structs
+  if(pRval && pRval->ulTag == CHILD_FRAME_TAG)
+  {
+    return(pRval);
+  }
+
+  return(NULL);
+}
+
 
 
 #ifdef __cplusplus

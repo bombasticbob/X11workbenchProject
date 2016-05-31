@@ -72,6 +72,8 @@
 #define FRAME_WINDOW_MIN_WIDTH 160  /* re-sizable window absolute minimum width */
 #define FRAME_WINDOW_MIN_HEIGHT 120 /* re-sizable window absolute minimum height */
 
+#define TAB_BAR_HEIGHT 20 /* for now */
+
 
 typedef struct __FRAME_WINDOW__
 {
@@ -80,10 +82,8 @@ typedef struct __FRAME_WINDOW__
   WBFWMenuHandler *pMenuHandler;     // pointer to the current menu handler structure array (internally allocated)
   WBFWMenuHandler *pDefMenuHandler;  // pointer to default menu handler (assigned by 'FWSetMenuHandlers()')
 
-//  Window *pwContents;                // malloc'd array of 'contents' window IDs (determines tab order)
-
   int nChildFrames;                  // total number of child frames
-  int nMaxChildFrames;               // max # of child frames within the current array
+  int nMaxChildFrames;               // max number of child frames within the current array
   WBChildFrame **ppChildFrames;      // Pointer to type-abstracted array of child frames
                                      // ctrl+alt+pageup/pagedown to navigate from one tab to another
   // NOTE:  'ppChildFrames' is a contiguous array, without any NULLs in between
@@ -110,6 +110,8 @@ static FRAME_WINDOW *pFrames = NULL;  // pointer to linked list of frame windows
 static XColor clrFG, clrBG, clrBD;
 static int iInitColorFlag = 0;
 
+
+
 static void __internal_destroy_frame_window(FRAME_WINDOW *pTemp)
 {
   int i1;
@@ -125,9 +127,11 @@ static void __internal_destroy_frame_window(FRAME_WINDOW *pTemp)
       if(pTemp->ppChildFrames[i1])
       {
         // validate the pointer
+#ifndef NO_DEBUG /* warning off for release build */
 #warning this is potentially unsafe code...
+#endif // !NO_DEBUG
 
-        WBDestroyWindow(pTemp->ppChildFrames[i1]->wSelf); // TODO:  improve this
+        WBDestroyWindow(pTemp->ppChildFrames[i1]->wID); // TODO:  improve this
       }
     }
 
@@ -206,6 +210,29 @@ static void InternalCheckColors(void)
     iInitColorFlag = 1;
   }
 }
+
+XColor FWGetDefaultFG(void)
+{
+  InternalCheckColors();
+
+  return clrFG;
+}
+
+XColor FWGetDefaultBG(void)
+{
+  InternalCheckColors();
+
+  return clrBG;
+}
+
+XColor FWGetDefaultBD(void)
+{
+  InternalCheckColors();
+
+  return clrBD;
+}
+
+
 
 WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *szMenuResource,
                                    int iX, int iY, int iWidth, int iHeight,
@@ -515,12 +542,65 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 
         break;
 
+      case ConfigureNotify:  // window size/position change
+        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
+                       "%s - CONFIGURE NOTIFY\n", __FUNCTION__);
+
+        // allow message to process first, and post a message to myself
+        // to re-evaluate the layout.  This is to avoid having a window that's
+        // not "changed" yet trying to update its size info when size info is
+        // not yet accurate.
+        //
+        // ALSO - I can get this on a window MOVE without a resize...
+
+        {
+          Display *pDisplay;
+          XClientMessageEvent evt;
+
+          pDisplay = WBGetWindowDisplay(wID);
+
+          bzero(&evt, sizeof(evt));
+          evt.type = ClientMessage;
+
+          evt.display = pDisplay;
+          evt.window = wID;
+          evt.message_type = aRESIZE_NOTIFY;
+          evt.format = 32;  // always
+          evt.data.l[0] = pEvent->xconfigure.x;
+          evt.data.l[1] = pEvent->xconfigure.y;
+          evt.data.l[2] = pEvent->xconfigure.x + pEvent->xconfigure.width; // right
+          evt.data.l[3] = pEvent->xconfigure.y + pEvent->xconfigure.height; // bottom
+          evt.data.l[4] = pEvent->xconfigure.border_width; // RESERVED (for now, just do it)
+
+          WBPostEvent(wID, (XEvent *)&evt); // NOTE:  if too slow, post 'priority' instead
+        }  
+        
+        break;
+
+
       case ClientMessage:  // menus, etc. (they generate the 'ClientMessage')
 
-        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
-                       "%s - CLIENT MESSAGE\n", __FUNCTION__);
+#ifndef NO_DEBUG
+        {
+          char *p1 = XGetAtomName(WBGetWindowDisplay(wID), pEvent->xclient.message_type);
 
-        if(pEvent->xclient.message_type == aMENU_COMMAND)
+          WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
+                         "%s - CLIENT MESSAGE:  %s\n", __FUNCTION__, p1);
+
+          if(p1)
+          {
+            XFree(p1);
+          }
+        }
+#endif // NO_DEBUG
+
+        if(pEvent->xclient.message_type == aRESIZE_NOTIFY)
+        {
+          FWRecalcLayout(wID);
+
+          return 1; // handled (TODO:  send to user-defined callback as well?)
+        }
+        else if(pEvent->xclient.message_type == aMENU_COMMAND)
         {
           //////////////////////////////////////////////////////////////////////////
           //                                _                     _ _             //
@@ -535,10 +615,12 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
           // check the container window that has the current focus, and THEN
           // check the frame window for an appropriate handler
 
-          Window wFocus = FWGetFocusWindow(&(pFrameWindow->wbFW));
-          if(wFocus != None)
+          WBChildFrame *pFocus = FWGetFocusWindow(&(pFrameWindow->wbFW));
+
+          if(pFocus) // if a tab has a focus, use that window's event handler first
           {
-            int iRet = WBWindowDispatch(wFocus, pEvent);
+            int iRet = WBWindowDispatch(pFocus->wID, pEvent);
+
             if(iRet) // non-zero return
             {
               return iRet; // the handler MUST return non-zero if the message should NOT be processed by the frame!
@@ -595,10 +677,10 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
           // check 'contained' window for an appropriate UI handler before passing
           // it off to the frame window's handler
 
-          Window wFocus = FWGetFocusWindow(&(pFrameWindow->wbFW));
-          if(wFocus != None)
+          WBChildFrame *pFocus = FWGetFocusWindow(&(pFrameWindow->wbFW));
+          if(pFocus)
           {
-            int iRet = WBWindowDispatch(wFocus, pEvent);
+            int iRet = WBWindowDispatch(pFocus->wID, pEvent);
             if(iRet >= 0)
             {
               return iRet;
@@ -652,7 +734,9 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 #endif
                   // TODO:  validate pointers, otherwise a posted message might crash me (like a vulnerability)
 
+#ifndef NO_DEBUG /* warning off for release build */
 #warning this code potentially has a vulnerability in it
+#endif // !NO_DEBUG
 
                   // if(!WBIsValidMenu(pMenu) || !WBIsValidMenuItem(pItem)) { do not do it }
 
@@ -668,11 +752,21 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 
           return -1; // if there's no handler and no UI handler, always return 'disabled'
         }
+#ifndef NO_DEBUG
         else
         {
+          char *p1 = XGetAtomName(WBGetWindowDisplay(wID), pEvent->xclient.message_type);
+
           WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
-                         "%s - Client message not handled by frame window\n", __FUNCTION__);
+                         "%s - Client message %s not handled by frame window\n",
+                          __FUNCTION__, p1);
+
+          if(p1)
+          {
+            XFree(p1);
+          }
         }
+#endif // NO_DEBUG
 
         break;
 
@@ -838,12 +932,81 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 
 void FWRecalcLayout(Window wID)
 {
+WB_RECT rct;
+FRAME_WINDOW *pFrameWindow;
+int i1, iMax;
+
+
+  pFrameWindow = (FRAME_WINDOW *)FWGetFrameWindowStruct(wID);
+
+  if(!pFrameWindow)
+  {
+    WB_ERROR_PRINT("%s - ERROR - no frame window pointer!\n", __FUNCTION__);
+    return;
+  }
+
   // this callback happens any time I change the window size.  Use this
   // also to re-size scrollbars and status bars and menus.
 
+  // calculate the actual size of the client area and inform all of the 'Child Frame'
+  // windows so that they can assign the size and fix scrollbars, etc. as appropriate
+
+  WBGetClientRect(wID, &rct); // get the rectangle for the client area
+
+  // obtain the height and position of the menu (if any), toolbar (if any), and tab area (if any)
+  // and subtract that from rct.top - then record this as my "client area" in the FRAME_WINDOW
+  // structure (iClientX, iClientY, iClientWidth, iClientHeight).
 
 
-  WBInvalidateGeom(wID, NULL, 1); // for now, just force a re-paint
+  if(!(WBFrameWindow_NO_TABS & pFrameWindow->wbFW.iFlags)) // window has tabs
+  {
+    rct.top += TAB_BAR_HEIGHT;
+  }
+
+
+
+  // Now that I've calculated the new client rectangle area, assign appropriate thingies
+  // (but if it matches, bail here, no need for anything else, since nothing changed)
+
+  rct.right -= rct.left; // now it's a width
+  rct.bottom -= rct.top;  // now it's a height
+
+  if(pFrameWindow->wbFW.iClientX == rct.left &&
+     pFrameWindow->wbFW.iClientY == rct.top &&
+     pFrameWindow->wbFW.iClientWidth == rct.right &&
+     pFrameWindow->wbFW.iClientHeight == rct.bottom)
+  {
+    return; // nothing changed
+  }
+
+  // assign the new values
+  pFrameWindow->wbFW.iClientX      = rct.left;
+  pFrameWindow->wbFW.iClientY      = rct.top;
+  pFrameWindow->wbFW.iClientWidth  = rct.right;
+  pFrameWindow->wbFW.iClientHeight = rct.bottom;
+
+
+  // next, inform all of the child frames that I'm different now
+
+  iMax = FWGetNumContWindows(&(pFrameWindow->wbFW));
+
+  for(i1=0; i1 < iMax; i1++)
+  {
+    WBChildFrame *pCW = FWGetContainedWindowByIndex(&(pFrameWindow->wbFW), i1);
+
+    if(pCW)
+    {
+      FWChildFrameRecalcLayout(pCW); // inform the child frame of the layout change
+    }
+  }
+
+  // temporarily use 'error level' so I can always see this
+  WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
+                 "%s - %d, %d, %d, %d\n", __FUNCTION__,
+                 pFrameWindow->wbFW.iClientX, pFrameWindow->wbFW.iClientY,
+                 pFrameWindow->wbFW.iClientWidth, pFrameWindow->wbFW.iClientHeight);
+
+  WBInvalidateGeom(wID, NULL, 1); // and, finally, force a re-paint (mostly hidden by child frame, except tabs, borders, etc.)
 }
 
 
@@ -854,21 +1017,21 @@ int FWGetNumContWindows(const WBFrameWindow *pFrameWindow)
   return -1;  // for now
 }
 
-Window FWGetContainedWindowByIndex(const WBFrameWindow *pFrameWindow, int iIndex)
+WBChildFrame * FWGetContainedWindowByIndex(const WBFrameWindow *pFrameWindow, int iIndex)
 {
-  return None; // for now
+  return NULL; // for now
 }
 
-int FWAddContainedWindow(WBFrameWindow *pFrameWindow, Window idNew)
+int FWAddContainedWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pNew)
 {
   return -1;  // for now
 }
 
-void FWRemoveContainedWindow(WBFrameWindow *pFrameWindow, Window idCont)
+void FWRemoveContainedWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pCont)
 {
 }
 
-void FWSetFocusWindow(WBFrameWindow *pFrameWindow, Window idCont)
+void FWSetFocusWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pCont)
 {
 }
 

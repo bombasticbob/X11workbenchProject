@@ -1143,7 +1143,7 @@ int DLGModifyControlListInfo(WBDialogControl *pCtrl, int bFlags, int nFlags,
 WB_DIALOG_PROP propTemp;
 const WB_DIALOG_PROP *pProp;
 LISTINFO *pLI;
-int i1;
+//int i1;
 
 
   pProp = WBDialogControlGetDialogProp(pCtrl, aDLGC_LISTINFO);
@@ -2116,8 +2116,11 @@ WB_SCROLLINFO *pScrollInfo;
 
     long lKey = pEvent->xclient.data.l[0];             // return from WBKeyEventProcessKey
     long lAltCtrlShift = pEvent->xclient.data.l[1];    // *piAltCtrlShift from WBKeyEventProcessKey
+#ifndef NO_DEBUG
     int nChar = (int)pEvent->xclient.data.l[2];        // # of characters decoded into pBuf (below)
     char *pBuf = (char *)&(pEvent->xclient.data.l[3]); // decode buffer (at least 8 chars in length)
+#endif // !NO_DEBUG
+
 
     WB_ERROR_PRINT("TEMPORARY:  %s char message %lx %ld %d %s\n", __FUNCTION__, lAltCtrlShift, lKey, nChar, pBuf);
 

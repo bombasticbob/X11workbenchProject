@@ -527,7 +527,7 @@ static int FileDialogCallback(Window wID, XEvent *pEvent)
 {
 WBDialogWindow *pDlg = DLGGetDialogWindowStruct(wID);
 struct _FILE_DIALOG_ *pUserData = (struct _FILE_DIALOG_ *)(pDlg ? pDlg->pUserData : NULL);
-Display *pDisplay = WBGetWindowDisplay(wID);
+//Display *pDisplay = WBGetWindowDisplay(wID);
 char *p1, *p2;
 
 
@@ -897,7 +897,7 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 
 void DLGSplashScreen(char *aXPM[], const char *szCopyright, unsigned long clrText)
 {
-Window wID, wIDTemp;
+Window wID;//, wIDTemp;
 XSetWindowAttributes xswa;  /* Temporary Set Window Attribute struct */
 int iX, iY, iW, iH;
 XSizeHints  xsh;            /* Size hints for window manager */
@@ -1099,17 +1099,18 @@ struct _SPLASH_ *pData = (struct _SPLASH_ *)WBGetWindowData(wID, 0);
 static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                                Window wID, struct _SPLASH_ *pData)
 {
-  int iHPos, iVPos;
-  XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
-  XFontStruct *pOldFont, *pFont;
-  XPoint xpt[3];
+  XFontStruct *pFont;//, *pOldFont;
+//  XPoint xpt[3];
   GC gc;// = WBGetWindowDefaultGC(wID);
   Pixmap pxTemp;
   XGCValues xgcv;
-  WB_GEOM geomPaint, geomBorder, geomText;
-  int i1, i2, iX, iY, iW, iH, iTimeStart, iTimeEnd;
+  WB_GEOM geomBorder, geomText;
   XRectangle xrct;
-  char *p1, *p2;
+//  WB_GEOM geomPaint;
+  int i1, i2, iX, iY, iTimeStart, iTimeEnd;
+//  int iW, iH, iHPos, iVPos;
+//  XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
+//  char *p1, *p2;
 
   if(!pDisplay)
   {

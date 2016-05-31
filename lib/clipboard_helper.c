@@ -286,6 +286,7 @@ void WBExitClipboardSystem(Display *pDisplay)
 }
 
 
+#if 0 /* uncomment this if I need the functionality; otherwise, consider removing it */
 // event check 'predicate' proc for selection events
 static Bool __ClipboardThreadEventPredicate(Display *pDisplay, XEvent *pEvent, XPointer arg)
 {
@@ -301,6 +302,7 @@ static Bool __ClipboardThreadEventPredicate(Display *pDisplay, XEvent *pEvent, X
     return FALSE;
   }
 }
+#endif // 0
 
 
 // a few utilities placed here to make the code read better
@@ -384,7 +386,7 @@ CLIPBOARD_TASK *pT, *pT2;
 
 void * ClipboardThreadProc(void *pParam)
 {
-int iLen, iFactor, iErr;
+int iLen, iFactor;//, iErr;
 const char *pDisplayName = (const char *)pParam;
 Display *pDisplay = NULL;
 volatile CLIPBOARD_TASK *pT;
@@ -401,13 +403,13 @@ Atom aINCR, aWBCLIP, aCLIPBOARD, aTEXT, aC_STRING, aCOMPOUND_TEXT, aTARGETS, aMU
 #ifdef X_HAVE_UTF8_STRING /* this indicates the extension is present */
 Atom aUTF8_STRING;
 #endif // X_HAVE_UTF8_STRING
-Atom aPRIMARY    = XA_PRIMARY;
-Atom aSECONDARY = XA_SECONDARY;
-Atom aSTRING    = XA_STRING;
-Atom aBITMAP    = XA_BITMAP;
-Atom aDRAWABLE  = XA_DRAWABLE;
-Atom aCOLORMAP  = XA_COLORMAP;
-Atom aPIXMAP    = XA_PIXMAP;
+//Atom aPRIMARY    = XA_PRIMARY;
+//Atom aSECONDARY = XA_SECONDARY;
+//Atom aSTRING    = XA_STRING;
+//Atom aBITMAP    = XA_BITMAP;
+//Atom aDRAWABLE  = XA_DRAWABLE;
+//Atom aCOLORMAP  = XA_COLORMAP;
+//Atom aPIXMAP    = XA_PIXMAP;
 
 
   pDisplay = XOpenDisplay(pDisplayName);

@@ -901,7 +901,7 @@ static __inline__ void WBInitializeTextObject(TEXT_OBJECT *pTextObject)
   typedef struct _text_buffer_
   {
     unsigned long nArraySize; // allocated size of aLines array
-    unsigned long nEntries;   // # of entries currently in the array
+    unsigned long nEntries;   // number of entries currently in the array
 
     // cached information
     unsigned int nMaxCol;     // The maximum column number for any line, rounded up by 'DEFAULT_TAB_WIDTH'
@@ -929,7 +929,7 @@ static __inline__ void WBInitializeTextObject(TEXT_OBJECT *pTextObject)
 typedef struct _text_buffer_
 {
   unsigned long nArraySize; ///< allocated size of aLines array
-  unsigned long nEntries;   ///< # of entries currently in the array - call WBCheckReAllocTextBuffer() before increasing
+  unsigned long nEntries;   ///< number of entries currently in the array - call WBCheckReAllocTextBuffer() before increasing
 
   // cached information
   unsigned int nMaxCol;     ///< The maximum column number for any line, rounded up by 'DEFAULT_TAB_WIDTH'

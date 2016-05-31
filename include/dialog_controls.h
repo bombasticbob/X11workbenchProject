@@ -92,7 +92,7 @@ typedef struct __WB_DIALOG_PROP__
   void *pVal;          // pointer to data, as needed (may be allocated, some property types auto-free the data)
 } WB_DIALOG_PROP;
 \endcode
-  *  /sa  \ref __WB_DIALOG_PROP__ and \ref WBDialogPropList
+  *  /sa  __WB_DIALOG_PROP__ and WBDialogPropList
 */
 /** \ingroup dlgctrl
   * \struct __WB_DIALOG_PROP__
@@ -197,7 +197,7 @@ typedef struct __WB_DIALOG_CONTROL__
   * For each dialog control, a pointer to this structure is assigned to window property index 0, and can be
   * easily obtained using DLGGetDialogControlStruct() (preferred method)
   *
-  * /sa  \ref __WB_DIALOG_CONTROL__, \ref WBDialogPropList
+  * /sa  __WB_DIALOG_CONTROL__ and WBDialogPropList
 */
 /** \ingroup dlgctrl
   * \struct __WB_DIALOG_CONTROL__
@@ -248,12 +248,14 @@ void WBDialogControlsInit(void);  // call once before using (dialog_window.c doe
   * \return Pointer to a WBDialogControl structure associated with the dialog control window
   * \param aClass The class name atom for the window being created (may be None)
   * \param pOwner The owner window (usually a dialog frame window)
+  * \param pDialogEntry A pointer to the WBDialogEntry structure associated with the control (the one I will be using)
   * \param iX The horizontal position of the upper left corner of the control window (relative to the owner window)
   * \param iY The vertical position of the upper left corner of the control window (relative to the owner window)
   * \param iWidth The width of the control window
   * \param iHeight The height of the control window
   * \param szTitle A null-byte terminated string containing the 'title' text for the control (may be NULL)
   * \param szPropertyList A set of newline terminated strings, ending with a null-byte, containing property/value pairs for initial property assignment
+  * \returns A pointer to a WBDialogControl structure identifying the control
   *
   * Use this function to create a dialog conrol window, returning a pointer to the WBDialogControl
   * class containing its properties.
@@ -1194,8 +1196,8 @@ void DLGSetControlListSelectionValue(WBDialogControl *pCtrl, int iIndex, int iSe
   * where 'iIndex' represents the index of the bit you wish to query.
 */
 int DLGGetControlListSelectionBits(WBDialogControl *pCtrl, unsigned int *piBits, int nSize);
-  // piBits and nSize must be large enough to accomodate bits.  'nSize' is # of integers (not bytes)
-  // return value is 0 for no sel, >0 for # of selections, < 0 on error.  assume 32 bits per entry ( LSbit is entry '0' )
+  // piBits and nSize must be large enough to accomodate bits.  'nSize' is number of integers (not bytes)
+  // return value is 0 for no sel, >0 for number of selections, < 0 on error.  assume 32 bits per entry ( LSbit is entry '0' )
   // a '1' in a bit position indicates the entry has been selected.
 
 /** \ingroup dlglist

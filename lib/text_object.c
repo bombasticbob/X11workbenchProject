@@ -324,7 +324,8 @@ struct __malloc_header__
   unsigned int cbSize; // size used for last malloc/realloc
 };
 
-static struct __malloc_header__ *pMallocList = NULL, *pMallocListEnd = NULL;
+//static struct __malloc_header__ *pMallocList = NULL, *pMallocListEnd = NULL;
+// TODO:  when I go to implement this, uncomment the above line
 
 // TODO:  sync object for pMallocList etc.
 
@@ -1090,6 +1091,8 @@ struct __internal_undo_redo_buffer *pUndo, *pTU, *pTU2;
   }
 }
 
+
+#if 0 /* not currently in use - uncomment to implement its functionality */
 static void __internal_add_redo(struct _text_object_ *pThis, struct __internal_undo_redo_buffer *pUndo)
 {
 struct __internal_undo_redo_buffer *pRedo;
@@ -1123,12 +1126,16 @@ int cbLen;
   pRedo->pNext = (struct __internal_undo_redo_buffer *)(pThis->pRedo);
   pThis->pRedo = pRedo;
 }
+#endif // 0
 
+#if 0 /* not currently in use - uncomment to implement its functionality */
 static void __internal_perform_undo(struct _text_object_ *pThis, struct __internal_undo_redo_buffer *pUndo)
 {
-struct __internal_undo_redo_buffer *pDo;
+struct __internal_undo_redo_buffer *pDo = NULL;
 int iOldSel;
 
+
+  pDo = pDo; // TEMPORARY, warning avoidance
 
   if(!WBIsValidTextObject(pThis) || !pUndo)
   {
@@ -1177,7 +1184,9 @@ int iOldSel;
   // add a redo buffer that's a copy of the undo operation
   __internal_add_redo(pThis, pUndo);
 }
+#endif // 0
 
+#if 0 /* not currently in use - uncomment to implement its functionality */
 static void __internal_perform_redo(struct _text_object_ *pThis, struct __internal_undo_redo_buffer *pRedo)
 {
 struct __internal_undo_redo_buffer *pNewUndo;
@@ -1250,6 +1259,7 @@ int iOldSel, cbLen;
   pNewUndo->pNext = (struct __internal_undo_redo_buffer *)(pThis->pUndo);
   pThis->pUndo = pNewUndo;
 }
+#endif // 0
 
 // ---------------------------------------------------------------------------
 // __internal_get_selected_text - arbitrary text retrieval (internal only)
@@ -1599,7 +1609,7 @@ TEXT_BUFFER *pBuf;
   }
   else
   {
-    pThis->rctWinView.top;
+//    pThis->rctWinView.top;  what did I intend to do here???
 
     if(iStartRow == iEndRow) // single row
     {
@@ -4438,7 +4448,7 @@ static void __internal_cursor_blink(struct _text_object_ *pThis, int bHasFocus)
 {
   if(WBIsValidTextObject(pThis))
   {
-    WB_RECT rctCursor;
+//    WB_RECT rctCursor;
 
     if(!bHasFocus)
     {

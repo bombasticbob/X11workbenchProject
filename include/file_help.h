@@ -84,7 +84,7 @@ extern "C" {
   *
   * An abstracted set of API functions that allow you to manage line-based text editing
   * using a basic structure as a 'File Buffer' object.
-*/
+**/
 
 /** \defgroup file_help_io File I/O 'helper' functions
   * \ingroup file_help
@@ -92,7 +92,7 @@ extern "C" {
   *
   * File helper utilities that enable you to more easily enumerate the contents of a directory,
   * make a backup copy of an existing file, get a file's type or permissions, or canonicalize a file name.\n
-*/
+**/
 
 
 /** \ingroup file_help_buf
@@ -112,7 +112,7 @@ extern "C" {
     struct __file_help_buf__ *pNext; // pointer to 'next' item in linked list (NULL for last object)
     long lBufferSize;                // size of entire buffer
     long lBufferCount;               // number of bytes of valid data
-    long lLineCount;                 // # of lines in 'cData' when ppLineBuf not NULL
+    long lLineCount;                 // number of lines in 'cData' when ppLineBuf not NULL
     long lLineBufSize;               // size of memory block pointed to by 'ppLineBuf'
     int  iFlags;                     // various bit flags
     char **ppLineBuf;                // array of pointers to beginning of each line (malloc'd TODO: make it part of 'cData'?)
@@ -135,7 +135,7 @@ typedef struct __file_help_buf__
   struct __file_help_buf__ *pNext; ///< pointer to 'next' item in linked list (NULL for last object)
   long lBufferSize;                ///< size of entire buffer
   long lBufferCount;               ///< number of bytes of valid data
-  long lLineCount;                 ///< # of lines in 'cData' when ppLineBuf not NULL
+  long lLineCount;                 ///< number of lines in 'cData' when ppLineBuf not NULL
   long lLineBufSize;               ///< size of memory block pointed to by 'ppLineBuf'
   int  iFlags;                     ///< various bit flags
   char **ppLineBuf;                ///< array of pointers to beginning of each line (malloc'd TODO: make it part of 'cData'?)
@@ -315,7 +315,7 @@ void FBDeleteFromFileBuf(file_help_buf_t *pBuf, long cbOffset, long cbDelFrom);
   * NOTE: this is a line-based abstraction for \ref FBInsertIntoFileBuf().  Automatically re-parses as needed
 **/
 void FBInsertLineIntoFileBuf(file_help_buf_t **ppBuf, long lLineNum, const char *szLine);
-  //
+
 
 /** \ingroup file_help_buf
   * \brief Delete a line of text from a \ref file_help_buf_t object at a specific line index
@@ -357,7 +357,7 @@ void FBReplaceLineInFileBuf(file_help_buf_t **ppBuf, long lLineNum, const char *
   * \param pBuf A const pointer to a buffer containing data to write, or NULL if no data is to be written
   * \param cbBuf The byte count to write from 'pBuf'.
   * \returns A value of zero if successful, non-zero on error
-  */
+**/
 static __inline__ int FBWriteFileFromBuffer(const char *szFileName, const char *pBuf, unsigned int cbBuf)
 {
 int iRval;
@@ -426,7 +426,7 @@ int WBIsDirectory(const char *szName);
 /** \ingroup file_help_io
   * \brief Return the canonical path for a file name (similar to POSIX 'realpath()' funtion)
   *
-  * \param szName The file name to query.  If the name contains symbolic links, they will be resolved.
+  * \param szFileName The file name to query.  If the name contains symbolic links, they will be resolved.
   * \returns A malloc'd buffer containing the canonical path, or NULL on error.
   *
   * Use this function to determine the canonical name for a specified path.  If the path does not exist,

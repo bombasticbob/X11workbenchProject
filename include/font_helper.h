@@ -63,23 +63,15 @@ extern "C" {
 #endif // __cplusplus
 
 
-/** \ingroup debug
-  * \brief Dump debug information about fonts according to pSpec
-  *
-  * \param pSpec An ASCII specification for font matching
-  *
-  * Use this function to gain insight into the available fonts.  Output is dumped to stderr
-  * using the debug output functions.
-**/
-void WBDumpFontInfo(const char *pSpec);  // debugging function - dumps a list of fonts and info
-
 /** \ingroup font
   * \brief make a copy of an existing font (best when assigning to a window)
   *
   * \param pFont The original font to be copied
   * \returns A copy of the original font as an XFontStruct
   *
-  * use this function to make a copy of an existing XFontStruct
+  * use this function to make a copy of an existing XFontStruct.
+  *
+  * On error this function returns NULL. The caller must free non-NULL return values via XFreeFont()
 **/
 XFontStruct *WBCopyFont(XFontStruct *pFont);
 
@@ -99,8 +91,8 @@ XFontStruct *WBCopyFont(XFontStruct *pFont);
   * Positive 'iFontSize' is the height (including ascend/descend)\n
   * A value of '0' is considered to be a 'wildcard' match.  Use a positive 'iFontSize' for more precise
   * font measurement.\n
-  * On error this function returns NULL.  A non-NULL returned value will need to be released
-  * using XUnloadFont()
+  *
+  * On error this function returns NULL. The caller must free non-NULL return values via XFreeFont()
 **/
 XFontStruct *WBLoadFont(Display *pDisplay, const char *szFontName,
                         int iFontSize, int iFlags);
@@ -121,8 +113,8 @@ XFontStruct *WBLoadFont(Display *pDisplay, const char *szFontName,
   * use this function to select a similar font that differs only by whatever is specified
   * in 'iFontSize' or 'iFlags'.  If a matching font is NOT available, a copy of the original
   * font will be returned.  Typical use is to 'bold' or 'italicize' an existing font.\n
-  * On error this function returns NULL.  A non-NULL returned value will need to be released
-  * using XUnloadFont()
+  *
+  * On error this function returns NULL. The caller must free non-NULL return values via XFreeFont()
 **/
 XFontStruct *WBLoadModifyFont(Display *pDisplay, const XFontStruct *pOriginal,
                               int iFontSize, int iFlags);
@@ -132,88 +124,108 @@ XFontStruct *WBLoadModifyFont(Display *pDisplay, const XFontStruct *pOriginal,
   *
   * \param pDisplay A pointer to the Display ( NULL uses \ref WBGetDefaultDisplay() )
   * \param pFont A pointer to an XFontStruct
-  * \returns An XFontSet appropriate to the XFontStruct
+  * \returns An XFontSet appropriate to the XFontStruct, or NULL on error.
   *
   * This function helps to support internationalization through use of the 'Xmb'
   * 'Xwc' and 'Xutf8' versions of the X11 'core' text rendering API functions
   * by creating an 'XFontSet' that matches all of the available character sets for
-  * a supplied font specification.
+  * a supplied font specification.\n
+  * The returned value (if not NULL) will need to be free'd using XFreeFontSet()
 **/
 XFontSet WBFontSetFromFont(Display *pDisplay, const XFontStruct *pFont);
 
 
+/** \ingroup debug
+  * \brief Dump debug information about fonts according to pSpec
+  *
+  * \param pSpec An ASCII specification for font matching
+  *
+  * Use this function to gain insight into the available fonts.  Output is dumped to stderr
+  * using the debug output functions.
+**/
+void WBDumpFontInfo(const char *pSpec);  // debugging function - dumps a list of fonts and info
 
-// font flag enumeration
+
+
+/** \ingroup font
+  * \enum WBFontFlags
+  * \brief Font 'flag' enumeration
+  *
+  * An enumeration of 'Font Flags' used by WBLoadFont() and WBLoadModifyFont() to load and/or
+  * modify a font according to the desired specifications.
+  *
+  * \sa WBLoadFont(), WBLoadModifyFont()
+**/
 enum WBFontFlags
 {
-  WBFontFlag_PITCH_FIXED     = 1,       // force fixed pitch
-  WBFontFlag_PITCH_VARIABLE  = 2,       // force variable pitch
-  WBFontFlag_PITCH_CONDENSED = 4,       // condensed (alternate to 'fixed')
-  WBFontFlag_PITCH_ANY       = 0,
-  WBFontFlag_PITCH_MASK      = 7,       // 'pitch mask'
+  WBFontFlag_PITCH_FIXED     = 1,       ///< force fixed pitch
+  WBFontFlag_PITCH_VARIABLE  = 2,       ///< force variable pitch
+  WBFontFlag_PITCH_CONDENSED = 4,       ///< condensed (alternate to 'fixed')
+  WBFontFlag_PITCH_ANY       = 0,       ///< 'Any' pitch (default, zero)
+  WBFontFlag_PITCH_MASK      = 7,       ///< 'pitch mask'
 
-  WBFontFlag_STYLE_SANS      = 8,       // force sans-serif
-  WBFontFlag_STYLE_SERIF     = 0x10,    // force serif (i.e. 'not sans')
-  WBFontFlag_Reserved20      = 0x20,    // reserved (style)
-  WBFontFlag_Reserved40      = 0x40,    // reserved (style)
-  WBFontFlag_STYLE_ANY       = 0,
-  WBFontFlag_STYLE_MASK      = 0x78,    // style mask
+  WBFontFlag_STYLE_SANS      = 8,       ///< force sans-serif
+  WBFontFlag_STYLE_SERIF     = 0x10,    ///< force serif (i.e. 'not sans')
+  WBFontFlag_Reserved20      = 0x20,    ///< reserved (style)
+  WBFontFlag_Reserved40      = 0x40,    ///< reserved (style)
+  WBFontFlag_STYLE_ANY       = 0,       ///< 'Any' style (default, zero)
+  WBFontFlag_STYLE_MASK      = 0x78,    ///< style mask
 
-  WBFontFlag_RASTER          = 0x80,    // force raster (xfree86?)
-  WBFontFlag_FREETYPE        = 0x100,   // force freetype
-  WBFontFlag_Reserved200     = 0x200,   // reserved (foundry)
-  WBFontFlag_FNDRY_ANY       = 0,
-  WBFontFlag_FNDRY_MASK      = 0x380,   // 'foundry mask'
+  WBFontFlag_RASTER          = 0x80,    ///< force raster (xfree86?)
+  WBFontFlag_FREETYPE        = 0x100,   ///< force freetype
+  WBFontFlag_Reserved200     = 0x200,   ///< reserved (foundry)
+  WBFontFlag_FNDRY_ANY       = 0,       ///< 'Any' foundry (default, zero)
+  WBFontFlag_FNDRY_MASK      = 0x380,   ///< 'foundry mask'
 
   // if the font size is > 0 then these bits apply
-  WBFontFlag_SIZE_PIXELS     = 0,       // font size is in 'pixels'
-  WBFontFlag_SIZE_POINTS     = 0x400,   // font size is in 'points'
-  WBFontFlag_SIZE_TWIPS      = 0x800,   // font size is in 'twips'
-  WBFontFlag_SIZE_Reserved   = 0xc00,   // reserved (size)
-  WBFontFlag_SIZE_MASK       = 0xc00,   // 'size mask'
+  WBFontFlag_SIZE_PIXELS     = 0,       ///< font size is in 'pixels' (when font size > 0)
+  WBFontFlag_SIZE_POINTS     = 0x400,   ///< font size is in 'points' (when font size > 0)
+  WBFontFlag_SIZE_TWIPS      = 0x800,   ///< font size is in 'twips' (when font size > 0)
+  WBFontFlag_SIZE_Reserved   = 0xc00,   ///< reserved flags for font size > 0
+  WBFontFlag_SIZE_MASK       = 0xc00,   ///< 'size mask' for font size > 0
 
-  WBFontFlag_WT_ANY          = 0,       // font weight specification
-  WBFontFlag_WT_REGULAR      = 0x1000,  // only one constant may be specified
-  WBFontFlag_WT_MEDIUM       = 0x2000,
-  WBFontFlag_WT_DEMIBOLD     = 0x3000,
-  WBFontFlag_WT_BOLD         = 0x4000,
-  WBFontFlag_WT_Reserved5    = 0x5000,  // reserved (5)
-  WBFontFlag_WT_Reserved6    = 0x6000,  // reserved (6)
-  WBFontFlag_WT_MASK         = 0x7000,  // weight mask
+  WBFontFlag_WT_ANY          = 0,       ///< Any font weight specification (mutually exclusive)
+  WBFontFlag_WT_REGULAR      = 0x1000,  ///< regular font weight (mutually exclusive0
+  WBFontFlag_WT_MEDIUM       = 0x2000,  ///< medium font weight (mutually exclusive0
+  WBFontFlag_WT_DEMIBOLD     = 0x3000,  ///< demi-bold font weight (mutually exclusive0
+  WBFontFlag_WT_BOLD         = 0x4000,  ///< bold font weight (mutually exclusive0
+  WBFontFlag_WT_Reserved5    = 0x5000,  ///< reserved font weight (5) (not currently in use)
+  WBFontFlag_WT_Reserved6    = 0x6000,  ///< reserved font weight (6) (not currently in use)
+  WBFontFlag_WT_MASK         = 0x7000,  ///< font weight bit mask
 
-  WBFontFlag_SLANT_REGULAR   = 0x10000, // slant (italic, oblique, regular)
-  WBFontFlag_SLANT_OBLIQUE   = 0x20000,
-  WBFontFlag_SLANT_ITALIC    = 0x30000,
-  WBFontFlag_SLANT_ANY       = 0,       // default slant may return an italic or oblique font
-  WBFontFlag_SLANT_MASK      = 0x30000, // slant mask
+  WBFontFlag_SLANT_REGULAR   = 0x10000, ///< 'regular' slant (mutually exclusive)
+  WBFontFlag_SLANT_OBLIQUE   = 0x20000, ///< 'oblique' slant (mutually exclusive)
+  WBFontFlag_SLANT_ITALIC    = 0x30000, ///< 'italic' slant (mutually exclusive)
+  WBFontFlag_SLANT_ANY       = 0,       ///< 'default' slant (zero; mutually exclusive; may return an italic or oblique font)
+  WBFontFlag_SLANT_MASK      = 0x30000, ///< slant mask
 
-  WBFontFlag_WIDTH_NORMAL    = 0x40000,
-  WBFontFlag_WIDTH_SEMICOND  = 0x80000, // semicondensed
-  WBFontFlag_WIDTH_Reserved  = 0xc0000, // reserved (condensed? blank?)
-  WBFontFlag_WIDTH_ANY       = 0,
-  WBFontFlag_WIDTH_MASK      = 0xc0000, // width mask
+  WBFontFlag_WIDTH_NORMAL    = 0x40000, ///< normal width (mutually exclusive)
+  WBFontFlag_WIDTH_SEMICOND  = 0x80000, ///< semicondensed width (mutually exclusive)
+  WBFontFlag_WIDTH_Reserved  = 0xc0000, ///< 'reserved' width type
+  WBFontFlag_WIDTH_ANY       = 0,       ///< 'Any' width (zero; mutually exclusive)
+  WBFontFlag_WIDTH_MASK      = 0xc0000, ///< width mask
 
   // reserved - font registry and encoding (installed X11 fonts typically include most if not all of these)
-  WBFontFlag_REG_ISO8859     = 0x100000, // known (common) registries
-  WBFontFlag_REG_ISO646_1991 = 0x200000,
-  WBFontFlag_REG_ASCII       = 0x300000,
-  WBFontFlag_REG_FNTSPECIFIC = 0x400000, // font specific
-  WBFontFlag_REG_MISC        = 0x500000,
-  WBFontFlag_REG_GB2312_1980 = 0x600000,
-  WBFontFlag_REG_ADOBE       = 0x700000, // a lot of fonts fall into this category
-  WBFontFlag_REG_Reserved8   = 0x800000,
-  WBFontFlag_REG_Reserved9   = 0x900000,
-  WBFontFlag_REG_ReservedA   = 0xa00000,
-  WBFontFlag_REG_ReservedB   = 0xb00000,
-  WBFontFlag_REG_ReservedC   = 0xc00000,
-  WBFontFlag_REG_ReservedD   = 0xd00000,
-  WBFontFlag_REG_ReservedE   = 0xe00000,
-  WBFontFlag_REG_ReservedF   = 0xf00000,
-  WBFontFlag_REG_MASK        = 0xf00000, // /registry mask'
+  WBFontFlag_REG_ISO8859     = 0x100000, ///< use ISO8859 registry (mutually exclusive)
+  WBFontFlag_REG_ISO646_1991 = 0x200000, ///< use ISO646-1991 registry (mutually exclusive)
+  WBFontFlag_REG_ASCII       = 0x300000, ///< use ASCII registry (mutually exclusive)
+  WBFontFlag_REG_FNTSPECIFIC = 0x400000, ///< use a font specific registry (mutually exclusive)
+  WBFontFlag_REG_MISC        = 0x500000, ///< use 'MISC' registry (mutually exclusive)
+  WBFontFlag_REG_GB2312_1980 = 0x600000, ///< use ADOBE registry (mutually exclusive)
+  WBFontFlag_REG_ADOBE       = 0x700000, ///< use ADOBE registry - a lot of fonts use this (mutually exclusive)
+  WBFontFlag_REG_Reserved8   = 0x800000, ///< reserved reg flag (reserved for future use)
+  WBFontFlag_REG_Reserved9   = 0x900000, ///< reserved reg flag (reserved for future use)
+  WBFontFlag_REG_ReservedA   = 0xa00000, ///< reserved reg flag (reserved for future use)
+  WBFontFlag_REG_ReservedB   = 0xb00000, ///< reserved reg flag (reserved for future use)
+  WBFontFlag_REG_ReservedC   = 0xc00000, ///< reserved reg flag (reserved for future use)
+  WBFontFlag_REG_ReservedD   = 0xd00000, ///< reserved reg flag (reserved for future use)
+  WBFontFlag_REG_ReservedE   = 0xe00000, ///< reserved reg flag (reserved for future use)
+  WBFontFlag_REG_ReservedF   = 0xf00000, ///< reserved reg flag (reserved for future use)
+  WBFontFlag_REG_MASK        = 0xf00000, ///< font registry mask
 
   // TODO: flags for 'encoding' ?
 
-  WBFontFlag_WHATEVER        = 0    // don't force anything
+  WBFontFlag_WHATEVER        = 0    // don't force anything (zero, default)
 };
 
 
