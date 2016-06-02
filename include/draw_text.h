@@ -7,6 +7,7 @@
 //                                      |_____|                                         //
 //                                                                                      //
 //                        text draw, multi-line and tabbed text                         //
+//                       Also, additional text-related utilities                        //
 //                                                                                      //
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -76,6 +77,8 @@ extern "C" {
   * This function creates a 'malloc'd copy of szStr, up to the 0-byte.  The returned string
   * ALWAYS ends in a zero byte.  The caller must deallocate the returned pointer using 'free()'.\n
   * The function returns NULL on error.
+  *
+  * Header File:  draw_text.h
 **/
 char *WBCopyString(const char *pSrc);
 
@@ -90,6 +93,8 @@ char *WBCopyString(const char *pSrc);
   * found, whichever happens first.  The returned string ALWAYS ends in a zero byte.
   * The caller must deallocate the returned pointer using 'free()'.\n
   * The function returns NULL on error.
+  *
+  * Header File:  draw_text.h
 **/
 char *WBCopyStringN(const char *pSrc, unsigned int nMaxChars);
 
@@ -105,6 +110,8 @@ char *WBCopyStringN(const char *pSrc, unsigned int nMaxChars);
   * have to be a malloc'd string.  The function will overwrite the first pointer with malloc'd copy of the result
   * of concatenating the two strings.\n
   * On error, the function does NOT modify ppDest and aborts the concatenate operation.
+  *
+  * Header File:  draw_text.h
 **/
 void WBCatString(char **ppDest, const char *pSrc);
 
@@ -122,6 +129,8 @@ void WBCatString(char **ppDest, const char *pSrc);
   * of concatenating the two strings.  The string 'pSrc' will be concatenated up to 'nMaxChars' or until a 0-byte is
   * found, whichever happens first.\n
   * On error, the function does NOT modify pszStr1 and aborts the concatenate operation.
+  *
+  * Header File:  draw_text.h
 **/
 void WBCatStringN(char **ppDest, const char *pSrc, unsigned int nMaxChars);
 
@@ -133,27 +142,38 @@ void WBCatStringN(char **ppDest, const char *pSrc, unsigned int nMaxChars);
   * Often you need to be able to remove quote characters from a string in a standardized manner.  This
   * function handles just about every standard quoting method available, including the use of double-quotes
   * to indicate a quote within a quoted string, the use of single or double quotes, etc.
+  *
+  * Header File:  draw_text.h
 **/
 void WBDeQuoteString(char *pszStr);      // de-quote a string in place
 
 /** \ingroup text
-  * \brief De-Quote a string 'in place', that is modifying the original string by removing quotes
+  * \brief Determine how many 'lines' are in a block of text by counting 'linefeed' characters
   *
-  * \param pSrc A const pointer to an ASCII string
+  * \param pSrc A const pointer to an ASCII or UTF8 string (may end in zero byte)
   * \param nMaxChars The maximum number of characters in the buffer
   * \returns The total number of lines (including blank lines)
+  *
+  * Use this function to determine how many lines are in the block of text.  A line is considered to be
+  * a string of 1 or more characters, ending in a zero byte [or end of text as determined by 'nMaxChars'],
+  * or one of the following sequences:  \<CRLF\>, \<LF\>, \<CR\>, or \<LFCR\>
+  *
+  * Header File:  draw_text.h
 **/
 int WBStringLineCount(const char *pSrc, unsigned int nMaxChars);
 
 /** \ingroup text
-  * \brief De-Quote a string 'in place', that is modifying the original string by removing quotes
+  * \brief Locate the next line in a block of text, returning its pointer (and updating remaining length)
   *
-  * \param pSrc A const pointer to an ASCII string
+  * \param pSrc A const pointer to an ASCII or UTF8 string (may end in a zero byte)
   * \param pnMaxChars A pointer to an integer containing maximum number of characters in the buffer
   * \returns A pointer to the next line, the character just following a \<CRLF\>, \<LF\>, \<CR\>, or \<LFCR\> sequence.
   *
-  * This function will also update the number of characters in the buffer stored in '*pnMaxChars'.  If 'pnMaxChars'
-  * is NULL, the string buffer is assumed to terminate with a zero-byte.
+  * Use this function to find the 'next line' in a block of text.  It will also update the number of characters remaining
+  * in the buffer, and store the result in '*pnMaxChars'.  If 'pnMaxChars' is NULL, the string buffer is assumed to
+  * terminate with a zero-byte.
+  *
+  * Header File:  draw_text.h
 **/
 const char *WBStringNextLine(const char *pSrc, unsigned int *pnMaxChars);
 
@@ -163,7 +183,8 @@ const char *WBStringNextLine(const char *pSrc, unsigned int *pnMaxChars);
 // THIS IS ALL RESERVED FOR FUTURE USE
 // MAY NOT BE NEEDED IF I USE _Xmbtowc _Xwctomb and _Xwctomb
 // X11 defines them as mblen(), mbtowc(), and wctomb()
-
+// The alternative is to do something similar on WIN32, once that is implemented in the toolkit
+// with '#ifdef blocks all around it
 
 /** \ingroup text
   * \brief Check for and report if multi-byte string
@@ -179,6 +200,8 @@ const char *WBStringNextLine(const char *pSrc, unsigned int *pnMaxChars);
   * This function scans a UTF-8 string and returns the length as a UTF-16 string if it contains ANY
   * multi-byte characters _AND_ can be properly converted.  It returns 0 if it's pure ASCII, and
   * a value of -1 if it cannot be properly converted, and -2 if it is simply 'malformed'.
+  *
+  * Header File:  draw_text.h
 **/
 int WBIsMultiByte(const char *pszStr);
 
@@ -191,6 +214,8 @@ int WBIsMultiByte(const char *pszStr);
   *
   * Use this function to create a UTF-16 string from a UTF-8 string for use with the '16' X11 API
   * text-related functions
+  *
+  * Header File:  draw_text.h
 **/
 XChar2b * WBConvertMultiByteTo16(const char *pszStr);
 
@@ -201,6 +226,8 @@ XChar2b * WBConvertMultiByteTo16(const char *pszStr);
   * \return A 'malloc'd pointer to a UTF-8 string that may have multi-byte characters
   *
   * Use this function to create a UTF-8 string from a UTF-16 string.
+  *
+  * Header File:  draw_text.h
 **/
 char *WBConvertMultiByteFrom16(const XChar2b *pwzStr);
 #endif // 0
@@ -348,6 +375,8 @@ typedef struct __DT_WORDS__
   * \returns the text width, in pixels
   *
   * Use this function in lieu of XTextWidth for MBCS and UTF-8 strings.
+  *
+  * Header File:  draw_text.h
 **/
 int DTGetTextWidth(XFontStruct *pFont, const char *szUTF8, int nLength);
 
@@ -361,6 +390,8 @@ int DTGetTextWidth(XFontStruct *pFont, const char *szUTF8, int nLength);
   *
   * sometimes you want to adjust text size to fit within a particular rectangle.  This function
   * determines how to do that by adjusting the font size.
+  *
+  * Header File:  draw_text.h
 **/
 XFontStruct *DTCalcIdealFont(XFontStruct *pRefFont, const char *szText, WB_GEOM *geomBounds);
 
@@ -387,6 +418,8 @@ XFontStruct *DTCalcIdealFont(XFontStruct *pRefFont, const char *szText, WB_GEOM 
   * NOTE:  tab width is negative for pixels, positive for avg char width, beginning at
   *        the left most position of the specified rectangle.  Tab Origin is always in
   *        pixels using the absolute position (relative to the same origin as prcSource).
+  *
+  * Header File:  draw_text.h
 **/
 int DTCalcIdealBounds(XFontStruct *pFont, const char *szText, int iTabWidth, unsigned int iTabOrigin,
                       const WB_RECT *prcSource, WB_RECT *prcDest, int iAlignment);
@@ -411,6 +444,8 @@ int DTCalcIdealBounds(XFontStruct *pFont, const char *szText, int iTabWidth, uns
   * If you want the text to wrap, use DTDrawMultiLineText()
   *
   * NOTE:  tabs begin at the 'left most' text position, adjusted by 'iTabOrigin'.
+  *
+  * Header File:  draw_text.h
 **/
 void DTDrawSingleLineText(XFontStruct *pFont, const char *szText, Display *pDisplay, GC gc, Drawable dw,
                           int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment);
@@ -433,6 +468,8 @@ void DTDrawSingleLineText(XFontStruct *pFont, const char *szText, Display *pDisp
   * drawable using the specified GC, adjusting for tab width and text alignment.
   *
   * NOTE:  tabs begin at the 'left most' position, adjusted by 'iTabOrigin'.
+  *
+  * Header File:  draw_text.h
 **/
 void DTDrawMultiLineText(XFontStruct *pFont, const char *szText, Display *pDisplay, GC gc, Drawable dw,
                          int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment);
@@ -452,6 +489,8 @@ void DTDrawMultiLineText(XFontStruct *pFont, const char *szText, Display *pDispl
   * a large block of text that may be calculation-expensive to re-render.  Call 'DTPreRender()' and
   * 'DTRender()' to manage rendering with the DT_WORDS structure.
   *
+  *
+  * Header File:  draw_text.h
 **/
 DT_WORDS * DTGetWordsFromText(XFontStruct *pFont, const char *szText, int iAlignment);
 
@@ -472,6 +511,8 @@ DT_WORDS * DTGetWordsFromText(XFontStruct *pFont, const char *szText, int iAlign
   * Since the 'WB_RECT' elements are 32-bit integers, it is possible to create an 'inifinite' display area
   * by specifying a value of 0x7fffffffL for the 'right' and 'bottom' members.  Then, you can use 'DTRender()'
   * and specify 'iHScrollBy' and 'iVScrollBy' to modify the location of the 'viewport' area using scroll bars.
+  *
+  * Header File:  draw_text.h
 **/
 void DTPreRender(XFontStruct *pFont, DT_WORDS *pWords, int iTabWidth, int iTabOrigin,
                  const WB_RECT *prcBounds, int iAlignment);
@@ -492,6 +533,7 @@ void DTPreRender(XFontStruct *pFont, DT_WORDS *pWords, int iTabWidth, int iTabOr
   * This function will scan the DT_WORDS structure 'pWords', and using the other parameters,
   * render the text within the 'prcBounds' rectangle on the specified Drawable.
   *
+  * Header File:  draw_text.h
 **/
 void DTRender(XFontStruct *pFont, const DT_WORDS *pWords, Display *pDisplay, GC gc, Drawable dw,
               int iHScrollBy, int iVScrollBy, const WB_RECT *prcBounds, int iAlignment);

@@ -215,30 +215,40 @@ void MBDestroyMenuItem(WBMenuItem *pMenuItem)
   }
 }
 
-int MBAddMenuItem(WBMenu *pMenu, WBMenuItem *pItem, int iPos)
+int MBAddMenuItem(WBMenu *pMenu, const WBMenuItem *pItem, int iPos)
 {
   return(-1);
 }
 
-void MBDelMenuItem(WBMenu *pMenu, int iPos)
+void MBRemoveMenuItem(WBMenu *pMenu, int iPos)
 {
 
 }
 
-int MBAddPopupMenu(WBMenu *pMenu, WBMenu *pPopupMenu)
+int MBAddPopupMenu(WBMenu *pMenu, const WBMenu *pPopupMenu)
 {
   return(-1);
 }
 
 WBMenu *MBFindPopupMenu(WBMenu *pMenu, int idPopup)
 {
-  return(NULL);
+  return NULL;
 }
 
-WBMenu *MBRemovePopupMenu(WBMenu *pMenu, int idPopup)
+void MBRemovePopupMenu(WBMenu *pMenu, int idPopup)
 {
-  return(NULL);  // TODO:  return the menu that I removed so I can delete it or ???
+
 }
+
+WBMenu *MBCopyMenu(const WBMenu *pMenu, int iReserveSpace)
+{
+  // TODO:  make a copy of the main structure, the individual WBMenuItem structures,
+  //        and recursively copy the 'popup' WBMenu structures
+
+
+  return NULL;
+}
+
 
 #define NEXT_LINE(X,Y) { while(*X && *X <= ' ' && *X != '\t' && *X != '\n') X++; Y=X; while(*X && *X != '\n') X++; if(*X=='\n') X++; }
 #define NEXT_COL(X,Y,Z) { while(*X && *X <= ' ' && *X != '\t' && *X != '\n' && X < Z) X++; \

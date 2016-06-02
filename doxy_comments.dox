@@ -754,8 +754,8 @@
   * Optional functions for configuration management.  Used internally by \ref startup and \ref core.
 */
 
-/** \defgroup text Text Utilities
-  * Utility functions for copying and manipulating text
+/** \defgroup text Text Utilities (generic)
+  * \brief Generic Utility functions for copying and manipulating text
   *
   * Utility functions for copying and manipulating text, such as string copying and concatenation.
   * These function standardize common string operations and allocate buffers with 'malloc()' as needed.

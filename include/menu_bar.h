@@ -50,9 +50,16 @@
   * This is the definition file for menus bar window functions and structures
 */
 
+/** \ingroup frame
+  * \defgroup menu_bar Menu Bar window - functions and structures
+  *
+  * Structures and API functions for managing and working with menu bar windows.  A menu
+  * bar is a window that contains one or more text menu items, usually displaying a popup menu
+  * whenever a text menu item is activated.  The popup menu is displayed as needed (normally hidden).\n
+  * Normally a menu bar will be part of a frame window, and will appear at the top.
+**/
 
-// a menu bar is a window that contains one or more text menu items, displaying a popup menu
-// whenever a text menu item is activated.  The popup menu is displayed as needed.
+
 
 #ifndef MENU_BAR_H_INCLUDED
 #define MENU_BAR_H_INCLUDED
@@ -66,32 +73,115 @@ extern "C" {
 
 #define MENU_WINDOW_TAG (*((const unsigned int *)"MWMW"))
 
-typedef struct
+/** \typedef WBMenuBarWindow
+  * \struct  __WBMenuBarWindow__
+  * \ingroup menu_bar
+  * \brief structure for defining a menu bar window
+  *
+  * Definition for the structure that defines a menu bar window
+  *
+  * \code
+
+  typedef struct __WBMenuBarWindow__
+  {
+    unsigned int ulTag; // tag indicating I'm a 'Menu Bar' window
+    Window wSelf;       // The window ID of the menu bar window
+    Window wOwner;      // The window ID of the owning window
+
+    WBMenu *pMenu;      // a pointer to the associated WBMenu structure
+
+    int iX;             // menu bar 'X' position within the owner's client area
+    int iY;             // menu bar 'Y' position within the owner's client area
+    int iWidth;         // menu bar width
+    int iHeight;        // menu bar height
+    int iSelected;      // currently selected menu (for internal-only menu UI purposes)
+    int iPrevSel;       // previously selected menu item (for internal-only menu UI purposes)
+    int iFlags;         // flags that determine behavior (reserved)
+
+  } WBMenuBarWindow;
+
+  * \endcode
+  *
+  * \sa \ref \_\_WBMenu "WBMenu"
+  *
+**/
+typedef struct __WBMenuBarWindow__
 {
-  unsigned int ulTag;
-  Window wSelf, wOwner;
+  unsigned int ulTag; ///< tag indicating I'm a 'Menu Bar' window
+  Window wSelf;       ///< The window ID of the menu bar window
+  Window wOwner;      ///< The window ID of the owning window
 
-  WBMenu *pMenu;
+  WBMenu *pMenu;      ///< a pointer to the associated WBMenu structure
 
-  int iX, iY, iWidth, iHeight;  // dimensions and position of bar within window
-  int iSelected;                // currently selected menu (for internal-only menu UI purposes)
-  int iPrevSel;                 // previously selected menu item (for internal-only menu UI purposes)
-  int iFlags;                   // flags that determine behavior (reserved)
+  int iX;             ///< menu bar 'X' position within the owner's client area
+  int iY;             ///< menu bar 'Y' position within the owner's client area
+  int iWidth;         ///< menu bar width
+  int iHeight;        ///< menu bar height
+  int iSelected;      ///< currently selected menu (for internal-only menu UI purposes)
+  int iPrevSel;       ///< previously selected menu item (for internal-only menu UI purposes)
+  int iFlags;         ///< flags that determine behavior (reserved)
 
-} WBMenuBarWindow;  // located at offset 0 in window data
+} WBMenuBarWindow;
 
 
 // Initialization, global objects, and default objects
 
+/** \ingroup menu_bar
+  * \brief Initialize global resources for Menu Bar windows
+  *
+  * \returns non-zero on success, zero on error
+  *
+  * Use this function to initialize the 'Menu Bar' support.
+  *
+  * Header File:  menu_bar.h
+**/
 int MBInitGlobal(void);
 
-extern XColor clrMenuFG, clrMenuBG, clrMenuActiveFG, clrMenuActiveBG, clrMenuBorder1, clrMenuBorder2, clrMenuBorder3, clrMenuDisabledFG, clrMenuActiveDisabledFG;
-extern Atom aMENU_RESIZE, aMENU_DISPLAY_POPUP, aMENU_ACTIVATE;
+/**
+  * \ingroup menu_bar
+ @{
+**/
+extern XColor clrMenuFG;               ///< menu foreground color
+extern XColor clrMenuBG;               ///< menu background color
+extern XColor clrMenuActiveFG;         ///< menu 'active' foreground color
+extern XColor clrMenuActiveBG;         ///< menu 'active' background color
+extern XColor clrMenuBorder1;          ///< menu border color 1
+extern XColor clrMenuBorder2;          ///< menu border color 2
+extern XColor clrMenuBorder3;          ///< menu border color 3
+extern XColor clrMenuDisabledFG;       ///< menu 'disabled' foreground color
+extern XColor clrMenuActiveDisabledFG; ///< menu 'disabled but active' foreground color
 
+extern Atom aMENU_RESIZE;              ///< Atom for 'RESIZE' client event
+extern Atom aMENU_DISPLAY_POPUP;       ///< Atom for 'DISPLAY POPUP' client event
+extern Atom aMENU_ACTIVATE;            ///< Atom for 'ACTIVATE' client event
+/**
+ @}
+**/
+
+
+/** \ingroup menu_bar
+  * \brief Get a pointer to the default 'Menu Bar' font structure
+  *
+  * \returns A pointer to the default font structure for 'Menu Bar' windows
+  *
+  * Use this function to obtain a pointer to the default 'Menu Bar' font structure
+  *
+  * Header File:  menu_bar.h
+**/
 XFontStruct *MBGetDefaultMenuFont(void);
 
 // menu bar window info
 
+/** \ingroup menu_bar
+  * \brief Obtain a pointer to the WBMenuBarWindow structure from a Window ID of a Menu Bar window
+  *
+  * \param wID The Window ID for a 'Menu Bar' window
+  * \returns A pointer to the associated WBMenuBarWindow structure, or NULL on error
+  *
+  * Use this function to obtain the WBMenuBarWindow struct pointer for a 'Menu Bar' window.
+  *
+  * Header File:  menu_bar.h
+**/
 static __inline__ WBMenuBarWindow *MBGetMenuBarWindowStruct(Window wID)  // for frame windows, returns the frame window struct
 {
   WBMenuBarWindow *pRval = (WBMenuBarWindow *)WBGetWindowData(wID, 0);  // offset 0 for window-specific structs
@@ -104,22 +194,72 @@ static __inline__ WBMenuBarWindow *MBGetMenuBarWindowStruct(Window wID)  // for 
   return(NULL);
 }
 
-WBMenuBarWindow *MBCreateMenuBarWindow(Window wIDParent, const char *pszResource,
-//                                       int iX, int iY, int *piWidth, int *piHeight,
-                                       int iFlags);
+/** \ingroup menu_bar
+  * \brief Create a Menu Bar windows and its associated WBMenuBarWindow structure
+  *
+  * \param wIDParent The Window ID for the owning window
+  * \param pszResource a 0-byte terminated string resource that defines the menu
+  * \param iFlags Additional binary flags
+  * \returns A pointer to the associated WBMenuBarWindow structure, or NULL on error
+  *
+  * Use this function to create a Menu Bar windows and its associated WBMenuBarWindow structure.
+  * You must call MBDestroyMenuBarWindow() for any non-NULL return value.
+  *
+  * Header File:  menu_bar.h
+**/
+WBMenuBarWindow *MBCreateMenuBarWindow(Window wIDParent, const char *pszResource, int iFlags);
 
+/** \ingroup menu_bar
+  * \brief Locate the first WBMenuBarWindow that is using a WBMenu structure
+  *
+  * \param pMenu A pointer to a WBMenu structure
+  * \returns A pointer to the first WBMenuBarWindow structure that is using 'pMenu'
+  *
+  * Use this function to locate the first 'Menu Bar' window that is using a specific WBMenu structure
+  *
+  * Header File:  menu_bar.h
+**/
 WBMenuBarWindow *MBFindMenuBarWindow(WBMenu *pMenu);  // find first (active) window that uses 'pMenu'
 
-// pass in 'iX' and 'iY' wih 'piWidth' or 'piHeight' as the width or height of the window (as needed)
-// return value indicates adjusted width or height (as needed) based on size requirements for menu display
 
-void MBReCalcMenuBarWindow(WBMenuBarWindow *pMenuBar /*, int iX, int iY, int *piWidth, int *piHeight*/);
-  // use this function to re-calculate the menu bar size when the owner window is re-sized
-  // or if the menu is re-assigned.
+/** \ingroup menu_bar
+  * \brief Cause a 'layout recalculation' for a Menu Bar window
+  *
+  * \param pMenuBar A pointer to the WBMenuBarWindow structure associated with a Menu Bar window
+  * \returns void
+  *
+  * Use this function to re-calculate the layout of a Menu Bar window.  Typically this will be done
+  * as a result of a re-size on the owning window, or as a result of re-assigning a new WBMenu.
+  *
+  * Header File:  menu_bar.h
+**/
+void MBReCalcMenuBarWindow(WBMenuBarWindow *pMenuBar);
 
+
+/** \ingroup menu_bar
+  * \brief Destroy a 'Menu Bar' window
+  *
+  * \param pMenuBar A pointer to the WBMenuBarWindow structure associated with a Menu Bar window
+  * \returns void
+  *
+  * Use this function to destroy a WBMenuBarWindow structure and the associated Menu Bar window,
+  * as created using WBCreateMenBarWindow()
+  *
+  * Header File:  menu_bar.h
+**/
 void MBDestroyMenuBarWindow(WBMenuBarWindow *pMenuBar);  // destroy by using struct pointer
 
 
+/** \ingroup menu_bar
+  * \brief Get the current WBMenu for a Menu Bar window
+  *
+  * \param pMenuBar A pointer to the WBMenuBarWindow structure associated with a Menu Bar window
+  * \returns A pointer to the WBMenu associated with this Menu Bar window
+  *
+  * Use this function to safely obtain the current WBMenu for a specified Menu Bar window.
+  *
+  * Header File:  menu_bar.h
+**/
 static __inline__ WBMenu * MBGetMenuBarMenu(WBMenuBarWindow *pMenuBar)
 {
   if(!pMenuBar || pMenuBar->ulTag != MENU_WINDOW_TAG)
@@ -130,6 +270,17 @@ static __inline__ WBMenu * MBGetMenuBarMenu(WBMenuBarWindow *pMenuBar)
   return pMenuBar->pMenu;
 }
 
+/** \ingroup menu_bar
+  * \brief Assign a new WBMenu for a Menu Bar window
+  *
+  * \param pMenuBar A pointer to the WBMenuBarWindow structure associated with a Menu Bar window
+  * \param pMenu A pointer to a new WBMenu to be assigned to the Menu Bar window.  Can be NULL.
+  * \returns previously assigned WBMenu
+  *
+  * Use this function to safely assign a new WBMenu to a Menu Bar window.
+  *
+  * Header File:  menu_bar.h
+**/
 static __inline__ WBMenu * MBSetMenuBarMenu(WBMenuBarWindow *pMenuBar, WBMenu *pMenu)
 {
 WBMenu *pRval;
@@ -144,7 +295,7 @@ WBMenu *pRval;
   pMenuBar->iSelected = -1;
   pMenuBar->iPrevSel = -1;
 
-  MBReCalcMenuBarWindow(pMenuBar /*, -1, -1, NULL, NULL*/);
+  MBReCalcMenuBarWindow(pMenuBar);
 
   return pRval; // the old menu
 }

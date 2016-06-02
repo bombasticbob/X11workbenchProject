@@ -50,6 +50,11 @@
   * This is the definition file for menu popup window functions and structures
 */
 
+/** \ingroup frame
+  * \defgroup menu_popup Popup Menus
+  * \brief Popup Menu windows and their associate structures and API functions
+**/
+
 
 #ifndef MENU_POPUP_H_INCLUDED
 #define MENU_POPUP_H_INCLUDED
@@ -63,35 +68,134 @@ extern "C" {
 
 #define MENU_POPUP_WINDOW_TAG (*((const unsigned int *)"MWMP"))
 
-typedef struct
+/** \typedef WBMenuPopupWindow
+  * \struct  __WBMenuPopupWindow__
+  * \ingroup menu_popup
+  * \brief structure for managing a popup menu window
+  *
+  * Definition for the structure that defines a popup menu window
+  *
+  * \code
+
+  typedef struct __WBMenuPopupWindow__
+  {
+    unsigned int ulTag; // tag indicating I'm a 'Menu Popup' window
+    Window wSelf;       // window ID for the Menu Popup window
+    Window wBar;        // window ID for the associated Menu Bar window
+    Window wOwner;      // window ID for the owner window
+
+    WBMenu *pMenu;      // a pointer to the associated WBMenu structure
+
+    int iX;             // popup menu 'X' position within the owner's client area
+    int iY;             // popup menu 'Y' position within the owner's client area
+    int iWidth;         // popup menu width
+    int iHeight;        // popup menu height
+
+    int iColumns;       // total number of columns (currently 1)
+    int iVisible;       // total number of visible menu items (including separators)
+    int iTop;           // index of the 'top' visible menu item (zero-based) for scrolling menus
+    int iSelected;      // currently selected menu (for display purposes)
+    int iFlags;         // flags that determine behavior (reserved)
+
+  } WBMenuPopupWindow;  // located at offset 0 in window data
+
+  * \endcode
+  *
+  * \sa \ref \_\_WBMenu "WBMenu"
+**/
+typedef struct __WBMenuPopupWindow__
 {
-  unsigned int ulTag;
-  Window wSelf, wBar, wOwner;
+  unsigned int ulTag; ///< tag indicating I'm a 'Menu Popup' window
+  Window wSelf;       ///< window ID for the Menu Popup window
+  Window wBar;        ///< window ID for the associated Menu Bar window
+  Window wOwner;      ///< window ID for the owner window
 
-  WBMenu *pMenu;
+  WBMenu *pMenu;      ///< a pointer to the associated WBMenu structure
 
-  int iX, iY, iWidth, iHeight;  // dimensions and position of items within popup window
-  int iColumns;  // total number of columns (currently 1)
-  int iVisible;  // total number of visible menu items (including separators)
-  int iTop;      // index of the 'top' visible menu item (zero-based) for scrolling menus
-  int iSelected;  // currently selected menu (for display purposes)
-  int iFlags;  // flags that determine behavior (reserved)
+  int iX;             ///< popup menu 'X' position within the owner's client area
+  int iY;             ///< popup menu 'Y' position within the owner's client area
+  int iWidth;         ///< popup menu width
+  int iHeight;        ///< popup menu height
 
-} WBMenuPopupWindow;  // located at offset 0 in window data
+  int iColumns;       ///< total number of columns (currently 1)
+  int iVisible;       ///< total number of visible menu items (including separators)
+  int iTop;           ///< index of the 'top' visible menu item (zero-based) for scrolling menus
+  int iSelected;      ///< currently selected menu (for display purposes)
+  int iFlags;         ///< flags that determine behavior (reserved)
 
-WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDParent, Window wIDOwner, WBMenu *pMenu,
+} WBMenuPopupWindow;
+
+
+/** \ingroup menu_popup
+  * \brief Create a WBMenuPopupWindow object and associated window
+  *
+  * \param wIDBar The Window ID of the associated menu bar
+  * \param wIDOwner The Window ID of the 'owner' window.  All coordinates are with respect to this window's client area
+  * \param pMenu A pointer to the associated 'WBMenu'
+  * \param iX The X coordinate for the upper left corner of the menu popup with respect to the client area of wIDOwner
+  * \param iY The Y coordinate for the upper left corner of the menu popup with respect to the client area of wIDOwner
+  * \param iFlags Various bit-flags associated with the popup menu
+  * \returns A pointer to an allocated WBMenuPopupWindow, or NULL on error.  This function also creates the actual window.
+  *
+  * Use this function to create a WBMenuPopupWindow structure and an associated window at the specified location with
+  * respect to the client area of 'wIDOwner'.  Use of this function assumes that you will immediately call MBMenuDoModal()
+  * using the returned pointer.  The call to MBMenuDoModal() will automatically free up the allocated structure and resources.
+  *
+  * Header File:  menu_popup.h
+**/
+WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDBar, Window wIDOwner, WBMenu *pMenu,
                                            int iX, int iY, int iFlags);
   // pass 'iX and 'iY' for the menu's origin location.  'pMenu' points to the popup menu and
   // it must contain a list of popup menus that it makes use of.
 
-int MBMenuDoModal(WBMenuPopupWindow *);
-  // returns 0 for 'ok', non-zero to represent an error
-  // on return the 'WBMenuPopupWindow' pointer will be invalid, and the popup
-  // (and any others it may have created) will have been destroyed
+/** \ingroup menu_popup
+  * \brief display a Menu Popup window in a 'modal' loop
+  *
+  * \param pMenuPopupWindow A pointer to a WBMenuPopupWindow that was created by MBCreateMenuPopupWindow()
+  * \returns zero for 'ok', non-zero on error
+  *
+  * Use this function to display a Menu Popup window created by MBCreateMenuPopupWindow() in a modal loop.
+  * On return, the WBMenuPopupWindow pointer will no longer be valid, and its resources will have been released.
+  *
+  * Header File:  menu_popup.h
+**/
+int MBMenuDoModal(WBMenuPopupWindow *pMenuPopupWindow);
 
+/** \ingroup menu_popup
+  * \brief Destroy a WBMenuPopupWindow structure
+  *
+  * \param pMenuPopupWindow A pointer to a WBMenuPopupWindow that was created by MBCreateMenuPopupWindow()
+  * \returns void
+  *
+  * Use this function to destroy a WBMenuPopupWindow structure (and resources) created by MBCreateMenuPopupWindow()
+  *
+  * Header File:  menu_popup.h
+**/
+void MBDestroyMenuPopupWindow(WBMenuPopupWindow *pMenuPopupWindow);
+
+/** \ingroup menu_popup
+  * \brief Find the first WBMenuPopupWindow that references a WBMenu
+  *
+  * \param pSubMenu A pointer to a WBMenu structure that represents a 'sub menu' for a Menu Popup window
+  * \returns A pointer to a WBMenuPopupWindow structure, or NULL on error
+  *
+  * Use this function to find the first WBMenuPopupWindow that references a WBMenu
+  *
+  * Header File:  menu_popup.h
+**/
 WBMenuPopupWindow *MBFindMenuPopupWindow(WBMenu *pSubMenu);  // find first (active) window that uses sub-menu 'pMenu'
 
 
+/** \ingroup menu_popup
+  * \brief Get the associated WBMenuPopupWindow structure from a Menu Popup window's window ID
+  *
+  * \param wID A Window ID for a Menu Popup window
+  * \returns A pointer to the associated WBMenuPopupWindow structure, or NULL on error
+  *
+  * Use this function to obtain the associated WBMenuPopupWindow structure from a Menu Popup window's window ID
+  *
+  * Header File:  menu_popup.h
+**/
 static __inline__ WBMenuPopupWindow *MBGetMenuPopupWindowStruct(Window wID)
 {
   WBMenuPopupWindow *pRval = (WBMenuPopupWindow *)WBGetWindowData(wID, 0);  // offset 0 for window-specific structs

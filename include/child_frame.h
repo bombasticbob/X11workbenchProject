@@ -75,7 +75,7 @@
   * the data from the Child Frame, this toolkit combines them (as it is simpler to do so).  If you need
   * extra levels of abstraction, just create more 'derived' versions from your own designs, and abstract
   * the 'next level up'.\n
-*/
+**/
 
 
 #ifdef __cplusplus
@@ -115,7 +115,9 @@ extern "C" {
   * NOTE 2:  If WBInitChildFrame() returns a non-zero value, do NOT call WBDestroyChildFrame() on that WBChildFrame .
   *
   * \sa \ref frame "Frame Windows"
-*/
+  *
+  * Header File:  child_frame.h
+**/
 int FWInitChildFrame(WBChildFrame *pChildFrame, WBFrameWindow *pOwner, XFontStruct *pFont,
                      const char *szFocusMenu, const WBFWMenuHandler *pHandlerArray,
                      WBWinEvent pUserCallback, int fFlags);
@@ -127,7 +129,9 @@ int FWInitChildFrame(WBChildFrame *pChildFrame, WBFrameWindow *pOwner, XFontStru
   * \returns void
   *
   * Call this function to destroy the actual window and de-reference
-*/
+  *
+  * Header File:  child_frame.h
+**/
 void FWDestroyChildFrame(WBChildFrame *pChildFrame);
 
 /** \ingroup child_frame
@@ -138,7 +142,9 @@ void FWDestroyChildFrame(WBChildFrame *pChildFrame);
   *
   * Assigns the (new) menu for the Child Frame.  The text will be copied, and the copy will be
   * used internally, and free'd as necessary.  Only valid when the owner is a Frame Window.
-*/
+  *
+  * Header File:  child_frame.h
+**/
 void FWSetChildFrameMenu(WBChildFrame *pChildFrame, const char *szFocusMenu);
 
 /** \ingroup child_frame
@@ -149,7 +155,9 @@ void FWSetChildFrameMenu(WBChildFrame *pChildFrame, const char *szFocusMenu);
   *
   * Assigns the (new) menu handlers for the Child Frame.  The array will be copied, and the copy will be
   * used internally, and free'd as necessary.
-*/
+  *
+  * Header File:  child_frame.h
+**/
 void FWSetChildFrameMenuHandlers(WBChildFrame *pChildFrame, const WBFWMenuHandler *pHandlerArray);
 
 /** \ingroup child_frame
@@ -160,7 +168,9 @@ void FWSetChildFrameMenuHandlers(WBChildFrame *pChildFrame, const WBFWMenuHandle
   *
   * Assigns the display name for the Child Frame, to appear in the tab and (optionally) in the frame window's title bar
   * whenever the Child Frame has the focus.
-*/
+  *
+  * Header File:  child_frame.h
+**/
 void FWSetChildFrameDisplayName(WBChildFrame *pChildFrame, const char *szDisplayName);
 
 /** \ingroup child_frame
@@ -173,7 +183,9 @@ void FWSetChildFrameDisplayName(WBChildFrame *pChildFrame, const char *szDisplay
   * Use this function to assign the X and Y extents for the display surface on a Child Frame window.  Calling
   * this function will set up the scrolling behavior as well as notifying 'everything' of the changes, such
   * as re-painting the window or re-sizing something.
-*/
+  *
+  * Header File:  child_frame.h
+**/
 void FWSetChildFrameExtent(WBChildFrame *pChildFrame, int iXExtent, int iYExtent);
 
 
@@ -184,8 +196,10 @@ void FWSetChildFrameExtent(WBChildFrame *pChildFrame, int iXExtent, int iYExtent
   *
   * The frame window will call this function whenever the layout changes, including at the point the
   * child frame is added to the frame window.  Internally, it will call the user-defined event handler
-  * function with an event type of 'ClientMessage' and message type \ref RESIZE_NOTIFY
-*/
+  * function with an event type of 'ClientMessage' and message type \ref aRESIZE_NOTIFY "RESIZE_NOTIFY"
+  *
+  * Header File:  child_frame.h
+**/
 void FWChildFrameRecalcLayout(WBChildFrame *pChildFrame);
 
 
@@ -197,7 +211,9 @@ void FWChildFrameRecalcLayout(WBChildFrame *pChildFrame);
   * \returns An integer value, in which zero indicates "not handled", and non-zero indicates "handled"
   *
   * Use this function to safely obtain the correct WBChildFrame structure for a given Window ID.
-*/
+  *
+  * Header File:  child_frame.h
+**/
 int FWChildFrameEvent(Window wID, XEvent *pEvent);
 
 
@@ -209,7 +225,9 @@ int FWChildFrameEvent(Window wID, XEvent *pEvent);
   * \returns A pointer to the associated WBChildFrame structure (if it is a WBChildFrame), or NULL on error
   *
   * Use this function to safely obtain the correct WBChildFrame structure for a given Window ID.
-*/
+  *
+  * Header File:  child_frame.h
+**/
 static __inline__ WBChildFrame *FWGetChildFrameStruct(Window wID)
 {
   WBChildFrame *pRval = (WBChildFrame *)WBGetWindowData(wID, 0);  // offset 0 for window-specific structs

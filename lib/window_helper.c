@@ -4246,6 +4246,8 @@ int WBWindowDispatch(Window wID, XEvent *pEvent)
                    "%s - client message, pEntry==%pH\n", __FUNCTION__, pEntry);
   }
 
+
+
   if(pEntry)
   {
     // detect resize, mouse, and keystrokes for menu
@@ -4443,35 +4445,63 @@ int WBDefault(Window wID, XEvent *pEvent)
                     : pEntry ? pEntry->pDisplay : pDefaultDisplay;
 
 
-  /*
-    * On the last of each group of Expose events,  repaint the entire
-    * window.  See Section 8.4.5.1 of the X11 API documentation
-    */
   if (pEvent->type == Expose && pEvent->xexpose.count == 0)
   {
-    /*
-      * Remove any other pending Expose events from the queue to
-      * avoid multiple repaints. See Section 8.7 of the X11 API docs
-      */
-    while(/* !bQuitFlag && */ XCheckTypedWindowEvent(pDisplay, wID, Expose, pEvent))
-      ;
-
     // for now, just erase the background using whatever background color is currently assigned
     if(pEntry && pEntry->hGC != None)
     {
-      WBClearWindow(wID, pEntry->hGC);
+      GC gc = WBBeginPaint(wID, &(pEvent->xexpose), NULL);
+      if(gc != None)
+      {
+        WBClearWindow(wID, gc);
+        WBEndPaint(wID, gc);
+      }
     }
     else
     {
+      WB_ERROR_PRINT("TEMPORARY: %s - window has NO assigned GC, calling XClearWindow\n", __FUNCTION__);
+
       XClearWindow(pDisplay, wID);  // TODO:  rather than erase background, see if I need to
     }
+
+    return 1; // handled
   }
   else if(pEvent->type == ConfigureNotify && pEvent->xconfigure.window == wID)
   {
 //    fprintf(stderr, "TEMPORARY:  ConfigureNotify  %d,%d\n",
 //            pEvent->xconfigure.width, pEvent->xconfigure.height);
 
-    WBInvalidateGeom(wID, NULL, 1);
+    // TODO:  see if it's a move, or a re-size.  on re-size I have to re-paint and re-calculate
+    //        the various display thingies.  But if I'm just moving it, no need.
+
+    WBInvalidateGeom(wID, NULL, 1);  // for simplicity, just re-paint it
+
+    return 1; // handled
+  }
+  else if(pEvent->type == VisibilityNotify &&
+          pEvent->xvisibility.window == wID &&
+          pEvent->xvisibility.state != VisibilityFullyObscured)
+  {
+    // Focus and Z-order changes generate this.  If my window's state changes to at least partially 'unobscured',
+    // then the response is to invalidate the entire window so it re-paints.
+
+    // TODO:  see what was covering it up before, to limit the re-painting
+
+    WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Window | DebugSubSystem_Event,
+                   "%s - window %08xH gets VisibilityNotify, state=%d\n",
+                   __FUNCTION__, (unsigned int)pEvent->xvisibility.window, pEvent->xvisibility.state);
+
+    WBInvalidateGeom(pEvent->xvisibility.window, NULL, 1); // TODO:  determine what changed
+
+    return 1; // handled
+  }
+  else if(pEvent->type == MapRequest &&
+          (pEvent->xmaprequest.parent == wID || pEvent->xmaprequest.window == wID))
+  {
+    // XMapWindow and related can generate this.  I want to see if it happens, ever.
+
+    WB_ERROR_PRINT("TEMPORARY: %s - window %08xH gets MapRequest for %08xH\n",
+                   __FUNCTION__, (unsigned int)pEvent->xmaprequest.parent, (unsigned int)pEvent->xmaprequest.window);
   }
   else if(pEvent->type == ClientMessage)
   {
@@ -4497,6 +4527,19 @@ int WBDefault(Window wID, XEvent *pEvent)
                       "%s - un-handled WM_TIMER for %d (%08xH)\n",
                       __FUNCTION__, (int)wID, (int)wID);
     }
+#ifndef NODEBUG    // uncomment this block to dump every event NOT handled
+    else
+    {
+      WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Window | DebugSubSystem_Event,
+                      "%s - un-handled ClientMessage for %d (%08xH)\n",
+                      __FUNCTION__, (int)wID, (int)wID);
+
+      WB_IF_DEBUG_LEVEL(DebugLevel_Light | DebugSubSystem_Window | DebugSubSystem_Event)
+      {
+        WBDebugDumpEvent(pEvent);
+      }
+    }
+#endif // NODEBUG
   }
   else if(pEvent->type == KeyPress ||
           pEvent->type == KeyRelease)
@@ -4591,6 +4634,10 @@ int WBDefault(Window wID, XEvent *pEvent)
   }
   else if(pEvent->type == SelectionRequest)
   {
+    // NOTE:  selection events are handled by the Clipboard worker thread.  However, I can still (possibly)
+    //        get these things sent to me.  The *POLITE* thing to do is respond to them with an error sent
+    //        back to the requestor.  And so, that's what I do.  And display it in on stderr in debug code...
+#ifndef NODEBUG
     char *p1 = pEvent->xselectionrequest.selection != None ? XGetAtomName(pDisplay, pEvent->xselectionrequest.selection) : NULL;
     char *p2 = pEvent->xselectionrequest.target != None ? XGetAtomName(pDisplay, pEvent->xselectionrequest.target) : NULL;
     char *p3 = pEvent->xselectionrequest.property != None ? XGetAtomName(pDisplay, pEvent->xselectionrequest.property) : NULL;
@@ -4617,8 +4664,10 @@ int WBDefault(Window wID, XEvent *pEvent)
     {
       XFree(p3);
     }                   
+#endif // NODEBUG
 
     // the default rejects the request.  Send a 'SelectionNotify' to indicate the failure
+    // failing to send the SelectionNotify can REALLY screw things up for the requestor
 
     if(pEvent->xselectionrequest.owner == wID) // only if I'm the selection owner
     {
@@ -4641,6 +4690,7 @@ int WBDefault(Window wID, XEvent *pEvent)
   }
   else if(pEvent->type == SelectionClear)
   {
+#ifndef NODEBUG
     char *p1 = XGetAtomName(pDisplay, pEvent->xselectionclear.selection);
 
     WB_ERROR_PRINT("TEMPORARY - %s - SelectionClear wID=%d(%08xH) class=%s window=%d selection=%s\n",
@@ -4654,30 +4704,13 @@ int WBDefault(Window wID, XEvent *pEvent)
     {
       XFree(p1);
     }                   
+#endif // NODEBUG
 
-    // the default rejects the request.  Send a 'SelectionNotify' to indicate the failure
-
-    if(pEvent->xselectionrequest.owner == wID) // only if I'm the selection owner
-    {
-      XSelectionEvent evtN;
-
-      memset(&evtN, 0, sizeof(evtN));
-
-      evtN.type = SelectionNotify;
-      evtN.send_event = True; // 'cause I'm going to use 'XSendEvent' to reply immediately
-      evtN.requestor = pEvent->xselectionrequest.requestor;
-      evtN.selection = pEvent->xselectionrequest.selection;
-      evtN.target = None;
-      evtN.property = None; // to indicate failure (?)
-      evtN.time = pEvent->xselectionrequest.time; // same time as request (for now)
-
-      BEGIN_XCALL_DEBUG_WRAPPER
-      XSendEvent(pDisplay, evtN.requestor, False, 0, (XEvent *)&evtN);
-      END_XCALL_DEBUG_WRAPPER
-    }
+    // the default rejects the request.  No need to send a 'SelectionNotify'
   }
   else if(pEvent->type == SelectionNotify)
   {
+#ifndef NODEBUG
     char *p1 = pEvent->xselection.selection != None ? XGetAtomName(pDisplay, pEvent->xselection.selection) : NULL;
     char *p2 = pEvent->xselection.target != None ? XGetAtomName(pDisplay, pEvent->xselection.target) : NULL;
     char *p3 = pEvent->xselection.property != None ? XGetAtomName(pDisplay, pEvent->xselection.property) : NULL;
@@ -4703,11 +4736,14 @@ int WBDefault(Window wID, XEvent *pEvent)
     {
       XFree(p3);
     }                   
+#endif // NODEBUG
   }
+//#ifndef NODEBUG    // uncomment this block to dump every event NOT handled
 //  else
 //  {
-//    fprintf(stderr, "TEMPORARY  undefined message type %d for window %d\n", pEvent->type, pEvent->xany.window);
+//    WBDebugDumpEvent(pEvent);
 //  }
+//#endif // NODEBUG
 
   return 0;  // indicate 'not handled' for now
 }
@@ -6428,35 +6464,53 @@ Region rgnRval;
 
 GC WBBeginPaint(Window wID, XExposeEvent *pEvent, WB_GEOM *pgBounds)
 {
+WB_GEOM geomTemp;
+GC gcRval;
+
+
+  if(!pEvent || pEvent->type != Expose)
+  {
+    return None;
+  }
+
+  geomTemp.x      = pEvent->x;
+  geomTemp.y      = pEvent->y;
+  geomTemp.width  = pEvent->width;
+  geomTemp.height = pEvent->height;
+
+  gcRval = WBBeginPaintGeom(wID, &geomTemp);
+
+  if(gcRval != None && pgBounds)
+  {
+    pgBounds->x      = geomTemp.x;
+    pgBounds->y      = geomTemp.y;
+    pgBounds->width  = geomTemp.width;
+    pgBounds->height = geomTemp.height;
+  }
+
+  return gcRval;
+}
+
+GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // GC has invalid region assigned
+{
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
   GC gcRval;
   Region rgnPaint;
   XRectangle xrct;
-//  XGCValues xgc;
 
-  if(!pEntry)
-    return 0;
 
-  if(!pEntry->rgnClip || XEmptyRegion(pEntry->rgnClip))
+  if(!pEntry || !pgBounds)
   {
-    // no need to paint.  return a zero
+    return None;
+  }
 
-//    WB_ERROR_PRINT("TEMPORARY:  no clipping region for window %d\n", wID);
-//    return 0;
-
-    // TEMPORARY WORKAROUND - create a clipping region that fits the paint region
-    WB_GEOM geomTemp;
-
-    geomTemp.x = pEvent->x;
-    geomTemp.y = pEvent->y;
-    geomTemp.width = pEvent->width;
-    geomTemp.height = pEvent->height;
-
-    pEntry->rgnClip = WBGeomToRegion(&geomTemp);
+  if(!pEntry->rgnClip || XEmptyRegion(pEntry->rgnClip)) // clipping region is empty?
+  {
+    pEntry->rgnClip = WBGeomToRegion(pgBounds); // create from the bounding rectangle
 
     if(!pEntry->rgnClip)
     {
-      return 0; // this is actually an error
+      return None; // this is actually an error
     }
   }
 
@@ -6494,10 +6548,10 @@ GC WBBeginPaint(Window wID, XExposeEvent *pEvent, WB_GEOM *pgBounds)
     {
       if(!pEntry->rgnClip)
       {
-        xrct.x = pEvent->x;
-        xrct.y = pEvent->y;
-        xrct.width = pEvent->width;
-        xrct.height = pEvent->height;
+        xrct.x      = pgBounds->x;
+        xrct.y      = pgBounds->y;
+        xrct.width  = pgBounds->width;
+        xrct.height = pgBounds->height;
 
         WB_ERROR_PRINT("TEMPORARY:  %s - no clip region\n", __FUNCTION__);
 
@@ -6516,15 +6570,16 @@ GC WBBeginPaint(Window wID, XExposeEvent *pEvent, WB_GEOM *pgBounds)
         }
         else
         {
-          xrct.x = pEvent->x;
-          xrct.y = pEvent->y;
-          xrct.width = pEvent->width;
-          xrct.height = pEvent->height;
+          xrct.x      = pgBounds->x;
+          xrct.y      = pgBounds->y;
+          xrct.width  = pgBounds->width;
+          xrct.height = pgBounds->height;
 
           XUnionRectWithRegion(&xrct, rgnTemp, rgnTemp);  // the paint rectangle as a region
           XUnionRegion(pEntry->rgnClip, rgnPaint, rgnPaint);  // a copy of the invalid region
           XUnionRegion(rgnTemp, rgnPaint, rgnPaint);      // union with xrct (from the event)
-          // so now the paint region includes the xrct passed by the Expose event as well as the invalid region
+          // so now the paint region includes the xrct passed as 'pgBounds' as well as the invalid region
+          // (if called by WBBeginPaint, 'pgBounds' will be the rectangular area from the Expose event)
 
           XDestroyRegion(rgnTemp);
         }
@@ -6548,21 +6603,21 @@ GC WBBeginPaint(Window wID, XExposeEvent *pEvent, WB_GEOM *pgBounds)
     }
   }
 
-  if(gcRval && pgBounds)
+  if(gcRval != None && pgBounds)
   {
     // assign the clipping region to the GC and get the 'bounds' from the expose event
     // and intersect them.  This should prevent me from re-painting several times
 
     XClipBox(rgnPaint, &xrct);
 
-    pgBounds->x = xrct.x;
-    pgBounds->y = xrct.y;
+    pgBounds->x     = xrct.x;
+    pgBounds->y     = xrct.y;
     pgBounds->width = xrct.width;
     pgBounds->height = xrct.height;
     pgBounds->border = 0;
   }
 
-  if(!gcRval)
+  if(gcRval == None)
   {
     WB_WARN_PRINT("%s - WARNING:  zero gcRval for window %d (%08xH)\n",
                   __FUNCTION__, (int)wID, (int)wID);
@@ -6581,6 +6636,8 @@ XRectangle xrct;
 
   if(!pEntry || pEntry->rgnPaint == None)
   {
+    WB_ERROR_PRINT("ERROR: %s - WBClearWindow with no paint region\n", __FUNCTION__);
+
     return; // for now don't do anything
   }
 
@@ -6591,42 +6648,74 @@ XRectangle xrct;
 
   BEGIN_XCALL_DEBUG_WRAPPER
   XClipBox(pEntry->rgnPaint, &xrct);
+  END_XCALL_DEBUG_WRAPPER
 
+/////// DEBUG
+//  if(xrct.x < 0 || xrct.y < 0 ||
+//     xrct.width > pEntry->width ||
+//     xrct.height > pEntry->height)
+//  {
+//    WB_ERROR_PRINT("TEMPORARY:  %s - rect exceeds window bounds (%d, %d, %d, %d)\n", __FUNCTION__,
+//                   xrct.x, xrct.y, xrct.x + xrct.width, xrct.y + xrct.height);
+//  }
+//  else
+//  {
+//    WB_ERROR_PRINT("TEMPORARY:  %s - filling rect (%d, %d, %d, %d)\n", __FUNCTION__,
+//                   xrct.x, xrct.y, xrct.x + xrct.width, xrct.y + xrct.height);
+//  }
+/////// DEBUG
+
+//  BEGIN_XCALL_DEBUG_WRAPPER
+//
+//  // use XClearArea first (this should refresh what was there before if 'covered up')
+//  XClearArea(pDisplay, wID, xrct.x, xrct.y, xrct.width, xrct.height, False);
+//
+//  END_XCALL_DEBUG_WRAPPER
+
+  // now erase the background according to the clip rectangle
+
+  BEGIN_XCALL_DEBUG_WRAPPER
   XSetForeground(pDisplay, gc, clrBG);
-  XFillRectangle(pDisplay, wID, gc, xrct.x, xrct.y, xrct.width, xrct.height);
+
+  if(xrct.width > 0 && xrct.height > 0)
+  {
+    XFillRectangle(pDisplay, wID, gc, xrct.x, xrct.y, xrct.width, xrct.height);
+  }
+
   XSetForeground(pDisplay, gc, clrFG);
   END_XCALL_DEBUG_WRAPPER
+
 }
 
 void WBEndPaint(Window wID, GC gc)
 {
-  // validate the paint region and remove it
+  // validate the paint region and remove it from the 'invalid' region
 
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
-  if(pEntry->rgnClip)
+  if(pEntry->rgnClip != None)
   {
-    if(pEntry->rgnPaint)
+    if(pEntry->rgnPaint != None)
     {
       XSubtractRegion(pEntry->rgnPaint, pEntry->rgnClip, pEntry->rgnClip);
 
-      if(XEmptyRegion(pEntry->rgnClip))
-      {
-        XDestroyRegion(pEntry->rgnClip);
-        pEntry->rgnClip = 0;
-      }
+//      if(XEmptyRegion(pEntry->rgnClip))  // TODO:  should I leave the empty region anyway?  that might work better...
+//      {
+//        XDestroyRegion(pEntry->rgnClip);
+//        pEntry->rgnClip = None;
+//      }
     }
-    else
+    else // destroy clip region if paint region is 'None'
     {
       XDestroyRegion(pEntry->rgnClip);
-      pEntry->rgnClip = 0;
+      pEntry->rgnClip = None;
     }
   }
 
-  if(pEntry->rgnPaint)
+  if(pEntry->rgnPaint != None)
   {
     XDestroyRegion(pEntry->rgnPaint);
-    pEntry->rgnPaint = 0;
+    pEntry->rgnPaint = None;
   }
 
   if(gc)
@@ -7059,7 +7148,7 @@ WB_GEOM geom;
     axWBEvt[iEvent].xEvt.xexpose.count = 0;  // always make this a zero
   }
 
-  // make sure I invalidate the region
+  // make sure I invalidate the region covered by the expose event
 
   geom.x = pEvent->x;
   geom.y = pEvent->y;

@@ -56,7 +56,8 @@ extern "C" {
 #endif // __cplusplus
 
 
-/** \file window_dressing.h Utilities for painting and handling standard components of windows */
+/** \file window_dressing.h Utilities for painting and handling standard components of windows
+**/
 
 // SCROLL BARS
 
@@ -93,6 +94,7 @@ enum
   WBScrollState_HRDRAG = 16,
   WBScrollState_HMDRAG = 32
 };
+
 
 static __inline__ void WBInitScrollInfo(WB_SCROLLINFO *pSI) { bzero(pSI, sizeof(*pSI)); pSI->iHPos = pSI->iVPos = -1; }
 

@@ -331,6 +331,8 @@ typedef struct _XPM_ATTRIBUTES_
   * used by XpmCreatePixmapFromData().  There are a large number of members in this structure that are not useful for the purpose of
   * this function, and so a scaled-down version is used when MyLoadPixmapFromData is being invoked.\n
   * You should use libXpm when it is present on your system, as this function has not been fully tested on all platforms.
+  *
+  * Header File:  platform_helper.h
 **/
 int MyLoadPixmapFromData(Display *pDisplay, Window wID, char *aData[],
                          Pixmap *pPixmap, Pixmap *pMask, XPM_ATTRIBUTES *pAttr);
@@ -420,6 +422,8 @@ extern "C" {
   * \param compar The comparison function, declared using DECLARE_SORT_FUNCTION
   *
   * This function implements the QSORT_R macro when there is no libc function for qsort_r()
+  *
+  * Header File:  platform_helper.h
 **/
 void my_qsort_r(void *base, int nmemb, int size, void *thunk,
                 int (*compar)(void *, const void *, const void *));
@@ -483,6 +487,8 @@ void my_qsort_r(void *base, int nmemb, int size, void *thunk,
   *
   * Call this function right before using any 'platform_helper' functions to initialize any global resources
   * from 'platform_helper.h'.  WBInit() does this automatically.  It should only be called once.\n
+  *
+  * Header File:  platform_helper.h
 **/
 void WBPlatformOnInit(void);
 
@@ -493,6 +499,8 @@ void WBPlatformOnInit(void);
   * from 'platform_helper.h'.  WBExit() does this automatically.  Among other things, it will delete any temporary
   * files that were created via WBTempFile().\n
   * It should also be safe to call this function from within a 'signal' handler.
+  *
+  * Header File:  platform_helper.h
 **/
 void WBPlatformOnExit(void);
 
@@ -507,6 +515,8 @@ void WBPlatformOnExit(void);
   * this function returns the path name as a 'malloc'd string.  If the file (or directory) cannot
   * be located, the function returns NULL.\n
   * The caller must 'free()' any non-NULL pointer returned by this function.
+  *
+  * Header File:  platform_helper.h
 **/
 char * WBSearchPath(const char *szFileName);
 
@@ -525,6 +535,8 @@ char * WBSearchPath(const char *szFileName);
   * application has terminated.  This way an external application can keep the file open indefinitely, or even
   * re-read the file, without negative effects.  The 'WBPlatformOnExit()' function will delete all temporary files
   * that have been previously created by 'WBTempFile'.
+  *
+  * Header File:  platform_helper.h
 **/
 char * WBTempFile(const char *szExt);
 
@@ -540,6 +552,8 @@ char * WBTempFile(const char *szExt);
   * The actual location of the temporary file depends upon platform-specific parameters, such as
   * environment variables and system settings.\n
   * The caller must 'free()' any non-NULL pointer returned by this function.
+  *
+  * Header File:  platform_helper.h
 **/
 char * WBTempFile0(const char *szExt);
 
@@ -578,6 +592,8 @@ char * WBTempFile0(const char *szExt);
   * Each additional parameter passed to this function is a parameter that is to be passed to the program.
   * The final parameter in the list must be NULL, so any call to this function will need to have at
   * least 2 parameters.
+  *
+  * Header File:  platform_helper.h
 **/
 WB_PROCESS_ID WBRunAsync(const char *szAppName, ...);
 
@@ -595,6 +611,8 @@ WB_PROCESS_ID WBRunAsync(const char *szAppName, ...);
   * The final parameter in the list must be NULL, so any call to this function will need to have at
   * least 2 parameters.
   * On error this function returns a NULL value.  Any non-NULL value must be 'free'd by the caller.
+  *
+  * Header File:  platform_helper.h
 **/
 char * WBRunResult(const char *szAppName, ...);
 
@@ -617,6 +635,8 @@ char * WBRunResult(const char *szAppName, ...);
   *
   * To create piped output, pass the result of the previous 'WBRunResult' or 'WBRunResultPipe' as the
   * 'szStdInBuf' parameter to a subsequent 'WBRunResultPipe' call.
+  *
+  * Header File:  platform_helper.h
 **/
 char * WBRunResultPipe(const char *szStdInBuf, const char *szAppName, ...);
 
@@ -643,6 +663,8 @@ char * WBRunResultPipe(const char *szStdInBuf, const char *szAppName, ...);
   * function.\n
   * You can monitor 'WB_PROCESS_ID' to find out if the process is running.  Additionally, you can use
   * the output of hStdOut and hStdErr by re-directing them to anonymous pipes and monitoring their activity.
+  *
+  * Header File:  platform_helper.h
 **/
 WB_PROCESS_ID WBRunAsyncPipe(WB_FILE_HANDLE hStdIn, WB_FILE_HANDLE hStdOut, WB_FILE_HANDLE hStdErr,
                              const char *szAppName, ...);
@@ -675,6 +697,8 @@ WB_PROCESS_ID WBRunAsyncPipe(WB_FILE_HANDLE hStdIn, WB_FILE_HANDLE hStdOut, WB_F
   * This function is used internally by the other process control functions, and is defined here in case
   * you need to write a customized version of one of the process control functions.  A typical example might
   * be the use of stderr rather than stdout for WBRunResult().
+  *
+  * Header File:  platform_helper.h
 **/
 WB_PROCESS_ID WBRunAsyncPipeV(WB_FILE_HANDLE hStdIn, WB_FILE_HANDLE hStdOut, WB_FILE_HANDLE hStdErr,
                               const char *szAppName, va_list va);
@@ -698,6 +722,8 @@ WB_PROCESS_ID WBRunAsyncPipeV(WB_FILE_HANDLE hStdIn, WB_FILE_HANDLE hStdOut, WB_
   * \returns A valid WB_MODULE module handle, depending upon the operating system
   *
   * This function is identical to LoadLibrary() under Windows, and calls 'dlopen()' on POSIX systems
+  *
+  * Header File:  platform_helper.h
 **/
 WB_MODULE WBLoadLibrary(const char *szModuleName); // load a library module (shared lib, DLL, whatever)
 
@@ -707,6 +733,8 @@ WB_MODULE WBLoadLibrary(const char *szModuleName); // load a library module (sha
   * \param hModule A valid WB_MODULE module handle, as returned by WBLoadLibrary()
   *
   * This function is identical to FreeLibrary() under Windows, and calls 'dlfree()' on POSIX systems
+  *
+  * Header File:  platform_helper.h
 **/
 void WBFreeLibrary(WB_MODULE hModule);                 
 
@@ -718,6 +746,8 @@ void WBFreeLibrary(WB_MODULE hModule);
   * \returns A valid WB_MODULE module handle, depending upon the operating system
   *
   * This function is identical to GetProcAddress() under Windows, and calls 'dlproc()' on POSIX systems
+  *
+  * Header File:  platform_helper.h
 **/
 WB_PROCADDRESS WBGetProcAddress(WB_MODULE hModule, const char *szProcName);
 
@@ -738,6 +768,8 @@ WB_PROCADDRESS WBGetProcAddress(WB_MODULE hModule, const char *szProcName);
   * \returns The 'key' that identifies the thread local storage data slot
   *
   * Allocate thread local storage, returning the identifier to that local storage slot
+  *
+  * Header File:  platform_helper.h
 **/
 WB_THREAD_KEY WBThreadAllocLocal(void);
 
@@ -747,6 +779,8 @@ WB_THREAD_KEY WBThreadAllocLocal(void);
   * \returns The 'key' that identifies the thread local storage data slot
   *
   * Free an allocate thread local storage slot
+  *
+  * Header File:  platform_helper.h
 **/
 void WBThreadFreeLocal(WB_THREAD_KEY keyVal);
 
@@ -757,6 +791,8 @@ void WBThreadFreeLocal(WB_THREAD_KEY keyVal);
   * \returns The stored thread-specific data value, or NULL if not assigned
   *
   * Get the data associated with a thread local storage slot
+  *
+  * Header File:  platform_helper.h
 **/
 void * WBThreadGetLocal(WB_THREAD_KEY keyVal);
 
@@ -767,6 +803,8 @@ void * WBThreadGetLocal(WB_THREAD_KEY keyVal);
   * \param pValue the value to assign for thread local data
   *
   * Assign (set) the data associated with a thread local storage slot
+  *
+  * Header File:  platform_helper.h
 **/
 void WBThreadSetLocal(WB_THREAD_KEY keyVal, void *pValue);
 
@@ -780,6 +818,8 @@ void WBThreadSetLocal(WB_THREAD_KEY keyVal, void *pValue);
   *
   * Returns a 'WB_THREAD' resource representing the current thread.  This returned value should
   * NOT be free'd using WBThreadClose(), nor waited on with WBThreadWait().
+  *
+  * Header File:  platform_helper.h
 **/
 WB_THREAD WBThreadGetCurrent(void);
 
@@ -791,6 +831,8 @@ WB_THREAD WBThreadGetCurrent(void);
   * \returns A WB_THREAD thread identifier, or INVALID_HANDLE_VALUE on error
   *
   * Call this function to create a new thread using standard attributes.
+  *
+  * Header File:  platform_helper.h
 **/
 WB_THREAD WBThreadCreate(void *(*function)(void *), void *pParam);
 
@@ -802,6 +844,8 @@ WB_THREAD WBThreadCreate(void *(*function)(void *), void *pParam);
   *
   * Call this function to wait for a thread to complete and/or obtain its exit code.
   * This function will block until the thread has terminated or is canceled (pthreads only).
+  *
+  * Header File:  platform_helper.h
 **/
 void *WBThreadWait(WB_THREAD hThread);        // closes hThread, returns exit code, waits for thread to terminate (blocks)
 
@@ -815,6 +859,8 @@ void *WBThreadWait(WB_THREAD hThread);        // closes hThread, returns exit co
   * indicating that there is an exit code available.  If the thread has terminated (invalidating its WB_THREAD identifier)
   * the function will return a value < 0.  otherwise, The return value is > 0 indicating the thread is still active.\n
   * NOTE:  an active thread that has been suspended will return a value > 0.
+  *
+  * Header File:  platform_helper.h
 **/
 int WBThreadRunning(WB_THREAD hThread);
 
@@ -826,6 +872,8 @@ int WBThreadRunning(WB_THREAD hThread);
   * Call this function to exit the current thread immediately, specifying a return code\n
   * NOTE:  when the thread proc returns, it implies a call to WBThreadExit() on completion, using the return
   *        value as the exit code.
+  *
+  * Header File:  platform_helper.h
 **/
 void WBThreadExit(void *pRval);
 
@@ -839,6 +887,8 @@ void WBThreadExit(void *pRval);
   * can allow a thread to run to its completion, and automatically delete the associated resources on exit.
   * You should not call this function after a call to WBThreadWait()\n
   * NOTE:  internally it calls either pthread_detach or CloseHandle (depending)
+  *
+  * Header File:  platform_helper.h
 **/
 void WBThreadClose(WB_THREAD hThread);
 
@@ -851,6 +901,8 @@ void WBThreadClose(WB_THREAD hThread);
   *
   * Use this function to create a 'condition' that can be signaled using WBCondSignal()\n
   * This is roughly the equivalent of an 'Event' object on MS Windows
+  *
+  * Header File:  platform_helper.h
 **/
 int WBCondCreate(WB_COND *pCond);
 
@@ -861,6 +913,8 @@ int WBCondCreate(WB_COND *pCond);
   * \returns A zero value if successful; non-zero on error
   *
   * Use this function to create a 'mutex' synchronization object that can be locked by only a single thread at a time
+  *
+  * Header File:  platform_helper.h
 **/
 int WBMutexCreate(WB_MUTEX *pMtx);
 
@@ -870,6 +924,8 @@ int WBMutexCreate(WB_MUTEX *pMtx);
   * \param pCond a pointer to the WB_COND signallable condition
   *
   * Use this function to free a WB_COND that was previously allocated with WBCondCreate()
+  *
+  * Header File:  platform_helper.h
 **/
 void WBCondFree(WB_COND *pCond);
 
@@ -879,6 +935,8 @@ void WBCondFree(WB_COND *pCond);
   * \param pMtx a pointer to the WB_MUTEX lockable mutex object
   *
   * Use this function to free a WB_MUTEX that was previously allocated with WBMutexCreate()
+  *
+  * Header File:  platform_helper.h
 **/
 void WBMutexFree(WB_MUTEX *pMtx);
 
@@ -892,6 +950,8 @@ void WBMutexFree(WB_MUTEX *pMtx);
   * This function attempts to lock the WB_MUTEX and returns a zero value if it succeeds, blocking for the period
   * of time specified by 'nTimeout' (in microseconds).  A negative 'nTimeout' causes an infinite waiting period.
   * The function will return a positive value if the timeout period was exceeded, or a negative value on error.
+  *
+  * Header File:  platform_helper.h
 **/
 int WBMutexLock(WB_MUTEX *pMtx, int nTimeout);
 
@@ -902,6 +962,8 @@ int WBMutexLock(WB_MUTEX *pMtx, int nTimeout);
   * \returns A zero if the unlock succeeded, non-zero on error
   *
   * This function unlocks a previously locked mutex
+  *
+  * Header File:  platform_helper.h
 **/
 int WBMutexUnlock(WB_MUTEX *pMtx);
 
@@ -913,6 +975,8 @@ int WBMutexUnlock(WB_MUTEX *pMtx);
   *
   * This function signals a condition so that a waiting process will 'wake up'
   * see WBCondWait() and WBCondWaitMutex()
+  *
+  * Header File:  platform_helper.h
 **/
 int WBCondSignal(WB_COND *pCond);
 
@@ -925,6 +989,8 @@ int WBCondSignal(WB_COND *pCond);
   *
   * This function waits up to a specified time (in microseconds), or indefinitely if the specified
   * wait time is negative, until the condition object 'hCond' has been signaled.  See WBCondSignal()
+  *
+  * Header File:  platform_helper.h
 **/
 int WBCondWait(WB_COND *pCond, int nTimeout);
 
@@ -943,6 +1009,8 @@ int WBCondWait(WB_COND *pCond, int nTimeout);
   * At that point, the mutex 'hMtx' will be re-locked (waiting indefinitely for the lock to be successful)\n
   * Upon return, 'hMtx' will be locked again by the calling thread.  'hMtx' must be already locked before
   * calling this function.  It will remain unlocked during the wait state.
+  *
+  * Header File:  platform_helper.h
 **/
 int WBCondWaitMutex(WB_COND *pCond, WB_MUTEX *pMtx, int nTimeout);
 
@@ -956,6 +1024,8 @@ int WBCondWaitMutex(WB_COND *pCond, WB_MUTEX *pMtx, int nTimeout);
   * This function performs an interlocked 'atomic' decrement of an unsigned integer,
   * guaranteeing that at the time the value is decremented, no other thread is allowed
   * to read or modify the value until the function returns.
+  *
+  * Header File:  platform_helper.h
 **/
 unsigned int WBInterlockedDecrement(volatile unsigned int *pValue);
 
@@ -969,6 +1039,8 @@ unsigned int WBInterlockedDecrement(volatile unsigned int *pValue);
   * This function performs an interlocked 'atomic' increment of an unsigned integer,
   * guaranteeing that at the time the value is incremented, no other thread is allowed
   * to read or modify the value until the function returns.
+  *
+  * Header File:  platform_helper.h
 **/
 unsigned int WBInterlockedIncrement(volatile unsigned int *pValue);
 
@@ -984,6 +1056,8 @@ unsigned int WBInterlockedIncrement(volatile unsigned int *pValue);
   * guaranteeing that at the time the value is assigned, no other thread is allowed
   * to read or modify the value until the function returns.  The previous value is returned
   * by the function, effectively 'exchanging' the value with one that you specify.
+  *
+  * Header File:  platform_helper.h
 **/
 unsigned int WBInterlockedExchange(volatile unsigned int *pValue, unsigned int nNewVal);
 
@@ -998,6 +1072,8 @@ unsigned int WBInterlockedExchange(volatile unsigned int *pValue, unsigned int n
   * guaranteeing that at the time the value is read, no other thread is allowed
   * to modify the value.  Once read, the value can still change; however, the value
   * as-read will be 'atomic' i.e. not a partially changed value.
+  *
+  * Header File:  platform_helper.h
 **/
 unsigned int WBInterlockedRead(volatile unsigned int *pValue);
 
@@ -1038,6 +1114,8 @@ unsigned int WBInterlockedRead(volatile unsigned int *pValue);
   * ghostscript and/or lpd directly.  Additional support for PDF, etc. may be in order.\n
   * NOTE 5:  'ipptool' may be the best CUPS method of sending files to a printer\n
   * example:  ipptool -4 -t http://localhost:631/printers/printername get-printer-attributes.test
+  *
+  * Header File:  platform_helper.h
 **/
 int WBPrintPostScriptFile(const char *szPrinterName, const char *szFileName);
 
@@ -1056,6 +1134,8 @@ int WBPrintPostScriptFile(const char *szPrinterName, const char *szFileName);
   * NOTE 2:  for CUPS, use 'lpstat -s' and filter the output to get the printer names.  URL should be
   *          http://localhost:631/printers/printername\n
   * NOTE 3:  fallback to /etc/printcap /usr/local/etc/printcap and other sources
+  *
+  * Header File:  platform_helper.h
 **/
 char *WBGetPrinterList(void);
 

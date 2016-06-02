@@ -67,7 +67,7 @@ extern "C" {
 **/
 
 /** \ingroup frame
-  * \defgroup frame_window Frame Window - APIs and Structures
+  * \defgroup frame_window Frame Window APIs and Structures
   *
   * To create a frame window, you will need to call the \ref FWCreateFrameWindow() API function,
   * which returns a WBFrameWindow structure pointer.  Until the window has been destroyed this
@@ -75,6 +75,7 @@ extern "C" {
   * Typical code for creating a frame window follows:
   *
   * \code
+
   XSizeHints  xsh;            // Size hints for window manager
   WBFrameWindow *pFrame;      // pointer to WBFrameWindow for my new frame window
 
@@ -98,6 +99,7 @@ extern "C" {
                                  MyWindowCallback,         // callback
                                  WBFrameWindow_APP_WINDOW  // flags and attributes
                                  | WBFrameWindow_VISIBLE);
+
   * \endcode
   *
   * Once the window has been created, you can manage its contents using FWAddContainedWindow()
@@ -120,7 +122,7 @@ extern "C" {
 **/
 
 /** \ingroup frame
-  * \defgroup frame_menu Frame Window - Menus
+  * \defgroup frame_menu Frame Window Menu Handling
   * \brief Macros and functions needed to set up a frame window's menu
   *
   * Setting up a menu event handler for a frame window using the WBFWMenuHandler structures involves
@@ -128,7 +130,9 @@ extern "C" {
   * assign them to the Frame window.
   *
   * Typical sample code follows:
+  *
   * \code
+
   static int FileExitHandler(XClientMessageEvent *);
   static int FileOpenHandler(XClientMessageEvent *);
   static int FileSaveHandler(XClientMessageEvent *);
@@ -158,7 +162,7 @@ extern "C" {
 
   * \endcode
   *
-  *
+  * \sa \ref frame_window "Frame Window APIs and Structures"
   *
 **/
 
@@ -181,6 +185,7 @@ extern "C" {
   * will be able to activate it.
   *
   * \code
+
   typedef struct __WB_FW_MENU_HANDLER_
   {
     unsigned long lMenuID;                       // menu ID (< 0x10000L) or const pointer to string
@@ -190,6 +195,7 @@ extern "C" {
                                                  // A return value of '0' displays normally, -1 disables
                                                  // Other return values are reserved
   } WBFWMenuHandler;
+
   * \endcode
   *
   * \sa \ref FW_MENU_HANDLER_ENTRY
@@ -223,6 +229,7 @@ typedef struct __WB_FW_MENU_HANDLER_
   * You should not manipulate this structure directly.  Use the appropriate API functions.
   *
   * \code
+
   typedef struct __WB_FRAME_WINDOW__
   {
     unsigned int ulTag;                  // tag indicating I'm a frame window
@@ -239,6 +246,7 @@ typedef struct __WB_FW_MENU_HANDLER_
     int iNumTabs;                        // The total number of visible tabs
 
   } WBFrameWindow;
+
   * \endcode
   *
 **/
@@ -271,8 +279,26 @@ enum WBFrameWindow_FLAGS
   WBFrameWindow_APP_WINDOW = 1,   ///< set this flag for application top-level window and whenever it is destroyed the application will exit
   WBFrameWindow_VISIBLE    = 2,   ///< set this to make window immediately visible
   WBFrameWindow_NO_TABS    = 4,   ///< set this to disable tabs (single child frame only)
+  WBFrameWindow_STATUS_BAR = 8,   ///< set this to enable a 'status bar' at the bottom
 
   WBFrameWindow_MAX = 0x80000000L ///< maximum flag value (for reference only)
+};
+
+/** \enum WBStatusTabInfo_FLAGS
+  * \ingroup frame_window
+  * \brief enumeration for bit flags that are 'or'd with the tab stop index
+  *
+**/
+enum WBStatusTabInfo_FLAGS
+{
+  WBStatusTabInfo_MASK          = 0x0fffffff, ///< mask for the actual tab value
+  WBStatusTabInfo_BREAK         = 0x10000000, ///< represents a 'break' (marks end of a column)
+  WBStatusTabInfo_JUSTIFY_MASK  = 0x6fffffff, ///< mask for the 'justification' value
+  WBStatusTabInfo_JUSTIFY_LEFT  = 0x00000000, ///< left-justify text within the column (default)  
+  WBStatusTabInfo_JUSTIFY_CENTER= 0x20000000, ///< center text within the column
+  WBStatusTabInfo_JUSTIFY_RIGHT = 0x40000000, ///< right justify text within the column
+  WBStatusTabInfo_JUSTIFY_res6  = 0x60000000, ///< reserved: unspecified new justification method
+  WBStatusTabInfo_RTL_COLUMN    = 0x80000000, ///< bit flag to 'right justify' the column location
 };
 
 
@@ -416,6 +442,12 @@ enum WBChildFrame_FLAGS
   * Use this function to create a basic frame window.  A frame window has a title, icon, menu, and
   * can contain one or more 'Child Frames'.  The menu is optional, and support for multiple 'tab'
   * child frames is also optional, depending on the bit flags set in 'iFlags'.
+  *
+  * NOTE:  scroll up to the 'Detailed Description' section for an example of how to use this function
+  *
+  * Header File:  frame_window.h
+  *
+  * \sa \ref frame_menu "Frame Window Menu Handling"
 **/
 WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *szMenuResource,
                                    int iX, int iY, int iWidth, int iHeight,
@@ -428,6 +460,8 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
   *
   * Forces the frame window to recalculate its layout (i.e. size of menus, tabs, and 'child frame' windows) and propogate
   * that information to all 'owned' windows and objects it contains.
+  *
+  * Header File:  frame_window.h
 **/
 void FWRecalcLayout(Window wID);  // recalculate layout information (propagates to contained windows)
 
@@ -438,6 +472,8 @@ void FWRecalcLayout(Window wID);  // recalculate layout information (propagates 
   * \param pCallBack A function pointer of type \ref WBWinEvent for the user-defined event handler callback.  Can be NULL.
   *
   * Use this function to assign the event handler callback for the frame window.
+  *
+  * Header File:  frame_window.h
 **/
 void FWSetUserCallback(WBFrameWindow *pFW, WBWinEvent pCallBack);
   // assigns the user-defined callback function (one only).  Not all messages pass through the callback
@@ -450,6 +486,8 @@ void FWSetUserCallback(WBFrameWindow *pFW, WBWinEvent pCallBack);
   * \returns A pointer to the associated WBFrameWindow structure (if it is a WBFrameWindow), or NULL on error
   *
   * Use this function to safely obtain the correct WBFrameWindow structure for a given Window ID.
+  *
+  * Header File:  frame_window.h
 **/
 static __inline__ WBFrameWindow *FWGetFrameWindowStruct(Window wID)  // for frame windows, returns the frame window struct
 {
@@ -470,6 +508,8 @@ static __inline__ WBFrameWindow *FWGetFrameWindowStruct(Window wID)  // for fram
   *
   * Use this function to destroy a WBFrameWindow based on it's ID.  After calling this function
   * the WBFrameWindow struct is no longer valid
+  *
+  * Header File:  frame_window.h
 **/
 void FWDestroyFrameWindow(Window wID);  // destroys frame window using the Window ID (frees the struct also)
 
@@ -480,6 +520,8 @@ void FWDestroyFrameWindow(Window wID);  // destroys frame window using the Windo
   *
   * Use this function to destroy a WBFrameWindow based on the WBFrameWindow struct pointer value.
   * After calling this function the WBFrameWindow struct is no longer valid
+  *
+  * Header File:  frame_window.h
 **/
 void FWDestroyFrameWindow2(WBFrameWindow *pFrameWindow); // destroys it using the struct pointer
 
@@ -494,6 +536,8 @@ void FWDestroyFrameWindow2(WBFrameWindow *pFrameWindow); // destroys it using th
   * handlers for the WBChildFrame that has the current focus.
   *
   * \sa \ref frame_menu "Frame Menus"
+  *
+  * Header File:  frame_window.h
 **/
 void FWSetMenuHandlers(WBFrameWindow *pFrameWindow, const WBFWMenuHandler *pHandlerArray);
 
@@ -527,6 +571,8 @@ void FWSetMenuHandlers(WBFrameWindow *pFrameWindow, const WBFWMenuHandler *pHand
   *
   * \param pFrameWindow A const pointer to a WBFrameWindow structure for the frame window
   * \returns The total number of 'contained' windows, or -1 on error
+  *
+  * Header File:  frame_window.h
 **/
 int FWGetNumContWindows(const WBFrameWindow *pFrameWindow);
 
@@ -539,6 +585,8 @@ int FWGetNumContWindows(const WBFrameWindow *pFrameWindow);
   *
   * Use this function to get the Window ID of a 'contained' (child frame) window.  To get more information
   * about contained 'Child Frame' window, see \ref child_frame "Child Frames"
+  *
+  * Header File:  frame_window.h
 **/
 WBChildFrame * FWGetContainedWindowByIndex(const WBFrameWindow *pFrameWindow, int iIndex);
 
@@ -556,6 +604,8 @@ WBChildFrame * FWGetContainedWindowByIndex(const WBFrameWindow *pFrameWindow, in
   * \param pFrameWindow A pointer to a WBFrameWindow structure for the frame window
   * \param pNew A pointer to the WBChildFrame for the window that is to become part of the 'contents' for the frame window
   * \returns The tab order index of the window, or -1 on error
+  *
+  * Header File:  frame_window.h
 **/
 int FWAddContainedWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pNew);
 
@@ -565,6 +615,8 @@ int FWAddContainedWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pNew);
   * \param pFrameWindow A pointer to a WBFrameWindow structure for the frame window
   * \param pCont A pointe to the WBChildFrame for the window that is to be removed from the 'contents' for the frame window
   * \returns void
+  *
+  * Header File:  frame_window.h
 **/
 void FWRemoveContainedWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pCont);
 
@@ -574,6 +626,8 @@ void FWRemoveContainedWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pCont);
   * \param pFrameWindow A pointer to a WBFrameWindow structure for the frame window
   * \param pCont A pointer to the WBChildFrame for the window that is to be assigned the focus.
   * \returns void
+  *
+  * Header File:  frame_window.h
 **/
 void FWSetFocusWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pCont);
 
@@ -583,9 +637,46 @@ void FWSetFocusWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pCont);
   * \param pFrameWindow A pointer to a WBFrameWindow structure for the frame window
   * \param iIndex The 'tab order' index of the 'contained' window that is to receive the focus
   * \returns void
+  *
+  * Header File:  frame_window.h
 **/
 void FWSetFocusWindowIndex(WBFrameWindow *pFrameWindow, int iIndex);
 
+/** \ingroup frame_window
+  * \brief Sets the 'status' text for a Frame Window with a status bar
+  *
+  * \param pFrameWindow A pointer to a WBFrameWindow structure for the frame window
+  * \param szText A tab-delimited character string containing UTF8 or ASCII status text. A copy of this will be stored internally.
+  * \returns void
+  *
+  * Use this function to update the status text.  Status text can contain multiple 'columns' that
+  * are displayed using the tab stop information assigned by FWSetStatusTabInfo().  Each column's
+  * text data will be 'appropriately justified' and displayed in the status bar according to the tab info.
+  *
+  * Header File:  frame_window.h
+**/
+void FWSetStatusText(WBFrameWindow *pFrameWindow, const char *szText);
+
+/** \ingroup frame_window
+  * \brief Sets the 'status' tab info for a Frame Window with a status bar
+  *
+  * \param pFrameWindow A pointer to a WBFrameWindow structure for the frame window
+  * \param nTabs The total number of tabs in 'pTabs'.  If 'pTabs' is NULL, it is the default (even) tab spacing.
+  * \param pTabs A pointer to an array of integers containing tab values.  See below on how they are interpreted.
+  * \returns void
+  *
+  * Use this function to assign the tab spacing and/or columns for the status bar.  Tabs are bit-wise
+  * 'or'd with flags from the \ref WBStatusTabInfo_FLAGS enumeration.\n
+  * The physical tab value starts at the left side unless WBStatusTabInfo_RTL_COLUMN has been 'or'd with
+  * its value.  Columns width is determined by both the next tab value and the current one.  Use the
+  * 'WBStatusTabInfo_BREAK' flag to create a 'blank' area that defines the width of the previous column
+  * but does not have anything displayed within it.\n
+  * To left, right, or center text within a column, use one of the WBStatusTabInfo_JUSTIFY_ constants.  The
+  * default (zero) is left-justification (even for RTL columns).
+  *
+  * Header File:  frame_window.h
+**/
+void FWSetStatusTabInfo(WBFrameWindow *pFrameWindow, int nTabs, const int *pTabs);
 
 // DEFAULT COLORS
 
@@ -593,6 +684,8 @@ void FWSetFocusWindowIndex(WBFrameWindow *pFrameWindow, int iIndex);
   * \brief Get the default foreground color
   *
   * \returns XColor representing default foreground color
+  *
+  * Header File:  frame_window.h
 **/
 XColor FWGetDefaultFG(void);
 
@@ -600,6 +693,8 @@ XColor FWGetDefaultFG(void);
   * \brief Get the default background color
   *
   * \returns XColor representing default background color
+  *
+  * Header File:  frame_window.h
 **/
 XColor FWGetDefaultBG(void);
 
@@ -607,6 +702,8 @@ XColor FWGetDefaultBG(void);
   * \brief Get the default border color
   *
   * \returns XColor representing default border color
+  *
+  * Header File:  frame_window.h
 **/
 XColor FWGetDefaultBD(void);
 
@@ -624,6 +721,8 @@ XColor FWGetDefaultBD(void);
   * This function performs basic 'selection event' processing.  It is normally called
   * internally for default handling of selection events whenever the specified callback
   * function returns 0 for such events.
+  *
+  * Header File:  frame_window.h
 **/
 int FWDoSelectionEvents(WBFrameWindow *pFrameWindow, Window wID, Window wIDMenu, XEvent *pEvent);
 #endif // 0

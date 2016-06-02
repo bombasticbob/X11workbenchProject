@@ -239,7 +239,9 @@ typedef struct __WB_DIALOG_CONTROL__
   * This function must be called once before using any of the Dialog Control functions.
   * Normally an explicit call to this won't be necessary since Dialog (frame) Window
   * support code in dialog_window.c does this automatically.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 void WBDialogControlsInit(void);  // call once before using (dialog_window.c does this for you)
 
 /** \ingroup dlgctrl
@@ -259,7 +261,9 @@ void WBDialogControlsInit(void);  // call once before using (dialog_window.c doe
   *
   * Use this function to create a dialog conrol window, returning a pointer to the WBDialogControl
   * class containing its properties.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 WBDialogControl * WBDialogControlCreate(Atom aClass, WBDialogWindow *pOwner,
                                         WBDialogEntry *pDialogEntry, // pointer to the dialog entry I'll be using
                                         int iX, int iY, int iWidth, int iHeight,
@@ -275,26 +279,36 @@ WBDialogControl * WBDialogControlCreate(Atom aClass, WBDialogWindow *pOwner,
   * Registers the callback function for the dialog control.  Also assigns the class name string pointer (for debug
   * and trace purposes), which may be different from the default in the case of a subclassed control.  This will
   * normally be called immediately after creating the control using WBDialogControlCreate()
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 void DLGRegisterControlCallback(WBDialogControl *pDialogControl, const char *szClassName, WBWinEvent pCallback);
 
 
 // generic property list helpers (low level)
 /** \ingroup dlgctrl
   * \brief Low-level dialog control property assignment
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 int WBDialogControlSetDialogProp(WBDialogControl *pCtrl, WB_DIALOG_PROP *pPropVal); // returns 0 on success
 /** \ingroup dlgctrl
   * \brief Low-level dialog control property removal
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 void WBDialogControlDelDialogProp(WBDialogControl *pCtrl, Atom aProp);
 /** \ingroup dlgctrl
   * \brief Low-level dialog control property retrieval
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 const WB_DIALOG_PROP *WBDialogControlGetDialogProp(WBDialogControl *pCtrl, Atom aProp);
 /** \ingroup dlgctrl
   * \brief Low-level dialog control property list retrieval
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 static __inline__ const WBDialogPropList *WBDialogControlGetPropList(WBDialogControl *pCtrl)
 {
   if(pCtrl)
@@ -308,7 +322,9 @@ static __inline__ const WBDialogPropList *WBDialogControlGetPropList(WBDialogCon
 
 /** \ingroup dlgctrl
   * \brief Mid-level dialog control property list assignment
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 int WBDialogControlSetPropList(WBDialogControl *pCtrl, const char *szPropList); // prop:value prop:"value" etc. separated by white space
 /** \ingroup dlgctrl
   * \brief Mid-level dialog control property assignment (character string)
@@ -316,7 +332,9 @@ int WBDialogControlSetPropList(WBDialogControl *pCtrl, const char *szPropList); 
   * Strings are stored internally within the property list as a memory block allocated via 'malloc()'.
   * If an existing pointer is already present when a new string is assigned, it is destroyed via 'free()'.
   * The assigned value is then copied into a memory block allocated via 'malloc()' and stored in the property list.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 int WBDialogControlSetProperty(WBDialogControl *pCtrl, Atom aPropName, const char *szPropVal);
 /** \ingroup dlgctrl
   * \brief Mid-level dialog control property list assignment (generic pointer)
@@ -325,7 +343,9 @@ int WBDialogControlSetProperty(WBDialogControl *pCtrl, Atom aPropName, const cha
   * pointer already assigned to this property will be automatically destroyed using 'free()'.
   * The property itself is considered to be 'owned' by the property list, and will be cleaned up
   * when the control window is destroyed.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 void WBDialogControlSetProperty2(WBDialogControl *pCtrl, Atom aPropName, void *szPropVal); // szPropVal must be malloc'd pointer or NULL
 
 /** \ingroup dlgctrl
@@ -334,7 +354,9 @@ void WBDialogControlSetProperty2(WBDialogControl *pCtrl, Atom aPropName, void *s
   * This function returns the actual string pointer stored within the property list, and may be NULL.
   * To modify an existing sring value, you should first make a copy of the string (as needed), then modify
   * the copy and re-assign teh value via WBDialogControlSetProperty().
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 const char *WBDialogControlGetProperty(WBDialogControl *pCtrl, Atom aPropName);
 /** \ingroup dlgctrl
   * \brief Mid-level dialog control property list retrieval (generic pointer)
@@ -343,7 +365,9 @@ const char *WBDialogControlGetProperty(WBDialogControl *pCtrl, Atom aPropName);
   * pointer already assigned to this property will be automatically destroyed using 'free()'.
   * The property itself is considered to be 'owned' by the property list, and will be cleaned up
   * when the control window is destroyed.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 void *WBDialogControlGetProperty2(WBDialogControl *pCtrl, Atom aPropName); // returns actual malloc'd pointer or NULL
 
 // NOTE:  use WBDialogControlSetProperty2 to directly assign malloc'd pointer, and modify actual data returned by above
@@ -358,7 +382,9 @@ void *WBDialogControlGetProperty2(WBDialogControl *pCtrl, Atom aPropName); // re
   * \return Pointer to WBDialogControl structure associated with the dialog control, or NULL if error or nonexistent
   *
   * This is the preferred function for obtaining a pointer to the WBDialogControl structure for a dialog control window
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 static __inline__ WBDialogControl *DLGGetDialogControlStruct(Window wID)  // for frame windows, returns the frame window struct
 {
   WBDialogControl *pRval = (WBDialogControl *)WBGetWindowData(wID, 0);  // offset 0 for window-specific structs
@@ -379,7 +405,9 @@ static __inline__ WBDialogControl *DLGGetDialogControlStruct(Window wID)  // for
   * The CAPTION property is a standard property for a dialog control.  Since it has
   * its own data member in the \ref WBDialogControl structure, you should maintain
   * it using this function.  It is equivalent to the 'Title'.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 void WBDialogControlSetCaption(WBDialogControl *pCtrl, const char *szCaption); // caption (all, equiv to 'title')
 /** \ingroup dlgctrl
   * \brief Obtain a pointer to the assigned text for the 'CAPTION' property of a dialog control
@@ -387,7 +415,9 @@ void WBDialogControlSetCaption(WBDialogControl *pCtrl, const char *szCaption); /
   * The CAPTION property is a standard property for a dialog control.  Since it has
   * its own data member in the \ref WBDialogControl structure, you should only query
   * it using this function.  It is equivalent to the 'Title'.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 const char *WBDialogControlGetCaption(WBDialogControl *pCtrl);
 
 /** \ingroup dlgctrl
@@ -396,7 +426,9 @@ const char *WBDialogControlGetCaption(WBDialogControl *pCtrl);
   * The PIXMAP property is a standard property for a dialog control.  Since it has
   * its own data member in the \ref WBDialogControl structure, you should only
   * maintain it using this function.  It is equivalent to the IMAGE or ICON property.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 void WBDialogControlSetPixmap(WBDialogControl *pCtrl, Pixmap pixmap);  // pixmaps (image, icon, button?)
 /** \ingroup dlgctrl
   * \brief Obtain the assigned PIXMAP (image) property for a control
@@ -404,7 +436,9 @@ void WBDialogControlSetPixmap(WBDialogControl *pCtrl, Pixmap pixmap);  // pixmap
   * The PIXMAP property is a standard property for a dialog control.  Since it has
   * its own data member in the \ref WBDialogControl structure, you should only
   * query it using this function.  It is equivalent to the IMAGE or ICON property.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 Pixmap WBDialogControlGetPixmap(WBDialogControl *pCtrl);
 
 /** \ingroup dlgctrl
@@ -417,7 +451,9 @@ Pixmap WBDialogControlGetPixmap(WBDialogControl *pCtrl);
   * The ICON property is a standard property for a dialog control.  Since it has
   * its own data member in the \ref WBDialogControl structure, you should only
   * maintain it using this function.  It is equivalent to the IMAGE or PIXMAP property.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 void WBDialogControlSetIconPixmap(WBDialogControl *pCtrl, Pixmap pixmap, Pixmap pixmap2);  // icons only
 /** \ingroup dlgctrl
   * \brief Obtain the assigned ICON (image) property for a control, which consists of 2 pixmaps
@@ -429,7 +465,9 @@ void WBDialogControlSetIconPixmap(WBDialogControl *pCtrl, Pixmap pixmap, Pixmap 
   * The ICON property is a standard property for a dialog control.  Since it has
   * its own data member in the \ref WBDialogControl structure, you should only
   * maintain it using this function.  It is equivalent to the IMAGE or PIXMAP property.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 Pixmap WBDialogControlGetIconPixmap(WBDialogControl *pCtrl, Pixmap *pPixmap2);
 
 /** \ingroup dlgctrl
@@ -437,7 +475,9 @@ Pixmap WBDialogControlGetIconPixmap(WBDialogControl *pCtrl, Pixmap *pPixmap2);
   *
   * The TEXT property is a standard property for a dialog control.  To preserve consistency
   * use this function to assign it, rather than assigning the TEXT property directly.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 static __inline__ void WBDialogControlSetText(WBDialogControl *pCtrl, const char *szText)
 {
 #ifdef DIALOG_SUPPORT_C
@@ -456,7 +496,9 @@ extern const Atom aDLGC_TEXT;
   *
   * The TEXT property is a standard property for a dialog control.  To preserve consistency
   * use this function to query it, rather than querying the TEXT property directly.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 static __inline__ const char *WBDialogControlGetText(WBDialogControl *pCtrl)
 {
 #ifdef DIALOG_SUPPORT_C
@@ -481,7 +523,9 @@ extern const Atom aDLGC_TEXT;
   *
   * This is the preferred function for obtaining a pointer to the WBDialogControl structure for a dialog control window
   * using the control ID and owning dialog window
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 static __inline__ WBDialogControl *DLGGetDialogControlStructFromID(WBDialogWindow *pDialog, int iControlID)
 {
   if(pDialog)
@@ -510,7 +554,9 @@ static __inline__ WBDialogControl *DLGGetDialogControlStructFromID(WBDialogWindo
   * for the correct information, test for validity, etc. and THEN make the assignment.  When the
   * control ID is known, but the Window or WBDialogControl structure pointer is not, use THIS
   * function to assign the caption.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 static __inline__ void DLGSetControlCaption(WBDialogWindow *pDialog, int iControlID, const char *szCaption)
 {
   if(pDialog)
@@ -539,7 +585,9 @@ static __inline__ void DLGSetControlCaption(WBDialogWindow *pDialog, int iContro
   * for the correct information, test for validity, etc. and THEN make the final query.  When the
   * control ID is known, but the Window or WBDialogControl structure pointer is not, use THIS
   * function to query for the caption.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 static __inline__ const char * DLGGetControlCaption(WBDialogWindow *pDialog, int iControlID)
 {
   if(pDialog)
@@ -571,7 +619,9 @@ static __inline__ const char * DLGGetControlCaption(WBDialogWindow *pDialog, int
   * for the correct information, test for validity, etc. and THEN make the assignment.  When the
   * control ID is known, but the Window or WBDialogControl structure pointer is not, use THIS
   * function to assign the caption.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 static __inline__ void DLGSetControlText(WBDialogWindow *pDialog, int iControlID, const char *szText)
 {
   if(pDialog)
@@ -600,7 +650,9 @@ static __inline__ void DLGSetControlText(WBDialogWindow *pDialog, int iControlID
   * for the correct information, test for validity, etc. and THEN make the final query.  When the
   * control ID is known, but the Window or WBDialogControl structure pointer is not, use THIS
   * function to query for the caption.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 static __inline__ const char * DLGGetControlText(WBDialogWindow *pDialog, int iControlID)
 {
   if(pDialog)
@@ -637,7 +689,9 @@ static __inline__ const char * DLGGetControlText(WBDialogWindow *pDialog, int iC
   * function to assign the property's text value.
   *
   * \sa \ref WBDialogControlSetProperty()
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 static __inline__ int DLGSetControlProperty(WBDialogWindow *pDialog, int iControlID, Atom aPropName, const char *szPropVal)
 {
   if(pDialog)
@@ -672,7 +726,9 @@ static __inline__ int DLGSetControlProperty(WBDialogWindow *pDialog, int iContro
   * function to query for the text property.
   *
   * \sa \ref WBDialogControlGetProperty()
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 static __inline__ const char * DLGGetControlProperty(WBDialogWindow *pDialog, int iControlID, Atom aPropName)
 {
   if(pDialog)
@@ -1048,16 +1104,23 @@ enum CONTROL_FLAGS
 //////////////////////////////////////
 
 /** \ingroup dlglist
-  * \brief The default 'List Info' data allocator for a control's list info */
+  * \brief The default 'List Info' data allocator for a control's list info
+  *
+  * Header File:  dialog_controls.h
+**/
 void * DLGCDefaultListInfoAllocator(const void *pData, int cbData);
 
 /** \ingroup dlglist
   * \brief Retrieve the text poiner for a single list entry (listbox, combo, and tree controls only)
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 const char * DLGGetControlListText(WBDialogControl *pCtrl, int iIndex);  // retrieve data pointer for single list entry
 /** \ingroup dlglist
   * \brief Retrieve the data pointer for a single list entry (listbox, combo, and tree controls only)
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 const void * DLGGetControlListData(WBDialogControl *pCtrl, int iIndex);  // retrieve data pointer for single list entry
 
 /** \ingroup dlglist
@@ -1073,7 +1136,9 @@ const void * DLGGetControlListData(WBDialogControl *pCtrl, int iIndex);  // retr
   *
   * This is a generic method by which a control's list entry can be initialized.  If the control's
   * list consists entirely of text data, you can simplify the process by using \ref DLGInitControlListInfoDefault()
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 int DLGInitControlListInfo(WBDialogControl *pCtrl, int nFlags,
                            void *(*pfnAllocator)(const void *,int), void (*pfnDestructor)(void *),
                            void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *),
@@ -1111,7 +1176,9 @@ int DLGInitControlListInfo(WBDialogControl *pCtrl, int nFlags,
   * This is a generic method by which the parameters of a control's list entry can be modified.  If the
   * entry does not already exist, a new entry will be initialized with 'default' parameters assigned
   * using the same values you would get with \ref DLGInitControlListInfoDefault()
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 int DLGModifyControlListInfo(WBDialogControl *pCtrl, int bFlags, int nFlags,
                              int bAllocator, void *(*pfnAllocator)(const void *,int),
                              int bDestructor, void (*pfnDestructor)(void *),
@@ -1132,7 +1199,9 @@ int DLGModifyControlListInfo(WBDialogControl *pCtrl, int bFlags, int nFlags,
   * 'cbData' parameters are passed along without modification to the allocator function.  Whenever DefaultListInfoAllocator()
   * is used, a cbData value less than zero indicates that pData points to a null-byte terminated string, and whenever cbData
   * is equal to zero, the pointer value of 'pData' is assigned to the internal list entry 'as-is'.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 int DLGAddControlListEntry(WBDialogControl *pCtrl, const char *pData, long cbData, int iIndex);
 
 /** \ingroup dlglist
@@ -1142,7 +1211,9 @@ int DLGAddControlListEntry(WBDialogControl *pCtrl, const char *pData, long cbDat
   * \param iIndex Identifies the index of the entry to delete, or is < 0 (i.e. ControlListIndex_DELETE_ALL) to delete ALL entries
   *
   * Use this function to remove one or all entries from the control's list info
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 void DLGDelControlListEntry(WBDialogControl *pCtrl, int iIndex); // delete item at index 'iIndex' (iIndex < 0 to delete all)
 
 /** \ingroup dlglist
@@ -1153,7 +1224,9 @@ void DLGDelControlListEntry(WBDialogControl *pCtrl, int iIndex); // delete item 
   *
   * In a single-selection list, or in a list where multiple selection operations are being performed,
   * there is one item that has a 'selected' state.  This function returns the index for that item.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 int DLGGetControlListSelection(WBDialogControl *pCtrl); // get selection for single-selection list
 
 /** \ingroup dlglist
@@ -1164,7 +1237,9 @@ int DLGGetControlListSelection(WBDialogControl *pCtrl); // get selection for sin
   *
   * In a single-selection list, or in a list where multiple selection operations are being performed,
   * there is one item that has a 'selected' state.  This function assigns the index for that item.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 void DLGSetControlListSelection(WBDialogControl *pCtrl, int iIndex); // set single selection for list
 
 /** \ingroup dlglist
@@ -1176,7 +1251,9 @@ void DLGSetControlListSelection(WBDialogControl *pCtrl, int iIndex); // set sing
   *
   * In a multi-selection list, each item has a specified 'selection state' that identifies whether
   * or not the item is selected.  This function assigns that value for a single item.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 void DLGSetControlListSelectionValue(WBDialogControl *pCtrl, int iIndex, int iSelState);  // set sel state for specific index
 
 /** \ingroup dlglist
@@ -1194,7 +1271,9 @@ void DLGSetControlListSelectionValue(WBDialogControl *pCtrl, int iIndex, int iSe
     piBits[(iIndex >> 32)] & (1 << (iIndex & 31)) ? TRUE : FALSE
 \endcode
   * where 'iIndex' represents the index of the bit you wish to query.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 int DLGGetControlListSelectionBits(WBDialogControl *pCtrl, unsigned int *piBits, int nSize);
   // piBits and nSize must be large enough to accomodate bits.  'nSize' is number of integers (not bytes)
   // return value is 0 for no sel, >0 for number of selections, < 0 on error.  assume 32 bits per entry ( LSbit is entry '0' )
@@ -1207,7 +1286,9 @@ int DLGGetControlListSelectionBits(WBDialogControl *pCtrl, unsigned int *piBits,
   * each separated by a newline character, corresponding to the selected list entries (TEXT elements only).\n
   * The return value is NULL if there are no selections or on error.\n
   * For non-NULL return values, the caller must use 'free()' to destroy the allocated buffer.
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 char * DLGGetControlListSelectionText(WBDialogControl *pCtrl); // caller must 'free()' non-NULL returned pointer
   // this returns TEXT elements (separated by line feeds) for corresponding selected LB entries
   // use this for multi-selection listboxes with unique text entries for which the list text is desired
@@ -1228,7 +1309,9 @@ char * DLGGetControlListSelectionText(WBDialogControl *pCtrl); // caller must 'f
   * unmodified (the dialog control callback handler uses this value).  Otherwise, processing can continue.\n
   *
   * Scroll events are send via a ClientMessage using \ref aSCROLL_NOTIFY .
-*/
+  *
+  * Header File:  dialog_controls.h
+**/
 int DLGScrollBarHandler(Window wID, WBDialogControl *pCtrl, XEvent *pEvent);
   // NOTE:  if this function returns a non-zero value, that same value should be returned
   //        unmodified from the control's message callback in order for this to work properly.
@@ -1243,8 +1326,9 @@ int DLGScrollBarHandler(Window wID, WBDialogControl *pCtrl, XEvent *pEvent);
   * of a blocking call, recursion, or invalid state as a result of the event processing
   *
   * \sa  DLGNotifyOwnerAsync()
-*/
-
+  *
+  * Header File:  dialog_controls.h
+**/
 static __inline__ void DLGNotifyOwner(WBDialogControl *pDialogControl, Atom aNotify,
                                       long lData0, long lData1, long lData2, long lData3, long lData4)
 {
@@ -1296,8 +1380,9 @@ Display *pDisplay = WBGetWindowDisplay(pDialogControl->wID);
   * duplication and the potential for additional 'bugginess'.
   *
   * \sa  DLGNotifySelfAsync()
-*/
-
+  *
+  * Header File:  dialog_controls.h
+**/
 static __inline__ void DLGNotifySelf(WBDialogControl *pDialogControl, Atom aNotify,
                                      long lData0, long lData1, long lData2, long lData3, long lData4)
 {
@@ -1331,8 +1416,9 @@ Display *pDisplay = WBGetWindowDisplay(pDialogControl->wID);
   * callback function.
   *
   * \sa  DLGNotifyOwner()
-*/
-
+  *
+  * Header File:  dialog_controls.h
+**/
 static __inline__ void DLGNotifyOwnerAsync(WBDialogControl *pDialogControl, Atom aNotify,
                                            long lData0, long lData1, long lData2, long lData3, long lData4)
 {
@@ -1374,8 +1460,9 @@ Display *pDisplay = WBGetWindowDisplay(pDialogControl->wID);
   * duplication and the potential for additional 'bugginess'.
   *
   * \sa  DLGNotifySelf()
-*/
-
+  *
+  * Header File:  dialog_controls.h
+**/
 static __inline__ void DLGNotifySelfAsync(WBDialogControl *pDialogControl, Atom aNotify,
                                           long lData0, long lData1, long lData2, long lData3, long lData4)
 {

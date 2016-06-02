@@ -409,7 +409,8 @@ int iDebugDumpConfig = 0;
                                    xsh.width, xsh.height,    // size
                                    MyWindowCallback,         // callback
                                    WBFrameWindow_APP_WINDOW  // flags and attributes
-                                   | WBFrameWindow_VISIBLE);
+                                   | WBFrameWindow_VISIBLE
+                                   | WBFrameWindow_STATUS_BAR);
 
   if(!pMainFrame)
   {
@@ -481,7 +482,6 @@ extern void TestFunc(Display *pDisplay, GC gc, Window wID, int iX, int iY);
 static int MyWindowCallback(Window wID, XEvent *pEvent)
 {
 XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
-XFontStruct *pFont;
 int iRval = 0;
 
   /*
@@ -505,21 +505,25 @@ int iRval = 0;
 
   if (pEvent->type == Expose && pEvent->xexpose.count == 0)
   {
-    /*
-      * Remove any other pending Expose events from the queue to
-      * avoid multiple repaints. See Section 8.7.
-      */
-    while(!bQuitFlag && XCheckTypedWindowEvent(pX11Display, wID, Expose, pEvent))
-      ;
+    GC gc;
+    WB_GEOM geom;
 
-    if(bQuitFlag)
-    {
-      iRval = 1;
-      WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Application,
-                     "%s - Quit flag set - returning %d\n", __FUNCTION__, iRval);
-
-      return iRval;  // let default processing happen
-    }
+// NOTE:  this is managed by the toolkit
+//    /*
+//      * Remove any other pending Expose events from the queue to
+//      * avoid multiple repaints. See Section 8.7.
+//      */
+//    while(!bQuitFlag && XCheckTypedWindowEvent(pX11Display, wID, Expose, pEvent))
+//      ;
+//
+//    if(bQuitFlag)
+//    {
+//      iRval = 1;
+//      WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Application,
+//                     "%s - Quit flag set - returning %d\n", __FUNCTION__, iRval);
+//
+//      return iRval;  // let default processing happen
+//    }
 
     /*
       * Find out how big the window is now,  so that we can center
@@ -532,18 +536,28 @@ int iRval = 0;
       return iRval;
     }
 
-    XClearWindow(pX11Display, wID);  // TODO:  rather than erase background, see if I need to
+    gc = WBBeginPaint(wID, &(pEvent->xexpose), &geom);  // begin paint, get a gc for it
 
-    pFont = WBGetWindowFontStruct(wID);
-    if(!pFont)
+    if(gc == None)
     {
-      WB_ERROR_PRINT("%s - No font - returning %d\n", __FUNCTION__, iRval);
-      return iRval;  // let default processing happen
+      WB_ERROR_PRINT("%s - Cannot get graphics context for paint\n", __FUNCTION__);
+      return 0; // not handled
     }
+
+    WBClearWindow(wID, gc);  // does the erase background intelligently
+
 
 #ifdef DISPLAY_HELLO_WORLD
     {
+      XFontStruct *pFont;
       int x, y, x0, y0, x1, y1;
+
+      pFont = WBGetWindowFontStruct(wID);
+      if(!pFont)
+      {
+        WB_ERROR_PRINT("%s - No font - returning %d\n", __FUNCTION__, iRval);
+        return iRval;  // let default processing happen
+      }
 
       x0 = XTextWidth(pFont, STRING, strlen(STRING));
       y0 = pFont->max_bounds.ascent
@@ -566,19 +580,21 @@ int iRval = 0;
         * the centered string.
         */
 
-      XSetForeground(pX11Display, WBGetWindowDefaultGC(wID), WBGetWindowFGColor(wID));
-      XDrawString(pX11Display, wID, WBGetWindowDefaultGC(wID), x, y, STRING, strlen(STRING));
+      XSetForeground(pX11Display, gc, WBGetWindowFGColor(wID));
+      XDrawString(pX11Display, wID, gc, x, y, STRING, strlen(STRING));
 
-      XSetForeground(pX11Display, WBGetWindowDefaultGC(wID), clrGreen.pixel);
+      XSetForeground(pX11Display, gc, clrGreen.pixel);
 
       // draw my green rectangle
 
-      XDrawRectangle(pX11Display, wID, WBGetWindowDefaultGC(wID), x0, y0, x1 - x0, y1 - y0);
-      XSetForeground(pX11Display, WBGetWindowDefaultGC(wID), WBGetWindowFGColor(wID));  // restore it at the end
+      XDrawRectangle(pX11Display, wID, gc, x0, y0, x1 - x0, y1 - y0);
+      XSetForeground(pX11Display, gc, WBGetWindowFGColor(wID));  // restore it at the end
     }
 #endif // DISPLAY_HELLO_WORLD
 
-//    TestFunc(pX11Display, WBGetWindowDefaultGC(wID), wID, x0 - 32, y0 - 32); // TEMPORARY
+//    TestFunc(pX11Display, gc, wID, x0 - 32, y0 - 32); // TEMPORARY
+
+    WBEndPaint(wID, gc);  // done now [free resources]
 
     iRval = 1;  // processed
 

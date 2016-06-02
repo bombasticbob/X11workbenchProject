@@ -347,7 +347,7 @@ int iL, iT, iW, iH;
     evt.data.l[2] = iL + iW; // right
     evt.data.l[3] = iT + iH; // bottom
 
-    pChildFrame->pUserCallback(evt.window, &evt);
+    pChildFrame->pUserCallback(evt.window, (XEvent *)&evt);
   }  
 }
 

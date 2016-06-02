@@ -229,16 +229,69 @@ typedef struct _WB_TREE_CONTROL_
 
 
 
-void DLGCDestroyProperties(WBDialogPropList *);
+/** \ingroup dlgctrl
+  * \brief Destroy Properties for a dialog control
+  *
+  * \param pPropList A pointer to the property list for the dialog control
+  * \returns void
+  *
+  * Call this function to destroy the property list for a dialog control
+  *
+  * Header File:  dialog_support.h
+**/
+void DLGCDestroyProperties(WBDialogPropList *pPropList);
 
+/** \ingroup dlgctrl
+  * \brief Create LISTINFO structure for a list type control
+  *
+  * \param wOwner the Window ID for the owner of the LISTINFO structure
+  * \param nMax the initial maximum size of the list (can be increased, but needs re-allocation)
+  * \param nFlags A binary flag indicating various properties, such as 'sorted'
+  * \param pfnAllocator A pointer to a constructor callback for a new list item.  Use NULL for default
+  * \param pfnDestructor A pointer to a destructor callback for the list item.  Use NULL for default
+  * \param pfnDisplay A pointer to a 'display' callback
+  * \param pfnSort A pointer to a 'sort' callback.  NULL uses the default
+  * \returns An allocated pointer to a LISTINFO structure.  To free this pointer, call DLGCListINfoDestructor()
+  *
+  * Call this function to create a LISTINFO structure associated with a list type control
+  *
+  * \sa LISTINFO
+  *
+  * Header File:  dialog_support.h
+**/
 LISTINFO *DLGCListInfoConstructor(Window wOwner, int nMax, int nFlags,
                                   void *(*pfnAllocator)(const void *,int), void (*pfnDestructor)(void *),
                                   void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *),
                                   int (*pfnSort)(const void *, const void *));
 
-void DLGCListInfoDestructor(LISTINFO *);
+/** \ingroup dlgctrl
+  * \brief Destroy a LISTINFO structure
+  *
+  * \param pListInfo A pointer to a LISTINFO structure created by DLGCListInfoConstructor()
+  * \returns void
+  *
+  * Call this function to destroy the LISTINFO structure created by DLGCListInfoConstructor()
+  *
+  * Header File:  dialog_support.h
+**/
+void DLGCListInfoDestructor(LISTINFO *pListInfo);
 
 
+/** \ingroup dlgctrl
+  * \brief The default 'display proc' for displaying a list item from a LISTINFO structure
+  *
+  * \param pList A pointer to a WBDialogControl structure for the list type control
+  * \param pData A pointer to the data to display
+  * \param iSelected A flag indicating whether the item has been selected (1 = selected, 0 = not selected)
+  * \param gc The graphics context for displaying the data
+  * \param pGeom a WB_GEOM representing the rectangular area to draw the item in.
+  * \returns void
+  *
+  * Pass this function's address as 'pfnDisplay' when calling DLGCListInfoConstructor to get a default
+  * display handler for your listbox items.
+  *
+  * Header File:  dialog_support.h
+**/
 void DLGCDefaultListControlDisplayProc(WBDialogControl *pList, void *pData, int iSelected, GC gc, WB_GEOM *pGeom);
 
 

@@ -72,8 +72,9 @@
 #define FRAME_WINDOW_MIN_WIDTH 160  /* re-sizable window absolute minimum width */
 #define FRAME_WINDOW_MIN_HEIGHT 120 /* re-sizable window absolute minimum height */
 
-#define TAB_BAR_HEIGHT 20 /* for now */
-
+#define TAB_BAR_HEIGHT         20 /* for now */
+#define STATUS_BAR_HEIGHT      20
+#define DEFAULT_STATUS_BAR_TAB 16
 
 typedef struct __FRAME_WINDOW__
 {
@@ -92,6 +93,10 @@ typedef struct __FRAME_WINDOW__
   int nLeftTab, nRightTab;           // left and right tab indices, same order as in ppChildFrames (0 if no tabs)
 
   char *szTitle;                     // title bar string (malloc'd)
+  char *szStatus;                    // status bar string (malloc'd)
+
+  int nStatusBarTabs;                // # of tab entries.  can be negative if pStatusBarTabs is NULL
+  int *pStatusBarTabs;               // status bar tab values (malloc'd).  may be NULL.
 
   char *pDefaultMenuResource;        // menu resource for 'default' menu
 
@@ -104,10 +109,12 @@ typedef struct __FRAME_WINDOW__
 
 int FWDefaultCallback(Window wID, XEvent *pEvent);  // default callback for frame windows (call for default processing)
 
+static void InternalPaintStatusBar(FRAME_WINDOW *pFrameWindow, XExposeEvent *pEvent);
+
 
 static FRAME_WINDOW *pFrames = NULL;  // pointer to linked list of frame windows (malloc'd)
 
-static XColor clrFG, clrBG, clrBD;
+static XColor clrFG, clrBG, clrBD, clrBD2, clrBD3;
 static int iInitColorFlag = 0;
 
 
@@ -147,12 +154,23 @@ static void __internal_destroy_frame_window(FRAME_WINDOW *pTemp)
     pTemp->szTitle = NULL;
   }
 
+  if(pTemp->szStatus)
+  {
+    free(pTemp->szStatus);
+    pTemp->szStatus = NULL;
+  }
+
+  if(pTemp->pStatusBarTabs)
+  {
+    free(pTemp->pStatusBarTabs);
+    pTemp->pStatusBarTabs = NULL;
+  }
+
   if(pTemp->pDefaultMenuResource)
   {
     free(pTemp->pDefaultMenuResource);
     pTemp->pDefaultMenuResource = NULL;
   }
-
 }
 
 void WBFrameWindowExit()
@@ -186,6 +204,8 @@ static void InternalCheckColors(void)
 
   if(!iInitColorFlag)
   {
+    static const char szBD2[]="#FFFFFF";
+    static const char szBD3[]="#9C9A94";
     char szFG[16], szBG[16], szBD[16];
     colormap = DefaultColormap(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
 
@@ -206,6 +226,10 @@ static void InternalCheckColors(void)
     XAllocColor(WBGetDefaultDisplay(), colormap, &clrBG);
     XParseColor(WBGetDefaultDisplay(), colormap, szBD, &clrBD);
     XAllocColor(WBGetDefaultDisplay(), colormap, &clrBD);
+    XParseColor(WBGetDefaultDisplay(), colormap, szBD2, &clrBD2);
+    XAllocColor(WBGetDefaultDisplay(), colormap, &clrBD2);
+    XParseColor(WBGetDefaultDisplay(), colormap, szBD3, &clrBD3);
+    XAllocColor(WBGetDefaultDisplay(), colormap, &clrBD3);
 
     iInitColorFlag = 1;
   }
@@ -272,6 +296,22 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
     strcpy(pNew->szTitle, szTitle);
   }
 
+  pNew->nStatusBarTabs = DEFAULT_STATUS_BAR_TAB;
+  pNew->pStatusBarTabs = NULL;
+
+  // do the default status now
+
+  if(WBFrameWindow_STATUS_BAR & pNew->wbFW.iFlags)
+  {
+    pNew->szStatus = WBCopyString("Status: none"); // default status bar text (mostly for testing)
+    WB_ERROR_PRINT("TEMPORARY: %s - window has a status bar\n", __FUNCTION__);
+  }
+  else
+  {
+    pNew->szStatus = NULL;
+    WB_ERROR_PRINT("TEMPORARY: %s - window has NO status bar\n", __FUNCTION__);
+  }
+
   // add struct to beginning of linked list 'cause it's faster that way
 
   pNew->pNext = pFrames;
@@ -294,6 +334,9 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
   if(pNew->wbFW.wID == None)//<= 0)
   {
     FWDestroyFrameWindow2((WBFrameWindow *)pNew);
+
+    WB_ERROR_PRINT("ERROR: %s - unable to create frame window (WBCreateWindow failed)\r\n", __FUNCTION__);
+
     return NULL;
   }
 
@@ -310,6 +353,13 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
   xsh.height = iHeight;
   xsh.base_width = iWidth / 8 > FRAME_WINDOW_MIN_WIDTH ? iWidth / 8 : FRAME_WINDOW_MIN_WIDTH;      // set min size
   xsh.base_height = iHeight / 8 > FRAME_WINDOW_MIN_HEIGHT ? iHeight / 8 : FRAME_WINDOW_MIN_HEIGHT;
+
+  // if I have a status bar, assign space for it in the 'base height'
+  if(WBFrameWindow_STATUS_BAR & pNew->wbFW.iFlags) // window has tabs
+  {
+    xsh.base_height += STATUS_BAR_HEIGHT;  // TODO:  base this on font height.  use the same font as the menu.
+  }
+
   xsh.win_gravity = NorthWestGravity; // StaticGravity
 
   bzero(&xwmh, sizeof(xwmh));
@@ -775,6 +825,13 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
     }
   }
 
+  // expose event - painting the status bar.
+
+  if(pEvent->type == Expose &&
+     (WBFrameWindow_STATUS_BAR & pFrameWindow->wbFW.iFlags))
+  {
+    InternalPaintStatusBar(pFrameWindow, &(pEvent->xexpose));  // this will 'validate' the status bar area, preventing re-paint
+  }
 
   if(pFrameWindow->pFWCallback)
   {
@@ -932,8 +989,10 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 
 void FWRecalcLayout(Window wID)
 {
-WB_RECT rct;
+WB_RECT rct, rct2;
 FRAME_WINDOW *pFrameWindow;
+Window wIDMenu;
+WBMenuBarWindow *pMB;
 int i1, iMax;
 
 
@@ -957,12 +1016,34 @@ int i1, iMax;
   // and subtract that from rct.top - then record this as my "client area" in the FRAME_WINDOW
   // structure (iClientX, iClientY, iClientWidth, iClientHeight).
 
+  wIDMenu = WBGetMenuWindow(wID);
+
+  if(wIDMenu != None)
+  {
+    pMB = MBGetMenuBarWindowStruct(wIDMenu);
+
+    if(pMB)
+    {
+      WBGetWindowRect(wIDMenu, &rct2);
+
+      // what I want is the height.
+      rct.top += rct2.bottom - rct2.top + 1;  // regardless of rect, this will be the height, plus 1 pixel
+    }
+  }
+
 
   if(!(WBFrameWindow_NO_TABS & pFrameWindow->wbFW.iFlags)) // window has tabs
   {
-    rct.top += TAB_BAR_HEIGHT;
+    rct.top += TAB_BAR_HEIGHT;  // TODO:  base this on font height.  use the same font as the menu.
   }
 
+  // if this window has a status bar on the bottom, subtract an appropriate height
+  // from the bottom of the client area.
+
+  if(WBFrameWindow_STATUS_BAR & pFrameWindow->wbFW.iFlags) // window has a status bar
+  {
+    rct.bottom -= STATUS_BAR_HEIGHT;  // TODO:  base this on font height.  use the same font as the menu.
+  }
 
 
   // Now that I've calculated the new client rectangle area, assign appropriate thingies
@@ -979,7 +1060,8 @@ int i1, iMax;
     return; // nothing changed
   }
 
-  // assign the new values
+  // assign the new values.  This will be the "true" client area
+  // of the frame window, excluding "things"
   pFrameWindow->wbFW.iClientX      = rct.left;
   pFrameWindow->wbFW.iClientY      = rct.top;
   pFrameWindow->wbFW.iClientWidth  = rct.right;
@@ -1038,6 +1120,163 @@ void FWSetFocusWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pCont)
 void FWSetFocusWindowIndex(WBFrameWindow *pFrameWindow, int iIndex)
 {
 }
+
+
+void FWSetStatusText(WBFrameWindow *pFrameWindow, const char *szText)
+{
+}
+
+void FWSetStatusTabInfo(WBFrameWindow *pFrameWindow, int nTabs, const int *pTabs)
+{
+}
+
+
+
+static void InternalPaintStatusBar(FRAME_WINDOW *pFrameWindow, XExposeEvent *pEvent)
+{
+WB_RECT rct, rctExpose;
+WB_GEOM geom;
+GC gc;
+
+
+  if(!(WBFrameWindow_STATUS_BAR & pFrameWindow->wbFW.iFlags)) // window has a status bar?
+  {
+    return; // no status bar, just bail
+  }
+
+  // calculate the location of the status bar
+
+  WBGetClientRect(pFrameWindow->wbFW.wID, &rct); // get the rectangle for the client area
+
+  rct.top = rct.bottom - STATUS_BAR_HEIGHT;
+
+//  rct.top -= 4 * STATUS_BAR_HEIGHT; // temporary
+
+//  WB_ERROR_PRINT("TEMPORARY: %s - status bar rect:  (%d,%d,%d,%d)\n",
+//                  __FUNCTION__, rct.left, rct.top, rct.right, rct.bottom);
+
+  // does the Expose event intersect my status bar?
+
+  rctExpose.left   = pEvent->x;
+  rctExpose.top    = pEvent->y;
+  rctExpose.right  = rctExpose.left + pEvent->width;
+  rctExpose.bottom = rctExpose.top + pEvent->height;
+
+  if(!WBRectOverlapped(rct, rctExpose))
+  {
+    WB_ERROR_PRINT("INFO: %s - expose event excludes status bar\n", __FUNCTION__);
+
+    return; // do nothing (no overlap)
+  }
+
+  // intersect the two rectangles so I only re-paint what I have to
+
+  if(rctExpose.top < rct.top)
+  {
+    rctExpose.top = rct.top;
+  }
+
+  if(rctExpose.bottom > rct.bottom)
+  {
+    rctExpose.bottom = rct.bottom;
+  }
+
+  if(rctExpose.left < rct.left)
+  {
+    rctExpose.left = rct.left;
+  }
+
+  if(rctExpose.right > rct.right)
+  {
+    rctExpose.right = rct.right;
+  }
+
+  // time to start painting
+
+  geom.x      = rctExpose.left;
+  geom.y      = rctExpose.top;
+  geom.width  = rctExpose.right - rctExpose.left;
+  geom.height = rctExpose.bottom - rctExpose.top;
+
+  gc = WBBeginPaintGeom(pFrameWindow->wbFW.wID, &geom);
+
+  if(gc == None)
+  {
+    WB_ERROR_PRINT("ERROR: %s - no GC from WBBeginPaintGeom\n", __FUNCTION__);
+  }
+  else
+  {
+    Display *pDisplay = WBGetWindowDisplay(pFrameWindow->wbFW.wID);
+    XPoint xpt[3];
+
+    // fill the rectangle with the background color
+
+    WBClearWindow(pFrameWindow->wbFW.wID, gc); // should only paint my little rectangle
+
+    // draw some lines in some colors for the border
+
+    // paint the 3D-looking border
+    XSetForeground(pDisplay, gc, clrBD2.pixel);
+    xpt[0].x=rct.left;
+    xpt[0].y=rct.bottom - 2;  // exclude first point
+    xpt[1].x=rct.left;
+    xpt[1].y=rct.top;
+    xpt[2].x=rct.right - 2;   // exclude last point
+    xpt[2].y=rct.top;
+
+    XDrawLines(pDisplay, pFrameWindow->wbFW.wID, gc, xpt, 3, CoordModeOrigin);
+
+    XSetForeground(pDisplay, gc, clrBD3.pixel);
+    xpt[0].x=rct.right - 1;
+    xpt[0].y=rct.top + 1;              // exclude first point
+    xpt[1].x=rct.right - 1;
+    xpt[1].y=rct.bottom - 1;
+    xpt[2].x=rct.left + 1;              // exclude final point
+    xpt[2].y=rct.bottom - 1;
+
+    XDrawLines(pDisplay, pFrameWindow->wbFW.wID, gc, xpt, 3, CoordModeOrigin);
+
+    XSetForeground(pDisplay, gc, clrFG.pixel); // by convention, set it to FG [for text I need this]
+
+    // TODO:  the tabbed columns and their enclosed text
+
+    if(pFrameWindow->szStatus)
+    {
+      WB_RECT rctTemp;
+
+      rctTemp.left = rct.left + 8;
+      rctTemp.top = rct.top + 4;
+      rctTemp.right = rct.right - 8;
+      rctTemp.bottom = rct.bottom - 4;
+
+      // temporary:  just paint the text
+//      DTDrawSingleLineText(WBGetDefaultFont(),
+//                           pFrameWindow->szStatus, pDisplay,
+//                           gc, pFrameWindow->wbFW.wID, 0, 0, &rctTemp, 0);
+      XDrawString(pDisplay, pFrameWindow->wbFW.wID, gc, rctTemp.left, rctTemp.bottom - 2,
+                  pFrameWindow->szStatus, strlen(pFrameWindow->szStatus));
+    }                         
+
+    WBEndPaint(pFrameWindow->wbFW.wID, gc);  // and that's it!
+  }
+
+  // finally, alter the expose event slightly so that it reflects the 'painted' area
+
+  if(pEvent->height + pEvent->x > rct.top)
+  {
+//    WB_ERROR_PRINT("TEMPOPRARY: %s - altering height in Expose event\n", __FUNCTION__);
+
+    pEvent->height = rct.top - pEvent->x;
+    if(pEvent->height < 0)
+    {
+      pEvent->height = 0;
+    }
+  }
+
+  // TODO:  manage top, left, right and x, y, width?  probably don't need to
+
+}
+
 
 
 

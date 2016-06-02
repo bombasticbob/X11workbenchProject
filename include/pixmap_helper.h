@@ -88,6 +88,8 @@ extern "C" {
   * Use this function to register the application's icons for IDC_ICON_APP and ID_APPLICATION.  In this
   * way you can use both of them in dialog boxes and take advantage of PXM_GetIconPixmap() to create
   * a pair of icon pixmaps whenever they are needed.
+  *
+  * Header File:  pixmap_helper.h
 **/
 void PXM_RegisterAppIcons(char *ppRegAppLarge[], char *ppRegAppSmall[]);
 
@@ -101,8 +103,9 @@ void PXM_RegisterAppIcons(char *ppRegAppLarge[], char *ppRegAppSmall[]);
   *
   * This function allows you to register a pixmap or icon resource using an Atom.  Typically
   * this will be used by dialog boxes or menus to conveniently identify pixmap or icon images.
+  *
+  * Header File:  pixmap_helper.h
 **/
-
 int PXM_RegisterPixmapResource(Atom aResource, char *ppResource[]);
 
 
@@ -117,8 +120,9 @@ int PXM_RegisterPixmapResource(Atom aResource, char *ppResource[]);
   * \returns The pixmap identifier for the Icon image, or None on error.
   *
   * Use this function whenever you need to load an icon using a pre-defined resource ID.
-*/
-
+  *
+  * Header File:  pixmap_helper.h
+**/
 Pixmap PXM_GetIconPixmap(int idIcon, XPM_ATTRIBUTES *pAttr, Pixmap *pMask /* = NULL*/);
 
 
@@ -132,7 +136,9 @@ Pixmap PXM_GetIconPixmap(int idIcon, XPM_ATTRIBUTES *pAttr, Pixmap *pMask /* = N
   * \returns The pixmap identifier for the Icon image, or None on error.
   *
   * Use this function whenever you need to load an icon using a pre-defined or registered Atom
-*/
+  *
+  * Header File:  pixmap_helper.h
+**/
 Pixmap PXM_GetIconPixmapFromAtom(Atom aIcon, XPM_ATTRIBUTES *pAttr, Pixmap *pMask /* = NULL*/);
 
 
@@ -149,8 +155,9 @@ Pixmap PXM_GetIconPixmapFromAtom(Atom aIcon, XPM_ATTRIBUTES *pAttr, Pixmap *pMas
   * \returns The pixmap identifier for the image, or None on error.
   *
   * This function conveniently wraps XpmCreatePixmapFromData()
-*/
-
+  *
+  * Header File:  pixmap_helper.h
+**/
 Pixmap PXM_LoadPixmap(char *ppXPM[], XPM_ATTRIBUTES *pAttr, Pixmap *pMask /* = NULL*/);
 
 
@@ -171,7 +178,9 @@ Pixmap PXM_LoadPixmap(char *ppXPM[], XPM_ATTRIBUTES *pAttr, Pixmap *pMask /* = N
   * that paints a window with a pixmap should perform more efficiently.  However, a pixmap cannot be queried nor
   * directly manipulated, while an XImage can.\n
   * The function returns a Pixmap identifier, or None.  To delete the Pixmap, use XFreePixmap().
-*/
+  *
+  * Header File:  pixmap_helper.h
+**/
 Pixmap PXM_ImageToPixmap(Display *pDisplay, Drawable dw, XImage *pImage,
                          unsigned long clrFGPixel, unsigned long clrBGPixel);
 
@@ -192,7 +201,9 @@ Pixmap PXM_ImageToPixmap(Display *pDisplay, Drawable dw, XImage *pImage,
   * directly manipulated, while an XImage can.\n
   * For monochrome images, the foreground color is black, and the background color is white.\n
   * The function returns a Pixmap identifier, or None.  To delete the Pixmap, use XFreePixmap().
-*/
+  *
+  * Header File:  pixmap_helper.h
+**/
 Pixmap PXM_ImageToPixmap0(Display *pDisplay, Drawable dw, XImage *pImage);
 
 
@@ -211,6 +222,8 @@ Pixmap PXM_ImageToPixmap0(Display *pDisplay, Drawable dw, XImage *pImage);
   * The size of the pixmap is automatically determined using XGetGeometry().  As a side note, you could theoretically
   * use this function to create an image from a pixmap for the purpose of determining its characteristics.\n
   * The function returns NULL on error.  Use XDestroyImage to dispose of the XImage object.
+  *
+  * Header File:  pixmap_helper.h
 **/
 XImage *PXM_PixmapToImage(Display *pDisplay, Pixmap pxImage);
 
@@ -221,6 +234,8 @@ XImage *PXM_PixmapToImage(Display *pDisplay, Pixmap pxImage);
   * \brief Frees resources allocated by \ref pixmap
   *
   * Call this to free resources allocated by the PXM functions.  Called by \ref WBExit()
+  *
+  * Header File:  pixmap_helper.h
 **/
 void PXM_OnExit(void);
 

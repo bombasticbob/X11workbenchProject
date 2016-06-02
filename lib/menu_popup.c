@@ -194,10 +194,10 @@ static WBMenuItem * __GetCurrentSelection(WBMenuPopupWindow *pSelf, WBMenu *pMen
 }
 
 
-WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDParent, Window wIDOwner, WBMenu *pMenu,
+WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDBar, Window wIDOwner, WBMenu *pMenu,
                                            int iX, int iY, int iFlags)
 {
-  Display *pDisplay = WBGetWindowDisplay(wIDParent);
+  Display *pDisplay = WBGetWindowDisplay(wIDBar);
   XFontStruct *pDefaultMenuFont = MBGetDefaultMenuFont();
   WBMenuPopupWindow *pRval = NULL;
   unsigned long fg, bg, bd;   /* Pixel values */
@@ -212,9 +212,11 @@ WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDParent, Window wIDOwner, WB
   char tbuf[256];
 
 
-  // initialize global menu objects
+  // check/initialize global menu objects
   if(!MBInitGlobal())
-      return NULL;
+  {
+    return NULL;
+  }
 
   // step 1:  create the window
 
@@ -225,7 +227,7 @@ WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDParent, Window wIDOwner, WB
   // menu orientation and size depend upon the size of the owner menu's parent window
   // and the size of the popup menu itself.  For now assume orientation top left at iX iY
 
-  pFS = WBGetWindowFontStruct(wIDParent);
+  pFS = WBGetWindowFontStruct(wIDBar);
 
   if(!pDefaultMenuFont && !pFS)
   {
@@ -233,10 +235,12 @@ WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDParent, Window wIDOwner, WB
     return 0;
   }
   else if(pDefaultMenuFont)
+  {
     pFS = pDefaultMenuFont;
+  }
 
   // get absolute position of "parent"
-  WBGetWindowGeom2(wIDParent, &geom);
+  WBGetWindowGeom2(wIDBar, &geom);
 
   // set size hints to match client area, upper left corner (always)
   // as translated from the position of the "parent"
@@ -257,7 +261,9 @@ WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDParent, Window wIDOwner, WB
     int iU1=0, iU2=0;
 
     if(!pItem)
+    {
       continue;
+    }
 
     if(pItem->iAction == -1) // separator
     {
@@ -334,7 +340,10 @@ WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDParent, Window wIDOwner, WB
   pRval = (WBMenuPopupWindow *)malloc(sizeof(*pRval));
 
   if(!pRval)
+  {
+    WB_ERROR_PRINT("%s - not enough memory to allocate structure\n", __FUNCTION__);
     return NULL;
+  }
 
   pRval->ulTag = MENU_POPUP_WINDOW_TAG;
 
@@ -370,7 +379,7 @@ WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDParent, Window wIDOwner, WB
     return NULL;
   }
 
-  pRval->wBar = wIDParent;  // for now do it this way
+  pRval->wBar = wIDBar;  // for now do it this way
   pRval->wOwner = wIDOwner;
   pRval->iSelected = iSelected;
   pRval->iFlags = iFlags;  // make a copy of them (for now)
@@ -410,7 +419,7 @@ WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDParent, Window wIDOwner, WB
   XChangeProperty(pDisplay, pRval->wSelf, a1, XA_ATOM, 32, PropModeReplace, (unsigned char *)&ul1, 1);
 
   a1 = XInternAtom(pDisplay, "WM_TRANSIENT_FOR", False);
-  XChangeProperty(pDisplay, pRval->wSelf, a1, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&wIDOwner, 1);//&wIDParent, 1);
+  XChangeProperty(pDisplay, pRval->wSelf, a1, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&wIDOwner, 1);//&wIDBar, 1);
 
 
   // TODO:  other properties... ?
@@ -420,7 +429,7 @@ WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDParent, Window wIDOwner, WB
 
   WBMapWindow(pDisplay, pRval->wSelf);  // make window visible
 
-  WBGetParentWindow(pRval->wSelf);  // this syncs everything up
+  WBGetParentWindow(pRval->wSelf);  // this syncs everything up (return value not needed)
 
   // TODO: set up font, GS, callback, etc.
 
@@ -457,6 +466,16 @@ int MBMenuDoModal(WBMenuPopupWindow *pPopup)
     return -1;
 
   return WBShowModal(pPopup->wSelf, 1);  // will only return when the window is destroyed
+}
+
+void MBDestroyMenuPopupWindow(WBMenuPopupWindow *pMenuPopupWindow)
+{
+  if(!pMenuPopupWindow || pMenuPopupWindow->ulTag != MENU_POPUP_WINDOW_TAG)
+  {
+    return;
+  }
+
+  WBDestroyWindow(pMenuPopupWindow->wSelf); // destroy the window (this should clean the rest up automatically)
 }
 
 

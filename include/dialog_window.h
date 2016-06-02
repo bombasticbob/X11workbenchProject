@@ -322,6 +322,8 @@ enum WBDialogEntryFlags
 \endcode
   *
   * For more information, see \ref dialog_resource .
+  *
+  * Header File:  dialog_window.h
 **/
 WBDialogWindow *DLGCreateDialogWindow(const char *szTitle, const char *szDialogResource,
                                       int iX, int iY, int iWidth, int iHeight,
@@ -334,6 +336,8 @@ WBDialogWindow *DLGCreateDialogWindow(const char *szTitle, const char *szDialogR
   * The 'owning' window defines the window that the dialog belongs to such that when
   * the dialog is destroyed (and currently has focus) this window will automatically
   * be raised and assigned the input focus.  This is NOT the same as the parent window!
+  *
+  * Header File:  dialog_window.h
 **/
 void DLGAssignOwner(WBDialogWindow *pDlg, Window wIDOwner);
 
@@ -342,6 +346,8 @@ void DLGAssignOwner(WBDialogWindow *pDlg, Window wIDOwner);
   *
   * Forcing re-calculation of the layout implies that size, position, and content information
   * is to be re-evaluated and updated, as needed, in an implementation-specific manner.
+  *
+  * Header File:  dialog_window.h
 **/
 void DLGRecalcLayout(Window wID);  // recalculate layout information (propagates to children)
 
@@ -349,6 +355,8 @@ void DLGRecalcLayout(Window wID);  // recalculate layout information (propagates
   * \brief Height of a single dialog unit (in pixels)
   *
   * Return the height of a dialog unit, in pixels.  Currently hard-coded to '1'
+  *
+  * Header File:  dialog_window.h
 **/
 int DLGPixelHeight(WBDialogWindow *pDlg, int iHeight);  // pixel height from dialog units
 
@@ -356,6 +364,8 @@ int DLGPixelHeight(WBDialogWindow *pDlg, int iHeight);  // pixel height from dia
   * \brief Width of a single dialog unit (in pixels)
   *
   * Return the width of a dialog unit, in pixels.  Currently hard-coded to '1'
+  *
+  * Header File:  dialog_window.h
 **/
 int DLGPixelWidth(WBDialogWindow *pDlg, int iWidth);    // pixel width from dialog units
 
@@ -369,6 +379,8 @@ int DLGPixelWidth(WBDialogWindow *pDlg, int iWidth);    // pixel width from dial
   * As a result it is important to be careful when processing certain kinds of events.  When
   * in doubt, return zero anyway.\n
   * NOTE:  not all events will pass through the callback.  Some are handled solely by the dialog window default processing
+  *
+  * Header File:  dialog_window.h
 **/
 void DLGSetUserCallback(WBDialogWindow *pDLG, WBWinEvent pCallBack);
   // assigns the user-defined callback function (one only).  Not all messages pass through the callback
@@ -379,6 +391,8 @@ void DLGSetUserCallback(WBDialogWindow *pDLG, WBWinEvent pCallBack);
   *
   * This call appears near the beginning of the dialog window's window callback to determine if a hot-key is present, and
   * blocks further processing if a hot-key is handled.\n
+  *
+  * Header File:  dialog_window.h
 **/
 int DLGProcessHotKey(WBDialogWindow *pDLG, XEvent *pEvent);
   // returns non-zero value if hot-key was processed and no further event processing
@@ -390,6 +404,8 @@ int DLGProcessHotKey(WBDialogWindow *pDLG, XEvent *pEvent);
   * \brief Returns a pointer to the dialog window's \ref WBDialogWindow structure
   *
   * Use this function to obtain a pointer to the WBDialogWindow structure for the dialog (frame) window.
+  *
+  * Header File:  dialog_window.h
 **/
 static __inline__ WBDialogWindow *DLGGetDialogWindowStruct(Window wID)  // for dialog windows, returns WBDialogWindow struct
 {
@@ -418,6 +434,8 @@ static __inline__ WBDialogWindow *DLGGetDialogWindowStruct(Window wID)  // for d
   * Use this function to obtain a pointer to the 'user data' for the dialog (frame) window.
   * This function returns NULL if there is no \ref WBDialogWindow structure associated
   * with the window, or if there is no user data assigned.
+  *
+  * Header File:  dialog_window.h
 **/
 void * DLGGetDialogWindowUserData(Window wID);
 
@@ -426,6 +444,8 @@ void * DLGGetDialogWindowUserData(Window wID);
   *
   * Use this function to destroy a modeless dialog window using the window ID of the dialog (frame) window.
   * This also causes the 'WBDialogWindow' structure to be destroyed.  Use caution if you retained a pointer to it.
+  *
+  * Header File:  dialog_window.h
 **/
 void DLGDestroyDialogWindow(Window wID);  // destroys frame window using the Window ID (frees the struct also)
 
@@ -434,6 +454,8 @@ void DLGDestroyDialogWindow(Window wID);  // destroys frame window using the Win
   *
   * Use this function to destroy a modeless dialog window using the WBDialogWindow for the dialog (frame) window.
   * This also causes the 'WBDialogWindow' structure to be destroyed.  Use caution if you retained a pointer to it.
+  *
+  * Header File:  dialog_window.h
 **/
 void DLGDestroyDialogWindow2(WBDialogWindow *pDialogWindow); // destroys it using the struct pointer
 // after calling either 'Destroy' function the DIALOG_WINDOW struct is no longer valid
@@ -445,6 +467,8 @@ void DLGDestroyDialogWindow2(WBDialogWindow *pDialogWindow); // destroys it usin
   * \brief returns the Window ID of a member control of the dialog window using the 'control ID'
   *
   * To obtain the Window ID of a member control, using the control's ID, call this function.
+  *
+  * Header File:  dialog_window.h
 **/
 Window DLGGetDialogControl(WBDialogWindow *pDialog, int iControlID);  // returns first match
 
@@ -455,6 +479,8 @@ Window DLGGetDialogControl(WBDialogWindow *pDialog, int iControlID);  // returns
   * this function to obtain a pointer to the WBDialogEntry for a control, passing the WBDialogWindow
   * pointer and the window ID.  The return value from DLGGetDialogControl() can be passed directly
   * as the control's Window ID.
+  *
+  * Header File:  dialog_window.h
 **/
 WBDialogEntry *DLGGetDialogControlEntry(WBDialogWindow *pDialog, Window idControl);  // returns matching WBDialogEntry
 
@@ -465,6 +491,8 @@ WBDialogEntry *DLGGetDialogControlEntry(WBDialogWindow *pDialog, Window idContro
   * the resource is the FIRST control in the tab order, the next control listed in the resource
   * is the NEXT control, and so on.  Tab order has nothing to do with the control's position
   * within the dialog window.  It is solely dependent on its order in the resource.
+  *
+  * Header File:  dialog_window.h
 **/
 Window DLGGetFirstDialogControl(WBDialogWindow *pDialog);  // first dialog control in tab order
 /** \ingroup dlgwindow
@@ -475,6 +503,8 @@ Window DLGGetFirstDialogControl(WBDialogWindow *pDialog);  // first dialog contr
   * is the NEXT control, and so on.  Tab order has nothing to do with the control's position
   * within the dialog window.  It is solely dependent on its order in the resource.\n
   * If the specified control ID is the LAST one, this function returns the FIRST dialog control's window ID
+  *
+  * Header File:  dialog_window.h
 **/
 Window DLGGetNextDialogControl(WBDialogWindow *pDialog, Window idControl);  // control following wIDControl
 
@@ -486,6 +516,8 @@ Window DLGGetNextDialogControl(WBDialogWindow *pDialog, Window idControl);  // c
   * is the NEXT control, and so on.  Tab order has nothing to do with the control's position
   * within the dialog window.  It is solely dependent on its order in the resource.\n
   * If the specified control ID is the FIRST one, this function returns the LAST dialog control's window ID
+  *
+  * Header File:  dialog_window.h
 **/
 Window DLGGetPrevDialogControl(WBDialogWindow *pDialog, Window idControl);  // control prior to wIDControl
   // NOTE:  'GetNext' and 'GetPrev' wrap around and may return the same window ID
@@ -500,6 +532,8 @@ Window DLGGetPrevDialogControl(WBDialogWindow *pDialog, Window idControl);  // c
   * of a blocking call, recursion, or invalid state as a result of the event processing.
   *
   * \sa  DLGNotifyDlgAsync()
+  *
+  * Header File:  dialog_window.h
 **/
 static __inline__ void DLGNotifyDlg(WBDialogWindow *pDLG, Atom aNotify,
                                     long lData0, long lData1, long lData2, long lData3, long lData4)
@@ -533,6 +567,8 @@ Display *pDisplay = WBGetWindowDisplay(pDLG->wID);
   * callback function.
   *
   * \sa  DLGNotifyDlg()
+  *
+  * Header File:  dialog_window.h
 **/
 static __inline__ void DLGNotifyDlgAsync(WBDialogWindow *pDLG, Atom aNotify,
                                          long lData0, long lData1, long lData2, long lData3, long lData4)
@@ -614,6 +650,8 @@ enum MessageBoxEnum
   *
   * Use this function to display a simple modal 'message box' dialog window, and return the button that was
   * pressed for further processing.
+  *
+  * Header File:  dialog_window.h
 **/
 int DLGMessageBox(int iType, Window wIDOwner, const char *szTitle, const char *szMessage);
 
@@ -628,6 +666,7 @@ int DLGMessageBox(int iType, Window wIDOwner, const char *szTitle, const char *s
   * \param iWidth The specified width of the dialog window, or -1 for default
   * \param iMaxChar The maximum number of characters in the input string
   *
+  * Header File:  dialog_window.h
 **/
 char *DLGInputBox(Window wIDOwner, const char *szTitle, const char *szPrompt, const char *szDefault,
                   int iWidth, int iMaxChar);
@@ -680,6 +719,8 @@ enum FileDialogEnum
 \endcode
   * This describes 3 file types with extensions '.txt', '.doc', and '.sh' with a 4th file type of 'other files' that
   * encompasses everything else.  Simple pattern matching is applied to each file name for the selected pattern.
+  *
+  * Header File:  dialog_window.h
 **/
 char *DLGFileDialog(int iType, Window wIDOwner, const char *szDefPath, const char *szDefName,
                     const char *szExtAndDescList);
@@ -695,6 +736,8 @@ char *DLGFileDialog(int iType, Window wIDOwner, const char *szDefPath, const cha
   * This function will create an animated splash screen based on the dimensions of the pixmap passed to it,
   * animating the pixmap with a 'diagonal flash' from upper left to lower right, and draw the copyright
   * string onto the lower 1/3 of the pixmap, vertically centered.
+  *
+  * Header File:  dialog_window.h
 **/
 void DLGSplashScreen(char * aXPM[], const char *szCopyright, unsigned long clrText);
 

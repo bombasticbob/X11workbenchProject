@@ -8,10 +8,11 @@
 //                                                                                          //
 //                       basic window creation and message handling                         //
 //                                                                                          //
-//      Copyright (c) 2012 by 'Big Bad Bombastic Bob' Frazier - all rights reserved.        //
-//  You may use this file in any way you see fit provided that any copy or derived work     //
-//  includes the above copyright notice.                                                    //
-//            NOTE:  'WB' is for 'Work Bench', aka 'X11workbench Toolkit'                   //
+//    Copyright (c) 2010-2016 by 'Big Bad Bombastic Bob' Frazier - all rights reserved.     //
+//   You may use this file in any way you see fit provided that any copy or derived work    //
+//   includes the above copyright notice.                                                   //
+//                                                                                          //
+//              NOTE:  'WB' is for 'Work Bench', aka 'X11workbench Toolkit'                 //
 //                                                                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -66,7 +67,7 @@
   *   Expose and GC management
   *   Window context/state management
   *   X11 API 'wrapper' functions
-*/
+**/
 
 // doxygen top-level stuff has been moved to doxy_comments.dox
 
@@ -99,30 +100,30 @@ extern "C" {
 #define WB_DEFAULT_CURSOR XC_left_ptr
 /** \ingroup core
   * \brief The 'wait' cursor (this is what xterm uses)
-*/
+**/
 #define WB_WAIT_CURSOR XC_watch /*XC_clock*/
 /** \ingroup font
   * \brief The default X11 font name (currently "fixed")
-*/
+**/
 #define WB_DEFAULT_FONT    "fixed"
 /** \ingroup font
   * \brief The default X11 font size (currently 13)
-*/
+**/
 #define WB_DEFAULT_FONT_SIZE 13 /* override via settings */
 /** \ingroup font
   * \brief The 'window data' array size (currently 4 void pointers)
-*/
+**/
 #define WINDOW_DATA_SIZE 4 /* size of a 'void *' array that stores per-window data */
 
 /** \ingroup font
   * \brief An event mask for ALL events, with bits 0 through 24 set - see X.h which only defines bits 0 to 24 for an event mask
-*/
+**/
 #define EVENT_ALL_MASK 0x01ffffffL /* 2^24 | 2^23 ... 2^0 - see X.h */
 
 
 /** \ingroup core
   * \brief A bit mask for ALL GC properties (used when copying a GC)
-*/
+**/
 #define GCAll (GCFunction | GCPlaneMask | GCForeground | GCBackground | GCLineWidth | \
                GCLineStyle | GCCapStyle | GCJoinStyle | GCFillStyle | GCFillRule | \
                GCTile | GCStipple | GCTileStipXOrigin | GCTileStipYOrigin | GCFont | \
@@ -135,21 +136,21 @@ extern "C" {
 
 /** \ingroup debug
   * \brief debug helper variable tracking the function calling into the X11 library
-  */
+**/
 extern const char *sz_xcall_func;
 /** \ingroup debug
   * \brief debug helper variable indicating the line number of the function calling into the X11 library
-  */
+**/
 extern int i_xcall_line;
 /** \ingroup debug
   * \def BEGIN_XCALL_DEBUG_WRAPPER()
   * \brief wrapper macro for calls into the X11 library.  This macro precedes the call(s)
-  */
+**/
 #define BEGIN_XCALL_DEBUG_WRAPPER { const char *szOldXCallFunc = sz_xcall_func; int iOldXCallLine = i_xcall_line; sz_xcall_func = __FUNCTION__;  i_xcall_line = __LINE__;
 /** \ingroup debug
   * \def END_XCALL_DEBUG_WRAPPER()
   * \brief wrapper macro for calls into the X11 library.  This macro follows the call(s)
-  */
+**/
 #define END_XCALL_DEBUG_WRAPPER  sz_xcall_func = szOldXCallFunc;  i_xcall_line = iOldXCallLine; }
 
 
@@ -162,7 +163,9 @@ extern int i_xcall_line;
   * \return Event-specific value.  Typically returns zero if the event was not processed, non-zero if further processing is not necessary
   *
   * Event callbacks for windows should be declared according to this defined type
-*/
+  *
+  * Header File:  window_helper.h
+**/
 typedef int (* WBWinEvent)(Window wID, XEvent *pEvent);
 /** \typedef WBAppEvent
   * \ingroup events
@@ -172,7 +175,9 @@ typedef int (* WBWinEvent)(Window wID, XEvent *pEvent);
   * \return Event-specific value.  Typically returns zero if the event was not processed, non-zero if further processing is not necessary
   *
   * An event callback for the application should be declared according to this defined type
-*/
+  *
+  * Header File:  window_helper.h
+**/
 typedef int (* WBAppEvent)(XEvent *pEvent);
 
 /** \typedef WB_RECT
@@ -279,6 +284,8 @@ extern int bQuitFlag;
   * Alternately you can create the display yourself and call \ref WBInitDisplay().  \ref WBExit() will
   * free the assigned Display pointer for you by calling XCloseDisplay().\n
   * The returned pointer can be retrieved at any time by calling 'WBGetDefaultDisplay()'.\n
+  *
+  * Header File:  window_helper.h
 **/
 Display *WBInit(const char *szDisplayName);
 
@@ -295,6 +302,8 @@ Display *WBInit(const char *szDisplayName);
   * However, in some cases you may wish to open the display yourself, and pass the pointer to this
   * function instead.  Typical reasons for that may be security-related, use of firewalls, proxies, and
   * any other kind of possible and/or unusual method for opening a display.
+  *
+  * Header File:  window_helper.h
 **/
 int WBInitDisplay(Display *pDisplay);
 
@@ -313,6 +322,8 @@ int WBInitDisplay(Display *pDisplay);
   * The 'pDisplay' parameter is reserved for future use, for when multiple displays are supported.\n
   * If a thread uses the same display name that was passed to 'WBInit' then it refers to the same Display as the
   * main thread, and you will not need to re-initialize the clipboard for that Display.
+  *
+  * Header File:  window_helper.h
 **/
 int WBInitClipboardSystem(Display *pDisplay, const char *szDisplayName);
 
@@ -322,6 +333,8 @@ int WBInitClipboardSystem(Display *pDisplay, const char *szDisplayName);
   * This function deletes any remaining global objects, frees the Display pointer, and terminates event
   * processing, freeing up any remaining resources for the entire toolkit.  You should call this function
   * in your application right before it terminates.
+  *
+  * Header File:  window_helper.h
 **/
 void WBExit(void);
 
@@ -329,6 +342,8 @@ void WBExit(void);
   * \brief Shut down the clipboard sub-system
   *
   * Shuts down the clipboard sub-system.  Called internally by WBExit()
+  *
+  * Header File:  window_helper.h
 **/
 void WBExitClipboardSystem(Display *pDisplay);
 
@@ -340,6 +355,8 @@ void WBExitClipboardSystem(Display *pDisplay);
   * Call this function to create a thread-specific Display object when you need to process
   * a message loop or create windows within that thread.  You must call WBThreadFreeDisplay()
   * to free up resources before exiting the thread.
+  *
+  * Header File:  window_helper.h
 **/
 Display *WBThreadInitDisplay(void);
 
@@ -350,6 +367,8 @@ Display *WBThreadInitDisplay(void);
   *
   * Call this function to free a thread-specific Display object that was created by WBThreadInitDisplay()
   * to free up resources before exiting the thread.
+  *
+  * Header File:  window_helper.h
 **/
 void WBThreadFreeDisplay(Display *pThreadDisplay);
 
@@ -365,11 +384,16 @@ void WBThreadFreeDisplay(Display *pThreadDisplay);
   * likely be modified from their original values as part of the processing.  If you
   * want to retain the original values, pass 'copies' to this function and use the
   * copies for normal argument processing (as with 'getarg').
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBParseStandardArguments(int *pargc, char ***pargv, char ***penvp);
 
 /** \ingroup startup
-  * \brief Displays 'usage' for toolkit options to stderr */
+  * \brief Displays 'usage' for toolkit options to stderr
+  *
+  * Header File:  window_helper.h
+**/
 void WBToolkitUsage(void);
 
 /** \ingroup startup
@@ -378,7 +402,9 @@ void WBToolkitUsage(void);
   * \returns A const pointer to a zero-byte terminated string containing a copy of the application name
   *
   * This function is only valid if you call WBParseStandardArguments() on startup
-*/
+  *
+  * Header File:  window_helper.h
+**/
 const char *GetStartupAppName(void);
 
 /** \ingroup startup
@@ -388,7 +414,9 @@ const char *GetStartupAppName(void);
   * display specified in the command line arguments passed to WBParseStandardArguments().
   * This name should be used in a call to XOpenDisplay(), and the resulting Display
   * should then be passed to WBInit()
-*/
+  *
+  * Header File:  window_helper.h
+**/
 const char *GetStartupDisplayName(void);
 
 /** \ingroup startup
@@ -397,14 +425,18 @@ const char *GetStartupDisplayName(void);
   * Returns the desired geometry to be applied to the main window on startup.
   * The value is based on a prior call to \ref WBParseStandardArguments(), and should
   * not be relied upon otherwise.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void GetStartupGeometry(WB_GEOM *pGeom);
 /** \ingroup startup
   * \brief returns the min/max/normal window state for startup
   *
   * Following a call to \ref WBParseStandardArguments(), this function will return the
   * desired startup window state, either minimized (< 0), maximized (> 0), or normal (= 0).
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int GetStartupMinMax(void);
 
 /** \ingroup startup
@@ -412,7 +444,9 @@ int GetStartupMinMax(void);
   *
   * Convenience function that returns the default colormap for the default screen of the
   * specified display.  Helps to clean up the initialization code and make it more 'modular'.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 static __inline__ Colormap WBDefaultColormap(Display *pDisplay)
 {
   return DefaultColormap(pDisplay, DefaultScreen(pDisplay));
@@ -430,7 +464,9 @@ static __inline__ Colormap WBDefaultColormap(Display *pDisplay)
   * Convenience function to assign the minimal window attributes to the XSetWindowAttributes
   * structure.  Helps to clean up the initialization code and make it more 'modular'.
   * For more information on window attributes, see the X11 API Documentation, section 3.3 .
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBInitWindowAttributes(XSetWindowAttributes *pXSWA, unsigned long lBorderPixel,
                             unsigned long lBackgroundPixel, Colormap clrMap, int iBitGravity);
 
@@ -446,7 +482,9 @@ void WBInitWindowAttributes(XSetWindowAttributes *pXSWA, unsigned long lBorderPi
   * Takes into consideration the screen dimensions and min width/height if the user did
   * not specify window geometry on startup.  See the X11 API Reference, sections
   * 9.1.6 and 10.3 for more information on XSizeHints
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBInitSizeHints(XSizeHints *pSH, Display *pDisplay, int iMinHeight, int iMinWidth);
 
 
@@ -468,7 +506,9 @@ void WBInitSizeHints(XSizeHints *pSH, Display *pDisplay, int iMinHeight, int iMi
   *
   * Pass the debug level as 'iLevel'
   *   0 for none, 1 for minimal, 2 for more, etc. up to 7
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBSetDebugLevel(unsigned int iLevel);
 
 
@@ -482,7 +522,9 @@ void WBSetDebugLevel(unsigned int iLevel);
   * way in which to obtain the debug level.  It is defined 'inline' to
   * minimize any performance impact and to allow optimization.
   *
-*/
+  *
+  * Header File:  window_helper.h
+**/
 
 #ifdef __GNUC__
 static __inline__ unsigned int WBGetDebugLevel(void)
@@ -505,7 +547,9 @@ unsigned int WBGetDebugLevel(void);
   * Conditionally sends output to the 'debug device' which is (by default) stderr
   * using a function call convention similar to 'printf'.  When debug is disabled
   * this function has no effect.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 #ifdef __GNUC__
 void WBDebugPrint(const char *pFmt, ...) __attribute__ ((format(printf, 1, 2)));
 #else // __GNUC__
@@ -522,7 +566,9 @@ void WBDebugPrint(const char *pFmt, ...);
   * Allows you to generate a custom 'binary data dump' in an easily
   * readable hex/ASCII format, using the debug message output
   *
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBDebugDump(const char *szTitle, void *pData, int cbData); // dump binary data
 
 /** \ingroup debug
@@ -533,6 +579,8 @@ void WBDebugDump(const char *szTitle, void *pData, int cbData); // dump binary d
   *
   * Debug function that dumps out all of the settings for a GC that can be
   * retrieved using normal API functions.
+  *
+  * Header File:  window_helper.h
 **/
 void WBDebugDumpGC(Display *pDisplay, GC hGC);
 
@@ -544,6 +592,8 @@ void WBDebugDumpGC(Display *pDisplay, GC hGC);
   *
   * Debug function that dumps out all of the members of the XNextEvent.  It assumes
   * that the event is genuine; that is, the 'display' 'window' etc. are valid.
+  *
+  * Header File:  window_helper.h
 **/
 void WBDebugDumpEvent(XEvent *pEvent);
 
@@ -554,6 +604,7 @@ void WBDebugDumpEvent(XEvent *pEvent);
 #ifdef NO_DEBUG /* assign this to disable debugging - most likely a -D in Makefile */
 #define WB_DEBUG_PRINT(...)
 #define WB_DEBUG_DUMP(L,X,Y,Z)
+#define WB_IF_DEBUG_LEVEL(L) if(0) /* TODO:  turn off the warning? */
 #else // NO_DEBUG
 
 // NOTE:  this macro is the preferred method of implementing debug output.
@@ -573,7 +624,7 @@ void WBDebugDumpEvent(XEvent *pEvent);
   * The remaining parameters, format string (and a variable number of parameters), are
   * passed along to the WBDebugPrint function.\n
   * \sa \ref DebugLevel
-*/
+**/
 #define WB_DEBUG_PRINT(L, ...) \
   if(WB_UNLIKELY((WBGetDebugLevel() & DebugLevel_MASK) >= ((L) & DebugLevel_MASK))) \
   { \
@@ -600,7 +651,7 @@ void WBDebugDumpEvent(XEvent *pEvent);
   * The remainng 3 parameters are passed to WBDebugDump as the title, data pointer,
   * and size of the data (in bytes).\n
   * \sa \ref DebugLevel
-*/
+**/
 #define WB_DEBUG_DUMP(L,X,Y,Z) \
   if(WB_UNLIKELY((WBGetDebugLevel() & DebugLevel_MASK) >= ((L) & DebugLevel_MASK))) \
   { \
@@ -610,7 +661,6 @@ void WBDebugDumpEvent(XEvent *pEvent);
       WBDebugDump(X,Y,Z); \
     } \
   }
-#endif // NO_DEBUG
 
 /** \ingroup debug
   * \brief Preferred method of implementing conditional debug 'if block' code
@@ -627,21 +677,26 @@ void WBDebugDumpEvent(XEvent *pEvent);
   }
   * \endcode
   * \sa \ref DebugLevel
-*/
-#define WB_IF_DEBUG_LEVEL(L) if(WB_UNLIKELY((WBGetDebugLevel() & DebugLevel_MASK) >= ((L) & DebugLevel_MASK)))
+**/
+#define WB_IF_DEBUG_LEVEL(L) if(WB_UNLIKELY((WBGetDebugLevel() & DebugLevel_MASK) >= ((L) & DebugLevel_MASK)) && \
+                                (!((L) & DebugSubSystem_MASK) || !(WBGetDebugLevel() & DebugSubSystem_MASK) \
+                                   || (((L) & WBGetDebugLevel()) & DebugSubSystem_MASK) != 0))
+
+#endif // NO_DEBUG
+
 
 /** \ingroup debug
   * \brief Preferred method of implementing a 'warning level' debug message for all subsystems
   *
   * Preferred method of implementing a 'warning level' debug message for all subsystems
-*/
+**/
 #define WB_WARN_PRINT(...) WB_DEBUG_PRINT(DebugLevel_WARN, __VA_ARGS__)
 
 /** \ingroup debug
   * \brief Preferred method of implementing an 'error level' debug message for all subsystems
   *
   * Preferred method of implementing an 'error level' debug message for all subsystems
-*/
+**/
 #define WB_ERROR_PRINT(...) WB_DEBUG_PRINT(DebugLevel_ERROR, __VA_ARGS__)
 
 /** \ingroup debug
@@ -652,7 +707,7 @@ void WBDebugDumpEvent(XEvent *pEvent);
   * \param Z An unsigned integer indicating the number of bytes to display
   *
   * Preferred method of implementing a 'warning level' binary dump for all subsystems
-*/
+**/
 #define WB_WARN_DUMP(X,Y,Z) WB_DEBUG_DUMP(DebugLevel_WARN, X,Y,Z)
 
 /** \ingroup debug
@@ -663,7 +718,7 @@ void WBDebugDumpEvent(XEvent *pEvent);
   * \param Z An unsigned integer indicating the number of bytes to display
   *
   * Preferred method of implementing an 'error level' binary dump for all subsystems
-*/
+**/
 #define WB_ERROR_DUMP(X,Y,Z) WB_DEBUG_DUMP(DebugLevel_ERROR, X,Y,Z)
 
 /** \ingroup debug
@@ -674,7 +729,7 @@ void WBDebugDumpEvent(XEvent *pEvent);
   *
   * Bits 0 to 3 identify the level (0 = none, 7 = excessive)\n
   * The remaining bits identify the subsystem filters (no bits set for ALL)
-*/
+**/
 enum DebugLevel
 {
   DebugLevel_None = 0,      //!< none (no debug output)
@@ -725,7 +780,8 @@ enum DebugLevel
 
 /** \ingroup core
   * \defgroup defaults Default Parameters
-  * Functions and variables associated with default parameters */
+  * Functions and variables associated with default parameters
+**/
 
 /** \ingroup defaults
   * \brief Returns the default Display
@@ -735,7 +791,9 @@ enum DebugLevel
   * can be used in any case where the current display is not known
   *
   * \sa  WBGetWindowDisplay()
-*/
+  *
+  * Header File:  window_helper.h
+**/
 static __inline__ Display * WBGetDefaultDisplay(void)
 {
   extern Display *pDefaultDisplay;
@@ -749,7 +807,9 @@ static __inline__ Display * WBGetDefaultDisplay(void)
   * returns a pointer to this XFontStruct, which can be used in a
   * case where the 'in use' XFontStruct is not known, or when an
   * overriding font has not been specified.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 XFontStruct *WBGetDefaultFont(void);
 
 /** \ingroup defaults
@@ -758,7 +818,9 @@ XFontStruct *WBGetDefaultFont(void);
   * This function returns a special window that was created for information
   * purposes.  If you need a window for query purposes that belongs to the
   * default display, you can use the one returned by this function.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 Window WBGetHiddenHelperWindow(void);  // if you need "a window" for the default display, use this
 
 
@@ -836,7 +898,7 @@ extern const Atom aNULL;             // Atom for 'NULL'
   * These functions and definitions comprise the CORE WINDOW HANDLING functionality
   * for the X11workbench Toolkit API.  This includes information and initialization
   * functions, but not event nor class-specific functionality.
-*/
+**/
 
 /** \ingroup core
   * \defgroup events Event Handling
@@ -846,21 +908,23 @@ extern const Atom aNULL;             // Atom for 'NULL'
   * application's event handler. The X11workbench Toolkit API has provisinos for
   * event prioritization, asynchronous processing, and the generation of 'internal
   * events' (see \ref aWM_CHAR, \ref aWM_POINTER, \ref aWM_TIMER).
-*/
+**/
 
 /** \ingroup core
   * \defgroup keyboard Keyboard event handling
   *
   * The X11workbench Toolkit API provides for mid-level keyboard event handling via
   * WM_CHAR ClientMessage notification events.\n
-  * See \ref aWM_CHAR for more info. */
+  * See \ref aWM_CHAR for more info.
+**/
 
 /** \ingroup core
   * \defgroup pointer Mouse Pointer event handling
   *
   * The X11workbench Toolkit API provides for mid-level pointer event handling via
   * WM_POINTER ClientMessage notification events.\n
-  * See \ref aWM_POINTER for more info. */
+  * See \ref aWM_POINTER for more info.
+**/
 
 /** \ingroup wcore
   * \brief 'Standard' input mask, bit flag for window creation
@@ -892,7 +956,7 @@ extern const Atom aNULL;             // Atom for 'NULL'
   * \brief Window type enumeration.  Reserved for future implementation.
   *
   * reserved for future implementation
-*/
+**/
 enum WMPropertiesWindowType
 {
   // must be ONLY ONE of the items below
@@ -945,7 +1009,7 @@ enum WMPropertiesWindowType
   * \brief Window WMProtocols support enumeration.
   *
   * Bit flags indicating support for known WM_PROTOCOLS window manager features
-*/
+**/
 enum WMPropertiesWMProtocols
 {
   // The following flags indicate WM_PROTOCOLS support
@@ -986,7 +1050,9 @@ enum WMPropertiesWMProtocols
   * for you automatically.\n
   * The window is created with the default visual and depth for the specified display with
   * default screen and a default set of WM_HINTS.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 Window WBCreateWindow(Display *pDisplay, Window wIDParent,
                       WBWinEvent pProc, const char *szClass,
                       int iX, int iY, int iWidth, int iHeight, int iBorder, int iIO,
@@ -996,7 +1062,9 @@ Window WBCreateWindow(Display *pDisplay, Window wIDParent,
   * \brief Destroy a window
   *
   * Call this function to destroy a window, rather than XDestroyWindow
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBDestroyWindow(Window wID);
 
 /** \ingroup wcore
@@ -1006,7 +1074,9 @@ void WBDestroyWindow(Window wID);
   *
   * Call this function to get the 'Application' window's ID registered via WBSetApplicationWindow().
   * There can be only one.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 Window WBGetApplicationWindow(void);
 
 /** \ingroup wcore
@@ -1018,17 +1088,23 @@ Window WBGetApplicationWindow(void);
   * Make sure the window has an assigned callback already, or the assignment will fail.
   * Once the application window's callback has been unregistered, the application window
   * ID will be reset to 'None' automatically.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBSetApplicationWindow(Window wID);
 
 /** \ingroup wcore
   * \brief implements the default window event callback behavior
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBDefault(Window wID, XEvent *pEvent);
 
 /** \ingroup wcore
   * \brief implements the default application event callback behavior
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBAppDefault(XEvent *pEvent);
 
 /** \ingroup wcore
@@ -1037,22 +1113,30 @@ int WBAppDefault(XEvent *pEvent);
   * To handle events sent to the application ('no window' events), register a callback
   * function using this API.  The callback function you register should call WBAppDefault()
   * for any events that it does not process.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBRegisterAppCallback(WBAppEvent pCallback);
 
 /** \ingroup wcore
   * \brief unregister callback function for application events
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBUnregisterAppCallback();
 
 /** \ingroup wcore
   * \brief register callback function for a window (required)
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBRegisterWindowCallback(Window wID, WBWinEvent pCallback);
 
 /** \ingroup wcore
   * \brief un-register the window's callback function (implies resource destruction)
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBUnregisterWindowCallback(Window wID);
 
 /** \ingroup wcore
@@ -1063,7 +1147,9 @@ void WBUnregisterWindowCallback(Window wID);
   * \param pNormalHints The pointer to the XSiteHints data, or NULL
   * \param pWMHints The pointer to the XWMHints data, or NULL
   * \param pClassHints The pointer to the XClassHint data, or NULL
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBSetWMProperties(Window wID, const char *szTitle, XSizeHints *pNormalHints,
                        XWMHints *pWMHints, XClassHint *pClassHints);
 /** \ingroup wcore
@@ -1071,7 +1157,9 @@ void WBSetWMProperties(Window wID, const char *szTitle, XSizeHints *pNormalHints
   *
   * \param wID The Window ID for the window
   * \param szTitle A const pointer to a character string containing the window title
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBSetWindowTitle(Window wID, const char *szTitle);
 
 /** \ingroup wcore
@@ -1082,7 +1170,9 @@ void WBSetWindowTitle(Window wID, const char *szTitle);
   *
   * \sa <a href="http://standards.freedesktop.org/wm-spec/wm-spec-latest.html">latest WM spec</a>
   * <a href="http://standards.freedesktop.org/freedesktop-platform-specs/1.0/wm-spec-1.3/"> WM spec v 1.3</a>
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBSetWMPropertiesWindowType(Window wID, enum WMPropertiesWindowType wmProp);
 
 /** \ingroup wcore
@@ -1094,7 +1184,9 @@ void WBSetWMPropertiesWindowType(Window wID, enum WMPropertiesWindowType wmProp)
   *
   * \sa <a href="http://standards.freedesktop.org/wm-spec/wm-spec-latest.html">latest WM spec</a>
   * <a href="http://standards.freedesktop.org/freedesktop-platform-specs/1.0/wm-spec-1.3/"> WM spec v 1.3</a>
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBChangeWMPropertiesWindowType(Window wID, enum WMPropertiesWindowType wmPropSet, enum WMPropertiesWindowType wmChangeMask);
 
 
@@ -1105,7 +1197,9 @@ void WBChangeWMPropertiesWindowType(Window wID, enum WMPropertiesWindowType wmPr
   * \return A bitmask consisting of WMPropertiesWindowType enumeration values.
   *
   * These values are cached from WBSetWMPropertiesWindowType() and WBChangeWMPropertiesWindowType()
-*/
+  *
+  * Header File:  window_helper.h
+**/
 enum WMPropertiesWindowType WBGetWMPropertiesWindowType(Window wID);
 
 /** \ingroup wcore
@@ -1118,7 +1212,9 @@ enum WMPropertiesWindowType WBGetWMPropertiesWindowType(Window wID);
   * These Atoms will be assigned to the WM_PROTOCOLS property via XSetWMProtocols().  In some cases,
   * the behavior of the toolkit will change depending on the atoms that are assigned.  This assignment
   * should ONLY be done on top-level windows, and only at the time of window creation.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBSetWMProtocols(Window wID, Atom aProperty, ...);
 
 
@@ -1128,6 +1224,8 @@ void WBSetWMProtocols(Window wID, Atom aProperty, ...);
   * \param wID The ID of the window being enumerated
   * \param pData The pointer specified in the call to WBLocateWindow
   * \return A value > 0 to indicate a match, < 0 to stop enumerating, 0 to continue enumerating
+  *
+  * Header File:  window_helper.h
 **/
 typedef int (*WBLocateWindowCallback)(Window wID, void *pData);
 
@@ -1147,7 +1245,9 @@ typedef int (*WBLocateWindowCallback)(Window wID, void *pData);
   * WBLocateWindow then returns either 0 (None) or a valid window ID
   *
   * \sa  \ref WBLocateWindowCallback
-*/
+  *
+  * Header File:  window_helper.h
+**/
 Window WBLocateWindow(WBLocateWindowCallback callback, void *pData);
 
 /** \ingroup wcore
@@ -1157,7 +1257,9 @@ Window WBLocateWindow(WBLocateWindowCallback callback, void *pData);
   *
   * Call this function to assign the input focus to a specific window.  The 'revert'
   * window will be the previous focus window.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBSetInputFocus(Window wID);
 
 /** \ingroup wcore
@@ -1165,7 +1267,9 @@ void WBSetInputFocus(Window wID);
   *
   * \param wID The Window ID from which to obtain the Display pointer
   * \return A Display pointer corresponding to the Window ID, or NULL on error
-*/
+  *
+  * Header File:  window_helper.h
+**/
 Display * WBGetWindowDisplay(Window wID);
 
 /** \ingroup wcore
@@ -1173,7 +1277,9 @@ Display * WBGetWindowDisplay(Window wID);
   *
   * \param wID The Window ID from which to return the default cursor
   * \param idIcon The resource ID for the window's icon
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBSetWindowIcon(Window wID, int idIcon);
 
 /** \ingroup wcore
@@ -1181,7 +1287,9 @@ void WBSetWindowIcon(Window wID, int idIcon);
   *
   * \param wID The Window ID from which to return the default cursor
   * \param pFontStruct A pointer to an XFontStruct that describes the font
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBSetWindowFontStruct(Window wID, XFontStruct *pFontStruct);
 
 /** \ingroup wcore
@@ -1189,7 +1297,9 @@ void WBSetWindowFontStruct(Window wID, XFontStruct *pFontStruct);
   *
   * \param wID The Window ID from which to return the default cursor
   * \param idStandardCursor The default Cursor ID to assign (Typically an XC_ definition from X11/cursorfont.h).  A value of '-1' equates to 'None'
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBSetWindowDefaultCursor(Window wID, int idStandardCursor);
 
 /** \ingroup wcore
@@ -1197,7 +1307,9 @@ void WBSetWindowDefaultCursor(Window wID, int idStandardCursor);
   *
   * \param wID The Window ID from which to return the default cursor
   * \return The Cursor ID (Typically an XC_ definition from X11/cursorfont.h).  A value of '-1' equates to 'None'
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBGetWindowDefaultCursor(Window wID);
 
 /** \ingroup wcore
@@ -1206,7 +1318,9 @@ int WBGetWindowDefaultCursor(Window wID);
   * \param wID The Window ID for which to assign the colors
   * \param clrFG The foreground color
   * \param clrBG The background color
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBCreateWindowDefaultGC(Window wID, unsigned long clrFG, unsigned long clrBG);
 
 /** \ingroup wcore
@@ -1214,7 +1328,9 @@ void WBCreateWindowDefaultGC(Window wID, unsigned long clrFG, unsigned long clrB
   *
   * \param wID The Window ID for which to assign the GC
   * \param hGC The GC to assign
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBSetWindowDefaultGC(Window wID, GC hGC);
 
 /** \ingroup wcore
@@ -1222,7 +1338,9 @@ void WBSetWindowDefaultGC(Window wID, GC hGC);
   *
   * \param wID The Window ID from which to copy the GC
   * \return A copy of the default GC for the specified window
-*/
+  *
+  * Header File:  window_helper.h
+**/
 GC WBGetWindowCopyGC(Window wID);
 
 /** \ingroup wcore
@@ -1234,7 +1352,9 @@ GC WBGetWindowCopyGC(Window wID);
   *
   * Essentially, it works the same as WBGetWindowCopyGC() except it uses gcSrc
   * instead of the window's 'default GC'.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 GC WBGetWindowCopyGC2(Window wID, GC gcSrc);
 
 /** \ingroup wcore
@@ -1248,7 +1368,9 @@ GC WBGetWindowCopyGC2(Window wID, GC gcSrc);
   * there has been NO font assigned, the system default font information will be
   * returned.  The return value is always a new pointer to an XFontStruct, or
   * NULL on error.  The caller must free non-NULL return values via XFreeFont().
-  */
+  *
+  * Header File:  window_helper.h
+**/
 XFontStruct * WBGetGCFont(Display *pDisplay, GC gc);
 
 /** \ingroup wcore
@@ -1257,21 +1379,27 @@ XFontStruct * WBGetGCFont(Display *pDisplay, GC gc);
   * \param wID The Window ID to which to assign the data pointer
   * \param iIndex The 0-based index that identifies the entry
   * \param pData The data pointer to assign (may be NULL)
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBSetWindowData(Window wID, int iIndex, void *pData);
 
 /** \ingroup wcore
   * \brief increment 'wait cursor' count, set cursor to WB_WAIT_CURSOR
   *
   * \param wID The Window ID to which the wait cursor needs to be assigned
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBBeginWaitCursor(Window wID);
 
 /** \ingroup wcore
   * \brief decrement 'wait cursor' count, restore to default when zero
   *
   * \param wID The Window ID to which the cursor needs to be restored
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBEndWaitCursor(Window wID);
 
 /** \ingroup wcore
@@ -1279,14 +1407,18 @@ void WBEndWaitCursor(Window wID);
   *
   * \param wID The Window ID to which the cursor needs to be assigned
   * \param idCursor The Cursor ID (Typically an XC_ definition from X11/cursorfont.h).  A value of '-1' equates to 'None'
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBSetWindowCursor(Window wID, int idCursor);
 
 /** \ingroup wcore
   * \brief restore the default cursor
   *
   * \param wID The Window ID to which the default cursor needs to be restored
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBRestoreDefaultCursor(Window wID);
 
 /** \ingroup wcore
@@ -1302,7 +1434,9 @@ void WBRestoreDefaultCursor(Window wID);
   * perform the desired operation.  This, in fact, will happen every time you use the API to
   * handle Expose events, via the WBBeginPaint() and WBEndPaint() functions, where the paint
   * GC is a modified version of the default GC.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 GC WBGetWindowDefaultGC(Window wID);
 
 /** \ingroup wcore
@@ -1310,7 +1444,9 @@ GC WBGetWindowDefaultGC(Window wID);
   *
   * \param wID The Window ID from which to obtain the current XFontStruct pointer
   * \return A pointer to the assigned XFontStruct, or NULL
-*/
+  *
+  * Header File:  window_helper.h
+**/
 XFontStruct *WBGetWindowFontStruct(Window wID);
 
 /** \ingroup wcore
@@ -1318,7 +1454,9 @@ XFontStruct *WBGetWindowFontStruct(Window wID);
   *
   * \param wID The Window ID from which to obtain the foreground color
   * \return The current foreground color for the window
-*/
+  *
+  * Header File:  window_helper.h
+**/
 unsigned long WBGetWindowFGColor(Window wID);
 
 /** \ingroup wcore
@@ -1326,7 +1464,9 @@ unsigned long WBGetWindowFGColor(Window wID);
   *
   * \param wID The Window ID from which to obtain the background color
   * \return The current background color for the window
-*/
+  *
+  * Header File:  window_helper.h
+**/
 unsigned long WBGetWindowBGColor(Window wID);
 
 /** \ingroup wcore
@@ -1338,7 +1478,9 @@ unsigned long WBGetWindowBGColor(Window wID);
   *
   * If the current foreground color cannot be determined, this function will
   * return the pre-defined color for BLACK on the specified Display and default screen
-  */
+  *
+  * Header File:  window_helper.h
+**/
 unsigned long WBGetGCFGColor(Display *pDisplay, GC gc);
 
 /** \ingroup wcore
@@ -1350,7 +1492,9 @@ unsigned long WBGetGCFGColor(Display *pDisplay, GC gc);
   *
   * If the current background color cannot be determined, this function will
   * return the pre-defined color for WHITE on the specified Display and default screen
-  */
+  *
+  * Header File:  window_helper.h
+**/
 unsigned long WBGetGCBGColor(Display *pDisplay, GC gc);
 
 /** \ingroup wcore
@@ -1363,7 +1507,9 @@ unsigned long WBGetGCBGColor(Display *pDisplay, GC gc);
   * 'window class' for debug and tracing purposes.  The pointer must be 'persistent', neither
   * allocated via 'malloc()' or on the stack, since it is assigned directly 'as-is' to the
   * internal structure, without copying the string data.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBSetWindowClassName(Window wID, const char *szClassName);
 
 /** \ingroup wcore
@@ -1375,7 +1521,9 @@ void WBSetWindowClassName(Window wID, const char *szClassName);
   * The windows 'class name' is a persistent string pointer that is optionally
   * assigned by calling WBSetWindowClassName().  This function returns the assigned
   * pointer.  Its primary use is for debugging and tracing.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 const char *WBGetWindowClassName(Window wID);
 
 /** \ingroup wcore
@@ -1391,7 +1539,9 @@ const char *WBGetWindowClassName(Window wID);
   * Any unused entries can be made use of in any way necessary.  It is important to
   * keep in mind that these values are not automatically checked, nor are any resources
   * automatically deleted when the window is destroyed.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void *WBGetWindowData(Window wID, int iIndex);
 
 /** \ingroup wcore
@@ -1399,7 +1549,9 @@ void *WBGetWindowData(Window wID, int iIndex);
   *
   * \param wID The Window ID to obtain the WB_GEOM data for
   * \param pGeom A pointer to the WB_GEOM structure to receive the data
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBGetWindowGeom(Window wID, WB_GEOM *pGeom);
 
 /** \ingroup wcore
@@ -1407,7 +1559,9 @@ void WBGetWindowGeom(Window wID, WB_GEOM *pGeom);
   *
   * \param wID The Window ID to obtain the WB_GEOM data for
   * \param pGeom A pointer to the WB_GEOM structure to receive the data
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBGetWindowGeom2(Window wID, WB_GEOM *pGeom);
 
 
@@ -1425,7 +1579,9 @@ void WBGetWindowGeom2(Window wID, WB_GEOM *pGeom);
   * window position is known (helpful for centering on screen, etc.), the absolute coordinates
   * are frequently cached within the internal data structure associated with the window.
   * Those cached values are returned by this function.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBGetWindowGeom0(Window wID, WB_GEOM *pGeom);  // absolute window geometry (from latest notification)
 
 /** \ingroup wcore
@@ -1433,7 +1589,9 @@ void WBGetWindowGeom0(Window wID, WB_GEOM *pGeom);  // absolute window geometry 
   *
   * \param wID The Window ID to obtain the WB_RECT data for
   * \param pRect A pointer to the WB_RECT structure to receive the data
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBGetWindowRect(Window wID, WB_RECT *pRect);
 
 /** \ingroup wcore
@@ -1441,7 +1599,9 @@ void WBGetWindowRect(Window wID, WB_RECT *pRect);
   *
   * \param wID The Window ID to obtain the WB_RECT data for
   * \param pRect A pointer to the WB_RECT structure to receive the data
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBGetClientRect(Window wID, WB_RECT *pRect);
 
 
@@ -1450,7 +1610,9 @@ void WBGetClientRect(Window wID, WB_RECT *pRect);
   *
   * \param wID The Window ID to obtain the parent for
   * \return The Window ID of the parent, or None
-*/
+  *
+  * Header File:  window_helper.h
+**/
 Window WBGetParentWindow(Window wID);
 
 
@@ -1465,7 +1627,9 @@ Window WBGetParentWindow(Window wID);
   *
   * If you want to change the owner window you should call \ref WBReparentWindow() instead.
   * NOTE:  this function should NOT be called for top level windows.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBSetParentWindow(Window wID, Window wIDParent);
 
 /** \ingroup wcore
@@ -1480,7 +1644,9 @@ void WBSetParentWindow(Window wID, Window wIDParent);
   * function will ensure that internal information remains synchronized.\n
   *
   * NOTE:  this function should NOT be called for top level windows.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBReparentWindow(Window wID, Window wIDParent, int iX, int iY); // keeps internal info up to date
 
 /** \ingroup wcore
@@ -1494,7 +1660,9 @@ int WBReparentWindow(Window wID, Window wIDParent, int iX, int iY); // keeps int
   * function checks all parent windows of 'wIDChild' to see if 'wIDParent' is
   * one of them, and returns a non-zero value if it is.  Otherwise, the function
   * returns zero.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBIsChildWindow(Window wIDParent, Window wIDChild);  // non-zero if 'wIDParent' is in a parent relationship with 'wIDChild'
 
 /** \ingroup wcore
@@ -1503,7 +1671,8 @@ int WBIsChildWindow(Window wIDParent, Window wIDChild);  // non-zero if 'wIDPare
   * \param Y The Y value to check for
   * \param R A WB_RECT structure bounding the area to check
   * \return logical TRUE if (X,Y) lies within 'R', FALSE otherwise
-*/
+  *
+**/
 #define WBPointInRect(X,Y,R) ((X) >= (R).left && (X) < (R).right && (Y) >= (R).top && (Y) < (R).bottom)
 
 /** \ingroup wcore
@@ -1512,7 +1681,7 @@ int WBIsChildWindow(Window wIDParent, Window wIDChild);  // non-zero if 'wIDPare
   * \param Y The Y value to check for
   * \param G A WB_GEOM structure bounding the area to check
   * \return logical TRUE if (X,Y) lies within 'G', FALSE otherwise
-*/
+**/
 #define WBPointInGeom(X,Y,G) ((X) >= (G).x && (X) < ((G).x + (G).width) && (Y) >= (G).y && (Y) < ((G).y + (G).height))
 
 /** \ingroup wcore
@@ -1520,7 +1689,7 @@ int WBIsChildWindow(Window wIDParent, Window wIDChild);  // non-zero if 'wIDPare
   * \param R1 A WB_RECT structure bounding the first area to check
   * \param R2 A second WB_RECT structure bounding the second area to check
   * \return logical TRUE if the two WB_RECTs intersect, FALSE otherwise
-*/
+**/
 #define WBRectOverlapped(R1,R2) \
   ((((R1).left >= (R2).left && (R1).left < (R2).right) || \
     ((R2).left >= (R1).left && (R2).left < (R1).right)) && \
@@ -1532,7 +1701,7 @@ int WBIsChildWindow(Window wIDParent, Window wIDChild);  // non-zero if 'wIDPare
   * \param G1 A WB_GEOM structure bounding the first area to check
   * \param G2 A second WB_GEOM structure bounding the second area to check
   * \return logical TRUE if the two WB_GEOMs intersect, FALSE otherwise
-*/
+**/
 #define WBGeomOverlapped(G1,G2) \
   ((((G1).x >= (G2).x && (G1).x < (G2).x + (G2).width) || \
     ((G2).x >= (G1).x && (G2).x < (G1).x + (G1).width)) && \
@@ -1554,7 +1723,8 @@ int WBIsChildWindow(Window wIDParent, Window wIDChild);  // non-zero if 'wIDPare
   * new window's processing.\n
   * To translate from screen coordinates, pass 'None' for 'wIDSrc'\n
   *
-*/
+  * Header File:  window_helper.h
+**/
 void WBXlatCoordPoint(Window wIDSrc, int iXSrc, int iYSrc, Window wIDDest, int *piXDest, int *piYDest);
 
 /** \ingroup wcore
@@ -1570,7 +1740,8 @@ void WBXlatCoordPoint(Window wIDSrc, int iXSrc, int iYSrc, Window wIDDest, int *
   * new window's processing.\n
   * To translate from screen coordinates, pass 'None' for 'wIDSrc'\n
   *
-*/
+  * Header File:  window_helper.h
+**/
 void WBXlatCoordGeom(Window wIDSrc, const WB_GEOM *pGeomSrc, Window wIDDest, WB_GEOM *pGeomDest);
 
 /** \ingroup wcore
@@ -1586,7 +1757,8 @@ void WBXlatCoordGeom(Window wIDSrc, const WB_GEOM *pGeomSrc, Window wIDDest, WB_
   * new window's processing.\n
   * To translate from screen coordinates, pass 'None' for 'wIDSrc'\n
   *
-*/
+  * Header File:  window_helper.h
+**/
 void WBXlatCoordRect(Window wIDSrc, const WB_RECT *pRectSrc, Window wIDDest, WB_RECT *pRectDest);
 
 /** \ingroup wcore
@@ -1602,34 +1774,35 @@ void WBXlatCoordRect(Window wIDSrc, const WB_RECT *pRectSrc, Window wIDDest, WB_
   * Typical use includes 'hover' detection, drag/drop operations, and child window activation
   * To specify X,Y screen coordinates, pass 'None' for 'wIDRef'\n
   *
-*/
+  * Header File:  window_helper.h
+**/
 int WBPointInWindow(Window wIDRef, int iX, int iY, Window wIDQuery);
 
 // keyboard translation helpers
 
 /** \ingroup keyboard
   * \brief 'AltCtrlShift' bit flag for 'VK_' keys for WBKeyEventProcessKey()
-*/
+**/
 #define WB_KEYEVENT_KEYSYM 8 /* bit flags for 'piAltCtrlShift' below */
 
 /** \ingroup keyboard
   * \brief 'AltCtrlShift' bit flag for ALT modifier for WBKeyEventProcessKey()
-*/
+**/
 #define WB_KEYEVENT_ALT    4
 
 /** \ingroup keyboard
   * \brief 'AltCtrlShift' bit flag for Control modifier for WBKeyEventProcessKey()
-*/
+**/
 #define WB_KEYEVENT_CTRL   2
 
 /** \ingroup keyboard
   * \brief 'AltCtrlShift' bit flag for Shift modifier for WBKeyEventProcessKey()
-*/
+**/
 #define WB_KEYEVENT_SHIFT  1
 
 /** \ingroup keyboard
   * \brief 'AltCtrlShift' bit mask for Alt+Ctrl+Shift bits for WBKeyEventProcessKey()
-*/
+**/
 #define WB_KEYEVENT_ACSMASK 7
 
 
@@ -1650,7 +1823,9 @@ int WBPointInWindow(Window wIDRef, int iX, int iY, Window wIDQuery);
   * translated UTF character of 1, 2 or 4 bytes (when pBuf is NULL).
   *
   * \sa  \ref aWM_CHAR, \ref aWM_POINTER
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBKeyEventProcessKey(const XKeyEvent *pEvent, char *pBuf, int *pcbLen, int *piAltCtrlShift);
   // NOTE:  WM_CHAR notification messages (related to WBKeyEventProcessKey)
   // message_type == aWM_CHAR
@@ -1669,62 +1844,77 @@ int WBKeyEventProcessKey(const XKeyEvent *pEvent, char *pBuf, int *pcbLen, int *
 // data.l[4] is translated Y coordinate
 
 /** \ingroup pointer
-  * \brief Unspecified event, possible motion or state-chagne notification */
+  * \brief Unspecified event, possible motion or state-chagne notification
+**/
 #define WB_POINTER_UNSPECIFIED 0 /* possible motion or state-change notifications */
 
 /** \ingroup pointer
-  * \brief Mouse 'click' event */
+  * \brief Mouse 'click' event
+**/
 #define WB_POINTER_CLICK       1
 
 /** \ingroup pointer
-  * \brief WM_POINTER 'double-click' event, send in lieu of WB_POINTER_CLICK for double-click */
+  * \brief WM_POINTER 'double-click' event, send in lieu of WB_POINTER_CLICK for double-click
+**/
 #define WB_POINTER_DBLCLICK    2
 
 /** \ingroup pointer
-  * \brief WM_POINTER 'drag' event, window proc MUST return the window ID to auto-support drag/drop */
+  * \brief WM_POINTER 'drag' event, window proc MUST return the window ID to auto-support drag/drop
+**/
 #define WB_POINTER_DRAG        3 /* window proc returns window ID to support drag/drop */
 
 /** \ingroup pointer
-  * \brief WM_POINTER 'drop' event, only sent if drag/drop supported AND was not 'canceled'; see WB_POINTER_CANCEL */
+  * \brief WM_POINTER 'drop' event, only sent if drag/drop supported AND was not 'canceled'; see WB_POINTER_CANCEL
+**/
 #define WB_POINTER_DROP        4 /* may not happen if drag is canceled */
 
 /** \ingroup pointer
-  * \brief WM_POINTER 'move' event, for motion notification during drag/drop */
+  * \brief WM_POINTER 'move' event, for motion notification during drag/drop
+**/
 #define WB_POINTER_MOVE        5 /* motion notify while dragging */
 
 /** \ingroup pointer
-  * \brief WM_POINTER 'cancel' event, cancels an ongoing operation, such as drag/drop (useful for resource cleanup) */
+  * \brief WM_POINTER 'cancel' event, cancels an ongoing operation, such as drag/drop (useful for resource cleanup)
+**/
 #define WB_POINTER_CANCEL      6 /* reservedly any kind of cancellation, but for now, 'drag cancel' */
 
 /** \ingroup pointer
-  * \brief WM_POINTER 'scroll up' event, caused by mouse button 4 */
+  * \brief WM_POINTER 'scroll up' event, caused by mouse button 4
+**/
 #define WB_POINTER_SCROLLUP    7 /* scroll event, mouse button 4 */
 
 /** \ingroup pointer
-  * \brief WM_POINTER 'scroll down' event, caused by mouse button 5 */
+  * \brief WM_POINTER 'scroll down' event, caused by mouse button 5
+ **/
 #define WB_POINTER_SCROLLDOWN  8 /* scroll event, mouse button 5 */
 
 /** \ingroup pointer
-  * \brief WM_POINTER button bitmask  indicating that button 1 is pressed */
+  * \brief WM_POINTER button bitmask  indicating that button 1 is pressed
+**/
 #define WB_POINTER_BUTTON1 1 /* these are bitmasks */
 /** \ingroup pointer
-  * \brief WM_POINTER button bitmask  indicating that button 2 is pressed */
+  * \brief WM_POINTER button bitmask  indicating that button 2 is pressed
+**/
 #define WB_POINTER_BUTTON2 2
 /** \ingroup pointer
-  * \brief WM_POINTER button bitmask  indicating that button 3 is pressed */
+  * \brief WM_POINTER button bitmask  indicating that button 3 is pressed
+**/
 #define WB_POINTER_BUTTON3 4
 /** \ingroup pointer
-  * \brief WM_POINTER button bitmask  indicating that button 4 (scroll wheel 'up') is pressed */
+  * \brief WM_POINTER button bitmask  indicating that button 4 (scroll wheel 'up') is pressed
+**/
 #define WB_POINTER_BUTTON4 8
 /** \ingroup pointer
-  * \brief WM_POINTER button bitmask  indicating that button 5 (scroll wheel 'down') is pressed */
+  * \brief WM_POINTER button bitmask  indicating that button 5 (scroll wheel 'down') is pressed
+**/
 #define WB_POINTER_BUTTON5 16
 
 // (you can add multiple menus to multiple windows)
 /** \ingroup wcore
   * \brief (internal) Register a MENU callback for a window
   *
-*/
+  * Header File:  window_helper.h
+**/
 void WBRegisterMenuCallback(Window wID, WBWinEvent pCallback);
 
 /** \ingroup wcore
@@ -1732,21 +1922,27 @@ void WBRegisterMenuCallback(Window wID, WBWinEvent pCallback);
   *
   * \param wID The Window ID to which a menu window will be added (typically only one)
   * \param wIDMenu The Window ID of the menu window to add/assign to wID
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBAddMenuWindow(Window wID, Window wIDMenu);
 /** \ingroup wcore
   * \brief Returns the Window ID of the (first) menu window assigned to a (frame) window
   *
   * \param wID The Window ID for which to query the menu Window ID
   * \return The Window ID for the Menu window assigned to wID (only one may be assigned for this to work)
-*/
+  *
+  * Header File:  window_helper.h
+**/
 Window WBGetMenuWindow(Window wID);  // returns ID of menu window assigned by above (one only)
 /** \ingroup wcore
   * \brief Remove (detach) the specified menu window from a (frame) window
   *
   * \param wID The Window ID for which to remove a menu Window ID
   * \param wIDMenu The Window ID of the menu window to remove
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBRemoveMenuWindow(Window wID, Window wIDMenu);
 
 /** \ingroup xcore
@@ -1760,7 +1956,9 @@ void WBRemoveMenuWindow(Window wID, Window wIDMenu);
   * It checks to see if the internal window information exists and returns
   * a non-zero value if the internal information exists AND the window itself has not
   * been destroyed.  This works whether or not the window was ever mapped.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBIsValid(Display *pDisplay, Window wID);
 
 
@@ -1784,7 +1982,9 @@ int WBIsValid(Display *pDisplay, Window wID);
   * In some cases it's necessary to know an approximate value of the X server's timestamp.
   * The message loop will capture the timestamp value whenever it can.  Use this function to
   * return the best known server time value for the default Display.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 Time WBGetLastEventTime(void);
 
 
@@ -1835,7 +2035,9 @@ Time WBGetLastEventTime(void);
     WBDispatch(&event);
   }
   * \endcode
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBCheckGetEvent(Display *pDisplay, XEvent *pEvent);
 
 /** \ingroup events
@@ -1846,7 +2048,9 @@ int WBCheckGetEvent(Display *pDisplay, XEvent *pEvent);
   * Call this function to generically dispatch an XEvent.  The application will
   * need to check for a 'quit' state independently.
   * See WBWindowDispatch(), WBAppDispatch()
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBDispatch(XEvent *pEvent);
 
 /** \ingroup events
@@ -1857,7 +2061,9 @@ void WBDispatch(XEvent *pEvent);
   * Application events have a window ID of None, and are dispatched to
   * the registered Application callback.  In the absence of a callback,
   * default processing is performed.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBAppDispatch(XEvent *pEvent);
 
 /** \ingroup events
@@ -1872,7 +2078,9 @@ int WBAppDispatch(XEvent *pEvent);
   * to a different window, specifying its window ID instead.  This is similar
   * to a modal 'Event Send' and can be useful to have a parent or child widnow
   * handle a particular type of event (rather than the destined window).
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBWindowDispatch(Window wID, XEvent *pEvent);
 
 /** \ingroup events
@@ -1884,7 +2092,9 @@ int WBWindowDispatch(Window wID, XEvent *pEvent);
   * Intended primarily for debug messages, it returns a pointer to an ASCII
   * string containing the name of the event, based on its event ID.  The ID of
   * the event is the value of 'type' within the XEvent structure.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 const char * WBEventName(int iEventID);
 
 /** \ingroup events
@@ -1901,7 +2111,9 @@ const char * WBEventName(int iEventID);
   *
   * The return value is -1 on error, or the value specified by 'iReturn' in the call
   * to WBEndModal().
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBShowModal(Window wID, int bMenuSplashFlag);  // modal window - returns 'EndModal' value or -1 on error
 
 /** \ingroup events
@@ -1912,7 +2124,9 @@ int WBShowModal(Window wID, int bMenuSplashFlag);  // modal window - returns 'En
   *
   * Call this function from within a modal window's event process to close the window
   * and exit from WBShowModal with the specified value in 'iReturn'
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBEndModal(Window wID, int iReturn);
 
 // client-side message queue (avoids XSendEvent)
@@ -1928,7 +2142,9 @@ void WBEndModal(Window wID, int iReturn);
   * Similar to XNextEvent, this function checks the internal (and external) event
   * queues for an event.  Unlike XNextEvent it does not wait for an event to appear
   * before returning.  The function returns zero if there are no events to be processed.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBNextEvent(Display *pDisplay, XEvent *pEvent);
 
 /** \ingroup events
@@ -1944,7 +2160,9 @@ int WBNextEvent(Display *pDisplay, XEvent *pEvent);
   * notifications and timers, or when recursion may occur.  Note that any pointers or X11 resources
   * that are passed using XEvent may not be valid by the time they are received. If you must pass
   * volatile data to a window, use WBDispatch() or WBWindowDispatch() instead.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBPostEvent(Window wID, XEvent *pEvent);
 
 /** \ingroup events
@@ -1957,7 +2175,9 @@ int WBPostEvent(Window wID, XEvent *pEvent);
   * The preferred method of event processing between windows is to post them to one of the internal
   * event queues, rather than using XSendEvent() or calling WBDispatch() or WBWindowDispatch() directly.\n
   * Use WBPostPriorityEvent for priority events, such as UI handling (where performance is critical)
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBPostPriorityEvent(Window wID, XEvent *pEvent); // like above but it goes at the beginning of the queue
 
 /** \ingroup events
@@ -1971,7 +2191,9 @@ int WBPostPriorityEvent(Window wID, XEvent *pEvent); // like above but it goes a
   * in the XEvent structure (otherwise specify the correct Window ID).
   * After the time delay, the event will be retrieved and returned via WBCheckGetEvent() similar to a timer message.
   * If the window specified in the message is destroyed before the timeout, the message will be ignored.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBPostDelayedEvent(XEvent *pEvent, unsigned int nDelay);
 
 /** \ingroup events
@@ -1983,7 +2205,9 @@ void WBPostDelayedEvent(XEvent *pEvent, unsigned int nDelay);
   * The preferred method of event processing between windows is to post them to one of the internal
   * event queues, rather than using XSendEvent or calling WBDispatch directly.\n
   * Use WBPostAppEvent for application events (where the window ID is 'None')
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBPostAppEvent(XEvent *pEvent);
 
 /** \ingroup events
@@ -2002,7 +2226,9 @@ int WBPostAppEvent(XEvent *pEvent);
   * 'things' to take place.  By forcing the window to be ACTIVE and also using the normal 'XSetInputFocus'
   * function, as well as 'Raising' and mapping the window, THIS method is likely to work everywhere, and
   * in a consistent manner.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBPostDelayedSetFocusAppEvent(Display *pDisplay, Window wID, Window wIDFrom, unsigned int nDelay);
 
 /** \ingroup events
@@ -2018,7 +2244,9 @@ void WBPostDelayedSetFocusAppEvent(Display *pDisplay, Window wID, Window wIDFrom
   * Normally this is done within WBCheckGetEvent() automatically.  If you decide to implement
   * the message prioritization yourself, you can use this function to handle Expose events
   * for you, and correctly prioritize them.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBProcessExposeEvent(XExposeEvent *pEvent);  // paint optimization
 
 
@@ -2056,7 +2284,9 @@ void WBProcessExposeEvent(XExposeEvent *pEvent);  // paint optimization
   * such as 'XA_TEXT' vs 'UTF8' (for example), if data in the requested format is not available.
   * The returned value is a pointer to the actual data of size '*pnData' 'items' (which have a bit
   * length as specified by '*piFormat').  You must call 'free()' to release the resource once you are done with it.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void * WBGetClipboardData(Display *pDisplay, Atom *paType, int *piFormat, unsigned long *pnData);
 
 /** \ingroup clipboard
@@ -2071,7 +2301,9 @@ void * WBGetClipboardData(Display *pDisplay, Atom *paType, int *piFormat, unsign
   *
   * This function assigns the clipboard data for the specified type ('aType') and format ('iFormat')
   * to the data specified by 'pData' and 'nData'.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBSetClipboardData(Display *pDisplay, Atom aType, int iFormat, const void *pData, unsigned long nData);
 
 
@@ -2092,7 +2324,9 @@ int WBSetClipboardData(Display *pDisplay, Atom aType, int iFormat, const void *p
   * such as 'XA_TEXT' vs 'UTF8' (for example), if data in the requested format is not available.
   * The returned value is a pointer to the actual data of size '*pnData' 'items' (which have a bit
   * length as specified by '*piFormat').  You must call 'free()' to release the resource once you are done with it.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void * WBGetSelectionData(Display *pDisplay, Atom aSelection, Atom *paType, int *piFormat, unsigned long *pnData);
 
 
@@ -2109,7 +2343,9 @@ void * WBGetSelectionData(Display *pDisplay, Atom aSelection, Atom *paType, int 
   *
   * This function assigns the selection data for the specified target 'aSelection' and type ('aType') and
   * format ('iFormat') to the data specified by 'pData' and 'nData'.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBSetSelectionData(Display *pDisplay, Atom aSelection, Atom aType, int iFormat, const void *pData, unsigned long nData);
 
 
@@ -2175,7 +2411,9 @@ int WBSetSelectionData(Display *pDisplay, Atom aSelection, Atom aType, int iForm
   *
   * Use this function when making a window visible, rather than XMapWindow
   * so that the internal state flags and other information can be updated.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBMapWindow(Display *pDisplay, Window wID);
 /** \ingroup expose
   * \brief wrapper for XMapRaised, makes window visible and moves to top
@@ -2186,7 +2424,9 @@ int WBMapWindow(Display *pDisplay, Window wID);
   *
   * Use this function when 'raising' a window, rather than XMapRaised
   * so that the internal state flags and other information can be updated
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBMapRaised(Display *pDisplay, Window wID);
 /** \ingroup expose
   * \brief wrapper for XUnmapWindow, makes window invisible without destroying it
@@ -2197,7 +2437,9 @@ int WBMapRaised(Display *pDisplay, Window wID);
   *
   * Use this function when making a window invisible, rather than XUnmapWindow
   * so that the internal state flags and other information can be updated
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBUnmapWindow(Display *pDisplay, Window wID);
 
 /** \ingroup expose
@@ -2211,7 +2453,9 @@ int WBUnmapWindow(Display *pDisplay, Window wID);
   * function.  It checks the internal flags to see if the window has been mapped,
   * and if it has, it returns a non-zero value.  It can be helpful to avoid unnecessary
   * signals from the X11 API.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBIsMapped(Display *pDisplay, Window wID);  // non-zero if mapped, zero otherwise
   // NOTE:  this only works for windows that have been registered with a callback
 
@@ -2230,7 +2474,9 @@ int WBIsMapped(Display *pDisplay, Window wID);  // non-zero if mapped, zero othe
   * if 'bPaintFlag' is non-zero.\n
   * For a zero 'bPaintFlag' the next Expose event will include this geometry as part of
   * its update region.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBInvalidateGeom(Window wID, const WB_GEOM *pGeom, int bPaintFlag);
 /** \ingroup expose
   * \brief 'Paint' helper, invalidates a region for asynchronous Expose event generation
@@ -2244,7 +2490,9 @@ void WBInvalidateGeom(Window wID, const WB_GEOM *pGeom, int bPaintFlag);
   * if 'bPaintFlag' is non-zero.\n
   * For a zero 'bPaintFlag' the next Expose event will include this region as part of
   * its update region.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBInvalidateRegion(Window wID, Region rgn, int bPaintFlag);
 /** \ingroup expose
   * \brief 'Paint' helper, validates a geometry for asynchronous Expose event generation
@@ -2256,7 +2504,9 @@ void WBInvalidateRegion(Window wID, Region rgn, int bPaintFlag);
   * associated with the window.  If the resulting 'invalid' region is empty, no subsequent
   * 'Expose' event will be generated, even if one had previously been in the queue, until
   * the next Expose event or 'invalid' region exists for this window.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBValidateGeom(Window wID, const WB_GEOM *pGeom);
 /** \ingroup expose
   * \brief 'Paint' helper, validates a region for asynchronous Expose event generation
@@ -2268,7 +2518,9 @@ void WBValidateGeom(Window wID, const WB_GEOM *pGeom);
   * associated with the window.  If the resulting 'invalid' region is empty, no subsequent
   * 'Expose' event will be generated, even if one had previously been in the queue, until
   * the next Expose event or 'invalid' region exists for this window.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBValidateRegion(Window wID, Region rgn);
 
 /** \ingroup expose
@@ -2279,7 +2531,9 @@ void WBValidateRegion(Window wID, Region rgn);
   *
   * This function returns a copy of the current invalid region for the window, or None if the
   * window is up-to-date.  The caller must destroy the returned value using XDestroyRegion()
-*/
+  *
+  * Header File:  window_helper.h
+**/
 Region WBGetInvalidRegion(Window wID);
 
 /** \ingroup expose
@@ -2290,9 +2544,11 @@ Region WBGetInvalidRegion(Window wID);
   *
   * This function returns a copy of the current paint region for the window, or None if the
   * window is up-to-date.  The caller must destroy the returned value using XDestroyRegion()\n
-  * This function is not valid outside of BeginPaint() / EndPaint() processing, typically part
+  * This function is not valid outside of WBBeginPaint() / WBEndPaint() processing, typically part
   * of an 'Expose' event handler.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 Region WBGetPaintRegion(Window wID);
 
 /** \ingroup expose
@@ -2303,7 +2559,9 @@ Region WBGetPaintRegion(Window wID);
   *
   * This function converts a WB_RECT structure to a Region.
   * The caller must destroy the returned value using XDestroyRegion()
-*/
+  *
+  * Header File:  window_helper.h
+**/
 Region WBRectToRegion(const WB_RECT *pRect);
 
 /** \ingroup expose
@@ -2314,7 +2572,9 @@ Region WBRectToRegion(const WB_RECT *pRect);
   *
   * This function converts a WB_GEOM structure to a Region.
   * The caller must destroy the returned value using XDestroyRegion()
-*/
+  *
+  * Header File:  window_helper.h
+**/
 Region WBGeomToRegion(const WB_GEOM *pGeom);
 
 /** \ingroup expose
@@ -2324,7 +2584,9 @@ Region WBGeomToRegion(const WB_GEOM *pGeom);
   * using this function.  This allows you to invalidate several geometries or regions during
   * normal processing, with the paint flag set to 'false', and then generate a single Expose
   * event after all of the processing has completed.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBUpdateWindow(Window wID);  // posts an expose event for the specified window
 
 /** \ingroup expose
@@ -2335,7 +2597,9 @@ void WBUpdateWindow(Window wID);  // posts an expose event for the specified win
   * to re-paint portions of a window immediately.\n
   * You should make sure that the Expose handler does not cause recursion, since it will be
   * called directly by this function.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBUpdateWindowImmediately(Window wID);  // sends expose event synchronously (can cause recursion)
 
 /** \ingroup expose
@@ -2348,8 +2612,34 @@ void WBUpdateWindowImmediately(Window wID);  // sends expose event synchronously
   *
   * When processing Expose events, you should call WBBeginPaint to obtain the GC needed for all
   * of the operations needed to update (paint) the window.\n
-*/
+  * This function collects all of the relevant invalid regions associated with the window that fall
+  * within the 'Expose' event area, and calculates a bounding WB_GEOM rectangle for it.  It also applies
+  * the invalid region as a 'clipping' region for the returned GC.  When you call WBEndPaint(), the
+  * entire clipping region will be marked 'valid' automatically, so it is important for your 'paint'
+  * function to update the entire WB_GEOM rectangle identified by pgRet.  This includes erasing the
+  * background as well as drawing whatever is in the foreground.
+  *
+  * Header File:  window_helper.h
+**/
 GC WBBeginPaint(Window wID, XExposeEvent *pEvent, WB_GEOM *pgRet); // GC has invalid region assigned
+
+/** \ingroup expose
+  * \brief 'Paint' helper, creates a GC for use in updating the window for a specified rectangular area
+  *
+  * \param wID Window ID associated with the Expose event
+  * \param pgBounds On entry, the bounding WB_GEOM for which to get a graphics context.  On return, the bounding WB_GEOM for the invalid region being 'painted'
+  * \return A GC (graphics context) to be used in painting the specific rectangular region
+  *
+  * When processing Expose events, you should call WBBeginPaint() to obtain the GC needed for all
+  * of the operations needed to update (paint) the window.\n
+  * This particular function is more suited to updating a specific area outside of a normal Expose callback handler.
+  * As an example, a frame window would use this to update the tab area or the status bar area, prior to calling the
+  * user callback function.  That way, only the desired region will be 'validated' on call to WBEndPaint(), and
+  * not the entire window client area.
+  *
+  * Header File:  window_helper.h
+**/
+GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds); // GC has invalid region assigned
 
 /** \ingroup expose
   * \brief 'Paint' helper, frees resources and marks the update region 'valid'
@@ -2359,18 +2649,22 @@ GC WBBeginPaint(Window wID, XExposeEvent *pEvent, WB_GEOM *pgRet); // GC has inv
   *
   * Call this function, following a call to WBBeginPaint(), once the invalid area of the window
   * has been properly rendered.  It will free resources and mark the invalid (update) region as 'valid'
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBEndPaint(Window wID, GC gc);  // frees the 'paint GC' and also resets the invalid region
 
 /** \ingroup expose
   * \brief 'Paint' helper, erases background by painting the background color within the clipping region
   *
   * \param wID Window ID associated with the Expose event
-  * \param gc The GC (graphics context) returned by WBBeginPaint()
+  * \param gc The GC (graphics context) returned by WBBeginPaint().  
   *
   * Call this function, following a call to WBBeginPaint(), if you want to erase the
   * background of the window.  Call this in lieu of XClearWindow() or XClearArea()
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBClearWindow(Window wID, GC gc);
 
 
@@ -2388,7 +2682,9 @@ void WBClearWindow(Window wID, GC gc);
   * if 'bPaintFlag' is non-zero.\n
   * For a zero 'bPaintFlag' the next Expose event will include this geometry as part of
   * its update region.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 static __inline__ void WBInvalidateRect(Window wID, const WB_RECT *pRCT, int bPaintFlag)
 {
   WB_GEOM geom;
@@ -2418,7 +2714,9 @@ static __inline__ void WBInvalidateRect(Window wID, const WB_RECT *pRCT, int bPa
   * associated with the window.  If the resulting 'invalid' region is empty, no subsequent
   * 'Expose' event will be generated, even if one had previously been in the queue, until
   * the next Expose event or 'invalid' region exists for this window.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 static __inline__ void WBValidateRect(Window wID, WB_RECT *pRCT)
 {
   WB_GEOM geom;
@@ -2473,7 +2771,9 @@ static __inline__ void WBValidateRect(Window wID, WB_RECT *pRCT)
   * By design it uses a 64-bit integer that never 'wraps around' to zero.  It is generally
   * derived from the 'gettimeofday' API call for operating systems such as BSD and Linux that
   * support the POSIX standard.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 WB_UINT64 WBGetTimeIndex(void);  // returns current 'time index' (in microseconds) which never wraps around
                                  // NOTE:  it is derived from the 'gettimeofday' call on BSD, Linux, etc.
 
@@ -2489,7 +2789,9 @@ WB_UINT64 WBGetTimeIndex(void);  // returns current 'time index' (in microsecond
   *
   * Timers can either be periodic (recurring), or one-shot.  Use this function to create them.
   * A timer created by this function must be subsequently deleted via \ref DeleteTimer()
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int CreateTimer(Display *pDisplay, Window wID, unsigned long lInterval, long lID, int iPeriodic);
   // NOTE:  'iPeriodic' non-zero for periodic, zero for one-shot.  'lInterval' is in microseconds
   //        Assign 'lID' to a unique value for the specified pDisplay and wID
@@ -2503,7 +2805,9 @@ int CreateTimer(Display *pDisplay, Window wID, unsigned long lInterval, long lID
   *
   * Timers created via CreateTimer() must be subsequently deleted using this function by passing
   * the same Display, Window, and Timer 'unique' ID that were used to create it.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void DeleteTimer(Display *pDisplay, Window wID, long lID);  // deletes entry with matching Display, Window, ID
 
 
@@ -2533,7 +2837,7 @@ void DeleteTimer(Display *pDisplay, Window wID, long lID);  // deletes entry wit
   } WB_ERROR_INFO;
 
   * \endcode
-*/
+**/
 typedef struct __WB_ERROR_INFO__
 {
   Display *pDisplay;     ///< Display pointer passed into error handler function (NULL if no error)
@@ -2554,7 +2858,9 @@ typedef struct __WB_ERROR_INFO__
   * Call this function to increment the error output supression counter.  Error output
   * will be restored whenever the supression counter returns to zero.  Each call to
   * this function should be balanced with a call to WBAllowErrorOutput().
-*/
+  *
+  * Header File:  window_helper.h
+**/
 static __inline__ void WBSupressErrorOutput(void)
 {
 extern int bIgnoreXErrors;
@@ -2568,7 +2874,9 @@ extern int bIgnoreXErrors;
   * Call this function to decrement the error output supression counter.  Error output
   * will be restored whenever the supression counter returns to zero.  Each call to the
   * WBSupressErrorOutput() function should be balanced with a call to this function.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 static __inline__ void WBAllowErrorOutput(void)
 {
 extern int bIgnoreXErrors;
@@ -2586,7 +2894,9 @@ extern int bIgnoreXErrors;
 
 /** \ingroup error
   * \brief Clear the 'last error' information obtained via WBGetLastError()
-*/
+  *
+  * Header File:  window_helper.h
+**/
 void WBErrorClear(void);
 
 /** \ingroup error
@@ -2597,7 +2907,9 @@ void WBErrorClear(void);
   * Call this function to check to see if an XErrorEvent has been processed and stored in the internal
   * WB_ERROR_INFO structure.  It is necessary to FIRST call WBErrorClear() before any operation that
   * might result in an error that can THEN be checked for using this function.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBErrorCheck(void);
 
 /** \ingroup error
@@ -2609,7 +2921,9 @@ int WBErrorCheck(void);
   * WB_ERROR_INFO structure, and if a retry is possible based on the type and condition of the error.
   * It is necessary to FIRST call WBErrorClear() before any operation that might result in an error
   * that can THEN be checked for retryability using this function.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 int WBErrorCheckRetry(void);
 
 /** \ingroup error
@@ -2621,7 +2935,9 @@ int WBErrorCheckRetry(void);
   * handler.  If there has been no error event, the 'pDisplay' member will always be NULL.  You should
   * always call WBErrorClear() to clear out this structure before performing an operation that might
   * result in an XErrorEvent.
-*/
+  *
+  * Header File:  window_helper.h
+**/
 const WB_ERROR_INFO * WBGetLastError(void);
 
 

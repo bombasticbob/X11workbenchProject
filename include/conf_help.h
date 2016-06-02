@@ -53,7 +53,25 @@
   * \brief 'configuration helper' main header file for the X11 Work Bench Toolkit API
   *
   * X11 Work Bench Toolkit Toolkit API
-*/
+**/
+
+/** \defgroup conf_file Configuration File Utilities
+  * \ingroup conf_help
+  *
+  * \brief Configuration File Utilities, for application or user-defined config files
+**/
+
+/** \defgroup desktop_settings Desktop Settings utilities
+  * \ingroup conf_help
+  *
+  * \brief Desktop Settings Utilities, to query desktop-defined settings like fonts, colors, mouse click times, etc.
+**/
+
+/** \defgroup text_xml XML-specific Text Utilities
+  * \ingroup text
+  *
+  * \brief Specialized text utility functions for parsing XML data
+**/
 
 
 #ifndef CONF_HELPER_H_INCLUDED
@@ -83,7 +101,7 @@ extern "C" {
 #define CH_OPEN_TIMEOUT 5000 /* wait up to 5000 milliseconds before timing out */
 
 
-/** \ingroup conf_help
+/** \ingroup conf_file
   @{
 **/
 #define CH_FLAGS_DEFAULT 0    /**< default flags for \ref CHOpenConfFile() */
@@ -93,7 +111,7 @@ extern "C" {
   @}
 **/
 
-/** \ingroup conf_help
+/** \ingroup startup
   * \brief registers arguments from the command line for later use
   *
   * \param argc The 'argc' as passed-in to main()
@@ -102,6 +120,8 @@ extern "C" {
   * This function registers the arguments from 'argv' as passed in to the main() for the
   * application, and keeps an independent record of their contents for future use by any
   * part of the program that might have use for this kind of information.
+  *
+  * Header File:  conf_help.h
 **/
 void CHRegisterArgs(int argc, char **argv);  // call in 'main'
 
@@ -109,29 +129,35 @@ void CHRegisterArgs(int argc, char **argv);  // call in 'main'
   * \brief frees resources used by \ref conf_help
   *
   * call this prior to normal application exit to free resources.  Called by \ref WBExit() .
+  *
+  * Header File:  conf_help.h
 **/
 void CHOnExit(void);
 
-/** \ingroup conf_help
+/** \ingroup startup
   * \brief retrieves the array of arguments stored by \ref CHRegisterArgs()
   *
   * \returns the 'argv' value stored by \ref CHRegisterArgs()
   *
   * Use this function to retrieve the stored 'argv' value from \ref CHRegisterArgs()
+  *
+  * Header File:  conf_help.h
 **/
 const char * const *CHGetArgV(void);
 
-/** \ingroup conf_help
+/** \ingroup startup
   * \brief retrieves the argument count stored by \ref CHRegisterArgs()
   *
   * \returns the 'argc' value stored by \ref CHRegisterArgs()
   *
   * Use this function to retrieve the stored 'argc' value from \ref CHRegisterArgs()
+  *
+  * Header File:  conf_help.h
 **/
 int CHGetArgC(void);
 
-/** \ingroup conf_help
-  * \brief Queryies resource strings (deprecated)
+/** \ingroup desktop_settings
+  * \brief Queries desktop resource strings (may become deprecated)
   *
   * \param pDisplay Display pointer (NULL for default)
   * \param szIdentifier The item to query
@@ -141,11 +167,13 @@ int CHGetArgC(void);
   *
   * This queries string values from the 'Old' resource manager.  This function is deprecated.
   * Some window managers may still supporte it, however, so it's worth keeping for now.
-*/
+  *
+  * Header File:  conf_help.h
+**/
 int CHGetResourceString(Display *pDisplay,const char *szIdentifier, char *szData, int cbData);
 
-/** \ingroup conf_help
-  * \brief Queryies resource integer values (from strings) (deprecated)
+/** \ingroup desktop_settings
+  * \brief Queryies desktop resource integer values (from strings) (may become deprecated)
   *
   * \param pDisplay The Display pointer (NULL for default)
   * \param szIdentifier The item to query
@@ -153,16 +181,18 @@ int CHGetResourceString(Display *pDisplay,const char *szIdentifier, char *szData
   *
   * This queries integer values from the 'Old' resource manager.  This function is deprecated.
   * Some window managers may still supporte it, however, so it's worth keeping for now.
-*/
+  *
+  * Header File:  conf_help.h
+**/
 int CHGetResourceInt(Display *pDisplay,const char *szIdentifier);
 
 
 
-/////////////////////////////
-// configuration management
-/////////////////////////////
+//////////////////////////////////
+// configuration file  management
+//////////////////////////////////
 
-/** \ingroup conf_help
+/** \ingroup conf_file
   * \brief open configuration file for read/write, optionally creating it, based on application name
   *
   * \param szAppName The name of the application for which a configuration file is to be opened (no extension)
@@ -173,10 +203,12 @@ int CHGetResourceInt(Display *pDisplay,const char *szIdentifier);
   * write mode for global config may require root privileges\n
   * when done, you must close the returned configuration file object pointer with \ref CHCloseConfFile\n
   * The function may block as needed.  Use \ref CHDestroyConfFile to close AND free memory resources.
-*/
+  *
+  * Header File:  conf_help.h
+**/
 void * CHOpenConfFile(const char *szAppName, int iFlags);
 
-/** \ingroup conf_help
+/** \ingroup conf_file
   * \brief close configuration file opened by \ref CHOpenConfFile(), but does NOT free memory resources
   *
   * \param hFile The configuration file object returned by \ref CHOpenConfFile()
@@ -184,20 +216,24 @@ void * CHOpenConfFile(const char *szAppName, int iFlags);
   * Use this function to close the configuration file that was opened by \ref CHOpenConfFile()\n
   * Memory resources will NOT be freed (values will remain cached as needed).  Use this function to simply
   * remove the open file reference but leave the data in memory for later use.
+  *
+  * Header File:  conf_help.h
 **/
 void CHCloseConfFile(void * hFile);
 
-/** \ingroup conf_help
+/** \ingroup conf_file
   * \brief destroy configuration file opened by \ref CHOpenConfFile(), freeing memory resources (but not the files)
   *
   * \param hFile The configuration file object returned by \ref CHOpenConfFile()
   *
   * This function will close the configuration file and destroy the cached information created by \ref CHOpenConfFile()
   * but does not physically destroy the file on disk.
+  *
+  * Header File:  conf_help.h
 **/
 void CHDestroyConfFile(void * hFile);
 
-/** \ingroup conf_help
+/** \ingroup conf_file
   * \brief obtain a string from a configuration file
   *
   * \param hFile the configuration file object pointer returned by \ref CHOpenConfFile
@@ -210,11 +246,13 @@ void CHDestroyConfFile(void * hFile);
   * Use this function to obtain a configuration parameter 'szIdentifier' from section 'szSection', and save
   * the data into 'szData', which is 'cbData' bytes in length.  The function will return the total length
   * of the resulting string.  The function returns -1 on error, or if the data value is not located.
+  *
+  * Header File:  conf_help.h
 **/
 int CHGetConfFileString(void * hFile, const char *szSection,
                         const char *szIdentifier, char *szData, int cbData);
 
-/** \ingroup conf_help
+/** \ingroup conf_file
   * \brief write a string to a configuration file
   *
   * \param hFile the configuration file object pointer returned by \ref CHOpenConfFile
@@ -225,12 +263,14 @@ int CHGetConfFileString(void * hFile, const char *szSection,
   *
   * Writes a string value to the configuration file for 'szIdentifier' in 'szSection'.  The function returns a
   * non-zero value if successful, or a value of 0 if an error occurred.
-*/
+  *
+  * Header File:  conf_help.h
+**/
 int CHWriteConfFileString(void * hFile, const char *szSection,
                           const char *szIdentifier, const char *szData);
 
 
-/** \ingroup conf_help
+/** \ingroup conf_file
   * \brief obtain an integer value from a configuration file
   *
   * \param hFile the configuration file object pointer returned by \ref CHOpenConfFile
@@ -242,10 +282,12 @@ int CHWriteConfFileString(void * hFile, const char *szSection,
   * a non-zero value on success, or a zero value on error, or if not found.\n
   * If you need to distinguish an actual zero value from an error or 'not found' condition, consider using
   * the \ref CHGetConfFileString() function instead.
-*/
+  *
+  * Header File:  conf_help.h
+**/
 int CHGetConfFileInt(void * hFile, const char *szSection, const char *szIdentifier);
 
-/** \ingroup conf_help
+/** \ingroup conf_file
   * \brief write an integer value to a configuration file
   *
   * \param hFile the configuration file object pointer returned by \ref CHOpenConfFile
@@ -256,26 +298,30 @@ int CHGetConfFileInt(void * hFile, const char *szSection, const char *szIdentifi
   *
   * Writes an integer value to the configuration file for 'szIdentifier' in 'szSection'.  The function returns a
   * non-zero value if successful, or a value of 0 if an error occurred.
-*/
+  *
+  * Header File:  conf_help.h
+**/
 int CHWriteConfFileInt(void * hFile, const char *szSection, const char *szIdentifier, int iData);
 
 
 
 // XSETTINGS
 
-/** \ingroup conf_help
+/** \ingroup desktop_settings
   * \brief refresh the internally cached X settings
   *
   * \param pDisplay The Display pointer (NULL for default)
   *
   * This function will refresh the internally cached X settings using various methods to query the
   * system's parameter storage, some deprecated, some in accordance with the latest window manager specs.
-*/
+  *
+  * Header File:  conf_help.h
+**/
 void CHSettingsRefresh(Display *pDisplay);  // call this to re-read and re-build XSettings info
 
 // X11 settings collection
 
-/** \ingroup conf_help
+/** \ingroup desktop_settings
   * \brief Enumeration for 'XSettingsType' which describes the type of setting being cached
 **/
 enum XSettingsType
@@ -286,7 +332,7 @@ enum XSettingsType
 };
 
 
-/** \ingroup conf_help
+/** \ingroup desktop_settings
   * \brief Structure for storing configuration color information, \ref XSettingsTypeColor
   *
   * This structure is part of the X11 Window Manager specification, and is defined here for use
@@ -313,7 +359,7 @@ typedef struct __XSETTINGS_DATA_COLOR__ // also used internally by XSettings
 
 
 
-/** \ingroup conf_help
+/** \ingroup desktop_settings
   * \brief Structure for storing settings information internally
   *
   * This structure is used internally by the \ref conf_help to cache configuration information obtained
@@ -355,7 +401,7 @@ typedef struct _CHXSetting_
 }  __PACKED__ CHXSetting;
 
 
-/** \ingroup conf_help
+/** \ingroup desktop_settings
   * \brief Array wrapper for \ref CHXSetting cache
   *
   * This structure wraps the array of \ref CHXSetting structures and any variable length data that
@@ -382,16 +428,18 @@ typedef struct _CHXSettings_
 } CHXSettings;
 
 
-/** \ingroup conf_help
+/** \ingroup desktop_settings
   * \brief returns a pointer to the cached X settings
   *
   * \param pDisplay The Display pointer (NULL for default)
   *
   * Returns a (const) pointer to the \ref CHXSettings structure that wraps the cached X settings
-*/
+  *
+  * Header File:  conf_help.h
+**/
 const CHXSettings * CHGetXSettings(Display *pDisplay);
 
-/** \ingroup conf_help
+/** \ingroup desktop_settings
   * \brief returns a pointer to a specific X setting entry by name
   *
   * \param pDisplay The Display pointer (NULL for default)
@@ -399,65 +447,77 @@ const CHXSettings * CHGetXSettings(Display *pDisplay);
   * \returns A const pointer to the cached CHXSetting structure
   *
   * Use this function to query a specific CHXSetting structure via the setting name
-*/
+  *
+  * Header File:  conf_help.h
+**/
 const CHXSetting * CHGetXSetting(Display *pDisplay, const char *szSettingName);
 
 
-/** \ingroup conf_help
+/** \ingroup desktop_settings
   * \brief returns default double click time (from X settings)
   *
   * \param pDisplay The Display pointer (NULL for default)
   * \returns default double-click time in milliseconds
   *
   * Returns default double-click time in milliseconds
-*/
+  *
+  * Header File:  conf_help.h
+**/
 int CHGetDoubleClickTime(Display *pDisplay);
 
-/** \ingroup conf_help
+/** \ingroup desktop_settings
   * \brief returns default double click distance (from X settings)
   *
   * \param pDisplay The Display pointer (NULL for default)
   * \returns default double-click 'slop' distance in pixels
   *
   * Returns double-click 'slop' distance in pixels
-*/
+  *
+  * Header File:  conf_help.h
+**/
 int CHGetDoubleClickDistance(Display *pDisplay);
 
-/** \ingroup conf_help
+/** \ingroup desktop_settings
   * \brief returns default drag threshold (from X settings)
   *
   * \param pDisplay The Display pointer (NULL for default)
   * \returns default drag threshold in pixels
   *
   * Returns default drag threshold in pixels
-*/
+  *
+  * Header File:  conf_help.h
+**/
 int CHGetDragThreshold(Display *pDisplay);
 
-/** \ingroup conf_help
+/** \ingroup desktop_settings
   * \brief returns default cursor blink 'enable' flag (from X settings)
   *
   * \param pDisplay The Display pointer (NULL for default)
   * \returns default cursor blink 'enable' flag (non-zero to enable blink)
   *
   * Returns the default cursor blink 'enable' flag, zero to disable, non-zero to enable.
-*/
+  *
+  * Header File:  conf_help.h
+**/
 int CHGetCursorBlink(Display *pDisplay);
 
-/** \ingroup conf_help
+/** \ingroup desktop_settings
   * \brief returns default cursor blink time (from X settings)
   *
   * \param pDisplay The Display pointer (NULL for default)
   * \returns default cursor blink time in milliseconds
   *
   * Returns the default cursor blink time in milliseconds
-*/
+  *
+  * Header File:  conf_help.h
+**/
 int CHGetCursorBlinkTime(Display *pDisplay);
 
 
 
 // XML help
 
-/** \ingroup text
+/** \ingroup text_xml
   * \brief Parses contents of an XML tag, returning as malloc'd string list similar to environment strings
   *
   * \param pTagContents A pointer to the string position just past the tag name
@@ -469,10 +529,12 @@ int CHGetCursorBlinkTime(Display *pDisplay);
   *
   * Generic XML tag parsing.  Parse the tag to 'just past the tag name', find the ending '>',
   * and pass that length as 'cbLength'.
+  *
+  * Header File:  conf_help.h
 **/
 char *CHParseXMLTagContents(const char *pTagContents, int cbLength);
 
-/** \ingroup text
+/** \ingroup text_xml
   * \brief Parses contents of an XML tag to find the end of it
   *
   * \param pTagContents A pointer to the string position just past the tag name
@@ -480,6 +542,8 @@ char *CHParseXMLTagContents(const char *pTagContents, int cbLength);
   *
   * Generic XML tag parsing.  Parse the tag to find its end.  The returned pointer will
   * either be the end of the string, or a pointer to the ending '>'.
+  *
+  * Header File:  conf_help.h
 **/
 const char *CHFindEndOfXMLTag(const char *pTagContents);
 
@@ -487,7 +551,7 @@ const char *CHFindEndOfXMLTag(const char *pTagContents);
 
 // MIME type help
 
-/** \ingroup conf_help
+/** \ingroup desktop_settings
   * \brief Get the MIME type for a particular file name or extension
   *
   * \param szFileName A const pointer to a string containing the filename or '.ext' for which to obtain the MIME type
@@ -495,10 +559,12 @@ const char *CHFindEndOfXMLTag(const char *pTagContents);
   *
   * This function will return NULL on error, or a malloc'd pointer to a string.  Caller must free any non-NULL pointer
   * returned by this function.
-  */
+  *
+  * Header File:  conf_help.h
+**/
 char *CHGetFileMimeType(const char *szFileName);
 
-/** \ingroup conf_help
+/** \ingroup desktop_settings
   * \brief Get the default application for a particular MIME type
   *
   * \param szMimeType A const pointer to a character string containing the MIME type
@@ -509,10 +575,12 @@ char *CHGetFileMimeType(const char *szFileName);
   *
   * This function will return NULL on error, or a malloc'd pointer to a string.  Caller must free any non-NULL pointer
   * returned by this function.
-  */
+  *
+  * Header File:  conf_help.h
+**/
 char *CHGetMimeDefaultApp(const char *szMimeType);
 
-/** \ingroup conf_help
+/** \ingroup desktop_settings
   * \brief Get the default application for a particular MIME type
   *
   * \param szDesktopFile A const pointer to a character string containing the desktop file name
@@ -521,7 +589,9 @@ char *CHGetMimeDefaultApp(const char *szMimeType);
   *
   * This function will return NULL on error, or a malloc'd pointer to a string.  Caller must free any non-NULL pointer
   * returned by this function.
-  */
+  *
+  * Header File:  conf_help.h
+**/
 char *CHGetDesktopFileInfo(const char *szDesktopFile, const char *szInfo);
 
 
@@ -529,11 +599,13 @@ char *CHGetDesktopFileInfo(const char *szDesktopFile, const char *szInfo);
 // debug
 #ifndef NO_DEBUG
 
-/** \ingroup conf_help
+/** \ingroup desktop_settings
   * \brief dump config information using debug output functions
   *
   * Debug function to dump config information using the debug output functions
-*/
+  *
+  * Header File:  conf_help.h
+**/
 void CHDumpConfig(void);
 
 #endif // NO_DEBUG
