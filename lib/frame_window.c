@@ -1150,11 +1150,6 @@ GC gc;
 
   rct.top = rct.bottom - STATUS_BAR_HEIGHT;
 
-//  rct.top -= 4 * STATUS_BAR_HEIGHT; // temporary
-
-//  WB_ERROR_PRINT("TEMPORARY: %s - status bar rect:  (%d,%d,%d,%d)\n",
-//                  __FUNCTION__, rct.left, rct.top, rct.right, rct.bottom);
-
   // does the Expose event intersect my status bar?
 
   rctExpose.left   = pEvent->x;
@@ -1164,7 +1159,7 @@ GC gc;
 
   if(!WBRectOverlapped(rct, rctExpose))
   {
-    WB_ERROR_PRINT("INFO: %s - expose event excludes status bar\n", __FUNCTION__);
+//    WB_ERROR_PRINT("INFO: %s - expose event excludes status bar\n", __FUNCTION__);
 
     return; // do nothing (no overlap)
   }

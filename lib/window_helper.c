@@ -566,8 +566,8 @@ typedef struct // the structure that identifies the window and what to do with i
   int idDefaultCursor;                       ///< default cursor
   int iWaitCursorCount;                      ///< current 'count' for wait cursor
   int width;                                 ///< cached width value from latest 'Expose' event
-  int height;                                ///< cached height value from latest 'Expose' event
-  int border;                                ///< cached border value from latest 'Expose' event
+  int height;                                ///< cached height value from latest 'Expose' event (TODO:  ConfigureNotify?)
+  int border;                                ///< cached border value from latest 'Expose' event (TODO:  ConfigureNotify?)
   int iModalFlag;                            ///< current modal state (0 for modeless)  (see WBShowModal)
   int iModalReturn;                          ///< return value for a modal window (see WBShowModal)
   int iWindowState;                          ///< indicates if window mapped
@@ -642,6 +642,7 @@ typedef struct __EVENT_ENTRY__
 static EVENT_ENTRY axWBEvt[EVENT_ARRAY_SIZE];
 
 static int iWBQueuedEvent = -1, iWBQueueLast = -1, iWBPaintEvent = -1, iWBPaintLast = -1, iWBFreeEvent = -1;
+static int iInitEventFlag = 0;
 
 //static WBAppEvent pAppEventCallback = NULL;
 static int (* pAppEventCallback)(XEvent *pEvent) = NULL;
@@ -695,11 +696,18 @@ static DELAYED_EVENT_ENTRY *pDelayedEventEntryActive = NULL, *pDelayedEventEntry
 
 //static __inline WBWindow WBWindowFromWindow(Window wID);
 //static __inline Window WBWindowToWindow(WBWindow wID);
+#ifdef NODEBUG
 static __inline__ _WINDOW_ENTRY_ *WBGetWindowEntry(Window wID);
+#else
+#define WBGetWindowEntry(X) Debug_WBGetWindowEntry(X, __FUNCTION__, __LINE__)
+static __inline__ _WINDOW_ENTRY_ *Debug_WBGetWindowEntry(Window wID, const char *szFunction, int nLine);
+#endif // NODEBUG
+
 static void __WBInitEvent();
 static int __WBAddEvent(Display *pDisp, Window wID, XEvent *pEvent);
 static void __WBDelWindowEvents(Display *pDisp, Window wID);
 static int __WBInsertPriorityEvent(Display *pDisp, Window wID, XEvent *pEvent);
+static int __WBNextPaintEvent(Display *pDisp, XEvent *pEvent, Window wID);
 static int __WBNextDisplayEvent(Display *pDisp, XEvent *pEvent);
 static void WBInternalProcessExposeEvent(XExposeEvent *pEvent);
 static int __internal_alloc_WMHints(_WINDOW_ENTRY_ *pEntry);
@@ -818,6 +826,7 @@ Display *pRval;
     return NULL;
   }
 
+//  XFlush(pRval);
   XSync(pRval, 0); // make sure that the display is "in sync"
 
   usleep(100000); // wait 0.1 seconds for everything to stabilize (shorter times not good enough)
@@ -1050,6 +1059,7 @@ destroy_without_wm:
     END_XCALL_DEBUG_WRAPPER
 
     BEGIN_XCALL_DEBUG_WRAPPER
+//    XFlush(pDefaultDisplay);
     XSync(pDefaultDisplay, FALSE);  // try sync'ing to avoid certain problems
     END_XCALL_DEBUG_WRAPPER
 
@@ -1098,6 +1108,7 @@ destroy_without_wm:
   END_XCALL_DEBUG_WRAPPER
 
   BEGIN_XCALL_DEBUG_WRAPPER
+//  XFlush(pDefaultDisplay);
   XSync(pDefaultDisplay, FALSE);  // try sync'ing to avoid certain errors
   END_XCALL_DEBUG_WRAPPER
 
@@ -1142,6 +1153,7 @@ destroy_without_wm:
     END_XCALL_DEBUG_WRAPPER
 
     BEGIN_XCALL_DEBUG_WRAPPER
+//    XFlush(pDefaultDisplay);
     XSync(pDefaultDisplay, FALSE);  // try sync'ing to avoid certain problems
     END_XCALL_DEBUG_WRAPPER
   }
@@ -1213,6 +1225,7 @@ int i1;
   }
 
   BEGIN_XCALL_DEBUG_WRAPPER
+//  XFlush(pDefaultDisplay);
   XSync(pDefaultDisplay, FALSE);  // try sync'ing first to avoid certain errors
   XCloseDisplay(pDefaultDisplay); // display is to be destroyed now
   END_XCALL_DEBUG_WRAPPER
@@ -1249,6 +1262,7 @@ Display *pDisplay;
   if(pDisplay)
   {
     BEGIN_XCALL_DEBUG_WRAPPER
+//    XFlush(pDisplay);
     XSync(pDisplay, FALSE);  // sync everything now
     END_XCALL_DEBUG_WRAPPER
   }
@@ -1261,6 +1275,7 @@ void WBThreadFreeDisplay(Display *pThreadDisplay)
   if(pThreadDisplay)
   {
     BEGIN_XCALL_DEBUG_WRAPPER
+//    XFlush(pThreadDisplay);
     XSync(pThreadDisplay, FALSE);  // try sync'ing first to avoid certain errors
     XCloseDisplay(pThreadDisplay); // display is to be destroyed now
     END_XCALL_DEBUG_WRAPPER
@@ -2046,6 +2061,7 @@ void WBDestroyWindow(Window wID)
     BEGIN_XCALL_DEBUG_WRAPPER
     XDestroyWindow(pDisplay, wID); // handler should clean up the rest
                                    // NOTE:  this _CAN_ recurse in some cases
+//    XFlush(pDisplay);
     XSync(pDisplay, False);        // wait for server to actually do it - specific to debug output, really
     END_XCALL_DEBUG_WRAPPER
     return;
@@ -2057,6 +2073,10 @@ void WBDestroyWindow(Window wID)
 
   // get all events for this window and remove them
 
+  BEGIN_XCALL_DEBUG_WRAPPER
+  XSync(pDisplay, FALSE);  // force a sync first
+  END_XCALL_DEBUG_WRAPPER
+  
   while(XCheckWindowEvent(pDisplay, wID, EVENT_ALL_MASK, &event))
   {
 //      usleep(1000);  // force sleep during loop?
@@ -2088,7 +2108,10 @@ void WBDestroyWindow(Window wID)
     // I'll want to process some additional events at this point, JUST for the
     // window and its children
 
-    XFlush(pDisplay);
+    BEGIN_XCALL_DEBUG_WRAPPER
+//    XFlush(pDisplay);
+    XSync(pDisplay, 0);
+    END_XCALL_DEBUG_WRAPPER
 
 //    while(XCheckWindowEvent(pDisplay, wID, EVENT_ALL_MASK, &event))
 //    {
@@ -2117,6 +2140,7 @@ void WBDestroyWindow(Window wID)
 //        BEGIN_XCALL_DEBUG_WRAPPER
 //        XDestroyWindow(pDisplay, wID); // handler should clean up the rest
 //                                       // NOTE:  this _CAN_ recurse in some cases
+////        XFlush(pDisplay);
 //        XSync(pDisplay, False);
 //        END_XCALL_DEBUG_WRAPPER
 ////        WBAllowErrorOutput();
@@ -2206,14 +2230,25 @@ static __inline__ void InternalRestoreWindowDefaults(int iIndex)
 //  return (Window)(wID & WBWINDOW_MASK);
 //}
 
+
+// WBGetWindowEntry - the debug version indicates what the caller's line number and function are
+
+#ifdef NODEBUG
 static /*__inline__*/ _WINDOW_ENTRY_ *WBGetWindowEntry(Window wID)
+#else
+#define WBGetWindowEntry(X) Debug_WBGetWindowEntry(X, __FUNCTION__, __LINE__)
+static /*__inline__*/ _WINDOW_ENTRY_ *Debug_WBGetWindowEntry(Window wID, const char *szFunction, int nLine)
+#endif // NODEBUG
 {
   int i1, iStart;
 
   if(!nWBHashEntries)
   {
+#ifndef NODEBUG
     WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Window,
-                   "Window hash table empty, %d (%08xH) not found\n", (int)wID, (int)wID);
+                   "%s:%d - Window hash table empty, %d (%08xH) not found\n",
+                   szFunction, nLine, (int)wID, (int)wID);
+#endif // NODEBUG
     return(NULL);
   }
 
@@ -2234,8 +2269,11 @@ static /*__inline__*/ _WINDOW_ENTRY_ *WBGetWindowEntry(Window wID)
       break;
   }
 
-  WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Window,
-                 "Window ID %d (%08xH) not found\n", (int)wID, (int)wID);
+#ifndef NODEBUG
+    WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Window,
+                   "%s:%d - Window ID %d (%08xH) not found\n",
+                   szFunction, nLine, (int)wID, (int)wID);
+#endif // NODEBUG
 
   return(NULL);
 }
@@ -2516,7 +2554,11 @@ _WINDOW_ENTRY_ *pEntry;
 
     pEntry = WBGetWindowEntry(idRval);
 
-    if(pEntry)
+    if(!pEntry)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - unable to get window entry (window still created)\n", __FUNCTION__);
+    }
+    else
     {
       pEntry->pDisplay = pDisplay; // make sure
 
@@ -3197,8 +3239,13 @@ WB_UINT64 lTime = WBGetTimeIndex();
   while(pCur)
   {
     if(pCur->pDisplay == pDisplay &&
-       lTime >= pCur->lTimeIndex)
+       lTime >= pCur->lTimeIndex) // time index has crossed "the threshold" for the timer
     {
+      if(!pEvent)
+      {
+        return 1; // only indicate that I found a timer that's active (don't process it)
+      }
+
       if(pCur->lTimeInterval)
       {
         pCur->lTimeIndex += pCur->lTimeInterval;
@@ -3225,14 +3272,14 @@ WB_UINT64 lTime = WBGetTimeIndex();
       pEvent->xclient.format=32;  // 32-bit integers
       pEvent->xclient.data.l[0] = pCur->lID;
 
-      return 1; // processed
+      return 1; // found/processed a timer
     }
 
     pPrev = pCur;
     pCur = pCur->pNext;
   }
 
-  return 0;  // no timer processed
+  return 0;  // no timer found/processed
 }
 
 static void __CreateDelayedEvent(XEvent *pEvent, unsigned int uiInterval)
@@ -3300,7 +3347,7 @@ static void __DeleteDelayedEvent(DELAYED_EVENT_ENTRY *pPrev, DELAYED_EVENT_ENTRY
   }
 }
 
-static int __CheckDelayedEvents(Display *pDisplay, XEvent *pEvent)
+static int __attribute__((noinline)) __CheckDelayedEvents(Display *pDisplay, XEvent *pEvent) 
 {
 DELAYED_EVENT_ENTRY *pCur, *pPrev;
 WB_UINT64 lTime = WBGetTimeIndex();
@@ -3328,9 +3375,12 @@ WB_UINT64 lTime = WBGetTimeIndex();
         }
       }
 
-      memcpy(pEvent, &(pCur->event), sizeof(*pEvent));
+      if(pEvent) // if NULL, I'm only looking to see if there IS one
+      {
+        memcpy(pEvent, &(pCur->event), sizeof(*pEvent));
 
-      __DeleteDelayedEvent(pPrev, pCur);
+        __DeleteDelayedEvent(pPrev, pCur);
+      }
 
       return 1; // processed
     }
@@ -3412,15 +3462,121 @@ int WBCheckGetEvent(Display *pDisplay, XEvent *pEvent)
   return __InternalCheckGetEvent(pDisplay, pEvent, None);  // no modal window implies "do certain things differently"
 }
 
+void WBWaitForEvent(Display *pDisplay)
+{
+int iTemp;
+
+  // First, see if I have any priority or other queued events
+
+  iTemp = iWBQueuedEvent;
+
+  // check internal queues first, if there's something there
+  // these queues won't change without calling WBCheckGetEvent()
+
+  while(WB_LIKELY(iTemp >= 0))
+  {
+    if(WB_LIKELY(axWBEvt[iTemp].pDisplay == pDisplay))
+    {
+      return; // found one
+    }
+
+    iTemp = axWBEvt[iTemp].iNext;
+  }
+
+  iTemp = iWBPaintEvent;
+
+  while(iTemp >= 0)
+  {
+    if(WB_LIKELY(axWBEvt[iTemp].pDisplay == pDisplay))
+    {
+      return; // found one
+    }
+
+    iTemp = axWBEvt[iTemp].iNext;
+  }
+
+  iTemp = 10; // see below
+
+  while(!bQuitFlag) // forever, unless I quit
+  {
+    // check timers and internal event queues
+
+    if(__CheckTimers(pDisplay, NULL))  // a timer is ready to create an event?
+    {
+      return;
+    }
+
+    if(__CheckDelayedEvents(pDisplay, NULL)) // delayed events
+    {
+      return;
+    }
+
+    // call XSync before checking if events have been queued
+    // I do this every 10 loops, waiting ~1msec per loop
+
+    if(iTemp >= 10)
+    {
+      BEGIN_XCALL_DEBUG_WRAPPER
+      XSync(pDisplay, 0);  // make sure I'm sync'd up before waiting
+      END_XCALL_DEBUG_WRAPPER
+
+      iTemp = 0;
+    }
+    else
+    {
+      iTemp++;
+    }
+
+    if(XEventsQueued(pDisplay, QueuedAlready))
+    {
+      return; // I have events waiting!
+    }
+
+#ifdef HAVE_NANOSLEEP
+    {
+      struct timespec tsp;
+      tsp.tv_sec = 0;
+      tsp.tv_nsec = 1000000;  // wait for 1 msec
+
+      nanosleep(&tsp, NULL);
+    }
+#else  // HAVE_NANOSLEEP
+
+    usleep(1000);  // 1000 microsecs - a POSIX alternative to 'nanosleep'
+
+#endif // HAVE_NANOSLEEP
+  }
+}
+
 // "internal" version that allows me to do things different for modal loops
 
 int __InternalCheckGetEvent(Display *pDisplay, XEvent *pEvent, Window wIDModal)
 {
 int iRval = 0, iQueued;
+int iFirstTime = 1;
+static unsigned long long ullLastTime = 0;
 
   do
   {
     iQueued = XEventsQueued(pDisplay, QueuedAlready);
+
+    if(!iQueued && iFirstTime)
+    {
+      unsigned long long ullTemp = WBGetTimeIndex();
+      if((ullTemp - ullLastTime) > 50000) // make sure it's more than 0.05 seconds, so I don't "spin"
+      {
+        ullLastTime = ullTemp;
+
+        BEGIN_XCALL_DEBUG_WRAPPER
+//        XFlush(pDisplay);
+        XSync(pDisplay, 0);  // no events?  attempt a sync (but only do this once per loop)
+        END_XCALL_DEBUG_WRAPPER
+      }
+
+      iQueued = XEventsQueued(pDisplay, QueuedAlready);
+    }
+
+    iFirstTime = 0; // only XSync once per loop and only if I need to
 
     // check for selection events first...
 
@@ -3494,6 +3650,13 @@ int iRval = 0, iQueued;
       {
         WBProcessExposeEvent((XExposeEvent *)pEvent); // this consolidates incoming Expose events
 
+        // after processing the expose event, use XSync to immediately sync back up
+        // in case there are more events NOT received yet.  Only for EXPOSE though.
+
+        BEGIN_XCALL_DEBUG_WRAPPER
+        XSync(pDisplay, 0);
+        END_XCALL_DEBUG_WRAPPER
+
         iRval = 0;
         continue; // added - this might have been a bug...?
       }
@@ -3515,6 +3678,10 @@ int iRval = 0, iQueued;
 
       break;  // regardless if an event is found I break out now
     }
+
+    // this conveniently re-tries when I get an Expose event (to try and consolidate them)
+
+
   } while(1);
 
   if(iRval)
@@ -4468,13 +4635,19 @@ int WBDefault(Window wID, XEvent *pEvent)
   }
   else if(pEvent->type == ConfigureNotify && pEvent->xconfigure.window == wID)
   {
-//    fprintf(stderr, "TEMPORARY:  ConfigureNotify  %d,%d\n",
-//            pEvent->xconfigure.width, pEvent->xconfigure.height);
+    WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Window | DebugSubSystem_Event,
+                   "%s - window %08xH gets ConfigureNotify\n",
+                   __FUNCTION__, (unsigned int)wID);
 
-    // TODO:  see if it's a move, or a re-size.  on re-size I have to re-paint and re-calculate
-    //        the various display thingies.  But if I'm just moving it, no need.
+    // see if it's a move, or a re-size.  on re-size I have to re-paint and re-calculate
+    // the various display thingies.  But if I'm just moving it, no need.
 
-    WBInvalidateGeom(wID, NULL, 1);  // for simplicity, just re-paint it
+    if(pEvent->xconfigure.width != pEntry->width ||
+       pEvent->xconfigure.height != pEntry->height ||
+       pEvent->xconfigure.border_width != pEntry->border)
+    {
+      WBInvalidateGeom(wID, NULL, 1);  // for simplicity, just re-paint it - note, NOT saying "do it now"
+    }
 
     return 1; // handled
   }
@@ -4757,6 +4930,9 @@ XEvent xevt;
   WBInternalProcessExposeEvent(pEvent);
 
   // next, grab whatever expose events are still out there and combine them, too
+
+//  XFlush(pEvent->display);
+  XSync(pEvent->display, 0); // to grab whatever expose events might be out there
 
   while(!bQuitFlag && XCheckTypedWindowEvent(pEvent->display, pEvent->window, Expose, &xevt))
   {
@@ -6178,7 +6354,10 @@ void WBUpdateWindow(Window wID)
 
 //      WB_ERROR_PRINT("TEMPORARY:  %s - %d,%d,%d,%d\n", __FUNCTION__, evt.x, evt.y, evt.width, evt.height);
 
-      WBPostEvent(wID, (XEvent *)&evt);  // post message (see below for immediate)
+      WBProcessExposeEvent(&evt); // better than posting it (this consolidates every Expose event for that window)
+                                  // NOTE:  it also calls WBInvalidateGeom() internally but NOT 'WBUpdateWindow()'
+                                  //        It also checks the message queue an combines *ALL* expose events that are waiting
+//      WBPostEvent(wID, (XEvent *)&evt);  // post message (see below for immediate)
     }
   }
 }
@@ -6187,6 +6366,7 @@ void WBUpdateWindowImmediately(Window wID)
 {
   XRectangle xrct;
   XExposeEvent evt;
+  XEvent evt0; // NOTE if it's too small I get a stack overflow so MUST be 'XEvent'
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
   if(pEntry)
@@ -6205,9 +6385,19 @@ void WBUpdateWindowImmediately(Window wID)
       evt.width = xrct.width;
       evt.height = xrct.height;
 
-//      WB_ERROR_PRINT("TEMPORARY:  %s - %d,%d,%d,%d\n", __FUNCTION__, evt.x, evt.y, evt.width, evt.height);
+//      WB_ERROR_PRINT("TEMPORARY:  %s:%d - %d,%d,%d,%d\n", __FUNCTION__, __LINE__, evt.x, evt.y, evt.width, evt.height);
 
-      WBWindowDispatch(wID, (XEvent *)&evt); // send message synchronously
+      WBInternalProcessExposeEvent(&evt); // better than posting it (this consolidates every Expose event for that window)
+                                          // NOTE:  it also calls WBInvalidateGeom() internally but NOT 'WBUpdateWindow()'
+
+      if(__WBNextPaintEvent(pEntry->pDisplay, &evt0, wID) >= 0) // grab the 'combined' paint event from the queue
+      {
+        WBWindowDispatch(wID, &evt0); // send "combined painting" message synchronously
+      }
+      else
+      {
+        WBWindowDispatch(wID, (XEvent *)&evt); // send message synchronously
+      }
     }
   }
 }
@@ -6735,6 +6925,15 @@ static void __WBInitEvent()
 {
   int i1;
 
+  if(iInitEventFlag)
+  {
+    return; // already done
+  }
+
+  iInitEventFlag = 1;
+
+  // initialize the 'free' event pool, and all of the other event queue entries
+
   iWBFreeEvent = 0;
   for(i1=1; i1 < EVENT_ARRAY_SIZE; i1++)
   {
@@ -6752,7 +6951,7 @@ static int __WBAddEvent(Display *pDisp, Window wID, XEvent *pEvent)
   int iEvent = -1;
   // TODO:  synchronization objects?
 
-  if(iWBFreeEvent < 0 && iWBQueuedEvent < 0)
+  if(!iInitEventFlag)
   {
     __WBInitEvent();
   }
@@ -6768,8 +6967,8 @@ static int __WBAddEvent(Display *pDisp, Window wID, XEvent *pEvent)
   }
 
   iEvent = iWBFreeEvent;
-  iWBFreeEvent = axWBEvt[iEvent].iNext;
-  axWBEvt[iEvent].iNext = -1;  // the end
+  iWBFreeEvent = axWBEvt[iWBFreeEvent].iNext; // new 'free' pointer
+  axWBEvt[iEvent].iNext = -1;                 // mark the end of the 'iEvent's entry
 
   // add to iWBQueuedEvent linked list
 
@@ -6909,7 +7108,7 @@ static int __WBInsertPriorityEvent(Display *pDisp, Window wID, XEvent *pEvent)
   int iEvent = -1;
   // TODO:  synchronization objects?
 
-  if(iWBFreeEvent < 0 && iWBQueuedEvent < 0)
+  if(!iInitEventFlag)
   {
     __WBInitEvent();
   }
@@ -6950,9 +7149,68 @@ static int __WBInsertPriorityEvent(Display *pDisp, Window wID, XEvent *pEvent)
   return 0;
 }
 
+static int __WBNextPaintEvent(Display *pDisp, XEvent *pEvent, Window wID)
+{
+  int iRval = iWBPaintEvent, iPrev = -1;
+
+  while(iRval >= 0)
+  {
+    if(WB_LIKELY(axWBEvt[iRval].pDisplay == pDisp) &&
+       (WB_LIKELY(wID == None) || axWBEvt[iRval].xEvt.xany.window == wID))
+    {
+      break;
+    }
+
+    iPrev = iRval;
+    iRval = axWBEvt[iRval].iNext;
+  }
+
+  if(iRval >= 0)
+  {
+    WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_Window | DebugSubSystem_Event,
+                 "%s - getting an EXPOSE event for %d (%08xH)\n",
+                 __FUNCTION__,
+                 (int)axWBEvt[iRval].xEvt.xany.window,
+                 (int)axWBEvt[iRval].xEvt.xany.window);
+
+    if(iRval == iWBPaintEvent)
+    {
+      iWBPaintEvent = axWBEvt[iRval].iNext;
+    }
+    else
+    {
+      if(iRval == iWBPaintLast)
+      {
+        iWBPaintLast = iPrev;
+        axWBEvt[iPrev].iNext = -1;
+      }
+      else if(iPrev >= 0)
+      {
+        axWBEvt[iPrev].iNext = axWBEvt[iRval].iNext;
+      }
+    }
+
+    if(iWBPaintEvent < 0)
+    {
+      iWBPaintLast = -1;
+    }
+
+    if(pEvent)
+    {
+      memcpy(pEvent, &(axWBEvt[iRval].xEvt), sizeof(XEvent));
+    }
+
+    axWBEvt[iRval].iNext = iWBFreeEvent;
+    iWBFreeEvent = iRval;
+  }
+
+  return iRval;
+}
+
+
 static int __WBNextDisplayEvent(Display *pDisp, XEvent *pEvent)
 {
-  int iRval = iWBQueuedEvent, iPrev = -1;;
+  int iRval = iWBQueuedEvent, iPrev = -1;
 
   while(WB_LIKELY(iRval >= 0))
   {
@@ -7008,51 +7266,9 @@ static int __WBNextDisplayEvent(Display *pDisp, XEvent *pEvent)
   // TODO:  is this really "unlikely" ?
   if(WB_UNLIKELY(iRval < 0))  // no event found in normal queue - try paint queue
   {
-    iRval = iWBPaintEvent;
+    // this function is separated out so I can call it directly - see WBUpdateWindowImmediately()
 
-    while(iRval >= 0)
-    {
-      if(WB_LIKELY(axWBEvt[iRval].pDisplay == pDisp))
-      {
-        break;
-      }
-
-      iPrev = iRval;
-      iRval = axWBEvt[iRval].iNext;
-    }
-
-    if(iRval >= 0)
-    {
-      WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_Window | DebugSubSystem_Event,
-                   "%s - getting an EXPOSE event for %d (%08xH)\n",
-                   __FUNCTION__,
-                   (int)axWBEvt[iRval].xEvt.xany.window,
-                   (int)axWBEvt[iRval].xEvt.xany.window);
-
-      if(iRval == iWBPaintEvent)
-      {
-        iWBPaintEvent = axWBEvt[iRval].iNext;
-      }
-      else
-      {
-        if(iRval == iWBPaintLast)
-        {
-          iWBPaintLast = iPrev;
-          axWBEvt[iPrev].iNext = -1;
-        }
-        else if(iPrev >= 0)
-          axWBEvt[iPrev].iNext = axWBEvt[iRval].iNext;
-      }
-
-      if(iWBPaintEvent < 0)
-        iWBPaintLast = -1;
-
-      if(pEvent)
-        memcpy(pEvent, &(axWBEvt[iRval].xEvt), sizeof(XEvent));
-
-      axWBEvt[iRval].iNext = iWBFreeEvent;
-      iWBFreeEvent = iRval;
-    }
+    iRval = __WBNextPaintEvent(pDisp, pEvent, None);
   }
 
   return iRval >= 0;
@@ -7064,6 +7280,12 @@ int iEvent;
 Window wID;
 Display *pDisp;
 WB_GEOM geom;
+
+
+  if(!iInitEventFlag)
+  {
+    __WBInitEvent();
+  }
 
   // expose events are combined whenever possible
   // so that I can choose to respond to them immediately, increment
@@ -7113,39 +7335,49 @@ WB_GEOM geom;
   else
   {
     // make a copy of the event and put it into the 'paint' queue
+    // note that if I have no room, I'll simply have to reject it
 
-    iEvent = iWBFreeEvent;
-    iWBFreeEvent = axWBEvt[iEvent].iNext;
-    axWBEvt[iEvent].iNext = -1;  // the end
-
-    // add to iWBPaintEvent linked list
-
-    if(iWBPaintEvent < 0)
+    if(iWBFreeEvent < 0) // I check here because an existing event might be editable
     {
-      iWBPaintEvent = iEvent;
-      iWBPaintLast = iEvent;
+      WB_ERROR_PRINT("ERROR: %s - no more free 'event queue' entries\n", __FUNCTION__);
+      return; // can't do anything else, really
     }
     else
     {
-      if(iWBPaintLast < 0)
+      iEvent = iWBFreeEvent;
+      iWBFreeEvent = axWBEvt[iWBFreeEvent].iNext; // remove 'iEvent' from the head of the free chain
+
+      axWBEvt[iEvent].iNext = -1;  // the end of the chain on my new "not free any more" event 'iEvent'
+
+      // add to iWBPaintEvent linked list
+
+      if(iWBPaintEvent < 0)
       {
-        // traverse the queue
-        iWBPaintLast = iWBPaintEvent;
-        while(axWBEvt[iWBPaintLast].iNext != -1)
+        iWBPaintEvent = iEvent;
+        iWBPaintLast = iEvent;
+      }
+      else
+      {
+        if(iWBPaintLast < 0)
         {
-          iWBPaintLast = axWBEvt[iWBPaintLast].iNext;
+          // traverse the queue
+          iWBPaintLast = iWBPaintEvent;
+          while(axWBEvt[iWBPaintLast].iNext != -1)
+          {
+            iWBPaintLast = axWBEvt[iWBPaintLast].iNext;
+          }
         }
+
+        axWBEvt[iWBPaintLast].iNext = iEvent;
+        iWBPaintLast = iEvent;
       }
 
-      axWBEvt[iWBPaintLast].iNext = iEvent;
-      iWBPaintLast = iEvent;
+      axWBEvt[iEvent].pDisplay = pDisp;
+      axWBEvt[iEvent].wID = wID;
+      memcpy(&(axWBEvt[iEvent].xEvt), pEvent, sizeof(XEvent));
+
+      axWBEvt[iEvent].xEvt.xexpose.count = 0;  // always make this a zero
     }
-
-    axWBEvt[iEvent].pDisplay = pDisp;
-    axWBEvt[iEvent].wID = wID;
-    memcpy(&(axWBEvt[iEvent].xEvt), pEvent, sizeof(XEvent));
-
-    axWBEvt[iEvent].xEvt.xexpose.count = 0;  // always make this a zero
   }
 
   // make sure I invalidate the region covered by the expose event

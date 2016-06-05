@@ -443,17 +443,27 @@ int iDebugDumpConfig = 0;
       // SLEEP if no event while in message loop (function returns without blocking)
       // otherwise I can do background tasks during this loop iteration.
 
-#ifdef HAVE_NANOSLEEP
-      struct timespec tsp;
-      tsp.tv_sec = 0;
-      tsp.tv_nsec = 100000;  // wait for .1 msec
+      // if I have NO BACKGROUND PROCESSES to do, I can use 'WBWaitForEvent'
 
-      nanosleep(&tsp, NULL);
+      if(1)
+      {
+        WBWaitForEvent(pX11Display);
+      }
+      else
+      {
+#ifdef HAVE_NANOSLEEP
+        struct timespec tsp;
+        tsp.tv_sec = 0;
+        tsp.tv_nsec = 500000;  // wait for .5 msec
+
+        nanosleep(&tsp, NULL);
 #else  // HAVE_NANOSLEEP
 
-      usleep(100);  // 100 microsecs - a POSIX alternative to 'nanosleep'
+        usleep(500);  // 100 microsecs - a POSIX alternative to 'nanosleep'
 
 #endif // HAVE_NANOSLEEP
+      }
+      
       continue; // skip the 'WBDispatch' since there was no event
     }
 

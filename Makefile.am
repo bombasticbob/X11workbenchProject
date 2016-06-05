@@ -22,6 +22,10 @@ if NEED_LRT
   LIBS += -lrt
 endif
 
+if NEED_LDL
+  LIBS += -ldl
+endif
+
 # MAN pages
 man1_MANS = @MAN_PAGES@
 

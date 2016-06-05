@@ -258,6 +258,7 @@ typedef HANDLE WB_MUTEX;        // equivalent to a mutex handle
 
 #define XPM_ATTRIBUTES XpmAttributes
 #define XPM_CREATE_PIXMAP_FROM_DATA(A,B,C,D,E,F) XpmCreatePixmapFromData(A,B,C,D,E,F)
+#define XPM_FREE_ATTRIBUTES(pAttr) XpmFreeAttributes(pAttr)
 
 #else // HAVE_XPM or __DOXYGEN__
 
@@ -337,7 +338,7 @@ typedef struct _XPM_ATTRIBUTES_
 int MyLoadPixmapFromData(Display *pDisplay, Window wID, char *aData[],
                          Pixmap *pPixmap, Pixmap *pMask, XPM_ATTRIBUTES *pAttr);
 
-/** \ingroup platform
+/** \ingroup pixmap
   * \def XPM_CREATE_PIXMAP_FROM_DATA
   * \brief Platform helper macro to create a pixmap from data
   *
@@ -353,6 +354,20 @@ int MyLoadPixmapFromData(Display *pDisplay, Window wID, char *aData[],
   * whenever libXpm is not available for this purpose.
 **/
 #define XPM_CREATE_PIXMAP_FROM_DATA(A,B,C,D,E,F) MyLoadPixmapFromData(A,B,C,D,E,F)
+
+/** \ingroup pixmap
+  * \def XPM_FREE_ATTRIBUTES
+  * \brief Platform helper macro to free XPM_ATTRIBUTES filled in by XPM_CREATE_PIXMAP_FROM_DATA()
+  *
+  * \param pAttr A pointer to the XPM_ATTRIBUTES that was filled in by a successful call to XPM_CREATE_PIXMAP_FROM_DATA()
+  *
+  * This macro abstracts calls to XpmFreeAttributes() by allowing an internal function to be called whenever
+  * libXpm is not available for this purpose.  For the current implementation, the non-libXpm version does nothing.\n
+  * Use this macro to free up XPM_ATTRIBUTES structure members that consume resources after a successful call
+  * to XPM_CREATE_PIXMAP_FROM_DATA().  This will help prevent resource leaks.
+  *
+**/
+#define XPM_FREE_ATTRIBUTES(pAttr) /* does nothing */
 
 
 #endif

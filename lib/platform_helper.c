@@ -413,11 +413,14 @@ char cNone[MAX_XPM_COLOR_CHAR_SIZE]={0};
 const char *pX, *pY, *pZ;
 const char **ppX;
 Colormap colormap;
-unsigned int *pRval, *pR;
+WB_UINT32 *pRval, *pR;
 unsigned char *pT;
 char tbuf[256];
 
+
+  // ------------------
   // parse the XPM file
+  // ------------------
 
   if(pXPM)
   {
@@ -443,7 +446,7 @@ char tbuf[256];
     return NULL;
   }
 
-// use a macro to grab 4 integers from text
+  // use a macro to grab 4 integers from text
 
 #define NEXT_INT(iW,pX,pY,pZ){int iLen; NEXT_WORD(pX,pY,pZ); \
                               iLen=pZ - pY > sizeof(tbuf) - 1 ? sizeof(tbuf) - 1 : pZ - pY; \
@@ -466,17 +469,19 @@ char tbuf[256];
 
   pClr = malloc(nColors * sizeof(MY_XPM_COLOR));
 
+  // ------------------------------------------------------------------------------
   // parse the colors - 1-4 chacters, then white space, then the color as '#nnnnnn'
+  // ------------------------------------------------------------------------------
+
   for(i1=0; i1 < nColors; i1++)
   {
     pY = pX = *(ppX++);
 
     if(!pX)
     {
-      free(pRval);
       free(pClr);
 
-      WB_ERROR_PRINT("%s NULL pX unexpected, i1=%d\n", __FUNCTION__, i2);
+      WB_ERROR_PRINT("%s NULL pX unexpected, i1=%d\n", __FUNCTION__, i1);
       return NULL;
     }
 
@@ -532,7 +537,8 @@ char tbuf[256];
     }
   }
 
-  pRval = malloc(iH * iW * 4); // always 32-bit value, B is first byte, G is 2nd byte, R is 3rd byte, 4th byte is zero
+  // first usage of 'pRval'
+  pRval = malloc(iH * iW * 4); // pixel array, always 32-bit-wide values; B is first byte, G is 2nd byte, R is 3rd byte, 4th byte is zero
 
   if(!pRval)
   {

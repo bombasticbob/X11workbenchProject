@@ -631,6 +631,8 @@ NOT_CYGWIN
 IS_CYGWIN
 GLOBAL_XPATH
 MAN_PAGES
+NEED_LDL_FALSE
+NEED_LDL_TRUE
 NEED_LRT_FALSE
 NEED_LRT_TRUE
 HAVE_XPM_LIB_FALSE
@@ -752,6 +754,7 @@ enable_dependency_tracking
 with_x
 enable_release
 enable_noopt
+enable_libXpm
 '
       ac_precious_vars='build_alias
 host_alias
@@ -1393,6 +1396,7 @@ Optional Features:
                           speeds up one-time build
   --enable-release        CUSTOM - Turn off all debugging for release version
   --enable-noopt          CUSTOM - removes optimized code, useful for debug
+  --enable-libXpm         CUSTOM - use libXpm, rather than the (faster) internal implementation
 
 Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
@@ -4854,6 +4858,7 @@ fi
 
 # --enable-release (default has debugging enabled)
 # --enable-noopt (default is optimization enabled)
+# --enable-libXpm (default is NOT to link to libXpm)
 
 # Check whether --enable-release was given.
 if test "${enable_release+set}" = set; then :
@@ -4876,6 +4881,18 @@ if test "${enable_noopt+set}" = set; then :
                esac
 else
   noopt=false
+fi
+
+
+# Check whether --enable-libXpm was given.
+if test "${enable_libXpm+set}" = set; then :
+  enableval=$enable_libXpm; case "${enableval}" in
+               yes)  libXpm=true ;;
+               no)   libXpm=false ;;
+               *) as_fn_error $? "bad value ${enableval} for --enable-libXpm" "$LINENO" 5 ;;
+               esac
+else
+  libXpm=false
 fi
 
 
@@ -4913,7 +4930,10 @@ CXXFLAGS="$CXXFLAGS $X_CFLAGS -I$local_incdir -I$local_xpmdir"
 
 
 
+
+#################################################################
 # header file and function checks (some recommended by autoscan)
+#################################################################
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for grep that handles long lines and -e" >&5
 $as_echo_n "checking for grep that handles long lines and -e... " >&6; }
@@ -5215,8 +5235,16 @@ fi
 
 
 
+
+# This is where I check for the presence of libXpm - if the configure script uses the
+# option '--enable-libXpm' then I will test for its presence.  Otherwise, the internal
+# implementation will be used, at least as far as the libraries are concerned.  This
+# would not prevent an application from using the pre-compiled libraries and ALSO use
+# libXpm.  It would only prevent the X11 toolkit library itself from linking to it.
+
 test_have_xpm=false
-ac_fn_c_check_header_mongrel "$LINENO" "X11/xpm.h" "ac_cv_header_X11_xpm_h" "$ac_includes_default"
+if test x$libXpm = xtrue ; then
+  ac_fn_c_check_header_mongrel "$LINENO" "X11/xpm.h" "ac_cv_header_X11_xpm_h" "$ac_includes_default"
 if test "x$ac_cv_header_X11_xpm_h" = xyes; then :
   test_have_xpm=true
 else
@@ -5225,6 +5253,7 @@ $as_echo "$as_me: WARNING: missing xpm.h - you should consider installing libXpm
 fi
 
 
+fi
 
 for ac_func in printf
 do :
@@ -5324,6 +5353,45 @@ if test "x$ac_cv_lib_rt_clock_gettime" = xyes; then :
   test_need_lrt=true
 fi
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for dlopen in -ldl" >&5
+$as_echo_n "checking for dlopen in -ldl... " >&6; }
+if ${ac_cv_lib_dl_dlopen+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-ldl  $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char dlopen ();
+int
+main ()
+{
+return dlopen ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_dl_dlopen=yes
+else
+  ac_cv_lib_dl_dlopen=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_dl_dlopen" >&5
+$as_echo "$ac_cv_lib_dl_dlopen" >&6; }
+if test "x$ac_cv_lib_dl_dlopen" = xyes; then :
+  test_need_ldl=true
+fi
 
 
 # custom function checks go here
@@ -5764,12 +5832,20 @@ else
 fi
 
 
- if test x$test_have_xpm = xtrue; then
+ if test x$test_need_lrt = xtrue; then
   NEED_LRT_TRUE=
   NEED_LRT_FALSE='#'
 else
   NEED_LRT_TRUE='#'
   NEED_LRT_FALSE=
+fi
+
+ if test x$test_need_ldl = xtrue; then
+  NEED_LDL_TRUE=
+  NEED_LDL_FALSE='#'
+else
+  NEED_LDL_TRUE='#'
+  NEED_LDL_FALSE=
 fi
 
 
@@ -5946,6 +6022,10 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${NEED_LRT_TRUE}" && test -z "${NEED_LRT_FALSE}"; then
   as_fn_error $? "conditional \"NEED_LRT\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${NEED_LDL_TRUE}" && test -z "${NEED_LDL_FALSE}"; then
+  as_fn_error $? "conditional \"NEED_LDL\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 

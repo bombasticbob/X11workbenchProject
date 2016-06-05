@@ -77,6 +77,14 @@
 
 
 
+#ifdef NODEBUG
+#define DEBUG_DUMP_XPM_ATTRIBUTES(X) 
+#else
+static void DebugDumpXpmAttributes(const char *szFunction, int nLine, XPM_ATTRIBUTES *pAttr);
+#define DEBUG_DUMP_XPM_ATTRIBUTES(X) DebugDumpXpmAttributes(__FUNCTION__, __LINE__, X)
+#endif // NODEBUG
+
+
 #define MINIMUM_ATOM_RESOURCE_LIST_SIZE 256
 
 typedef struct __INTERNAL_ATOM_RESOURCE_LIST__
@@ -341,6 +349,9 @@ Pixmap PXM_LoadPixmap(char *ppXPM[], XPM_ATTRIBUTES *pAttr, Pixmap *pMask /* = N
 {
 Pixmap pixRval = None, pixRval2 = None;
 XPM_ATTRIBUTES xattr;
+//#ifndef NODEBUG
+//WB_UINT64 ullTime = WBGetTimeIndex();
+//#endif // NODEBUG
 
 
   if(!ppXPM)
@@ -360,8 +371,14 @@ XPM_ATTRIBUTES xattr;
 
   bzero(&xattr, sizeof(xattr));
 
+//  WB_ERROR_PRINT("TEMPORARY:  %s line %d  delta tick %lld\n", __FUNCTION__, __LINE__, (WBGetTimeIndex() - ullTime));
+
+  BEGIN_XCALL_DEBUG_WRAPPER
   XPM_CREATE_PIXMAP_FROM_DATA(WBGetDefaultDisplay(), WBGetHiddenHelperWindow(),
                               ppXPM, &pixRval, &pixRval2, &xattr);
+  END_XCALL_DEBUG_WRAPPER
+
+//  WB_ERROR_PRINT("TEMPORARY:  %s line %d  delta tick %lld\n", __FUNCTION__, __LINE__, (WBGetTimeIndex() - ullTime));
 
   if(pAttr)
   {
@@ -369,14 +386,19 @@ XPM_ATTRIBUTES xattr;
   }
   else
   {
-    // todo:  free things allocated for xattr?
+    WB_IF_DEBUG_LEVEL(DebugLevel_Light | DebugSubSystem_Pixmap)
+    {
+      DEBUG_DUMP_XPM_ATTRIBUTES(&xattr);
+    }
+
+    XPM_FREE_ATTRIBUTES(&xattr);
   }
 
   if(pMask)
   {
     *pMask = pixRval2;
   }
-  else if(pixRval2 != None)
+  else if(pixRval2 != None) // free pixRval2 if it was allocated (it's the 'mask')
   {
     BEGIN_XCALL_DEBUG_WRAPPER
     XFreePixmap(WBGetDefaultDisplay(), pixRval2);
@@ -529,4 +551,50 @@ void PXM_OnExit(void)
   ppRegAppSmall_Internal = NULL;
 }
 
+
+
+#ifndef NODEBUG
+static void DebugDumpXpmAttributes(const char *szFunction, int nLine, XPM_ATTRIBUTES *pAttr)
+{
+  WBDebugPrint("%s line %d XPM_ATTRIBUTES contain:\n", szFunction, nLine);
+#if defined(HAVE_XPM)
+  WBDebugPrint("  valuemask:          %ld\n", pAttr->valuemask);
+  WBDebugPrint("  visual:             %p\n", pAttr->visual);
+  WBDebugPrint("  colormap:           %p\n", (void *)pAttr->colormap);
+#endif // defined(HAVE_XPM)
+
+  WBDebugPrint("  depth:              %u\n", pAttr->depth);
+  WBDebugPrint("  width:              %u\n", pAttr->width);
+  WBDebugPrint("  height:             %u\n", pAttr->height);
+
+#if defined(HAVE_XPM)
+  WBDebugPrint("  x_hotspot:          %u\n", pAttr->x_hotspot);
+  WBDebugPrint("  y_hotspot:          %u\n", pAttr->y_hotspot);
+  WBDebugPrint("  cpp:                %u\n", pAttr->cpp);
+  WBDebugPrint("  pixels:             %p\n", pAttr->pixels);
+  WBDebugPrint("  npixels:            %u\n", pAttr->npixels);
+  WBDebugPrint("  colorsymbols:       %p\n", pAttr->colorsymbols);
+  WBDebugPrint("  numsymbols:         %u\n", pAttr->numsymbols);
+  WBDebugPrint("  rgb_fname:          %s\n", pAttr->rgb_fname);
+  WBDebugPrint("  nextensions:        %u\n", pAttr->nextensions);
+  WBDebugPrint("  extensions:         %p\n", pAttr->extensions);
+  WBDebugPrint("  ncolors:            %u\n", pAttr->ncolors);
+  WBDebugPrint("  colorTable:         %p\n", pAttr->colorTable);
+  WBDebugPrint("  mask_pixel:         %u\n", pAttr->mask_pixel);
+  WBDebugPrint("  exactColors:        %c\n", pAttr->exactColors ? 'T' : 'F');
+  WBDebugPrint("  closeness:          %u\n", pAttr->closeness);
+  WBDebugPrint("  red_closeness:      %u\n", pAttr->red_closeness);
+  WBDebugPrint("  green_closeness:    %u\n", pAttr->green_closeness);
+  WBDebugPrint("  blue_closeness:     %u\n", pAttr->blue_closeness);
+  WBDebugPrint("  color_key:          %d\n", pAttr->color_key);
+  WBDebugPrint("  alloc_pixels:       %p\n", pAttr->alloc_pixels);
+  WBDebugPrint("  nalloc_pixels:      %d\n", pAttr->nalloc_pixels);
+  WBDebugPrint("  alloc_close_colors: %c\n", pAttr->alloc_close_colors ? 'T' : 'F');
+  WBDebugPrint("  bitmap_format:      %d\n", pAttr->bitmap_format);
+  WBDebugPrint("  alloc_color:        %p\n", pAttr->alloc_color);
+  WBDebugPrint("  free_colors:        %p\n", pAttr->free_colors);
+  WBDebugPrint("  color_closure:      %p\n", pAttr->color_closure);
+#endif // defined(HAVE_XPM)
+}
+#endif // !NODEBUG
 

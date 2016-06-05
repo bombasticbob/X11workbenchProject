@@ -142,6 +142,9 @@ static int MessageBoxCallback(Window wID, XEvent *pEvent)
 {
 WBDialogWindow *pDlg = DLGGetDialogWindowStruct(wID);
 struct _MESSAGE_BOX_ *pUserData = (struct _MESSAGE_BOX_ *)(pDlg ? pDlg->pUserData : NULL);
+//#ifndef NODEBUG
+//WB_UINT64 ullTime = WBGetTimeIndex();
+//#endif // NODEBUG
 
 
   if(pEvent->type == ClientMessage && pEvent->xclient.message_type == aDIALOG_INIT)
@@ -166,13 +169,17 @@ struct _MESSAGE_BOX_ *pUserData = (struct _MESSAGE_BOX_ *)(pDlg ? pDlg->pUserDat
                                           NULL, &pixmap2);
 
         if(pixmap != None)
+        {
           WBDialogControlSetIconPixmap(pCtrl, pixmap, pixmap2);
+        }
       }
     }
 
     // assign the caption text to the caption window (which varies and must be assigned at run time)
 
     DLGSetControlCaption((WBDialogWindow *)pDlg, 1001, pUserData->szMessage);
+
+//    WB_ERROR_PRINT("TEMPORARY:  %s line %d  delta tick %lld\n", __FUNCTION__, __LINE__, (WBGetTimeIndex() - ullTime));
 
     return 1;
   }

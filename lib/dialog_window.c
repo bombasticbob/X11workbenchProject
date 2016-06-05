@@ -235,10 +235,16 @@ WBDialogWindow *DLGCreateDialogWindow(const char *szTitle, const char *szDialogR
 //  Atom aProto[3];
   XClientMessageEvent evt;
   int i1;
+//#ifndef NODEBUG
+//  WB_UINT64 ullTime = WBGetTimeIndex();
+//#endif // NODEBUG
+
+
+//  WB_ERROR_PRINT("TEMPORARY:  %s line %d  delta tick %lld\n", __FUNCTION__, __LINE__, (WBGetTimeIndex() - ullTime));
 
   if(!pNew)
   {
-    WB_ERROR_PRINT("DLGCreateDialogWindow - not enough memory to create dialog window (1)\n");
+    WB_ERROR_PRINT("%s - not enough memory to create dialog window (1)\n", __FUNCTION__);
     return NULL;
   }
 
@@ -260,7 +266,7 @@ WBDialogWindow *DLGCreateDialogWindow(const char *szTitle, const char *szDialogR
     {
       free(pNew);
 
-      WB_ERROR_PRINT("DLGCreateDialogWindow - not enough memory to create dialog window (2)\n");
+      WB_ERROR_PRINT("%s - not enough memory to create dialog window (2)\n", __FUNCTION__);
       return NULL;
     }
     strcpy(pNew->szTitle, szTitle);
@@ -401,7 +407,6 @@ WBDialogWindow *DLGCreateDialogWindow(const char *szTitle, const char *szDialogR
   // set title, size hints, and 'WM_HINTS' hints (so WM knows where to put the window and how to set focus)
   WBSetWMProperties(pNew->wbDLG.wID, szTitle, &xsh, &xwmh, NULL);
 
-
 #if 0
   aProto[0] = aWM_DELETE_WINDOW;  // for now, that's the only one
   aProto[1] = aWM_TAKE_FOCUS;     // GDK does this, see set_wm_protocols() in gdkwindow-x11.c
@@ -419,7 +424,6 @@ WBDialogWindow *DLGCreateDialogWindow(const char *szTitle, const char *szDialogR
 
   // now allow certain kinds of input messages (I should be able to handle messages at this point)
   XSelectInput(pDisplay, pNew->wbDLG.wID, WB_STANDARD_INPUT_MASK | WB_KEYBOARD_INPUT_MASK);
-
 
   // now that the controls have been created, assign the title, and send
   // an event to the user callback to initialize the dialog box contents

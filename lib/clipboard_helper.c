@@ -1576,15 +1576,35 @@ null_data_me_own:
     if(!pCBTHead && // go ahead and test outside of a lock.  if NULL, I need to sleep a bit
        XEventsQueued(pDisplay, QueuedAlready) <= 0) // no events
     {
+      static unsigned long long ullLastTime = 0;
+      unsigned long long ullTemp;
+
       // if nothing to do, sleep or something rather than spinning
       // this way if I have events to process, or if I have tasks to manage,
       // I can continue to cycle without delays
 
-      XFlush(pDisplay);  // force flush just in case
+//      XFlush(pDisplay);  // force flush just in case
 
-      usleep(100); // but if I'm not busy, use a sleep state to limit CPU utilization in the thread
+#ifdef HAVE_NANOSLEEP
+      struct timespec tsp;
+      tsp.tv_sec = 0;
+      tsp.tv_nsec = 1000;  // wait for 1 msec
 
-      XSync(pDisplay, False); // force sync just in case
+      nanosleep(&tsp, NULL);
+#else  // HAVE_NANOSLEEP
+
+      usleep(1000); // but if I'm not busy, use a sleep state to limit CPU utilization in the thread
+#endif // HAVE_NANOSLEEP
+
+      ullTemp = WBGetTimeIndex();
+      if((ullTemp - ullLastTime) > 50000) // make sure it's more than 0.05 seconds, so I don't "spin"
+      {
+        ullLastTime = ullTemp;
+
+        BEGIN_XCALL_DEBUG_WRAPPER
+        XSync(pDisplay, False); // force sync just in case
+        END_XCALL_DEBUG_WRAPPER
+      }
     }
   }
 

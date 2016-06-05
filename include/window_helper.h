@@ -763,6 +763,7 @@ enum DebugLevel
   DebugSubSystem_Font        = 0x00002000,  //!< font manager
   DebugSubSystem_Settings    = 0x00004000,  //!< settings manager
   DebugSubSystem_Selection   = 0x00008000,  //!< selection processing
+  DebugSubSystem_Pixmap      = 0x00010000,  //!< pixmap handling
 
   DebugSubSystem_MASK = ~7L  //!< mask for allowed 'subsystem' bits
 };
@@ -1997,8 +1998,8 @@ Time WBGetLastEventTime(void);
   *
   * Implementation of the X11workbench Toolkit API is centered around the API's event
   * loop processing.  The main application should implement its message loop by repeatedly
-  * calling WBCheckGetEvent and passing any retrieved event to \ref WBDispatch().
-  * Internall this function calls the X___CheckEvent functions correctly, dispatches Expose
+  * calling WBCheckGetEvent() or WBNextEvent() and passing any retrieved event to \ref WBDispatch().
+  * Internally, WBCheckGetEvent() calls the X___CheckEvent functions correctly, dispatches Expose
   * events for asynchronous processing, translates keyboard and pointer events, and handles
   * internally queued events (such as timers and 'posted' events).
   *
@@ -2015,18 +2016,20 @@ Time WBGetLastEventTime(void);
       // as needed, perform an iteration of background processing here
 
       // With nothing else to do, SLEEP if there is no event in the message queue
-      // and no background processing to be performed
+      // and no background processing to be performed.
+      // (alternately, you could use WBWaitForEvent() if you do not need periodic
+      //  wake-up for background processing)
 
 // implementations that support 'nanosleep' should use it
 #ifdef HAVE_NANOSLEEP
       struct timespec tsp;
       tsp.tv_sec = 0;
-      tsp.tv_nsec = 100000;  // wait for .1 msec
+      tsp.tv_nsec = 1000000;  // wait for 1 msec
 
       nanosleep(&tsp, NULL);
 #else  // HAVE_NANOSLEEP
 
-      usleep(100);  // 100 microsecs - a POSIX alternative to 'nanosleep'
+      usleep(1000);  // 1000 microsecs - a POSIX alternative to 'nanosleep'
 
 #endif // HAVE_NANOSLEEP
       continue;
@@ -2034,11 +2037,33 @@ Time WBGetLastEventTime(void);
 
     WBDispatch(&event);
   }
+
   * \endcode
+  *
+  * NOTE:  If you do not want to do any background processing, consider using
+  *        WBWaitForEvent() instead of 'usleep' or 'nanosleep'.
+  *
+  * To only retrieve 'internally queued' events, see WBNextEvent()
   *
   * Header File:  window_helper.h
 **/
 int WBCheckGetEvent(Display *pDisplay, XEvent *pEvent);
+
+/** \ingroup events
+  * \brief Wait for an event, blocking indefinitely
+  *
+  * \param pDisplay a pointer to the Display on which to wait for events
+  *
+  * Call this function to wait until a new event is available in the event queue.  This
+  * function will block indefinitely until such an event is available.\n
+  * NOTE: if 'bQuitFlag' is set, this function will return immediately.
+  *
+  * See WBNextEvent(), WBCheckGetEvent()
+  *
+  * Header File:  window_helper.h
+**/
+void WBWaitForEvent(Display *pDisplay);
+
 
 /** \ingroup events
   * \brief Generic Event Dispatcher, using message type to dispatch
@@ -2133,15 +2158,20 @@ void WBEndModal(Window wID, int iReturn);
 // to send a message directly use WBAppDispatch and WBWindowDispatch
 
 /** \ingroup events
-  * \brief low-level event queue wrapper.  Implements the client-side event queue
+  * \brief low-level event queue wrapper.  Implements the client-side event queue.  Does not block if no events available.
   *
   * \param pDisplay The Display pointer to query events on
   * \param pEvent A pointer to an XEvent structure to receive event info
   * \return a non-zero value if an event was obtained, or zero if no event was available
   *
-  * Similar to XNextEvent, this function checks the internal (and external) event
-  * queues for an event.  Unlike XNextEvent it does not wait for an event to appear
-  * before returning.  The function returns zero if there are no events to be processed.
+  * Similar to XNextEvent, this function checks the internal event queues for an event.
+  * Unlike XNextEvent it does not wait for an event to be available before returning.
+  * The function returns zero if there are no events to be processed.
+  *
+  * This function will not pull events out of the X server's event queue.  It ONLY manages
+  * 'internal' queued events, prioritizing them as needed.
+  *
+  * See WBCheckGetEvent(), WBWaitForEvent()
   *
   * Header File:  window_helper.h
 **/
@@ -2189,7 +2219,7 @@ int WBPostPriorityEvent(Window wID, XEvent *pEvent); // like above but it goes a
   * Use this function to effectively delay an event's posting to the internal queue for a specified
   * period of time, in milliseconds.  For application messages, specify 'None' for the Window ID
   * in the XEvent structure (otherwise specify the correct Window ID).
-  * After the time delay, the event will be retrieved and returned via WBCheckGetEvent() similar to a timer message.
+  * After the time delay, the event will be retrieved and returned via WBCheckGetEvent(), or WBNextEvent(), similar to a timer message.
   * If the window specified in the message is destroyed before the timeout, the message will be ignored.
   *
   * Header File:  window_helper.h

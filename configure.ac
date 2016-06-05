@@ -21,6 +21,7 @@ AC_PROG_LN_S
 
 # --enable-release (default has debugging enabled)
 # --enable-noopt (default is optimization enabled)
+# --enable-libXpm (default is NOT to link to libXpm)
 
 AC_ARG_ENABLE(release,
               [  --enable-release        CUSTOM - Turn off all debugging for release version],
@@ -39,6 +40,15 @@ AC_ARG_ENABLE(noopt,
                *) AC_MSG_ERROR(bad value ${enableval} for --enable-noopt) ;;
                esac],
               [noopt=false])
+
+AC_ARG_ENABLE(libXpm,
+              [  --enable-libXpm         CUSTOM - use libXpm, rather than the (faster) internal implementation],
+              [case "${enableval}" in
+               yes)  libXpm=true ;;
+               no)   libXpm=false ;;
+               *) AC_MSG_ERROR(bad value ${enableval} for --enable-libXpm) ;;
+               esac],
+              [libXpm=false])
 
 AM_CONDITIONAL(NO_DEBUG, test x$release = xtrue)
 AM_CONDITIONAL(NO_OPT, test x$noopt = xtrue)
@@ -60,7 +70,10 @@ AC_SUBST([CFLAGS])
 AC_SUBST([CPPFLAGS])
 AC_SUBST([CXXFLAGS])
 
+
+#################################################################
 # header file and function checks (some recommended by autoscan)
+#################################################################
 
 AC_CHECK_HEADER([unistd.h],[],AC_MSG_ERROR([missing unistd.h]))
 AC_CHECK_HEADER([X11/Xlib.h],[],AC_MSG_ERROR([missing Xlib.h]))
@@ -68,8 +81,17 @@ AC_CHECK_HEADER([X11/Xmd.h],[],AC_MSG_ERROR([missing Xmd.h]))
 AC_CHECK_HEADER([X11/Xutil.h],[],AC_MSG_ERROR([missing Xutil.h]))
 AC_CHECK_HEADER([X11/Xatom.h],[],AC_MSG_ERROR([missing Xatom.h]))
 
+
+# This is where I check for the presence of libXpm - if the configure script uses the
+# option '--enable-libXpm' then I will test for its presence.  Otherwise, the internal
+# implementation will be used, at least as far as the libraries are concerned.  This
+# would not prevent an application from using the pre-compiled libraries and ALSO use
+# libXpm.  It would only prevent the X11 toolkit library itself from linking to it.
+
 test_have_xpm=false
-AC_CHECK_HEADER([X11/xpm.h],test_have_xpm=true,AC_MSG_WARN([missing xpm.h - you should consider installing libXpm]))
+if test x$libXpm = xtrue ; then
+  AC_CHECK_HEADER([X11/xpm.h],test_have_xpm=true,AC_MSG_WARN([missing xpm.h - you should consider installing libXpm]))
+fi
 
 AC_CHECK_FUNCS([printf])
 AC_CHECK_FUNCS([alarm])
@@ -80,7 +102,7 @@ AC_CHECK_FUNCS([nanosleep])
 AC_CHECK_FUNCS([clock_gettime])
 
 AC_CHECK_LIB(rt, clock_gettime, test_need_lrt=true)
-
+AC_CHECK_LIB(dl, dlopen, test_need_ldl=true)
 
 # custom function checks go here
 
@@ -191,7 +213,8 @@ AM_CONDITIONAL(NOT_CYGWIN, test x$is_cygwin = xfalse)
 
 AM_CONDITIONAL(HAVE_XPM_LIB, test x$test_have_xpm = xtrue )
 
-AM_CONDITIONAL(NEED_LRT, test x$test_have_xpm = xtrue)
+AM_CONDITIONAL(NEED_LRT, test x$test_need_lrt = xtrue)
+AM_CONDITIONAL(NEED_LDL, test x$test_need_ldl = xtrue)
 
 
 GLOBAL_XPATH=`echo "$ac_x_libraries" | sed 's/\/lib//g'`

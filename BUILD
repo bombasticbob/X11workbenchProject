@@ -93,6 +93,21 @@ You can then re-build the debug version using the following:
   make
 
 
+CONFIGURE OPTIONS
+-----------------
+
+Other than enabling a release build, there are additional 'configure' options
+that you might consider using.
+
+  --enable-release   enables a RELEASE build (i.e. no debug symbols)
+  --enable-noopt     enables a 'no optimization' build; useful for debugging
+  --enable-libXpm    uses libXpm rather than the internal equivalents.
+                     NOTE:  libXpm is MUCH slower, observably so.  Many things
+                            don't use libXpm any more because of this.
+
+
+
+
 INSTALLATION
 ------------
 

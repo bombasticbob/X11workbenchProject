@@ -81,6 +81,7 @@ host_triplet = @host@
 bin_PROGRAMS = X11workbench$(EXEEXT)
 @HAVE_XPM_LIB_TRUE@am__append_1 = -lXpm
 @NEED_LRT_TRUE@am__append_2 = -lrt
+@NEED_LDL_TRUE@am__append_3 = -ldl
 subdir = .
 DIST_COMMON = INSTALL NEWS README AUTHORS ChangeLog \
 	$(srcdir)/Makefile.in $(srcdir)/Makefile.am \
@@ -283,7 +284,7 @@ LIBOBJS = @LIBOBJS@
 
 # any additional libraries go here
 LIBS = -L./lib -lX11WorkbenchToolkit $(X_LIBS) -lm -lX11 $(X_PRE_LIBS) \
-	$(X_EXTRA_LIBS) -lpthread $(am__append_2)
+	$(X_EXTRA_LIBS) -lpthread $(am__append_2) $(am__append_3)
 LN_S = @LN_S@
 LTLIBOBJS = @LTLIBOBJS@
 MAKEINFO = @MAKEINFO@
