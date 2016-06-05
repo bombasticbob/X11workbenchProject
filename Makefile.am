@@ -1,5 +1,5 @@
 bin_PROGRAMS = X11workbench
-X11workbench_SOURCES = X11workbench.c X11workbench.h refactor.c refactor.h
+X11workbench_SOURCES = X11workbench.c X11workbench.h refactor.c refactor.h gizzard.c gizzard.h
 X11workbench_SOURCES += application_icon.xpm splash.xpm
 X11workbench_SOURCES += doxy_comments.dox doxy.txt
 
@@ -12,8 +12,8 @@ endif
 
 # note:  was using AM_LDFLAGS but Ubuntu build borked, so using LIBS instead
 #AM_LDFLAGS = $(X_LIBS) -lm -lX11 $(X_PRE_LIBS) $(X_EXTRA_LIBS)
-LDADD=./lib/libX11WorkbenchToolkit.a
-LIBS = -L./lib -lX11WorkbenchToolkit $(X_LIBS) -lm -lX11 $(X_PRE_LIBS) $(X_EXTRA_LIBS)
+LDADD=./lib/libX11workbenchToolkit.a
+LIBS = -L./lib -lX11workbenchToolkit $(X_LIBS) -lm -lX11 $(X_PRE_LIBS) $(X_EXTRA_LIBS)
 
 # any additional libraries go here
 LIBS += -lpthread
@@ -82,13 +82,15 @@ else
 
 endif
 
+AM_CFLAGS = $(NO_OPT_FLAGS) -DX11WORKBENCH_PROJECT_BUILD
+
 if NO_DEBUG
 
-  AM_CFLAGS = $(NO_OPT_FLAGS) -DNO_DEBUG -Wall -Werror -fno-strict-aliasing
+  AM_CFLAGS += -DNO_DEBUG -Wall -Werror -fno-strict-aliasing
 
 else
 
-  AM_CFLAGS = $(NO_OPT_FLAGS) $(EXTRA_WARN_FLAGS) -Wimplicit-int \
+  AM_CFLAGS += $(EXTRA_WARN_FLAGS) -Wimplicit-int \
    -Wimplicit-function-declaration -Wformat -Wmissing-braces \
    -Wnonnull -Wparentheses -Wreturn-type \
    -Wsequence-point -Wswitch -Wtrigraphs \

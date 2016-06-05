@@ -73,6 +73,19 @@
 
 #include <pthread.h> /* make sure this is included for POSIX */
 
+#ifdef X11WORKBENCH_PROJECT_BUILD
+
+// Globally include the output of the configure script for GNUC compiles for "the project"
+#include "X11workbenchToolkit_config.h" // the 'generated' version'
+
+#else // X11WORKBENCH_PROJECT_BUILD
+
+// This is for the installed version, a subset of the things defined by the configure output script.
+// NOTE:  this must be installed in the appropriate package directory along with platform_helper.h
+#include "X11workbenchToolkit_install_config.h"
+
+#endif // X11WORKBENCH_PROJECT_BUILD
+
 
 // DEBUG vs RELEASE code
 
@@ -180,8 +193,6 @@ typedef pthread_mutex_t WB_MUTEX;
 
 // TODO:  sizeof(int) sizeof(long) - long is 64-bit for GNUC - MS compilers make it 32-bit
 
-// dont' forget to globally include the output of the configure script for GNUC compiles
-#include "X11WorkbenchToolkit_config.h"
 
 
 #ifdef __DOXYGEN__
@@ -250,7 +261,7 @@ typedef HANDLE WB_MUTEX;        // equivalent to a mutex handle
 
 // XPM library (libXpm) and X11/xpm.h
 
-#if defined(HAVE_XPM) && !defined(__DOXYGEN__)
+#if defined(X11WORKBENCH_TOOLKIT_HAVE_XPM) && !defined(__DOXYGEN__)
 
 // Doxygen doesn't need THIS part, it needs the other one.
 
@@ -260,7 +271,7 @@ typedef HANDLE WB_MUTEX;        // equivalent to a mutex handle
 #define XPM_CREATE_PIXMAP_FROM_DATA(A,B,C,D,E,F) XpmCreatePixmapFromData(A,B,C,D,E,F)
 #define XPM_FREE_ATTRIBUTES(pAttr) XpmFreeAttributes(pAttr)
 
-#else // HAVE_XPM or __DOXYGEN__
+#else // X11WORKBENCH_TOOLKIT_HAVE_XPM or __DOXYGEN__
 
 /** \ingroup pixmap
   * \typedef typedef struct _XPM_ATTRIBUTES_ XPM_ATTRIBUTES

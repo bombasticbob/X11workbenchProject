@@ -557,17 +557,17 @@ void PXM_OnExit(void)
 static void DebugDumpXpmAttributes(const char *szFunction, int nLine, XPM_ATTRIBUTES *pAttr)
 {
   WBDebugPrint("%s line %d XPM_ATTRIBUTES contain:\n", szFunction, nLine);
-#if defined(HAVE_XPM)
+#if defined(X11WORKBENCH_TOOLKIT_HAVE_XPM)
   WBDebugPrint("  valuemask:          %ld\n", pAttr->valuemask);
   WBDebugPrint("  visual:             %p\n", pAttr->visual);
   WBDebugPrint("  colormap:           %p\n", (void *)pAttr->colormap);
-#endif // defined(HAVE_XPM)
+#endif // defined(X11WORKBENCH_TOOLKIT_HAVE_XPM)
 
   WBDebugPrint("  depth:              %u\n", pAttr->depth);
   WBDebugPrint("  width:              %u\n", pAttr->width);
   WBDebugPrint("  height:             %u\n", pAttr->height);
 
-#if defined(HAVE_XPM)
+#if defined(X11WORKBENCH_TOOLKIT_HAVE_XPM)
   WBDebugPrint("  x_hotspot:          %u\n", pAttr->x_hotspot);
   WBDebugPrint("  y_hotspot:          %u\n", pAttr->y_hotspot);
   WBDebugPrint("  cpp:                %u\n", pAttr->cpp);
@@ -594,7 +594,7 @@ static void DebugDumpXpmAttributes(const char *szFunction, int nLine, XPM_ATTRIB
   WBDebugPrint("  alloc_color:        %p\n", pAttr->alloc_color);
   WBDebugPrint("  free_colors:        %p\n", pAttr->free_colors);
   WBDebugPrint("  color_closure:      %p\n", pAttr->color_closure);
-#endif // defined(HAVE_XPM)
+#endif // defined(X11WORKBENCH_TOOLKIT_HAVE_XPM)
 }
 #endif // !NODEBUG
 

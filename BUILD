@@ -105,6 +105,19 @@ that you might consider using.
                      NOTE:  libXpm is MUCH slower, observably so.  Many things
                             don't use libXpm any more because of this.
 
+And also, the '--prefix' option, for installing everything in a place that
+is NOT /usr/local (the default prefix):
+
+  --prefix=pathname  sets the install prefix to 'pathname'
+
+As an example, you might want to build and install a LOCAL copy for yourself
+in '$HOME', or put it into a separate tree (particularly for a cross-compiled
+version) such as '/usr/local/myversion' or '/usr/local/x86'
+
+NOTE:  the install option will place a copy of the configuration output header
+       'X11workbenchToolkit_config.h' in the appropriate 'include' directory.
+       This will specify whatever options you built the toolkit with,
+       excluding any debug or release options.
 
 
 

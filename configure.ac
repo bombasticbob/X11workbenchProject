@@ -1,8 +1,8 @@
 AC_INIT(X11workbench, 1.0, bobf@mrp3.com, X11workbench)
 # check/get base source directory based on a single unique file name
 AC_CONFIG_SRCDIR(X11workbench.c)
-# output defines to a header file 'X11WorkbenchToolkit_config.h'
-AC_CONFIG_HEADERS([include/X11WorkbenchToolkit_config.h])
+# output defines to a header file 'X11workbenchToolkit_config.h'
+AC_CONFIG_HEADERS([include/X11workbenchToolkit_config.h])
 # enable automake using 'more modern' syntax where AC_INIT defines the project and version
 AM_INIT_AUTOMAKE
 
@@ -191,7 +191,7 @@ case $host in
 esac
 
 if test x$test_have_xpm = xtrue ; then
-  AC_DEFINE([HAVE_XPM],[1],[whether or not XPM header and libraries are available])
+  AC_DEFINE([X11WORKBENCH_TOOLKIT_HAVE_XPM],[1],[whether or not XPM header and libraries are available])
 fi
 
 
