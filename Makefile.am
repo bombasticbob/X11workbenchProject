@@ -3,6 +3,8 @@ X11workbench_SOURCES = X11workbench.c X11workbench.h refactor.c refactor.h gizza
 X11workbench_SOURCES += application_icon.xpm splash.xpm
 X11workbench_SOURCES += doxy_comments.dox doxy.txt
 
+X11workbench_DEPENDENCIES = toolkit_lib
+
 AM_CPPFLAGS = $(X_CFLAGS) -DGLOBAL_XPATH="\"$(GLOBAL_XPATH)/etc\"" -DGLOBAL_PATH="\"$(sysconfdir)\""
 
 
@@ -101,4 +103,16 @@ endif
 
 # subdirectories containing additional sources
 SUBDIRS = lib
+
+
+
+# pseudo target for building the library
+
+.PHONY: toolkit_lib
+
+lib/libX11workbenchToolkit.a: toolkit_lib
+
+toolkit_lib:
+	$(MAKE) -C lib libX11workbenchToolkit.a
+
 

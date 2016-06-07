@@ -2527,6 +2527,8 @@ Window WBCreateWindow(Display *pDisplay, Window wIDParent,
 {
 Window idRval;
 _WINDOW_ENTRY_ *pEntry;
+WB_GEOM geom;
+
 
   if(!iFlags)
   {
@@ -2573,6 +2575,14 @@ _WINDOW_ENTRY_ *pEntry;
           END_XCALL_DEBUG_WRAPPER
         }
       }
+
+      geom.x = 0; // client area always begins at 0,0
+      geom.y = 0;
+      geom.width = iWidth;
+      geom.height = iHeight;
+      geom.border = iBorder;
+
+      WBInvalidateGeom(idRval, &geom, 0); // invalidate but don't paint yet
     }
   }
 
@@ -6696,13 +6706,17 @@ GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // GC has invalid region assi
 
   if(!pEntry->rgnClip || XEmptyRegion(pEntry->rgnClip)) // clipping region is empty?
   {
-    pEntry->rgnClip = WBGeomToRegion(pgBounds); // create from the bounding rectangle
+    WB_ERROR_PRINT("TEMPORARY:  %s - empty or no clip region\n", __FUNCTION__);
 
-    if(!pEntry->rgnClip)
+    if(pEntry->rgnClip)
     {
-      return None; // this is actually an error
+      XDestroyRegion(pEntry->rgnClip);
+//      pEntry->rgnClip = None;
     }
+
+    pEntry->rgnClip = WBGeomToRegion(pgBounds); // for now do this, using a new clip region, like implicit 'WBInvalidateGeom'
   }
+
 
   gcRval = XCreateGC(pEntry->pDisplay, wID, 0, NULL);
   if(gcRval)
@@ -6734,6 +6748,7 @@ GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // GC has invalid region assi
   if(gcRval)
   {
     rgnPaint = XCreateRegion();
+
     if(rgnPaint)
     {
       if(!pEntry->rgnClip)
@@ -6743,7 +6758,7 @@ GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // GC has invalid region assi
         xrct.width  = pgBounds->width;
         xrct.height = pgBounds->height;
 
-        WB_ERROR_PRINT("TEMPORARY:  %s - no clip region\n", __FUNCTION__);
+//        WB_ERROR_PRINT("TEMPORARY:  %s - no clip region\n", __FUNCTION__);
 
         XUnionRectWithRegion(&xrct, rgnPaint, rgnPaint);  // the paint rectangle as a region
       }
@@ -6757,9 +6772,12 @@ GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // GC has invalid region assi
 
           XFreeGC(pEntry->pDisplay, gcRval);
           gcRval = 0;
+
+          WB_ERROR_PRINT("ERROR:  %s - could not create clip region\n", __FUNCTION__);
         }
         else
         {
+          // combine specified region with clipping region.  result is new paint region
           xrct.x      = pgBounds->x;
           xrct.y      = pgBounds->y;
           xrct.width  = pgBounds->width;
@@ -6767,8 +6785,9 @@ GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // GC has invalid region assi
 
           XUnionRectWithRegion(&xrct, rgnTemp, rgnTemp);  // the paint rectangle as a region
           XUnionRegion(pEntry->rgnClip, rgnPaint, rgnPaint);  // a copy of the invalid region
-          XUnionRegion(rgnTemp, rgnPaint, rgnPaint);      // union with xrct (from the event)
-          // so now the paint region includes the xrct passed as 'pgBounds' as well as the invalid region
+          XIntersectRegion(rgnTemp, rgnPaint, rgnPaint);      // INTERSECT with xrct (usually from the Expose event)
+
+          // so now the paint region includes the intersect of the xrct passed as 'pgBounds' with the invalid region
           // (if called by WBBeginPaint, 'pgBounds' will be the rectangular area from the Expose event)
 
           XDestroyRegion(rgnTemp);
@@ -6869,6 +6888,9 @@ XRectangle xrct;
 
   if(xrct.width > 0 && xrct.height > 0)
   {
+//    WB_ERROR_PRINT("TEMPORARY: %s - clearing window %08xH geom %d, %d, %d, %d\n",
+//                   __FUNCTION__, (WB_UINT32)wID, xrct.x, xrct.y, xrct.width, xrct.height);
+
     XFillRectangle(pDisplay, wID, gc, xrct.x, xrct.y, xrct.width, xrct.height);
   }
 
@@ -6887,19 +6909,40 @@ void WBEndPaint(Window wID, GC gc)
   {
     if(pEntry->rgnPaint != None)
     {
-      XSubtractRegion(pEntry->rgnPaint, pEntry->rgnClip, pEntry->rgnClip);
+      XSubtractRegion(pEntry->rgnClip, pEntry->rgnPaint, pEntry->rgnClip);
 
-//      if(XEmptyRegion(pEntry->rgnClip))  // TODO:  should I leave the empty region anyway?  that might work better...
+// TODO:  should I leave the empty region anyway, or not?  leaving it might work better...
+//
+//      if(XEmptyRegion(pEntry->rgnClip))
 //      {
 //        XDestroyRegion(pEntry->rgnClip);
 //        pEntry->rgnClip = None;
 //      }
+
+// some debugging code
+//
+//      {
+//        XRectangle xrct;
+//
+//        BEGIN_XCALL_DEBUG_WRAPPER
+//        XClipBox(pEntry->rgnPaint, &xrct);
+//        END_XCALL_DEBUG_WRAPPER
+//
+//        WB_ERROR_PRINT("TEMPORARY: %s - new clip region, window %08xH geom %d, %d, %d, %d\n",
+//                       __FUNCTION__, (WB_UINT32)wID, xrct.x, xrct.y, xrct.width, xrct.height);
+//      }
     }
     else // destroy clip region if paint region is 'None'
     {
-      XDestroyRegion(pEntry->rgnClip);
-      pEntry->rgnClip = None;
+      WB_ERROR_PRINT("ERROR: %s - no paint region\n", __FUNCTION__);
+
+//      XDestroyRegion(pEntry->rgnClip);
+//      pEntry->rgnClip = None;
     }
+  }
+  else
+  {
+    WB_ERROR_PRINT("ERROR: %s - no clip region\n", __FUNCTION__);
   }
 
   if(pEntry->rgnPaint != None)

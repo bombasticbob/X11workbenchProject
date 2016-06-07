@@ -70,7 +70,7 @@
 #include "icon_app.xpm"   /* application icon that's the same size as the others, 36x36 */
 
 
-#define NO_SPLASH /* temporary, later put it as a configure option - need to get 'gleam' to work better */
+//#define NO_SPLASH /* temporary, later put it as a configure option - need to get 'gleam' to work better */
 
 #define STRING  "Hello, world"
 #define BORDER  32 /* was 1 */
@@ -232,15 +232,18 @@ FW_MENU_HANDLER_END
 
 static void usage(void)
 {
-  fputs("X11workbench - Copyright (c) 2010-2016 by S.F.T. Inc. - all rights reserved\n"
-        "Usage:  X11workbench [options] filename [filename [...]]\n"
-        "where   'filename' represents one or more files or workspaces to be opened on startup\n"
+  fputs("X11workbench - Copyright (c) 2010-2016 by S.F.T. Inc. - all rights reserved\n\n"
+        "Usage:      X11workbench [options] filename [filename [...]]\n"
+        "  where     'filename' represents one or more files or workspaces to be opened on startup\n"
         "\n"
         "Standard X11workbench Options\n"
-        "-h      display this message\n"
+        "-h          display this message\n"
 #ifndef NO_DEBUG
-        "-d      dump settings on startup\n"
+        "-d          dump settings on startup\n"
 #endif // NO_DEBUG
+#ifndef NO_SPLASH
+        "--nosplash  Skip the 'splash' screen on startup\n"
+#endif // !NO_SPLASH
         "\n", stderr);
 
   WBToolkitUsage();
@@ -284,6 +287,9 @@ int i1, iMinHeight, iMinWidth;
 #ifndef NO_DEBUG
 int iDebugDumpConfig = 0;
 #endif // NO_DEBUG
+#ifndef NO_SPLASH
+int bNoSplash = 0;
+#endif // !NO_SPLASH
 
 
   // as opposed to 'getarg' this method is system independent
@@ -301,6 +307,22 @@ int iDebugDumpConfig = 0;
       }
 
       break;
+    }
+
+    if(argv[1][1] == '-') // a double-dash
+    {
+      // double-dash items go here.  only 'one per'
+
+      if(!strcmp(&(argv[1][2]), "nosplash"))
+      {
+        bNoSplash = 1;
+        goto next_argument;
+      }
+
+      fprintf(stderr, "Unrecognized option \"%s\"\n", argv[1]);
+      usage();
+
+      return 1; // illegal argument
     }
 
     for(i1=1; argv[1][i1]; i1++)
@@ -326,6 +348,7 @@ int iDebugDumpConfig = 0;
       }
     }
 
+next_argument:
     argv++;
     argc--;
   }
@@ -377,10 +400,13 @@ int iDebugDumpConfig = 0;
 #define UTF8_COPYRIGHT "\xc2""\xa9"
 
 #ifndef NO_SPLASH
-  DLGSplashScreen(splash_xpm,
-//                  "Copyright " UTF8_COPYRIGHT " 2010-2016 by Big Bad Bombastic Bob\nAll Rights Reserved",  // text string with unicode char in it U+00A9
-                  "Copyright (c) 2010-2016 by Big Bad Bombastic Bob\nAll Rights Reserved", // 1 or 2 lines only
-                  WhitePixel(pX11Display, DefaultScreen(pX11Display))); // white text
+  if(!bNoSplash)
+  {
+    DLGSplashScreen(splash_xpm,
+//                    "Copyright " UTF8_COPYRIGHT " 2010-2016 by Big Bad Bombastic Bob\nAll Rights Reserved",  // text string with unicode char in it U+00A9
+                    "Copyright (c) 2010-2016 by Big Bad Bombastic Bob\nAll Rights Reserved", // 1 or 2 lines only
+                    WhitePixel(pX11Display, DefaultScreen(pX11Display))); // white text
+  }
 #endif // NO_SPLASH
 
   get_min_window_height_width(&iMinHeight, &iMinWidth);

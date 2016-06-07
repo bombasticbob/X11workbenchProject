@@ -889,9 +889,15 @@ typedef struct _SPLASH_
   Pixmap pixmap, pixmap2;
   char *szCopyright;
   int iW, iH; // width/height of bitmap
-  int iDepth; // depth, needed to create compatible bitmaps
+  int iDepth; // depth, needed to create compatible pixmaps
   int nIter; // total # of iterations thus far
   XFontStruct *pFont;
+  int nGleam;      // current gleam center position
+  WB_GEOM geomBorder;
+  XStandardColormap cmap;
+  XImage *pImage;
+  void *pImageData;
+  unsigned long cbImageData;
   unsigned long clrText, clrBlack, clrWhite; // pixel colors
 } SPLASH;
 
@@ -899,14 +905,14 @@ static int splash_callback(Window wID, XEvent *pEvent);
 static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                                Window wID, struct _SPLASH_ *pData);
 
-#define SPLASH_FRAMERATE 100 /* make this configurable? */
-#define SPLASH_TIME 2 /* seconds */
+#define SPLASH_FRAMERATE 30 /* make this configurable? */
+#define SPLASH_TIME 1500 /* milliseconds */
 
 void DLGSplashScreen(char *aXPM[], const char *szCopyright, unsigned long clrText)
 {
 Window wID;//, wIDTemp;
 XSetWindowAttributes xswa;  /* Temporary Set Window Attribute struct */
-int iX, iY, iW, iH;
+int i1, iX, iY, iW, iH;
 XSizeHints  xsh;            /* Size hints for window manager */
 XWMHints xwmh;
 XPM_ATTRIBUTES xattr;
@@ -960,6 +966,10 @@ unsigned int ai1[3];
   data.iW = xattr.width;
   data.iH = xattr.height;
   data.pFont = NULL;  // must do this
+  data.nGleam = 0;
+  data.pImage = NULL;
+  data.pImageData = NULL;
+  data.cbImageData = 0;
 
   bzero(&xswa, sizeof(xswa));
 
@@ -1014,6 +1024,60 @@ unsigned int ai1[3];
   // must EXPLICITLY allow PAINTING (and other stuff) i.e. ExposureMask
   XSelectInput(WBGetDefaultDisplay(), wID, WB_STANDARD_INPUT_MASK);
 
+  // NOW, I need a copy of the 'Standard Colormap' for this window.  Hopefully
+  // won't have any problems with this (if I do, maybe I can derive it?)
+  {
+    XStandardColormap *pMaps = NULL;
+    Display *pDisplay = WBGetDefaultDisplay();
+    Colormap cmDefault = DefaultColormap(pDisplay, DefaultScreen(pDisplay));
+    int nMaps = 0;
+
+    if(!XGetRGBColormaps(pDisplay, wID, &pMaps, &nMaps, XA_RGB_DEFAULT_MAP) ||
+       nMaps == 0)
+    {
+      // TODO:  create my own default mapping???
+
+      unsigned long lWhite = WhitePixel(pDisplay, DefaultScreen(pDisplay));
+
+      if(pMaps)
+      {
+        XFree(pMaps);
+      }
+
+fake_up_default_colormap:
+
+      WB_ERROR_PRINT("TEMPORARY:  %s using 'default' XStandardColormap\n", __FUNCTION__);
+
+      data.cmap.base_pixel = BlackPixel(pDisplay, DefaultScreen(pDisplay));
+      lWhite -= data.cmap.base_pixel;
+
+      data.cmap.red_max = 255;
+      data.cmap.green_max = 255;
+      data.cmap.blue_max = 255;
+
+      data.cmap.blue_mult = 1; // typical
+      data.cmap.green_mult = 256;
+      data.cmap.red_mult = 65536; // TODO derive these from 'lWhite'
+    }
+    else
+    {
+      for(i1=0; i1 < nMaps; i1++)
+      {
+        if(pMaps[i1].colormap == cmDefault)
+        {
+          memcpy(&data.cmap, &(pMaps[i1]), sizeof(XStandardColormap));
+          break;
+        }
+      }
+
+      XFree(pMaps);
+      if(i1 >= nMaps)
+      {
+        goto fake_up_default_colormap;
+      }
+    }
+  }
+
   if(CreateTimer(WBGetDefaultDisplay(), wID, 1000000 / SPLASH_FRAMERATE, 1, 1)) // periodic timer at 'frame rate'
   {
     WBDestroyWindow(wID);
@@ -1030,7 +1094,17 @@ unsigned int ai1[3];
     free((void *)data.szCopyright);
   }
 
+  if(data.pImageData)
+  {
+    free(data.pImageData);
+  }
+
   BEGIN_XCALL_DEBUG_WRAPPER
+  if(data.pImage)
+  {
+    XDestroyImage(data.pImage);
+  }
+
   if(data.pixmap != None)
   {
     XFreePixmap(WBGetDefaultDisplay(), data.pixmap);
@@ -1074,7 +1148,7 @@ struct _SPLASH_ *pData = (struct _SPLASH_ *)WBGetWindowData(wID, 0);
 
     pData->nIter ++;
 
-    if(pData->nIter >= SPLASH_FRAMERATE * SPLASH_TIME)
+    if(pData->nIter * 1000 >= SPLASH_FRAMERATE * (SPLASH_TIME + 1000))
     {
       DeleteTimer(WBGetDefaultDisplay(), wID, 1);
       WBSetWindowData(wID, 0, NULL);
@@ -1111,13 +1185,10 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
   GC gc;// = WBGetWindowDefaultGC(wID);
   Pixmap pxTemp;
   XGCValues xgcv;
-  WB_GEOM geomBorder, geomText;
+  WB_GEOM geomText;
   XRectangle xrct;
-//  WB_GEOM geomPaint;
-  int i1, i2, iX, iY, iTimeStart, iTimeEnd;
-//  int iW, iH, iHPos, iVPos;
-//  XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
-//  char *p1, *p2;
+  int iX, iY, iTimeStart, iTimeEnd;
+
 
   if(!pDisplay)
   {
@@ -1165,43 +1236,98 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
   // now we get to create a window-compatible pixmap compatible with the window size
   // NOTE:  XListDepths and XDefaultDepth may be needed to convert pixmaps to something that's compatible
 
-  pxTemp = XCreatePixmap(pDisplay, wID, pData->iW + 4, pData->iH + 4,
-                         DefaultDepth(pDisplay, DefaultScreen(pDisplay)));
+  WBGetWindowGeom(wID, &(pData->geomBorder));
+  pData->geomBorder.x = pData->geomBorder.y = 0; // force this (for now, gnome has absolute coordinates for splash window!)
 
-  if(!pxTemp)
+
+  xrct.x = pData->geomBorder.x;
+  xrct.y = pData->geomBorder.y;
+  xrct.width = pData->geomBorder.width;
+  xrct.height = pData->geomBorder.height;
+
+
+  if(pData->pixmap2 != None) // first part was already done
   {
-    WB_ERROR_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
-    XFreeGC(pDisplay, gc);
-    return 0;
+    pxTemp = pData->pixmap2;
   }
+  else
+  {
+    pxTemp = XCreatePixmap(pDisplay, wID, pData->iW + 4, pData->iH + 4,
+                           DefaultDepth(pDisplay, DefaultScreen(pDisplay)));
 
-  WBGetWindowGeom(wID, &geomBorder);
+    if(pxTemp == None)
+    {
+      WB_ERROR_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
+      XFreeGC(pDisplay, gc);
+      return 0;
+    }
 
-  geomBorder.x = geomBorder.y = 0; // force this (for now, gnome has absolute coordinates for splash window!)
+    if(pData->pixmap != None)  // just in case
+    {
+      XCopyArea(pDisplay, pData->pixmap, pxTemp, gc,
+                0, 0, pData->iW, pData->iH,
+                pData->geomBorder.x + 2, pData->geomBorder.y + 2);
+    }
+    else
+    {
+      // TODO: erase the background of the drawable, WBEraseBackground maybe?
+    }
 
-  xrct.x = geomBorder.x;
-  xrct.y = geomBorder.y;
-  xrct.width = geomBorder.width;
-  xrct.height = geomBorder.height;
+    // this fixes the border areas properly
+
+    xgcv.line_width = 3;
+    xgcv.function = GXcopy; // copy
+    xgcv.cap_style = CapProjecting;
+
+    XChangeGC(pDisplay, gc, GCCapStyle | GCFunction | GCLineWidth, &xgcv);
+
+    XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, 0,0, pData->iW + 3, 0);
+    XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, pData->iW + 3, 0, pData->iW + 3, pData->iH + 3);
+    XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, pData->iW + 3, pData->iH + 3, 0, pData->iH + 3);
+    XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, 0, pData->iH + 3, 0, 0);
+
+    pData->pixmap2 = pxTemp; // temporarily cache it here (I'll juggle it after allocating 2nd pixmap)
+
+    // next, I must create a *new* temporary pixmap as my 'working' pixmap.  the previous one is the 'reference' pixmap
+
+    pxTemp = XCreatePixmap(pDisplay, wID, pData->iW + 4, pData->iH + 4,
+                           DefaultDepth(pDisplay, DefaultScreen(pDisplay)));
+
+    if(pxTemp == None)
+    {
+      WB_ERROR_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
+
+      XFreePixmap(WBGetDefaultDisplay(), pData->pixmap2); // restartability
+      pData->pixmap2 = None;
+
+      XFreeGC(pDisplay, gc);
+      return 0;
+    }
+
+    if(pData->pixmap != None)  // just in case, test for it
+    {
+      XFreePixmap(WBGetDefaultDisplay(), pData->pixmap);
+    }    
+
+    pData->pixmap = pData->pixmap2; // NOW, ref pixmap (with image and border) goes into 'pixmap'
+    pData->pixmap2 = pxTemp;        // and the 'working' copy into 'pixmap2' (which is also 'pxTemp')
+
+    // make an exact duplicate without any clipping regions
+    XCopyArea(pDisplay, pData->pixmap, pxTemp, gc,
+              0, 0, pData->iW + 4, pData->iH + 4, 0, 0);  // make a good copy of it at least once
+  }
 
   if(pData->nIter <= 1)
   {
 //    WBClearWindow(wID, gc);  GC doesn't have a clip region yet, don't do this
     XClearWindow(pDisplay, wID);  // erase background
   }
-
-  // TODO:  create pixmap, do the operations, then render pixmap
-  // TODO:  consider creating clip regions to improve performance
-
-  XCopyArea(pDisplay, pData->pixmap, pxTemp ? pxTemp : wID, gc,
-            0, 0, pData->iW, pData->iH, geomBorder.x + 2, geomBorder.y + 2);
-
-  if(pData->nIter >= SPLASH_FRAMERATE / 2) // after first half second
+  else if(pData->nIter == SPLASH_FRAMERATE / 2) // after first half second
   {
-    geomText.x = geomBorder.x + 2;
-    geomText.y = geomBorder.y + 2;
-    geomText.width = geomBorder.width - 4;
-    geomText.height = geomBorder.height - 4;
+    geomText.x = pData->geomBorder.x + 2;
+    geomText.y = pData->geomBorder.y + 2;
+    geomText.width = pData->geomBorder.width - 4;
+    geomText.height = pData->geomBorder.height - 4;
 
     geomText.y += (geomText.height * 2) / 3;
     geomText.height -= (geomText.height * 2) / 3; // bottom 1/3
@@ -1216,7 +1342,7 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
       rctBounds.right = rctBounds.left + geomText.width;
       rctBounds.bottom = rctBounds.top + geomText.height;
 
-      DTDrawMultiLineText(pFont, pData->szCopyright, pDisplay, gc, pxTemp ? pxTemp : wID,
+      DTDrawMultiLineText(pFont, pData->szCopyright, pDisplay, gc, pData->pixmap,
                           -8, 0, &rctBounds, DTAlignment_VCENTER | DTAlignment_HCENTER);
 #if 0
       p1 = pData->szCopyright;
@@ -1260,35 +1386,183 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
       fprintf(stderr, "NO FONT, iter=%d\n", pData->nIter);
     }
 
-    iTimeStart = 3 * SPLASH_FRAMERATE / 2;
-    iTimeEnd = SPLASH_TIME * SPLASH_FRAMERATE - SPLASH_FRAMERATE / 2; // 1/2 sec before end
+    // make an exact duplicate without any clipping regions
 
-    if(iTimeStart + SPLASH_FRAMERATE / 2 > iTimeEnd)
+    XCopyArea(pDisplay, pData->pixmap, pxTemp, gc,
+              0, 0, pData->iW + 4, pData->iH + 4, 0, 0);
+
+    // now, grab an XImage for it
+
+    pData->pImage = XGetImage(pDisplay, pxTemp, 0, 0, pData->iW + 4, pData->iH + 4,
+                              0xffffffff, XYPixmap);
+  }
+
+  // TODO:  consider creating clip regions to improve performance
+
+  if(pData->nIter >= SPLASH_FRAMERATE / 2) // after first half second
+  {
+    iTimeStart = 1250 * SPLASH_FRAMERATE;                     // 1.5 seconds' worth in msecs, not seconds
+    iTimeEnd = (SPLASH_TIME + 1000) * SPLASH_FRAMERATE
+             - 500 * SPLASH_FRAMERATE;                        // 1/2 sec before end
+
+    if(iTimeStart + 1000 * SPLASH_FRAMERATE / 2 > iTimeEnd)
     {
       iTimeStart = iTimeEnd - SPLASH_FRAMERATE / 2;
     }
 
-    // drawing the 'glimmer' diagonally from upper left to lower right
+    // drawing the 'gleam' diagonally from upper left to lower right
     // TODO:  make this optional?
 
-    if(pData->nIter >= iTimeStart && pData->nIter <= iTimeEnd)
+    if(pData->nIter * 1000 > iTimeEnd)
     {
-      int bInvert = 0;
-      int iDelta = iTimeEnd - iTimeStart + 1;
-
-      iX = 2 * (pData->iW * (pData->nIter - iTimeStart) / iDelta + pData->iW / (2 * iDelta));
-      iY = 2 * (pData->iH * (pData->nIter - iTimeStart) / iDelta + pData->iH / (2 * iDelta));
-
-      if(iX > pData->iW || iY > pData->iH)
+      if(pData->pImage)
       {
-        i1 = (iX - pData->iW) * pData->iH / pData->iW;
-        i2 = (iY - pData->iH) * pData->iW / pData->iH;
+        XPutImage(pDisplay, pData->pixmap2, gc, pData->pImage, 0, 0, 0, 0, pData->iW + 4, pData->iH + 4);
 
-        iX = i2;
-        iY = i1;
-        bInvert = 1; // so it's (iX,pData->iH-1),(pData->iW-1,iY)
+        XDestroyImage(pData->pImage); // destroy it now that I'm done with it
+        pData->pImage = NULL;         // no longer stored (already cleaned up)
+      }
+    }
+    else if(pData->nIter * 1000 >= iTimeStart && pData->nIter * 1000 <= iTimeEnd)
+    {
+      int iDelta = iTimeEnd - iTimeStart + 1;
+      int iTemp;
+      XImage *pI; // the image I'll be manipulating
+
+      iTemp = pData->nIter * 1000L - iTimeStart;
+      iTemp = (int)(((long long)iTemp * (long long)iTemp) / (iTimeEnd - iTimeStart));
+
+      // get the starting points and end points
+      iX = 2 * (pData->iW * iTemp / iDelta + pData->iW / (2 * iDelta) / 1000); // x pos of top
+      iY = 2 * (pData->iH * iTemp / iDelta + pData->iH / (2 * iDelta) / 1000); // y pos of left
+
+      // will draw the line from 0,iY to iX,0
+
+      if(!pData->pImage)
+      {
+        pData->pImage = XGetImage(pDisplay, pData->pixmap2, 0, 0, pData->iW + 4, pData->iH + 4,
+                                  0xffffffff, XYPixmap);
       }
 
+      pI = pData->pImage;
+
+      if(pI && !pData->pImageData)
+      {
+        pData->cbImageData = pI->bytes_per_line * pI->height * pI->depth;
+        pData->pImageData = malloc(pData->cbImageData + 4);
+
+        if(pData->pImageData)
+        {
+          memcpy(pData->pImageData, pI->data, pData->cbImageData);
+        }
+      }
+
+      if(!pI)
+      {
+        // don't do anything
+      }
+      else
+      {
+        static int aLuma[11] = { 255, 249, 231, 202, 167, 128, 88, 53, 24, 6, 0  }; // 'luma' values for "the gleam" based on offset from center
+
+        int iX0, iY0, iX1, i1, i2, iW, iL, iMaxX, iMaxY;
+
+        // NOW I get the fun of directly manipulating my image.  W00T!
+
+        // effectively I do this:  XDrawLine(pDisplay, pxTemp, gc, -2, iY, iX, -2) and it's 19 pixels wide
+        
+        // So the line has a width of 19 pixels.  The pixels represent a white reflection centering at the
+        // coordinates I specified above, that is the line from -2, iY to iX, -2 .  This actually SHOULD
+        // be offset by 2 pixels so that it does not affect the border, but that's less iomportant
+
+        // draw the line.  19 pixels wide is actually +/- 9.  We start with a single pixel-width line, then
+        // do a for loop from -9 to +9 on the X axis, keeping Y constant.  if Y did not change, skip it.
+
+        iMaxX = pData->iW;
+        iMaxY = pData->iH;
+
+        for(iX0 = 0, iY0 = iY; iX0 < iMaxX && iY0 > 0; iX0++)
+        {
+          i1 = (int)(((iX - iX0) * (long long)iMaxY) / iMaxX); // a muldiv conversion (where I should be)
+
+          if(iY0 > i1) // so I don't repeat what I've done
+          {
+            for(; iY0 > i1; iY0--) // remember, top < bottom so if I start at the bottom, must SUBTRACT
+            {
+              // +/- 9 pixels
+              i2 = iX0 + 9;
+              for(iX1=iX0 - 9, iW = -9; iX1 <= i2; iX1++, iW++)
+              {
+                // is my current iX1, iY0 inside the desired rectangle?  If so, calculate the
+                // new color and assign it to this point.
+
+                if(iX1 > 2 && iX1 < iMaxX &&
+                   iY0 > 2 && iY0 < iMaxY)
+                {
+                  XColor clrTemp, clrPixel;
+                  int iY, iU, iV, iR, iG, iB;
+
+                  clrPixel.pixel = XGetPixel(pI, iX1 + 2, iY0 + 2);
+                  PXM_PixelToRGB(&(pData->cmap), &clrPixel);
+
+                  PXM_RGBToYUV(clrPixel.red >> 8, clrPixel.green >> 8, clrPixel.blue >> 8,
+                               &iY, &iU, &iV);
+
+                  iL = aLuma[abs(iW)]; // the 'Luma' constant, 0-255 (with 255 = 'white')
+
+                  // new pixel luma will be:  luma * (1 + iL / 128) (maxed at 255)
+                  // if new luma is > 255, reduce iU and iV (delta from 128) by the 'factor'
+                  // such that iU = 128 + (iU - 128) * factor [etc.]
+                  // and the 'factor' would be 255 / iU (the new value)
+
+                  iY = ((short)iY * ((short)256 + (short)iL)) / (short)256; // >> 6;/// (short)128;
+
+                  if(iY > 255)
+                  {
+                    iU = (short)128 + (((short)iU - (short)128) * (short)256) / (short)iY;
+                    iV = (short)128 + (((short)iV - (short)128) * (short)256) / (short)iY;
+                    iY = 255;
+                  }
+
+                  PXM_YUVToRGB(iY, iU, iV, &iR, &iG, &iB);
+                  clrTemp.red   = iR << 8;
+                  clrTemp.green = iG << 8;
+                  clrTemp.blue  = iB << 8;
+                  clrTemp.flags = DoRed | DoGreen | DoBlue;
+
+                  PXM_RGBToPixel(&(pData->cmap), &clrTemp);
+
+                  XPutPixel(pI, iX1 + 2, iY0 + 2, clrTemp.pixel);
+                }
+              }            
+            }
+          }
+        }        
+
+        // TODO:  assign clipping region to gc
+
+//        llTick -= WBGetTimeIndex();
+
+        XPutImage(pDisplay, pData->pixmap2, gc, pI, 0, 0, 0, 0, pData->iW + 4, pData->iH + 4);
+        XFlush(pDisplay); // make sure
+
+//        llTick += WBGetTimeIndex();
+
+        if(pData->pImageData)
+        {
+          // restore previous image data now that I'm done messing with it
+          memcpy(pI->data, pData->pImageData, pData->cbImageData); // restore previous image data
+        }
+        else
+        {
+          XDestroyImage(pI);
+          pData->pImage = NULL; // no longer stored (a fallback)
+        }
+
+//        WB_ERROR_PRINT("TEMPORARY:  %s - pixel stuff takes %llu millis\n", __FUNCTION__, llTick);
+      }
+
+#if 0
       // using some interesting raster ops, 'highlight' the pixels along the line of
       // (0,iY),(iX,0) or (iX,pData->iH-1),(pData->iW-1,iY)
 
@@ -1359,26 +1633,13 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
       {
         XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, iX, pData->iH + 4, pData->iW + 4, iY);
       }
+#endif // 0
     }
   }
 
-  // this fixes the border areas properly
-
-  xgcv.line_width = 3;
-  xgcv.function = GXcopy; // copy
-  xgcv.cap_style = CapProjecting;
-
-  XChangeGC(pDisplay, gc, GCCapStyle | GCFunction | GCLineWidth, &xgcv);
-
-  XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, 0,0, pData->iW + 3, 0);
-  XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, pData->iW + 3, 0, pData->iW + 3, pData->iH + 3);
-  XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, pData->iW + 3, pData->iH + 3, 0, pData->iH + 3);
-  XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, 0, pData->iH + 3, 0, 0);
-
-  if(pxTemp) // use the spare bitmap to do the work, thus making the whole screen update at once
+  if(pxTemp) // using the 2nd pixmap to do the work, thus making the whole screen update at once
   {
-    XCopyArea(pDisplay, pxTemp, wID, gc, 0, 0, pData->iW + 4, pData->iH + 4, geomBorder.x, geomBorder.y);
-    XFreePixmap(pDisplay, pxTemp);
+    XCopyArea(pDisplay, pxTemp, wID, gc, 0, 0, pData->iW + 4, pData->iH + 4, pData->geomBorder.x, pData->geomBorder.y);
   }
 
   XFreeGC(pDisplay, gc);

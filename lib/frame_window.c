@@ -109,6 +109,7 @@ typedef struct __FRAME_WINDOW__
 
 int FWDefaultCallback(Window wID, XEvent *pEvent);  // default callback for frame windows (call for default processing)
 
+static void InternalPaintTabBar(FRAME_WINDOW *pFrameWindow, XExposeEvent *pEvent);
 static void InternalPaintStatusBar(FRAME_WINDOW *pFrameWindow, XExposeEvent *pEvent);
 
 
@@ -304,12 +305,12 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
   if(WBFrameWindow_STATUS_BAR & pNew->wbFW.iFlags)
   {
     pNew->szStatus = WBCopyString("Status: none"); // default status bar text (mostly for testing)
-    WB_ERROR_PRINT("TEMPORARY: %s - window has a status bar\n", __FUNCTION__);
+//    WB_ERROR_PRINT("TEMPORARY: %s - window has a status bar\n", __FUNCTION__);
   }
   else
   {
     pNew->szStatus = NULL;
-    WB_ERROR_PRINT("TEMPORARY: %s - window has NO status bar\n", __FUNCTION__);
+//    WB_ERROR_PRINT("TEMPORARY: %s - window has NO status bar\n", __FUNCTION__);
   }
 
   // add struct to beginning of linked list 'cause it's faster that way
@@ -825,7 +826,13 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
     }
   }
 
-  // expose event - painting the status bar.
+  // expose event - painting the status bar and tab bar.
+
+  if(pEvent->type == Expose &&
+     !(WBFrameWindow_NO_TABS & pFrameWindow->wbFW.iFlags))
+  {
+    InternalPaintTabBar(pFrameWindow, &(pEvent->xexpose));  // this will 'validate' the tab bar area, preventing re-paint
+  }
 
   if(pEvent->type == Expose &&
      (WBFrameWindow_STATUS_BAR & pFrameWindow->wbFW.iFlags))
@@ -1132,6 +1139,178 @@ void FWSetStatusTabInfo(WBFrameWindow *pFrameWindow, int nTabs, const int *pTabs
 
 
 
+static void InternalPaintTabBar(FRAME_WINDOW *pFrameWindow, XExposeEvent *pEvent)
+{
+WB_RECT rct, rct2, rctExpose;
+WB_GEOM geom;
+Window wIDMenu;
+GC gc;
+WBMenuBarWindow *pMB;
+
+
+  if(WBFrameWindow_NO_TABS & pFrameWindow->wbFW.iFlags) // window has no tab bar?
+  {
+    return; // no tab bar, just bail
+  }
+
+  // calculate the location of the status bar
+
+  WBGetClientRect(pFrameWindow->wbFW.wID, &rct); // get the rectangle for the client area
+
+  // how big is the menu?  (assuming there is one)
+
+  wIDMenu = WBGetMenuWindow(pFrameWindow->wbFW.wID);
+
+  if(wIDMenu != None)
+  {
+    pMB = MBGetMenuBarWindowStruct(wIDMenu);
+
+    if(pMB)
+    {
+      WBGetWindowRect(wIDMenu, &rct2);
+
+      // what I want is the height.  Same calcuation done for 'recalc layout'
+      rct.top += rct2.bottom - rct2.top + 1;  // regardless of rect, this will be the height, plus 1 pixel
+    }
+  }
+
+  rct.bottom = rct.top + TAB_BAR_HEIGHT; // the rectangle for the tab bar
+
+//  WB_ERROR_PRINT("TEMPORARY: %s - tab bar rect %d, %d, %d, %d\n",
+//                 __FUNCTION__, rct.left, rct.top, rct.right, rct.bottom);
+
+  // does the Expose event intersect my status bar?
+
+  rctExpose.left   = pEvent->x;
+  rctExpose.top    = pEvent->y;
+  rctExpose.right  = rctExpose.left + pEvent->width;
+  rctExpose.bottom = rctExpose.top + pEvent->height;
+
+  if(!WBRectOverlapped(rct, rctExpose))
+  {
+//    WB_ERROR_PRINT("INFO: %s - expose event excludes tab bar\n", __FUNCTION__);
+
+    return; // do nothing (no overlap)
+  }
+
+  // intersect the two rectangles so I only re-paint what I have to
+
+  if(rctExpose.top < rct.top)
+  {
+    rctExpose.top = rct.top;
+  }
+
+  if(rctExpose.bottom > rct.bottom)
+  {
+    rctExpose.bottom = rct.bottom;
+  }
+
+  if(rctExpose.left < rct.left)
+  {
+    rctExpose.left = rct.left;
+  }
+
+  if(rctExpose.right > rct.right)
+  {
+    rctExpose.right = rct.right;
+  }
+
+  // time to start painting
+
+  geom.x      = rctExpose.left;
+  geom.y      = rctExpose.top;
+  geom.width  = rctExpose.right - rctExpose.left;
+  geom.height = rctExpose.bottom - rctExpose.top;
+
+//  WB_ERROR_PRINT("TEMPORARY: %s - tab bar EXPOSE rect %d, %d, %d, %d\n",
+//                 __FUNCTION__, rctExpose.left, rctExpose.top, rctExpose.right, rctExpose.bottom);
+
+  gc = WBBeginPaintGeom(pFrameWindow->wbFW.wID, &geom);
+
+  if(gc == None)
+  {
+    WB_ERROR_PRINT("ERROR: %s - no GC from WBBeginPaintGeom\n", __FUNCTION__);
+  }
+  else
+  {
+    Display *pDisplay = WBGetWindowDisplay(pFrameWindow->wbFW.wID);
+    XPoint xpt[3];
+
+//    WB_ERROR_PRINT("TEMPORARY: %s - filling display geom %d, %d, %d, %d\n",
+//                   __FUNCTION__, geom.x, geom.y, geom.width, geom.height);
+
+    // fill the rectangle with the background color
+
+    WBClearWindow(pFrameWindow->wbFW.wID, gc); // should only paint my little rectangle
+
+    // draw some lines in some colors for the border
+
+    // paint the 3D-looking border (a 'sunken' appearance for tab bar)
+    XSetForeground(pDisplay, gc, clrBD3.pixel);
+    xpt[0].x=rct.left;
+    xpt[0].y=rct.bottom - 2;  // exclude first point
+    xpt[1].x=rct.left;
+    xpt[1].y=rct.top;
+    xpt[2].x=rct.right - 2;   // exclude last point
+    xpt[2].y=rct.top;
+
+    XDrawLines(pDisplay, pFrameWindow->wbFW.wID, gc, xpt, 3, CoordModeOrigin);
+
+    XSetForeground(pDisplay, gc, clrBD2.pixel);
+    xpt[0].x=rct.right - 1;
+    xpt[0].y=rct.top + 1;              // exclude first point
+    xpt[1].x=rct.right - 1;
+    xpt[1].y=rct.bottom - 1;
+    xpt[2].x=rct.left + 1;              // exclude final point
+    xpt[2].y=rct.bottom - 1;
+
+    XDrawLines(pDisplay, pFrameWindow->wbFW.wID, gc, xpt, 3, CoordModeOrigin);
+
+    XSetForeground(pDisplay, gc, clrFG.pixel); // by convention, set it to FG [for text I need this]
+
+    // TODO:  draw the actual tabs and the text within them
+
+//    if(pFrameWindow->szStatus)
+//    {
+//      WB_RECT rctTemp;
+//
+//      rctTemp.left = rct.left + 8;
+//      rctTemp.top = rct.top + 4;
+//      rctTemp.right = rct.right - 8;
+//      rctTemp.bottom = rct.bottom - 4;
+//
+//      // temporary:  just paint the text
+////      DTDrawSingleLineText(WBGetDefaultFont(),
+////                           pFrameWindow->szStatus, pDisplay,
+////                           gc, pFrameWindow->wbFW.wID, 0, 0, &rctTemp, 0);
+//      XDrawString(pDisplay, pFrameWindow->wbFW.wID, gc, rctTemp.left, rctTemp.bottom - 2,
+//                  pFrameWindow->szStatus, strlen(pFrameWindow->szStatus));
+//    }                         
+
+    WBEndPaint(pFrameWindow->wbFW.wID, gc);  // and that's it!
+  }
+
+  // finally, alter the expose event slightly so that it reflects the 'painted' area
+
+  if(pEvent->height + pEvent->y < rct.bottom)
+  {
+//    WB_ERROR_PRINT("TEMPORARY: %s - altering x and height in Expose event\n", __FUNCTION__);
+
+    if(pEvent->y < rct.bottom)
+    {
+      pEvent->height -= rct.bottom - pEvent->y;
+      pEvent->y = rct.bottom;
+
+      if(pEvent->height < 0)
+      {
+        pEvent->height = 0;
+      }
+    }
+  }
+}
+
+
+
 static void InternalPaintStatusBar(FRAME_WINDOW *pFrameWindow, XExposeEvent *pEvent)
 {
 WB_RECT rct, rctExpose;
@@ -1159,7 +1338,7 @@ GC gc;
 
   if(!WBRectOverlapped(rct, rctExpose))
   {
-//    WB_ERROR_PRINT("INFO: %s - expose event excludes status bar\n", __FUNCTION__);
+    WB_ERROR_PRINT("INFO: %s - expose event excludes status bar\n", __FUNCTION__);
 
     return; // do nothing (no overlap)
   }

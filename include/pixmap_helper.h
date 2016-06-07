@@ -80,6 +80,94 @@ extern "C" {
 
 
 /** \ingroup pixmap
+  * \brief Convert R, G, B values to Y, U, V
+  *
+  * \param iR the Red value (0-255)
+  * \param iG the Green value (0-255)
+  * \param iB the Blue value (0-255)
+  * \param piY the returned 'Y' value (0-255)
+  * \param piU the returned 'U' value (0-255)
+  * \param piV the returned 'V' value (0-255)
+  *
+  * Translate colors from RGB to YUV.  Often this is desirable when doing color conversions,
+  * where you want to alter the brightness but leave the chroma information as-is.\n
+  * The chrominance (U, V) information determines the color space, and the luminance (Y)
+  * determines the brightness.  Altering the brightness 'Y' effectively leaves the chrominance
+  * information intact, while affecting how 'bright' a color appears.  A color can also be 'faded'
+  * or 'saturated' by equally increasing or decreasing the 'U' and 'V' levels.
+  *
+  * In YUV, for a white pixel, Y should be 255, U and V should both be 128\n
+  * In RGB, a white pixel would have R, G, and B at 255.\n
+  * Similarly, a black pixel should have R, G, B of 0, with Y at 255, and both U and V 128.\n
+  *
+  * However, the actual YUV calculations return 'iY' as 16 for 'black', and 235 for 'white'.
+  * Anything outside of this Y range SHOULD result in 'faded' colors (towards black or white).
+  * This algorithm has been tested for RGB values between 0 and 255, respectively, and the inverse
+  * calculation results in a deviation of at most '1' for R, G, or B, from the original RGB value.
+  *
+  * Header File:  pixmap_helper.h
+**/
+void PXM_RGBToYUV(int iR, int iG, int iB, int *piY, int *piU, int *piV);
+
+/** \ingroup pixmap
+  * \brief Convert Y, U, V values to  R, G, B 
+  *
+  * \param iY the 'Y' value (0-255)
+  * \param iU the 'U' value (0-255)
+  * \param iV the 'V' value (0-255)
+  * \param piR the returned Red value (0-255)
+  * \param piG the returned Green value (0-255)
+  * \param piB the returned Blue value (0-255)
+  *
+  * Translate colors from YUV to RGB.  Often this is desirable when doing color conversions,
+  * where you want to alter the brightness but leave the chroma information as-is.\n
+  * The chrominance (U, V) information determines the color space, and the luminance (Y)
+  * determines the brightness.  Altering the brightness 'Y' effectively leaves the chrominance
+  * information intact, while affecting how 'bright' a color appears.  A color can also be 'faded'
+  * or 'saturated' by equally increasing or decreasing the 'U' and 'V' levels.\n
+  *
+  * In YUV, for a white pixel, Y should be 255, U and V should both be 128\n
+  * In RGB, a white pixel would have R, G, and B at 255.\n
+  * Similarly, a black pixel should have R, G, B of 0, with Y at 255, and both U and V 128.\n
+  *
+  * However, the actual YUV calculations return 'iY' as 16 for 'black', and 235 for 'white'.
+  * Anything outside of this Y range SHOULD result in 'faded' colors (towards black or white).
+  * This algorithm has been tested for RGB values between 0 and 255, respectively, and the inverse
+  * calculation results in a deviation of at most '1' for R, G, or B, from the original RGB value.
+  *
+  * Header File:  pixmap_helper.h
+**/
+void PXM_YUVToRGB(int iY, int iU, int iV, int *piR, int *piG, int *piB);
+
+
+/** \ingroup pixmap
+  * \brief Convert the pixel menber of an XColor to RGB
+  *
+  * \param pMap A pointer to the XStandardColormap for conversion
+  * \param pColor A pointer to the XColor structure.  The 'pixel' member must be a valid pixel value
+  *
+  * This function reads the pixel member from 'pColor' and calculates the RGB values between 0 and 65535
+  *
+  * Header File:  pixmap_helper.h
+**/
+void PXM_PixelToRGB(XStandardColormap *pMap, XColor *pColor);
+
+
+/** \ingroup pixmap
+  * \brief Icon Registration for application 'large' and 'small' icons
+  *
+  * \param pMap A pointer to the XStandardColormap for conversion
+  * \param pColor A pointer to the XColor structure.  The 'red' 'green' and 'blue' members must be a valid RGB value
+  *
+  * This function reads the red, green, and blue members from 'pColor' and calculates the pixel value.  RGB
+  * entries are between 0 and 65535, for each of the red, green, and blue members.
+  *
+  * Header File:  pixmap_helper.h
+**/
+void PXM_RGBToPixel(XStandardColormap *pMap, XColor *pColor);
+
+
+/** \ingroup pixmap
   * \brief Icon Registration for application 'large' and 'small' icons
   *
   * \param ppRegAppLarge XPM definition array for 'large' 36x36 icon, IDC_ICON_APP

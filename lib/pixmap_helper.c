@@ -100,6 +100,600 @@ static char **ppRegAppLarge_Internal = NULL;
 static char **ppRegAppSmall_Internal = NULL;
 
 
+//-------------------------
+// RGB and YUV conversions
+//-------------------------
+
+static int clip255(int iIn)
+{
+  if(iIn < 0)
+  {
+    return 0;
+  }
+  else if(iIn > 255)
+  {
+    return 255;
+  }
+
+  return iIn;
+}
+
+void PXM_RGBToYUV(int iR, int iG, int iB, int *piY, int *piU, int *piV)
+{
+int iY, iU, iV;
+
+  iR = clip255(iR);
+  iG = clip255(iG);
+  iB = clip255(iB);
+
+  iY = clip255(((  66 * iR + 129 * iG +  25 * iB + 128) >> 8) + 16);
+  iU = clip255((( -38 * iR -  74 * iG + 112 * iB + 128) >> 8) + 128);
+  iV = clip255((( 112 * iR -  94 * iG -  18 * iB + 128) >> 8) + 128);
+
+  if(piY)
+  {
+    *piY = iY;
+  }
+
+  if(piU)
+  {
+    *piU = iU;
+  }
+
+  if(piV)
+  {
+    *piV = iV;
+  }
+}
+
+void PXM_YUVToRGB(int iY, int iU, int iV, int *piR, int *piG, int *piB)
+{
+int iR, iG, iB;
+int iC = iY - 16;
+int iD = iU - 128;
+int iE = iV - 128;
+
+  iR = clip255(( 298 * iC            + 409 * iE + 128) >> 8);
+  iG = clip255(( 298 * iC - 100 * iD - 208 * iE + 128) >> 8);
+  iB = clip255(( 298 * iC + 516 * iD            + 128) >> 8);
+
+  if(piR)
+  {
+    *piR = iR;
+  }
+
+  if(piG)
+  {
+    *piG = iG;
+  }
+
+  if(piB)
+  {
+    *piB = iB;
+  }
+}
+
+
+void PXM_PixelToRGB(XStandardColormap *pMap, XColor *pColor)
+{
+unsigned long long lColor, l2;
+
+  if(!pMap || !pColor)
+  {
+    return;
+  }
+
+  // 'nuking' this one out is a bit difficult.  I have to sort the values properly
+
+  lColor = pColor->pixel - pMap->base_pixel;
+
+  if(!pMap->red_mult && !pMap->green_mult && !pMap->blue_mult)
+  {
+    return;
+  }
+
+  if(pMap->red_mult >= pMap->green_mult &&
+     pMap->red_mult >= pMap->blue_mult) // this includes monochrome I think
+  {
+    if(!pMap->green_mult && !pMap->blue_mult)
+    {
+      // it's monochrome, so I only use red
+
+      if(pMap->red_mult == 1)
+      {
+        l2 = (65535 * lColor);
+      }
+      else
+      {
+        l2 = (65535 * lColor) / pMap->red_mult;
+      }
+
+      if(l2 >= 65536 * pMap->red_max)
+      {
+        l2 = 65535;
+      }
+      else if(lColor < 0)
+      {
+        l2 = 0;
+      }
+      else
+      {
+        l2 /= pMap->red_max;
+      }
+
+      pColor->red = l2;
+      pColor->green = l2;
+      pColor->blue = l2; // since it's monochrome
+    }
+    else if(pMap->green_mult > pMap->blue_mult)
+    {
+      // red first
+
+      l2 = (65535 * lColor) / pMap->red_mult;
+      lColor %= pMap->red_mult;
+
+      if(l2 >= 65536 * pMap->red_max)
+      {
+        l2 = 65535;
+      }
+      else if(lColor < 0)
+      {
+        l2 = 0;
+      }
+      else
+      {
+        l2 /= pMap->red_max;
+      }
+
+      pColor->red = l2;
+
+      // then green
+
+      l2 = (65535 * lColor) / pMap->green_mult;
+      lColor %= pMap->green_mult;
+
+      if(l2 >= 65536 * pMap->green_max)
+      {
+        l2 = 65535;
+      }
+      else if(lColor < 0)
+      {
+        l2 = 0;
+      }
+      else
+      {
+        l2 /= pMap->green_max;
+      }
+
+      pColor->green = l2;
+
+      // and then, blue
+
+      if(!pMap->blue_mult)
+      {
+        l2 = 0;
+      }
+      else
+      {
+        l2 = (65535 * lColor) / pMap->blue_mult;
+
+        if(l2 >= 65536 * pMap->blue_max)
+        {
+          l2 = 65535;
+        }
+        else if(lColor < 0)
+        {
+          l2 = 0;
+        }
+        else
+        {
+          l2 /= pMap->blue_max;
+        }
+      }
+      pColor->blue = l2;
+    }
+    else // if(pMap->blue_mult > pMap->green_mult)
+    {
+      // red first
+
+      l2 = (65535 * lColor) / pMap->red_mult;
+      lColor %= pMap->red_mult;
+
+      if(l2 >= 65536 * pMap->red_max)
+      {
+        l2 = 65535;
+      }
+      else if(lColor < 0)
+      {
+        l2 = 0;
+      }
+      else
+      {
+        l2 /= pMap->red_max;
+      }
+
+      pColor->red = l2;
+
+      // then blue
+
+      l2 = (65535 * lColor) / pMap->blue_mult;
+      lColor %= pMap->green_mult;
+
+      if(l2 >= 65536 * pMap->blue_max)
+      {
+        l2 = 65535;
+      }
+      else if(lColor < 0)
+      {
+        l2 = 0;
+      }
+      else
+      {
+        l2 /= pMap->blue_max;
+      }
+
+      pColor->blue = l2;
+
+      // and then, green
+
+      if(!pMap->green_mult)
+      {
+        l2 = 0;
+      }
+      else
+      {
+        l2 = (65535 * lColor) / pMap->green_mult;
+
+        if(l2 >= 65536 * pMap->green_max)
+        {
+          l2 = 65535;
+        }
+        else if(lColor < 0)
+        {
+          l2 = 0;
+        }
+        else
+        {
+          l2 /= pMap->green_max;
+        }
+      }
+
+      pColor->green = l2;
+    }
+  }          
+  else if(pMap->green_mult >= pMap->red_mult &&
+          pMap->green_mult >= pMap->blue_mult)
+  {
+    if(pMap->red_mult > pMap->blue_mult)
+    {
+      // green first
+
+      l2 = (65535 * lColor) / pMap->green_mult;
+      lColor %= pMap->green_mult;
+
+      if(l2 >= 65536 * pMap->green_max)
+      {
+        l2 = 65535;
+      }
+      else if(lColor < 0)
+      {
+        l2 = 0;
+      }
+      else
+      {
+        l2 /= pMap->green_max;
+      }
+
+      pColor->green = l2;
+
+      // then red
+
+      l2 = (65535 * lColor) / pMap->red_mult;
+      lColor %= pMap->red_mult;
+
+      if(l2 >= 65536 * pMap->red_max)
+      {
+        l2 = 65535;
+      }
+      else if(lColor < 0)
+      {
+        l2 = 0;
+      }
+      else
+      {
+        l2 /= pMap->red_max;
+      }
+
+      pColor->red = l2;
+
+      // and then, blue
+
+      if(!pMap->blue_mult)
+      {
+        l2 = 0;
+      }
+      else
+      {
+        l2 = (65535 * lColor) / pMap->blue_mult;
+
+        if(l2 >= 65536 * pMap->blue_max)
+        {
+          l2 = 65535;
+        }
+        else if(lColor < 0)
+        {
+          l2 = 0;
+        }
+        else
+        {
+          l2 /= pMap->blue_max;
+        }
+      }
+      pColor->blue = l2;
+    }
+    else // if(pMap->blue_mult > pMap->green_mult)
+    {
+      // green first
+
+      l2 = (65535 * lColor) / pMap->green_mult;
+      lColor %= pMap->green_mult;
+
+      if(l2 >= 65536 * pMap->green_max)
+      {
+        l2 = 65535;
+      }
+      else if(lColor < 0)
+      {
+        l2 = 0;
+      }
+      else
+      {
+        l2 /= pMap->green_max;
+      }
+
+      pColor->green = l2;
+
+      // then blue
+
+      l2 = (65535 * lColor) / pMap->blue_mult;
+      lColor %= pMap->green_mult;
+
+      if(l2 >= 65536 * pMap->blue_max)
+      {
+        l2 = 65535;
+      }
+      else if(lColor < 0)
+      {
+        l2 = 0;
+      }
+      else
+      {
+        l2 /= pMap->blue_max;
+      }
+
+      pColor->blue = l2;
+
+      // and then, red
+
+      if(!pMap->red_mult)
+      {
+        l2 = 0;
+      }
+      else
+      {
+        l2 = (65535 * lColor) / pMap->red_mult;
+
+        if(l2 >= 65536 * pMap->red_max)
+        {
+          l2 = 65535;
+        }
+        else if(lColor < 0)
+        {
+          l2 = 0;
+        }
+        else
+        {
+          l2 /= pMap->red_max;
+        }
+      }
+
+      pColor->red = l2;
+    }
+  }
+  else //if(pMap->blue_mult >= pMap->red_mult &&
+       //   pMap->blue_mult >= pMap->green_mult)
+  {
+    if(pMap->red_mult > pMap->green_mult)
+    {
+      // blue first
+
+      l2 = (65535 * lColor) / pMap->blue_mult;
+      lColor %= pMap->green_mult;
+
+      if(l2 >= 65536 * pMap->blue_max)
+      {
+        l2 = 65535;
+      }
+      else if(lColor < 0)
+      {
+        l2 = 0;
+      }
+      else
+      {
+        l2 /= pMap->blue_max;
+      }
+
+      pColor->blue = l2;
+
+      // then red
+
+      l2 = (65535 * lColor) / pMap->red_mult;
+      lColor %= pMap->red_mult;
+
+      if(l2 >= 65536 * pMap->red_max)
+      {
+        l2 = 65535;
+      }
+      else if(lColor < 0)
+      {
+        l2 = 0;
+      }
+      else
+      {
+        l2 /= pMap->red_max;
+      }
+
+      pColor->red = l2;
+
+      // and then, green
+
+      if(!pMap->green_mult)
+      {
+        l2 = 0;
+      }
+      else
+      {
+        l2 = (65535 * lColor) / pMap->green_mult;
+
+        if(l2 >= 65536 * pMap->green_max)
+        {
+          l2 = 65535;
+        }
+        else if(lColor < 0)
+        {
+          l2 = 0;
+        }
+        else
+        {
+          l2 /= pMap->green_max;
+        }
+      }
+      pColor->green = l2;
+    }
+    else // if(pMap->blue_mult > pMap->green_mult)
+    {
+      // blue first
+
+      l2 = (65535 * lColor) / pMap->blue_mult;
+      lColor %= pMap->green_mult;
+
+      if(l2 >= 65536 * pMap->blue_max)
+      {
+        l2 = 65535;
+      }
+      else if(lColor < 0)
+      {
+        l2 = 0;
+      }
+      else
+      {
+        l2 /= pMap->blue_max;
+      }
+
+      pColor->blue = l2;
+
+      // then green
+
+      l2 = (65535 * lColor) / pMap->green_mult;
+      lColor %= pMap->green_mult;
+
+      if(l2 >= 65536 * pMap->green_max)
+      {
+        l2 = 65535;
+      }
+      else if(lColor < 0)
+      {
+        l2 = 0;
+      }
+      else
+      {
+        l2 /= pMap->green_max;
+      }
+
+      pColor->green = l2;
+
+
+      // and then, red
+
+      if(!pMap->red_mult)
+      {
+        l2 = 0;
+      }
+      else
+      {
+        l2 = (65535 * lColor) / pMap->red_mult;
+
+        if(l2 >= 65536 * pMap->red_max)
+        {
+          l2 = 65535;
+        }
+        else if(lColor < 0)
+        {
+          l2 = 0;
+        }
+        else
+        {
+          l2 /= pMap->red_max;
+        }
+      }
+
+      pColor->red = l2;
+    }
+  }
+}
+
+void PXM_RGBToPixel(XStandardColormap *pMap, XColor *pColor)
+{
+unsigned long lR, lG, lB;
+
+  if(!pMap || !pColor)
+  {
+    return;
+  }
+
+  // this one is straightforward, right out of the docs for the XStandardColormap structure
+
+  lR = (unsigned long)(pColor->red * pMap->red_max) / 65535;
+
+  if(lR < 0)
+  {
+    lR = 0;
+  }
+  else if(lR > pMap->red_max)
+  {
+    lR = pMap->red_max;
+  }
+
+  lG = (unsigned long)(pColor->green * pMap->green_max) / 65535;
+
+  if(lG < 0)
+  {
+    lG = 0;
+  }
+  else if(lG > pMap->green_max)
+  {
+    lG = pMap->green_max;
+  }
+
+  lB = (unsigned long)(pColor->blue * pMap->blue_max) / 65535;
+
+  if(lB < 0)
+  {
+    lB = 0;
+  }
+  else if(lB > pMap->blue_max)
+  {
+    lB = pMap->blue_max;
+  }
+
+  pColor->pixel = (pMap->base_pixel
+                   + lR * pMap->red_mult
+                   + lG * pMap->green_mult
+                   + lB * pMap->blue_mult)
+                & 0xffffffffL;
+}
+
+
 void PXM_RegisterAppIcons(char *ppRegAppLarge[], char *ppRegAppSmall[])
 {
   ppRegAppLarge_Internal = ppRegAppLarge;
