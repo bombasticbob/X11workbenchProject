@@ -838,7 +838,8 @@ XFontStruct *WBLoadFont(Display *pDisplay, const char *szFontName,
 {
 XFontStruct *pRval=NULL, *pFSInfo=NULL;
 char **ppNames;
-int i1, i2, i3, iBest, iCount = 0, iWildcardFlag = 0;
+int i1, i2, i3, iBest, iCount = 0;
+//int iWildcardFlag = 0;
 char tbuf[512], tbuf2[512], tbuf3[512];
 
 // font names follow one of these patterns...
@@ -880,7 +881,7 @@ char tbuf[512], tbuf2[512], tbuf3[512];
   }
   else
   {
-    iWildcardFlag = 1;  // additional information
+//    iWildcardFlag = 1;  // additional information (TODO:  use this?)
 
     strncpy(tbuf, szFontName, sizeof(tbuf));
   }
@@ -890,10 +891,11 @@ char tbuf[512], tbuf2[512], tbuf3[512];
   if(iFlags || iFontSize)
   {
     InternalBuildFontString(tbuf, iFontSize, iFlags, tbuf2, sizeof(tbuf2), FALSE);
-//    fprintf(stderr, "TEMPORARY:  font string %s\n", tbuf2);
   }
   else
+  {
     strncpy(tbuf2, tbuf, sizeof(tbuf2));
+  }
 
   ppNames = XListFontsWithInfo(pDisplay, tbuf2, 2, &iCount, &pFSInfo);
 

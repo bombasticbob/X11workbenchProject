@@ -1554,6 +1554,8 @@ BEGIN_CREATE_CONTROL(COMBOTREE_CONTROL);
   int (*x)(Window wID, XEvent *pEvent) = NULL; // warning avoidance
   x = combo_tree_callback;                     // warning avoidance
 
+  x = x; // more warning avoidance (linux gcc is picky)
+
 
   return NULL;  // for now
 }
@@ -2913,7 +2915,6 @@ static int EditDoCharEvent(XClientMessageEvent *pEvent, Display *pDisplay,
 WBEditControl *pPrivate = (WBEditControl *)pSelf;
 int iRval = 0, iACS, iKey, nChar;//, iLen;
 char *pBuf, *pData;
-Window wIDParent;
 WB_RECT rctTemp;
 
 
@@ -2982,8 +2983,6 @@ WB_RECT rctTemp;
       {
         if(pPrivate->xTextObject.vtable->has_select(&(pPrivate->xTextObject)))
         {
-          wIDParent = WBGetParentWindow(wID);
-
           WB_DEBUG_PRINT(/*KEYSYM_DEBUG_FLAG*/DebugLevel_ERROR | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
                          "%s - CTRL+C key pressed, iACS=%d (%xH)\n", __FUNCTION__, iACS, iACS);
 
@@ -2993,14 +2992,10 @@ WB_RECT rctTemp;
           {
             if(aUTF8_STRING != None)
             {
-//              CHSetSelectionData(wIDParent, aCLIPBOARD, aUTF8_STRING, aUTF8_STRING,
-//                                 aUTF8_STRING, 8, pData, strlen(pData) + 1);
               WBSetClipboardData(pDisplay, aUTF8_STRING, 8, pData, strlen(pData) + 1);
             }
             else
             {
-//              CHSetSelectionData(wIDParent, aCLIPBOARD, aSTRING, aSTRING,
-//                                 aSTRING, 8, pData, strlen(pData) + 1);
               WBSetClipboardData(pDisplay, aSTRING, 8, pData, strlen(pData) + 1);
             }
             free(pData);
@@ -3127,8 +3122,6 @@ WB_RECT rctTemp;
       {
         if(pPrivate->xTextObject.vtable->has_select(&(pPrivate->xTextObject)))
         {
-          wIDParent = WBGetParentWindow(wID);
-
           WB_DEBUG_PRINT(/*KEYSYM_DEBUG_FLAG*/DebugLevel_ERROR | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
                          "%s - CTRL+C key pressed, iACS=%d (%xH)\n", __FUNCTION__, iACS, iACS);
 
@@ -3138,14 +3131,10 @@ WB_RECT rctTemp;
           {
             if(aUTF8_STRING != None)
             {
-//              CHSetSelectionData(wIDParent, aCLIPBOARD, aUTF8_STRING, aUTF8_STRING,
-//                                 aUTF8_STRING, 8, pData, strlen(pData) + 1);
               WBSetClipboardData(pDisplay, aUTF8_STRING, 8, pData, strlen(pData) + 1);
             }
             else
             {
-//              CHSetSelectionData(wIDParent, aCLIPBOARD, aSTRING, aSTRING,
-//                                 aSTRING, 8, pData, strlen(pData) + 1);
               WBSetClipboardData(pDisplay, aSTRING, 8, pData, strlen(pData) + 1);
             }
 
@@ -3568,21 +3557,16 @@ WB_RECT rctTemp;
         }
         else if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_CTRL) // CTRL+insert (copy)
         {
-//          Window wIDParent = WBGetParentWindow(wID);
           char *pData = pPrivate->xTextObject.vtable->get_sel_text(&(pPrivate->xTextObject), NULL);
 
           if(pData)
           {
             if(aUTF8_STRING != None)
             {
-//              CHSetSelectionData(wIDParent, aCLIPBOARD, aUTF8_STRING, aUTF8_STRING,
-//                                 aUTF8_STRING, 8, pData, strlen(pData) + 1);
               WBSetClipboardData(pDisplay, aUTF8_STRING, 8, pData, strlen(pData) + 1);
             }
             else
             {
-//              CHSetSelectionData(wIDParent, aCLIPBOARD, aSTRING, aSTRING,
-//                                 aSTRING, 8, pData, strlen(pData) + 1);
               WBSetClipboardData(pDisplay, aSTRING, 8, pData, strlen(pData) + 1);
             }
 
@@ -3726,13 +3710,13 @@ static int ListDoCharEvent(XClientMessageEvent *pEvent, Display *pDisplay,
                            Window wID, WBDialogControl *pSelf)
 {
 int iRval = 0, iACS, iKey, nChar;//, iLen;
-char *pBuf;
+//char *pBuf;
 
 
   iKey = pEvent->data.l[0];  // result from WBKeyEventProcessKey()
   iACS = pEvent->data.l[1];
   nChar = pEvent->data.l[2];
-  pBuf = (char *)&(pEvent->data.l[3]);
+//  pBuf = (char *)&(pEvent->data.l[3]);
 
   if(nChar > 0) // normal ASCII characters
   {
@@ -4107,7 +4091,7 @@ static int EditDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                              Window wID, WBDialogControl *pSelf)
 {
 WBEditControl *pPrivate = (WBEditControl *)pSelf;
-int /*i1, i2,*/ iHPos, iVPos;
+//int /*i1, i2,*/ iHPos, iVPos;
 XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
 XFontStruct *pOldFont, *pFont;
 GC gc; // = WBGetWindowDefaultGC(wID);
@@ -4155,8 +4139,10 @@ WB_GEOM geomPaint, geomBorder;
 //  XClearArea(pDisplay, wID, geomPaint.x, geomPaint.y, geomPaint.width, geomPaint.height, False);
 //  XClearWindow(pDisplay, wID);  // TODO:  rather than erase background, see if I need to
 
-  iHPos = XTextWidth(pFont, " ", 2);  // width of 1 space for text border (TODO:  RTL text)
+// TODO:  uncomment this when iVPos needs to be used - linux gcc warning avoidance
+//  iHPos = XTextWidth(pFont, " ", 2);  // width of 1 space for text border (TODO:  RTL text)
   END_XCALL_DEBUG_WRAPPER
+
 
   geomBorder.x = 0;
   geomBorder.y = 0;
@@ -4165,10 +4151,11 @@ WB_GEOM geomPaint, geomBorder;
 
   // TODO:  scrollbars, 'display window' scroll position within physical display
 
-  // vertically centered text (for single-line version)
-  iVPos = pFont->max_bounds.ascent + pFont->max_bounds.descent;  // font height
-  iVPos = (xwa.height - iVPos) >> 1;  // half of the difference - top of text
-  iVPos += pFont->max_bounds.ascent;
+// TODO:  uncomment these when iVPos needs to be used - linux gcc warning avoidance
+//  // vertically centered text (for single-line version)
+//  iVPos = pFont->max_bounds.ascent + pFont->max_bounds.descent;  // font height
+//  iVPos = (xwa.height - iVPos) >> 1;  // half of the difference - top of text
+//  iVPos += pFont->max_bounds.ascent;
 
   if(pSelf->pOwner && pSelf->pDlgControlEntry)       //pSelf->ulFlags & STATIC_3DBorder)
   {
@@ -4710,7 +4697,7 @@ static int PushButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                              Window wID, WBDialogControl *pSelf)
 {
-  int i1, /*i2,*/ iHPos, /*iVPos,*/ iVScrollWidth, iHScrollHeight;
+  int i1, /*i2, iHPos, iVPos,*/ iVScrollWidth, iHScrollHeight;
   int /* iType,*/ nHeight, nItemHeight;
   XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
   XFontStruct *pOldFont, *pFont;
@@ -4779,7 +4766,8 @@ static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
   geomBorder.width -= 2;
 
   // calculate a few things
-  iHPos = XTextWidth(pFont, " ", 1);  // width of 1 space for text border (TODO:  RTL text)
+// TODO:  uncomment this when iVPos needs to be used - linux gcc warning avoidance
+//  iHPos = XTextWidth(pFont, " ", 1);  // width of 1 space for text border (TODO:  RTL text)
   iVScrollWidth = XTextWidth(pFont, "X", 1) * 2 + 4;
   iHScrollHeight = pFont->max_bounds.ascent + pFont->max_bounds.descent + 4;
 

@@ -563,7 +563,7 @@ int MBMenuWinEvent(Window wID, XEvent *pEvent)
   Display *pDisplay = WBGetWindowDisplay(wID);
   WBMenuBarWindow *pSelf = MBGetMenuBarWindowStruct(wID);
   WBMenu *pMenu = pSelf ? pSelf->pMenu : NULL;
-  int i1, i2; //, iHPos, iVPos;
+  int i1; //, iHPos, iVPos;
   WBMenuItem *pItem;
   WB_GEOM geom;
 
@@ -898,12 +898,22 @@ int MBMenuWinEvent(Window wID, XEvent *pEvent)
 
           if(pPopup)
           {
-            WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Menu,
-                           "%s - Displaying popup menu id %d\n", __FUNCTION__, iMenuItem);
-            i2 = MBMenuDoModal(pPopup);
+#ifndef NO_DEBUG
+            int i2;
+#endif // NO_DEBUG
 
             WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Menu,
+                           "%s - Displaying popup menu id %d\n", __FUNCTION__, iMenuItem);
+
+#ifndef NO_DEBUG
+            i2 = 
+#endif // NO_DEBUG
+            MBMenuDoModal(pPopup);
+
+#ifndef NO_DEBUG
+            WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Menu,
                            "%s - Done with popup menu id %d, return %d\n", __FUNCTION__, iMenuItem, i2);
+#endif // NO_DEBUG
           }
           else
           {

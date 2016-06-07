@@ -3830,13 +3830,9 @@ static unsigned long long ullLastTime = 0;
           }
           else
           {
-            int iTempRet;
-
             BEGIN_XCALL_DEBUG_WRAPPER
-            iTempRet = XSetInputFocus(pDisplay, wID0, RevertToParent, CurrentTime);
+            XSetInputFocus(pDisplay, wID0, RevertToParent, CurrentTime);
             END_XCALL_DEBUG_WRAPPER
-
-//            WB_ERROR_PRINT("TEMPORARY (again): XSetInputFocus returns %d\n", iTempRet);
           }
 
           iMouseState = MouseState_NONE; // if window focus changes, I don't want double clicking or dragging to happen
@@ -8069,6 +8065,8 @@ _WINDOW_ENTRY_ *pEntry;
 
     if(pEntry)
     {
+#ifndef NO_DEBUG
+
       const char *pState;
 
       switch(pEntry->iWindowState)
@@ -8101,6 +8099,8 @@ _WINDOW_ENTRY_ *pEntry;
         WB_ERROR_PRINT("        Window 'class name': %s\n", pEntry->szClassName);
       }
 
+#endif // NO_DEBUG
+
       while(pEntry && pEntry->wParent != None)
       {
         Window wID = pEntry->wParent;
@@ -8113,6 +8113,8 @@ _WINDOW_ENTRY_ *pEntry;
         }
         else
         {
+#ifndef NO_DEBUG
+
           switch(pEntry->iWindowState)
           {
             case WB_WINDOW_DELETE:
@@ -8142,6 +8144,8 @@ _WINDOW_ENTRY_ *pEntry;
           {
             WB_ERROR_PRINT("        Parent Window 'class name': %s\n", pEntry->szClassName);
           }
+
+#endif // NO_DEBUG
         }
       }
     }

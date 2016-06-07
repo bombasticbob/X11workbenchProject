@@ -258,7 +258,7 @@ WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDBar, Window wIDOwner, WBMen
   {
     WBMenuItem *pItem = pMenu->ppItems[i1];
     const char *szText;
-    int iU1=0, iU2=0;
+//    int iU1=0, iU2=0;
 
     if(!pItem)
     {
@@ -292,18 +292,22 @@ WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDBar, Window wIDOwner, WBMen
         {
           *p1 = 0;
 
-          if(p1 == tbuf)
-            iU1 = 0;
-          else
-            iU1 = XTextWidth(pFS, tbuf, strlen(tbuf));
+// NOTE:  iU1 not being used; commented out because of linux gcc warnings
+//          if(p1 == tbuf)
+//            iU1 = 0;
+//          else
+//            iU1 = XTextWidth(pFS, tbuf, strlen(tbuf));
 
           if(p1[1])
           {
-            iU2 = XTextWidth(pFS, p1, 1);
+// NOTE:  iU2 not being used; commented out because of linux gcc warnings
+//            iU2 = XTextWidth(pFS, p1, 1);
             strcpy(p1, p1 + 1);
           }
-          else
-            iU2 = iU1;  // shouldn't happen
+//          else
+//          {
+//            iU2 = iU1;  // shouldn't happen
+//          }
         }
         p1++;
       }
@@ -727,7 +731,9 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
           strcpy(p1, p1 + 1); // adjust actual text so there is no underscore
         }
         else
+        {
           iU2 = iU1;  // shouldn't happen
+        }
       }
       else
       {
@@ -823,7 +829,7 @@ WB_GEOM geom;
 
     if(pItem->iPosition <= iY && iMaxY >= iY)  // between them
     {
-      XFontStruct *pFont, *pOldFont, *pDefaultMenuFont;
+//      XFontStruct *pFont, *pOldFont, *pDefaultMenuFont;
       int iHPos;
 
       if(pSelf->iSelected == i1) // already selected?
@@ -842,18 +848,19 @@ WB_GEOM geom;
         return NULL;
       }
 
-      pFont = pOldFont = WBGetWindowFontStruct(wID);
-      pDefaultMenuFont = MBGetDefaultMenuFont();
-
-      if(!pDefaultMenuFont && !pOldFont)
-      {
-        WB_WARN_PRINT("%s - * BUG * no font!\n", __FUNCTION__);
-        return 0;
-      }
-      else if(pDefaultMenuFont)
-      {
-        pFont = pDefaultMenuFont;
-      }
+// TODO:  if I need the font, uncomment this later.  otherwise, it causes a warning in linux gcc
+//      pFont = pOldFont = WBGetWindowFontStruct(wID);
+//      pDefaultMenuFont = MBGetDefaultMenuFont();
+//
+//      if(!pDefaultMenuFont && !pOldFont)
+//      {
+//        WB_WARN_PRINT("%s - * BUG * no font!\n", __FUNCTION__);
+//        return 0;
+//      }
+//      else if(pDefaultMenuFont)
+//      {
+//        pFont = pDefaultMenuFont;
+//      }
 
       iHPos = 1; // XTextWidth(pFont, "  ", 2);  // width of 2 spaces
 

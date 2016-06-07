@@ -1565,7 +1565,7 @@ int iAvgChar
 void DTDrawMultiLineText(XFontStruct *pFont, const char *szText, Display *pDisplay, GC gc, Drawable dw,
                          int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment)
 {
-int i1, i2, i3, iH, iH2, /*iW2,*/ iFontWidth, iFontHeight;
+int i1, i2, i3, iH, iH2; //, iW2, iFontWidth, iFontHeight;
 DT_WORDS *pWords;
 DT_WORD *pW;
 WB_RECT rcDest;
@@ -1596,8 +1596,9 @@ XFontSet fSet;
 
   // get a few things straight 'round here
 
-  iFontWidth = DTGetTextWidth(pFont, " ", 1);  // width of a single space
-  iFontHeight = pFont->ascent + pFont->descent;
+// NOTE:  iFontWidth and iFontHeight not being used; commented out because of linux gcc warnings
+//  iFontWidth = DTGetTextWidth(pFont, " ", 1);  // width of a single space
+//  iFontHeight = pFont->ascent + pFont->descent;
 
   pWords = DTGetWordsFromText(pFont, szText, iAlignment);
 

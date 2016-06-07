@@ -512,7 +512,7 @@ void DLGDestroyDialogWindow2(WBDialogWindow *pDialogWindow)
   // step 1:  unhook pDialogWindow
   DIALOG_WINDOW *pTemp = pDialogs;
   DIALOG_WINDOW *pPrev = NULL;
-  Window wID, wIDOwner;
+  Window wID; //, wIDOwner;
 //  int i1;
 
   if(!pDialogWindow || pDialogWindow->ulTag != DIALOG_WINDOW_TAG)
@@ -521,7 +521,7 @@ void DLGDestroyDialogWindow2(WBDialogWindow *pDialogWindow)
   }
 
   wID = pDialogWindow->wID;
-  wIDOwner = pDialogWindow->wIDOwner;
+//  wIDOwner = pDialogWindow->wIDOwner;
 
   WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Dialog,
                  "%s - Destroying dialog window %d (%08xH)\n",
@@ -1266,16 +1266,18 @@ int DLGProcessHotKey(WBDialogWindow *pDLG, XEvent *pEvent)
 //int cbLen;
 KeySym ks;
 int iACSMask = ShiftMask | ControlMask | Mod1Mask /* | Mod2Mask | Mod3Mask | Mod4Mask | Mod5Mask */;
-int i1, iCtrl, iAlt, iShift, iNoEnter = 0, iNoEsc = 0, iNoTab = 0;
+int i1, /* iCtrl, iAlt, iShift, */ iNoEnter = 0, iNoEsc = 0, iNoTab = 0;
 WBDialogEntry *pFocusEntry = NULL, *pDefaultEntry = NULL, *pCancelEntry = NULL;
 Display *pDisplay = WBGetWindowDisplay(pDLG->wID);
 
 
   iACSMask &= ((XKeyEvent *)pEvent)->state;
 
-  iCtrl = (iACSMask & ControlMask) ? 1 : 0;
-  iShift = (iACSMask & ShiftMask) ? 1 : 0;
-  iAlt = (iACSMask & Mod1Mask) ? 1 : 0;
+// TODO:  do I need the CTRL/ALT/SHIFT info?  uncomment these later if I need it
+//        for now they are commented out because linux GCC barphs on unused assigned vars
+//  iCtrl = (iACSMask & ControlMask) ? 1 : 0;
+//  iShift = (iACSMask & ShiftMask) ? 1 : 0;
+//  iAlt = (iACSMask & Mod1Mask) ? 1 : 0;
 
   // find default & current focus control entries
   for(i1=0; ((DIALOG_WINDOW *)pDLG)->pwContents && i1 < ((DIALOG_WINDOW *)pDLG)->nContents; i1++)

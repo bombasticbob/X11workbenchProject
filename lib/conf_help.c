@@ -433,7 +433,7 @@ const char * const *CHGetArgV()
 void * CHOpenConfFile(const char *szAppName, int iFlags)
 {
   CONF_FILE *pRval;
-  char *p1, *p2, *p3, *p4, *p5, *p6;
+  char *p1, *p2, *p3, *p4, /* *p5, */ *p6;
 //  int i1;
   struct stat st;
 //  file_help_buf_t *pFHB = NULL;
@@ -493,12 +493,14 @@ void * CHOpenConfFile(const char *szAppName, int iFlags)
     p6 = WBGetCanonicalPath(szLocalPath);
     if(p6)
     {
-      p5 = DoMakePath(p4, p6, szAppName, szConf); // then THIS one
+// NOTE:  p5 not being used; commented out because of linux gcc warnings
+//      p5 = DoMakePath(p4, p6, szAppName, szConf); // then THIS one
       free(p6);
     }
     else
     {
-      p5 = DoMakePath(p4, szLocalPath, szAppName, szConf); // alternate (uncanonical) name
+// NOTE:  p5 not being used; commented out because of linux gcc warnings
+//      p5 = DoMakePath(p4, szLocalPath, szAppName, szConf); // alternate (uncanonical) name
     }
   }
   else

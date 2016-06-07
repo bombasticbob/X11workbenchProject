@@ -1186,7 +1186,7 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
   Pixmap pxTemp;
   XGCValues xgcv;
   WB_GEOM geomText;
-  XRectangle xrct;
+//  XRectangle xrct;
   int iX, iY, iTimeStart, iTimeEnd;
 
 
@@ -1239,11 +1239,11 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
   WBGetWindowGeom(wID, &(pData->geomBorder));
   pData->geomBorder.x = pData->geomBorder.y = 0; // force this (for now, gnome has absolute coordinates for splash window!)
 
-
-  xrct.x = pData->geomBorder.x;
-  xrct.y = pData->geomBorder.y;
-  xrct.width = pData->geomBorder.width;
-  xrct.height = pData->geomBorder.height;
+// not currently being used - later if I need it, uncomment - gcc in linux barphs on unused assigned vars
+//  xrct.x = pData->geomBorder.x;
+//  xrct.y = pData->geomBorder.y;
+//  xrct.width = pData->geomBorder.width;
+//  xrct.height = pData->geomBorder.height;
 
 
   if(pData->pixmap2 != None) // first part was already done

@@ -2337,7 +2337,7 @@ int iSelAll;
 
   if(WBIsValidTextObject(pThis))
   {
-    int iOldRow, iOldCol, iOldIns;
+    int iOldIns; //, iOldRow, iOldCol;
 
     if(pThis->iRow < 0 || pThis->iCol< 0)
     {
@@ -2345,8 +2345,9 @@ int iSelAll;
       pThis->iCol = 0;
     }
 
-    iOldRow = pThis->iRow;
-    iOldCol = pThis->iCol;
+// NOTE:  iOldRow and iOldCol not being used; commented out because of linux gcc warnings
+//    iOldRow = pThis->iRow;
+//    iOldCol = pThis->iCol;
     iOldIns = pThis->iInsMode;
 
     iSelAll = SEL_RECT_ALL(pThis);
@@ -3842,9 +3843,9 @@ TEXT_BUFFER *pBuf;
 WB_GEOM geomV, geomP, geomC;
 XFontStruct *pFont = NULL, **ppFonts = NULL;
 char **ppNames, *pL;
-int i1, iLen, iFontHeight, iFontWidth, nFonts, iAsc=0, iDesc=0, iX, iY, iW, iPX, iPY;
+int i1, iLen, iFontHeight, iFontWidth, nFonts, iAsc=0, iDesc=0, /* iW, */ iX, iY, iPX, iPY;
 XFontSet fSet;
-XFontSetExtents *pExt;
+//XFontSetExtents *pExt;
 Pixmap pxTemp;
 unsigned long clrFG, clrBG, clrHFG, clrHBG;
 GC gc2 = None;
@@ -3914,7 +3915,8 @@ GC gc2 = None;
 
   // at this point I must use 'fSet' to do all of the font metrics + drawing
 
-  pExt = XExtentsOfFontSet(fSet); // get extents for the font set (reserved)
+// NOTE:  pExt not being used; commented out because of linux gcc warnings
+//  pExt = XExtentsOfFontSet(fSet); // get extents for the font set (reserved)
   nFonts = XFontsOfFontSet(fSet, &ppFonts, &ppNames); // returns # of items (do NOT free resources!  They are owned by the font set)
 
   // TODO:  XFontStruct::direction indicates LTR RTL TTB or BTT for painting - for now _ONLY_ LTR_TTB will apply
@@ -4199,7 +4201,8 @@ GC gc2 = None;
       iY = geomV.y + (geomV.height - iAsc - iDesc) / 2 + iAsc; // iY is now "the baseline" for the font
       iX = geomV.x;
 
-      iW = 0;
+// variable 'iW' is not eing used.  uncomment this later if you need it.  linux gcc warning avoidance
+//      iW = 0;
 
       pL = pBuf->aLines[0];
       if(!pL)

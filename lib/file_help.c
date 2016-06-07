@@ -207,7 +207,7 @@ void FBDestroyFileBuf(file_help_buf_t *pBuf)
 int FBParseFileBuf(file_help_buf_t *pBuf)
 {
   int i1, iLines;
-  const char *p1, *p2, *pEnd;
+  const char *p1, /* *p2,*/ *pEnd;
 
   // TODO:  ppLineBuf should be part of 'cData'.  For now it's malloc'd
 
@@ -222,7 +222,8 @@ int FBParseFileBuf(file_help_buf_t *pBuf)
   // count the lines first
   for(i1=0, p1 = pBuf->cData, pEnd = pBuf->cData + pBuf->lBufferCount; p1 < pEnd; )
   {
-    p2 = p1;
+// NOTE:  p2 not being used; commented out because of linux gcc warnings
+//    p2 = p1;
     while(p1 < pEnd && *p1 != '\n')
     {
       p1++;
