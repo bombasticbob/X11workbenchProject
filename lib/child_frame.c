@@ -157,13 +157,13 @@ int iRval = -1;
   bzero(&xswa, sizeof(xswa));
 
   xswa.border_pixel = FWGetDefaultBD().pixel;
-  xswa.background_pixel = FWGetDefaultBG().pixel;
+  xswa.background_pixel = FWGetDefaultBG().pixel;  // typically a 'grey' color
   xswa.colormap = DefaultColormap(pDisplay, DefaultScreen(pDisplay));
   xswa.bit_gravity = CenterGravity;
 
   pChildFrame->wID = WBCreateWindow(pDisplay, pOwner->wID, FWChildFrameEvent, "ChildFrame",
                                     pOwner->iClientX, pOwner->iClientY,
-                                    pOwner->iClientWidth, pOwner->iClientHeight,
+                                    pOwner->iClientWidth - 2, pOwner->iClientHeight - 2, // border is 1 pixel
                                     1, InputOutput,
                                     CWBorderPixel | CWBackPixel | CWColormap | CWBitGravity,
                                     &xswa);
@@ -294,6 +294,7 @@ void FWSetChildFrameExtent(WBChildFrame *pChildFrame, int iXExtent, int iYExtent
 void FWChildFrameRecalcLayout(WBChildFrame *pChildFrame)
 {
 WBFrameWindow *pOwner;
+Display *pDisplay;
 int iL, iT, iW, iH;
 
 
@@ -302,6 +303,7 @@ int iL, iT, iW, iH;
     return;
   }
 
+  pDisplay = WBGetWindowDisplay(pChildFrame->wID);
   pOwner = pChildFrame->pOwner;
 
   if(!pOwner) // irrelevant if NULL.  TODO:  properly validate this (anal retentive if DEBUG build)
@@ -328,6 +330,10 @@ int iL, iT, iW, iH;
   //        just apply that to iL, iT, iW, iH so that it reflects the correct viewpoirt in pixels
   //        minus any border, decorations, scrollbars, whatever, with 0,0 being top,left
 
+
+  // resize the window accordingly
+  XMoveWindow(pDisplay, pChildFrame->wID, iL, iT);
+  XResizeWindow(pDisplay, pChildFrame->wID, iW - 2, iH - 2); // 1 pixel for border
 
   // NOW, tell the user callback function (if any) what's happening.
   // I must assume that the owning frame is valid and has already re-calc'd its layout

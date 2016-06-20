@@ -285,7 +285,12 @@ typedef HANDLE WB_MUTEX;        // equivalent to a mutex handle
   *
   * When libXpm is in use, XPM_ATTRIBUTES becomes a \#define for XpmAttributes, the structure used
   * by XpmCreatePixmapFromData().  Because so many elements are not needed, MyLoadPixmapFromData()
-  * uses this scaled-down version when libXpm is not available.
+  * uses this scaled-down version whenever libXpm is not being used by the library.
+  *
+  * The configure option "--enable-libXpm" forces linkage with libXpm.  Note that this is NOT the
+  * default option, since performance is adversely affected when using libXpm.  However, for 100\%
+  * compatibility, it may be necessary to use libXpm as MyLoadPixmapFromData() has not been tested
+  * on all platforms.
   *
   * When libXpm is NOT in use, the follow structure is defined:
   *
@@ -309,9 +314,10 @@ typedef HANDLE WB_MUTEX;        // equivalent to a mutex handle
 
   * \endcode
   *
-  * This structure is a scaled-down version of the standard X11 structure 'XpmAttributes', and is defined
-  * ONLY when libXpm is not in use (that is, the configure script did not discover it).  Only those
-  * structure members that are needed by this toolkit have been defined.\n
+  * In summary, this structure is a scaled-down version of the standard X11 structure 'XpmAttributes', and
+  * is defined ONLY when libXpm is not in use (based on the configure script).  Only those structure
+  * members that are needed by this toolkit have been defined in the scaled-down version.
+  *
   * For more information, see MyLoadPixmapFromData()
   *
 **/
@@ -327,7 +333,7 @@ typedef struct _XPM_ATTRIBUTES_
 
 
 /** \ingroup pixmap
-  * \brief Alternate for XpmCreatePixmapFromData() when libXpm is not present
+  * \brief Alternate for XpmCreatePixmapFromData() whenever libXpm is not being used
   *
   * \param pDisplay A pointer to the display to use when creating the pixmaps
   * \param wID A window used as a 'drawable' reference when creating the pixmaps
@@ -337,12 +343,20 @@ typedef struct _XPM_ATTRIBUTES_
   * \param pAttr Pointer to the 'XPM_ATTRIBUTES' structure, which is a subset of the XpmAttributes structure used by XpmCreatePixmapFromData()
   * \return A value of zero on success (same as XpmSuccess, returned by XpmCreatePixmapFromData() on success).
   *
-  * This function is an alternate for XpmCreatePixmapFromData() when libXpm is not present.  It provides similar functionality,
-  * although there are some significant differences, particularly with the use of XPM_ATTRIBUTES as an actual structure and
-  * not just a '\#define'.  When libXpm is compiled in, XPM_ATTRIBUTES becomes a macro that is defined as XpmAttributes, the structure
-  * used by XpmCreatePixmapFromData().  There are a large number of members in this structure that are not useful for the purpose of
-  * this function, and so a scaled-down version is used when MyLoadPixmapFromData is being invoked.\n
-  * You should use libXpm when it is present on your system, as this function has not been fully tested on all platforms.
+  * This function is an alternate for XpmCreatePixmapFromData() whenever libXpm is not being used.  It provides similar
+  * functionality, although there are some significant differences, particularly with the use of XPM_ATTRIBUTES as an
+  * actual structure and not just a '\#define'.  Additionally, there is a significant performance benefit for using
+  * this function in lieu of libXpm.  As such it is the default configuration NOT to use libXpm.
+  *
+  * If you want to use libXpm, you can use the '--enable-libXpm' option in the 'configure' script for the project.
+  *
+  * Whenever libXpm is compiled in, XPM_ATTRIBUTES becomes a macro that is defined as XpmAttributes, the structure
+  * used by XpmCreatePixmapFromData().  There are a large number of members in this structure that are not useful
+  * for the purpose of this function, and so a scaled-down version is used when MyLoadPixmapFromData is being invoked.
+  *
+  * You should consider whether or not you want to use libXpm whenever it is present on your system, as this function has
+  * not been fully tested on all platforms.  However, using libXpm carries with it a significant performance penalty.
+  * If the application runs ok with the default configuration (i.e. no libXpm), you might as well leave it as-is.
   *
   * Header File:  platform_helper.h
 **/

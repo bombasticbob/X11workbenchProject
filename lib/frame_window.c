@@ -1830,6 +1830,9 @@ int iIndex;
 void FWSetFocusWindowIndex(WBFrameWindow *pFW, int iIndex)
 {
 FRAME_WINDOW *pFrameWindow;
+WBChildFrame *pC;
+int i1;
+Display *pDisplay = WBGetWindowDisplay(pFW->wID);
 
 
   pFrameWindow = InternalGet_FRAME_WINDOW(pFW);
@@ -1850,13 +1853,36 @@ FRAME_WINDOW *pFrameWindow;
 
   pFrameWindow->nFocusTab = iIndex; // set focus to THIS one
 
+  // go through the list and hide all of the others NOT the focus window
+  for(i1=0; i1 < pFrameWindow->nChildFrames; i1++)
+  {
+    if(i1 == iIndex)
+    {
+      continue;
+    }
+
+    pC = pFrameWindow->ppChildFrames[i1];
+    if(WBIsMapped(pDisplay, pC->wID))
+    {
+      WBUnmapWindow(pDisplay, pC->wID); // unmap it (make it invisible)
+    }
+  }
+
   // invalidate the tab bar rectangle first, before I continue
   WBInvalidateRect(pFW->wID, &(pFrameWindow->rctLastTabBarRect), 0);
 
   FWRecalcLayout(pFW->wID); // recalculate layout (this also updates the frame window and whatnot)
   // note that recalc'ing the layout does NOT re-paint the window.
 
-  WBUpdateWindow(pFW->wID);  // update the window now
+  pC = pFrameWindow->ppChildFrames[iIndex];
+
+//  if(!WBIsMapped(pDisplay, pC->wID))  determine why this is NOT working
+  {
+    WBMapWindow(pDisplay, pC->wID);     // make sure it's mapped
+  }
+
+  WBUpdateWindow(pFW->wID);  // update these windows now
+  WBUpdateWindow(pC->wID);
 }
 
 

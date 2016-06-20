@@ -53,10 +53,55 @@
 
 #include "window_helper.h"
 #include "edit_window.h"
+#include "conf_help.h"
 
 
 int FWEditWindowEvent(Window wID, XEvent *pEvent);
 
+static XColor clrFG, clrBG, clrAFG, clrABG;
+static int iInitColorFlag = 0;
+
+#define LOAD_COLOR0(X,Y) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) > 0) {  }
+#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
+
+static void InternalCheckEWColors(void)
+{
+  Colormap colormap;
+
+  // *Frame.background, *Frame.foreground, *WmFrame.background, *WmFrame.foreground,
+  // *Form.background, *Form.foreground, *background, *foreground
+
+  if(!iInitColorFlag)
+  {
+    char szFG[16], szBG[16], szAFG[16], szABG[16]; // note colors can typically be up to 13 characters + 0 byte
+
+    colormap = DefaultColormap(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
+
+    // (these color names and standards have changed *WAY* too many times...)
+
+    LOAD_COLOR0("*Text.foreground",szFG) else LOAD_COLOR0("*Edit.foreground", szFG)
+     else LOAD_COLOR("*foreground", szFG, "#000000");
+    LOAD_COLOR0("*Text.background",szBG) else LOAD_COLOR0("*Edit.background", szBG)
+     else LOAD_COLOR("*background", szBG, "white"); // pure white background by default
+
+    LOAD_COLOR("selected_bg_color", szABG, "#0040FF"); // a slightly greenish blue for the 'selected' BG color
+    LOAD_COLOR("selected_fg_color", szAFG, "white");   // white FG when selected
+
+    WB_ERROR_PRINT("TEMPORARY:  %s - edit window colors:  FG=%s BG=%s AFG=%s ABG=%s\n", __FUNCTION__,
+                   szFG, szBG, szAFG, szABG);
+
+    XParseColor(WBGetDefaultDisplay(), colormap, szFG, &clrFG);
+    XAllocColor(WBGetDefaultDisplay(), colormap, &clrFG);
+    XParseColor(WBGetDefaultDisplay(), colormap, szBG, &clrBG);
+    XAllocColor(WBGetDefaultDisplay(), colormap, &clrBG);
+    XParseColor(WBGetDefaultDisplay(), colormap, szAFG, &clrAFG);
+    XAllocColor(WBGetDefaultDisplay(), colormap, &clrAFG);
+    XParseColor(WBGetDefaultDisplay(), colormap, szABG, &clrABG);
+    XAllocColor(WBGetDefaultDisplay(), colormap, &clrABG);
+
+    iInitColorFlag = 1;
+  }
+}
 
 
 WBEditWindow *WBCreateEditWindow(WBFrameWindow *pOwner, XFontStruct *pFont,
@@ -64,6 +109,9 @@ WBEditWindow *WBCreateEditWindow(WBFrameWindow *pOwner, XFontStruct *pFont,
                                  int fFlags)
 {
 WBEditWindow *pRval;
+
+
+  InternalCheckEWColors();
 
   pRval = (WBEditWindow *)malloc(sizeof(*pRval));
 
@@ -123,6 +171,35 @@ WBEditWindow *WBEditWindowFromWindowID(Window wID)
 
 int FWEditWindowEvent(Window wID, XEvent *pEvent)
 {
+WBEditWindow *pE;
+GC gc;
+WB_GEOM geom;
+Display *pDisplay = WBGetWindowDisplay(wID);
+
+
+  pE = WBEditWindowFromWindowID(wID);
+
+  switch(pEvent->type)
+  {
+    case Expose:
+      WB_ERROR_PRINT("TEMPORARY:  %s - expose event\n", __FUNCTION__);
+      geom.x = pEvent->xexpose.x;
+      geom.y = pEvent->xexpose.y;
+      geom.width = pEvent->xexpose.width;
+      geom.height = pEvent->xexpose.height;
+
+      // TEMPORARY - just erase the background, for now...
+      gc = WBBeginPaintGeom(wID, &geom);
+
+      XSetForeground(pDisplay, gc, clrBG.pixel);
+      XSetBackground(pDisplay, gc, clrBG.pixel);
+      XFillRectangle(pDisplay, wID, gc, geom.x, geom.y, geom.width - 2, geom.height - 2);
+
+      WBEndPaint(wID, gc);
+      
+      return 1; // "handled"
+  }
+  
   return 0; // for now, NONE are handled
 }
 

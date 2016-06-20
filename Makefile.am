@@ -8,6 +8,13 @@ X11workbench_DEPENDENCIES = toolkit_lib
 AM_CPPFLAGS = $(X_CFLAGS) -DGLOBAL_XPATH="\"$(GLOBAL_XPATH)/etc\"" -DGLOBAL_PATH="\"$(sysconfdir)\""
 
 
+# this allows me to eliminate a few files, like README  Since I have included
+# 'README.md' in EXTRA_DIST (see below), I'll get THAT one and any others
+# that are present.  But automake won't ENFORCE them.
+AUTOMAKE_OPTIONS = foreign
+
+
+# presence of XPM library.  use --enable-libXpm in configure to enable it
 if HAVE_XPM_LIB
   X_EXTRA_LIBS += -lXpm
 endif
@@ -32,39 +39,8 @@ endif
 man1_MANS = @MAN_PAGES@
 
 # Extra distribution files
-EXTRA_DIST = BUILD X11workbench.1 X11workbench.interix $(man1_MANS)
+EXTRA_DIST = README.md BUILD X11workbench.1 X11workbench.interix $(man1_MANS)
 
-# comment out this section to include external 'man2html' perl script
-## man2html distribution files - man2html version 3.0.1 license under GPLv2
-## web site http://www.oac.uci.edu/indiv/ehood/man2html.html
-##
-## what you see here is a copy of the contents of the tarball as GPL compliance
-## I have to use this package directly since it might not exist and there
-## are OTHER 'man2html' packages, such as those for debian, that do not
-## work even remotely the same as this one
-## This program is ONLY run as an external utility and is not 'compiled in'
-## and is not necessary for X11workbench to run.  Only specific functionality
-## relies on it, and it could be substituted with a different utility provided
-## that the different utility gives you the same functionality
-##
-#EXTRA_DIST += man2html/man2html man2html/README man2html/COPYING
-#EXTRA_DIST += man2html/CHANGES man2html/MANIFEST man2html/man.cgi
-#EXTRA_DIST += man2html/doc/man2html.1 man2html/doc/man2html.html
-#EXTRA_DIST += man2html/doc/man2html.txt man2html/doc/man2html.ps
-#EXTRA_DIST += man2html/install.me
-#
-#bin_PROGRAMS += X11workbench_man2html
-#
-## build target for man2html, installed in the same dir as X11workbench
-## following example from automake docs, use 'low res time' for dest
-#
-#.LOW_RESOLUTION_TIME: X11workbench_man2html$(EXEEXT)
-#X11workbench_man2html$(EXEEXT):	man2html/man2html
-#	cp -p man2html/man2html $@
-#	sed -i".bak" 's/\/usr\/local\/bin\/perl/'`which perl | sed 's/\//\\\\\//g'`'/' $@
-#	rm -f $@".bak"
-#	chmod 755 $@
-#
 
 if NO_OPT
   NO_OPT_FLAGS = -O0
