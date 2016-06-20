@@ -77,8 +77,15 @@
 
 #define THIS_SUBSYSTEM DebugSubSystem_Dialog
 
-
-
+//-------------------------------------------------------------------
+//
+// alteration of 'gleam' behavior for 'Splash' dialog
+// default is the 'wide' gleam that uses 1/r^2
+//
+//#define GLEAM_OLD /* use this to do the 'old' gleam behavior */
+//#define GLEAM_NARROW /* use this to produce the 'narrow' gleam */
+//
+//------------------------------------------------------------------
 
 
 ///////////////
@@ -299,6 +306,8 @@ int iRval, iX, iY;
   }
 
 
+//  WB_ERROR_PRINT("TEMPORARY:  %s - calling DLGCreateDialogWindow\n", __FUNCTION__);
+
   pDlg = DLGCreateDialogWindow(szTitle,pRes, iX, iY,
                                MESSAGE_BOX_WIDTH,
                                MESSAGE_BOX_HEIGHT, // TODO:  derive from ???
@@ -327,6 +336,8 @@ int iRval, iX, iY;
     }
 
     WBSetWindowIcon(wIDDlg, GetMessageBoxIconPixmapID(iType & MessageBox_ICON_MASK));
+
+//    WB_ERROR_PRINT("TEMPORARY:  %s - calling WBShowModal\n", __FUNCTION__);
 
     iRval = WBShowModal(wIDDlg, 0);
 
@@ -912,7 +923,7 @@ void DLGSplashScreen(char *aXPM[], const char *szCopyright, unsigned long clrTex
 {
 Window wID;//, wIDTemp;
 XSetWindowAttributes xswa;  /* Temporary Set Window Attribute struct */
-int i1, iX, iY, iW, iH;
+int iX, iY, iW, iH;
 XSizeHints  xsh;            /* Size hints for window manager */
 XWMHints xwmh;
 XPM_ATTRIBUTES xattr;
@@ -946,8 +957,8 @@ unsigned int ai1[3];
     return;
   }
 
-  WB_ERROR_PRINT("TEMPORARY %s - iW=%d, iH=%d, data.pixmap=%d (%08xH)\n",
-                 __FUNCTION__, iW, iH, (int)data.pixmap, (int)data.pixmap);
+//  WB_ERROR_PRINT("TEMPORARY %s - iW=%d, iH=%d, data.pixmap=%d (%08xH)\n",
+//                 __FUNCTION__, iW, iH, (int)data.pixmap, (int)data.pixmap);
 
   // TODO:  choose font, calculate bounds of text area
   //        save font/bounds data and/or combine text into pixmap with transparent background
@@ -1024,59 +1035,7 @@ unsigned int ai1[3];
   // must EXPLICITLY allow PAINTING (and other stuff) i.e. ExposureMask
   XSelectInput(WBGetDefaultDisplay(), wID, WB_STANDARD_INPUT_MASK);
 
-  // NOW, I need a copy of the 'Standard Colormap' for this window.  Hopefully
-  // won't have any problems with this (if I do, maybe I can derive it?)
-  {
-    XStandardColormap *pMaps = NULL;
-    Display *pDisplay = WBGetDefaultDisplay();
-    Colormap cmDefault = DefaultColormap(pDisplay, DefaultScreen(pDisplay));
-    int nMaps = 0;
-
-    if(!XGetRGBColormaps(pDisplay, wID, &pMaps, &nMaps, XA_RGB_DEFAULT_MAP) ||
-       nMaps == 0)
-    {
-      // TODO:  create my own default mapping???
-
-      unsigned long lWhite = WhitePixel(pDisplay, DefaultScreen(pDisplay));
-
-      if(pMaps)
-      {
-        XFree(pMaps);
-      }
-
-fake_up_default_colormap:
-
-      WB_ERROR_PRINT("TEMPORARY:  %s using 'default' XStandardColormap\n", __FUNCTION__);
-
-      data.cmap.base_pixel = BlackPixel(pDisplay, DefaultScreen(pDisplay));
-      lWhite -= data.cmap.base_pixel;
-
-      data.cmap.red_max = 255;
-      data.cmap.green_max = 255;
-      data.cmap.blue_max = 255;
-
-      data.cmap.blue_mult = 1; // typical
-      data.cmap.green_mult = 256;
-      data.cmap.red_mult = 65536; // TODO derive these from 'lWhite'
-    }
-    else
-    {
-      for(i1=0; i1 < nMaps; i1++)
-      {
-        if(pMaps[i1].colormap == cmDefault)
-        {
-          memcpy(&data.cmap, &(pMaps[i1]), sizeof(XStandardColormap));
-          break;
-        }
-      }
-
-      XFree(pMaps);
-      if(i1 >= nMaps)
-      {
-        goto fake_up_default_colormap;
-      }
-    }
-  }
+  WBDefaultStandardColormap(WBGetDefaultDisplay(), &data.cmap);
 
   if(CreateTimer(WBGetDefaultDisplay(), wID, 1000000 / SPLASH_FRAMERATE, 1, 1)) // periodic timer at 'frame rate'
   {
@@ -1441,19 +1400,29 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
       if(!pData->pImage)
       {
         pData->pImage = XGetImage(pDisplay, pData->pixmap2, 0, 0, pData->iW + 4, pData->iH + 4,
-                                  0xffffffff, XYPixmap);
+                                  0xffffffff, // I've tried 0, 1, and THIS value - no apparent difference
+                                  XYPixmap); // TODO:  use ZPixmap instead?
       }
 
       pI = pData->pImage;
 
       if(pI && !pData->pImageData)
       {
-        pData->cbImageData = pI->bytes_per_line * pI->height * pI->depth;
+        // this formula can be found in the xorg-server source:
+        // length = ximage->bytes_per_line * ximage->height;
+        // this is from 'xnestGetImage' in hw/xnest/GCOps.c
+        // note that they don't include 'depth' in that.  when I exclude 'depth', it doesn't work
+        // TODO:  do I need to pay attention to PADDING?  docs and source suggest 'no'
+
+//        WB_ERROR_PRINT("TEMPORARY:  %s - bytes_per_line=%d, height=%d, depth=%d\n", __FUNCTION__,
+//                       pI->bytes_per_line, pI->height, pI->depth);
+        
+        pData->cbImageData = PXM_GetImageDataLength(pI);
         pData->pImageData = malloc(pData->cbImageData + 4);
 
         if(pData->pImageData)
         {
-          memcpy(pData->pImageData, pI->data, pData->cbImageData);
+          memcpy(pData->pImageData, PXM_GetImageDataPtr(pI), pData->cbImageData);
         }
       }
 
@@ -1463,7 +1432,18 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
       }
       else
       {
-        static int aLuma[11] = { 255, 249, 231, 202, 167, 128, 88, 53, 24, 6, 0  }; // 'luma' values for "the gleam" based on offset from center
+#if defined(GLEAM_OLD)
+#define GLEAM_WIDTH 10
+        static int aLuma[GLEAM_WIDTH + 1] = { 255, 249, 231, 202, 167, 128, 88, 53, 24, 6, 0  }; // 'luma' values for "the gleam" based on offset from center
+#elif defined(GLEAM_NARROW)
+#define GLEAM_WIDTH 17
+        static int aLuma[GLEAM_WIDTH + 1] = { 255, 202, 161, 128, 101, 80, 64, 51, 40,
+                                              32, 25, 20, 16, 13, 10, 8, 6, 5  }; // similar but 1/r^2 version (no cos)
+#else // WIDE gleam
+#define GLEAM_WIDTH 29
+        static int aLuma[GLEAM_WIDTH + 1] = { 255,225,198,175,154,136,120,106,93,82,72,64,
+                                              56,50,44,39,34,30,26,23,21,18,16,14,12,11,10,8,7,7 }; // a bit wider, more obvious
+#endif // GLEAM_OLD, GLEAM_NARROW
 
         int iX0, iY0, iX1, i1, i2, iW, iL, iMaxX, iMaxY;
 
@@ -1471,17 +1451,17 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 
         // effectively I do this:  XDrawLine(pDisplay, pxTemp, gc, -2, iY, iX, -2) and it's 19 pixels wide
         
-        // So the line has a width of 19 pixels.  The pixels represent a white reflection centering at the
-        // coordinates I specified above, that is the line from -2, iY to iX, -2 .  This actually SHOULD
-        // be offset by 2 pixels so that it does not affect the border, but that's less iomportant
+        // So the line has a width of '2*GLEAM_WIDTH + 1' pixels.  The pixels represent a white reflection
+        // centering at the coordinates I specified above, that is the line from -2, iY to iX, -2 .  This
+        // actually SHOULD be offset by 2 pixels so that it does not affect the border, but that's less iomportant
 
         // draw the line.  19 pixels wide is actually +/- 9.  We start with a single pixel-width line, then
-        // do a for loop from -9 to +9 on the X axis, keeping Y constant.  if Y did not change, skip it.
+        // do a for loop from/to +/- GLEAM_WIDTH on the X axis, keeping Y constant.  if Y did not change, skip it.
 
         iMaxX = pData->iW;
         iMaxY = pData->iH;
 
-        for(iX0 = 0, iY0 = iY; iX0 < iMaxX && iY0 > 0; iX0++)
+        for(iX0 = -GLEAM_WIDTH, iY0 = iY + GLEAM_WIDTH; iX0 < iMaxX + GLEAM_WIDTH && iY0 > -GLEAM_WIDTH; iX0++)
         {
           i1 = (int)(((iX - iX0) * (long long)iMaxY) / iMaxX); // a muldiv conversion (where I should be)
 
@@ -1489,9 +1469,9 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
           {
             for(; iY0 > i1; iY0--) // remember, top < bottom so if I start at the bottom, must SUBTRACT
             {
-              // +/- 9 pixels
-              i2 = iX0 + 9;
-              for(iX1=iX0 - 9, iW = -9; iX1 <= i2; iX1++, iW++)
+              // +/- GLEAM_WIDTH pixels
+              i2 = iX0 + GLEAM_WIDTH;
+              for(iX1=iX0 - GLEAM_WIDTH, iW = -GLEAM_WIDTH; iX1 <= i2; iX1++, iW++)
               {
                 // is my current iX1, iY0 inside the desired rectangle?  If so, calculate the
                 // new color and assign it to this point.
@@ -1525,6 +1505,7 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                   }
 
                   PXM_YUVToRGB(iY, iU, iV, &iR, &iG, &iB);
+
                   clrTemp.red   = iR << 8;
                   clrTemp.green = iG << 8;
                   clrTemp.blue  = iB << 8;
@@ -1551,7 +1532,7 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
         if(pData->pImageData)
         {
           // restore previous image data now that I'm done messing with it
-          memcpy(pI->data, pData->pImageData, pData->cbImageData); // restore previous image data
+          memcpy(PXM_GetImageDataPtr(pI), pData->pImageData, pData->cbImageData); // restore previous image data
         }
         else
         {

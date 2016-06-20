@@ -54,6 +54,7 @@
 #include "text_object.h"
 #include "frame_window.h"
 
+
 /** \file child_frame.h
   * \brief Child Frame API functions
   *
@@ -85,6 +86,9 @@ extern "C" {
 
 // SEE frame_window.h for WBChildFrame definition
 
+/** \ingroup child_frame
+  * \brief TAG for the WBChildFrame structure
+**/
 #define CHILD_FRAME_TAG (*((const unsigned int *)"FWCF"))
 
 /** \ingroup child_frame
@@ -172,6 +176,21 @@ void FWSetChildFrameMenuHandlers(WBChildFrame *pChildFrame, const WBFWMenuHandle
   * Header File:  child_frame.h
 **/
 void FWSetChildFrameDisplayName(WBChildFrame *pChildFrame, const char *szDisplayName);
+
+/** \ingroup child_frame
+  * \brief Assign the image atom for the child frame.  the image appears in the tab associated with the child frame
+  *
+  * \param pChildFrame The pointer to the WBChildFrame structure for the desired Child Frame window
+  * \param aImage An atom that identifies the registered image.  The default is no image.  For more information, see PXM_RegisterPixmapResource().
+  *
+  * Assigns the Atom for the image to be displayed in the tab.  The default is no image.  The image will appear
+  * on the far left edge of the tab, before the tab text.  Typically it will be an icon-like image that represents
+  * the contents of the document being viewed/edited in that particular tab.\n
+  * the image should be approximately 16 pixels high, and approximately 12 pixels wide, in order to to properly fit.
+  *
+  * Header File:  child_frame.h
+**/
+void FWSetChildFrameImageAtom(WBChildFrame *pChildFrame, Atom aImage);
 
 /** \ingroup child_frame
   * \brief Set the X,Y extent for the child frame (notifies everything)

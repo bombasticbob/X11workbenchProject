@@ -58,8 +58,13 @@ extern "C" {
 /** \file dialog_window.h Definitions for dialog (frame) window and intercommunication structures and APIs
 **/
 
-#define DIALOG_WINDOW_TAG (*((const unsigned int *)"DLGW"))
-#define DIALOG_ENTRY_TAG (*((const unsigned int *)"DLGE"))
+/** \ingroup dialog
+  * \defgroup dialog_api Main Dialog API Functions and definitions
+  *
+  * High-level dialog box functions and definitions.  Normally you will use
+  * these to create dialog boxes of various types.
+  *
+**/
 
 /** \ingroup dialog
   * \defgroup dlgwindow Dialog (Frame) Windows
@@ -72,12 +77,14 @@ extern "C" {
   * that can be language-dependent or content-dependent (or both).  For this reason the Dialog
   * portion of the X11 Work Bench Toolkit API supports dialog window creation from a text resource,
   * using registered identifier names within the resource text.
+  *
 **/
 
 /** \ingroup dialog
   * \defgroup dlgctrl Dialog Box Controls
   *
   * Structures and API functions used for dialog controls
+  *
 **/
 
 /** \ingroup dialog
@@ -86,6 +93,7 @@ extern "C" {
   * Designed specifically for dialog controls, 'List Support' APIs and
   * structures contain lists of objects or strings that are 'self-maintained'
   * via special callback functions assigned to the 'List Info' structure.
+  *
 **/
 
 /** \ingroup dialog
@@ -94,14 +102,31 @@ extern "C" {
   * The following atoms are used by dialog windows in ClientMessage events
   * for intercommunication between controls and the dialog frame window, or
   * to notify the dialog box callback function of certain events (like initialization).
+  *
 **/
 
+
+/** \ingroup dialog_api
+  * @{
+**/
+#define DIALOG_WINDOW_TAG (*((const unsigned int *)"DLGW")) /**< tag for WB_DIALOG_WINDOW structure **/
+#define DIALOG_ENTRY_TAG (*((const unsigned int *)"DLGE"))  /**< tag for WB_DIALOG_ENTRY structure **/
+/**
+  * @}
+**/
+
+
+
+/** \ingroup dlgwindow
+  * \struct __WB_DIALOG_ENTRY__
+  * \copydoc WBDialogEntry
+**/
 /** \ingroup dlgwindow
   * \typedef WBDialogEntry
   * \brief Structure identifying one of the controls that appears on a dialog window
   *
-  * Public members of the structure that identifies a dialog control
-\code
+  * \code
+
   typedef struct __WB_DIALOG_ENTRY__
   {
     unsigned int ulTag;  // tag word DIALOG_ENTRY_TAG
@@ -114,17 +139,15 @@ extern "C" {
         iWidth,          // width of control
         iHeight;         // height of control
   } WBDialogEntry;
-\endcode
-  *
-  * \sa __WB_DIALOG_ENTRY__
-**/
 
-/** \ingroup dlgwindow
-  * \struct __WB_DIALOG_ENTRY__
-  * \brief Structure identifying one of the controls that appears on a dialog window
+  * \endcode
   *
-  * This structure identifies one of the controls that appears on a dialog window.  Each control will
+  * Public members of the structure that identifies a dialog control. This structure
+  * identifies one of the controls that appears on a dialog window.  Each control will
   * uniquely map to one of these structures.
+  *
+  * \sa WBDialogWindow
+  *
 **/
 typedef struct __WB_DIALOG_ENTRY__
 {
@@ -140,12 +163,17 @@ typedef struct __WB_DIALOG_ENTRY__
 
 } WBDialogEntry;
 
+
+/** \ingroup dlgwindow
+  * \struct __WB_DIALOG_WINDOW__
+  * \copydoc WBDialogWindow
+**/
 /** \ingroup dlgwindow
   * \typedef WBDialogWindow
   * \brief Structure identifying a dialog (frame) window
   *
-  * Public members of the structure that identifies a dialog (frame) window.
-\code
+  * \code
+
   typedef struct __WB_DIALOG_WINDOW__
   {
     unsigned int ulTag;    // tag word, always assigned to DIALOG_WINDOW_TAG
@@ -161,18 +189,16 @@ typedef struct __WB_DIALOG_ENTRY__
            clrBG,          // background pixel color
            clrBD;          // border pixel color
   } WBDialogWindow;
-\endcode
-  *
-  * \sa __WB_DIALOG_WINDOW__
-**/
 
-/** \ingroup dlgwindow
-  * \struct __WB_DIALOG_WINDOW__
-  * \brief Structure identifying a dialog (frame) window
+  * \endcode
+  *
   *
   * This structure identifies the dialog (frame) window.  The public members are
   * documented in this file.  Private members store information that is only accessible
   * using the API functions (such as an array of \ref WBDialogEntry structures).
+  *
+  * \sa WBDialogEntry
+  *
 **/
 typedef struct __WB_DIALOG_WINDOW__
 {
@@ -191,6 +217,7 @@ typedef struct __WB_DIALOG_WINDOW__
 } WBDialogWindow;
 
 /** \ingroup dlgwindow
+  * \enum WBDialogWindowFlags
   * \hideinitializer
   * \brief enumeration for the iFlags member of WBDialogWindow
 **/
@@ -238,6 +265,7 @@ enum WBDialogWindowFlags
 };
 
 /** \ingroup dlgwindow
+  * \enum WBDialogEntryFlags
   * \hideinitializer
   * \brief enumeration for the iFlags member of WBDialogEntry
 **/
@@ -289,7 +317,7 @@ enum WBDialogEntryFlags
 
 };
 
-/** \ingroup dialog
+/** \ingroup dialog_api
   * \brief create a dialog window using a text resource
   *
   * \returns Pointer to WBDialogWindow structure that identifies the dialog (frame) window
@@ -313,13 +341,15 @@ enum WBDialogEntryFlags
   * a ':' separating the name and value.  Properties and Values with embedded white space must be quoted.
   *
   * A typical dialog window resource might look as follows:\n
-\code
+  * \code
+
   BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:"Sample Message Box Dialog Window"
     CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE
     CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE
     CONTROL:DefPushButton ID:IDOK TITLE:OK X:80 Y:28 WIDTH:40 HEIGHT:18 VISIBLE
   END_DIALOG
-\endcode
+
+  * \endcode
   *
   * For more information, see \ref dialog_resource .
   *
@@ -447,18 +477,19 @@ void * DLGGetDialogWindowUserData(Window wID);
   *
   * Header File:  dialog_window.h
 **/
-void DLGDestroyDialogWindow(Window wID);  // destroys frame window using the Window ID (frees the struct also)
+void DLGDestroyDialogWindow(Window wID);
 
 /** \ingroup dlgwindow
   * \brief Destroy a modeless dialog window via a pointer to its WBDialogWindow structure
   *
   * Use this function to destroy a modeless dialog window using the WBDialogWindow for the dialog (frame) window.
-  * This also causes the 'WBDialogWindow' structure to be destroyed.  Use caution if you retained a pointer to it.
+  * This also causes the 'WBDialogWindow' structure to be destroyed.  Use caution if you retained a pointer to it,
+  * to avoid re-using the (now) invalid pointer.
   *
   * Header File:  dialog_window.h
 **/
-void DLGDestroyDialogWindow2(WBDialogWindow *pDialogWindow); // destroys it using the struct pointer
-// after calling either 'Destroy' function the DIALOG_WINDOW struct is no longer valid
+void DLGDestroyDialogWindow2(WBDialogWindow *pDialogWindow);
+
 
 
 // control query and enumeration
@@ -597,7 +628,9 @@ Display *pDisplay = WBGetWindowDisplay(pDLG->wID);
 
 // special pre-defined dialog windows
 
-/** \ingroup dialog
+/** \ingroup dialog_api
+  * \enum MessageBoxEnum
+  * \hideinitializer
   * \brief Message Box flag enumeration
   *
   * Use these bit-flags and masks for calls to DLGMessageBox()\n
@@ -639,7 +672,7 @@ enum MessageBoxEnum
     MessageBox_BUTTON_MASK = 0xfe0   ///< mask for button bits
 };
 
-/** \ingroup dialog
+/** \ingroup dialog_api
   * \brief Display a modal 'message box' dialog window with a specific title, message, and button combination
   *
   * \return The Control ID of the button that was pressed, or -1 (equivalent to 'IDCANCEL') on error
@@ -655,7 +688,7 @@ enum MessageBoxEnum
 **/
 int DLGMessageBox(int iType, Window wIDOwner, const char *szTitle, const char *szMessage);
 
-/** \ingroup dialog
+/** \ingroup dialog_api
   * \brief Displays a special purpose dialog window that retrieves a character string as input
   *
   * \return A 'malloc'd memory block containing a null-byte terminated input string, or NULL on cancel/error
@@ -672,7 +705,9 @@ char *DLGInputBox(Window wIDOwner, const char *szTitle, const char *szPrompt, co
                   int iWidth, int iMaxChar);
 
 
-/** \ingroup dialog
+/** \ingroup dialog_api
+  * \enum FileDialogEnum
+  * \hideinitializer
   * \brief FileDialog enumeration
   *
   * Enumeration of bit flags for DLGFileDialog()\n
@@ -696,7 +731,7 @@ enum FileDialogEnum
     FileDialog_MODIFIER_MASK = 0xff0      ///< bit mask for modifier flag
 };
 
-/** \ingroup dialog
+/** \ingroup dialog_api
   * \brief Display a modal File Dialog window, returning a malloc'd pointer to a null-byte terminated string containing a fully qualified file or path name
   *
   * \return Returns either a NULL on cancel/error, or a malloc'd pointer to a null-byte terminated string containing a fully qualified file or path name
@@ -710,13 +745,17 @@ enum FileDialogEnum
   * have been intionally tweeked for better UI performance than other file dialogs.\n
   *
   * When specifying the 'szExtAndDescList' parameter, point it to a string similar to the following:\n
-\code
+  *
+  * \code
+
   static const char szExtAndDescList[]=
     "*.txt\tText Files\n"
     "*.doc\tDocument Files\n"
     "*.sh\tShell Script Files\n"
     "*.*\tOther Files\n";
-\endcode
+
+  * \endcode
+  *
   * This describes 3 file types with extensions '.txt', '.doc', and '.sh' with a 4th file type of 'other files' that
   * encompasses everything else.  Simple pattern matching is applied to each file name for the selected pattern.
   *
@@ -726,7 +765,7 @@ char *DLGFileDialog(int iType, Window wIDOwner, const char *szDefPath, const cha
                     const char *szExtAndDescList);
 
 
-/** \ingroup dialog
+/** \ingroup dialog_api
   * \brief Display a splash screen for 5 seconds (with animation and copyright string), and then return.
   *
   * \param aXPM a pointer to an XPM array (as created by utilities like 'gimp').
@@ -734,8 +773,11 @@ char *DLGFileDialog(int iType, Window wIDOwner, const char *szDefPath, const cha
   * \param clrText a pixel color value for the copyright text
   *
   * This function will create an animated splash screen based on the dimensions of the pixmap passed to it,
-  * animating the pixmap with a 'diagonal flash' from upper left to lower right, and draw the copyright
+  * animating the pixmap with a 'diagonal gleam' from upper left to lower right, and draw the copyright
   * string onto the lower 1/3 of the pixmap, vertically centered.
+  *
+  * The copyright string can be multi-line.  Care should be taken that it is not too wide for the display
+  * or the results of horizontally and vertically centering the string in the lower half may be unpredictable.
   *
   * Header File:  dialog_window.h
 **/

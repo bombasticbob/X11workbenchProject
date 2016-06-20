@@ -282,6 +282,7 @@ enum DTAlignment
                                          /// DTCalcIdealBounds and DTCalcIdealFont functions will attempt to restructure
                                          /// the text with word-wrapping to fit within horizontal bounds.
 
+    DTAlignment_SINGLELINE = 0x20000000, ///< internal flag, 'single line only' (no line breaks).  Implies DTAlignment_NO_WORD_WRAP
     DTAlignment_UNDERSCORE = 0x40000000, ///< internal flag, indicates that an underscore underlines the next character
     DTAlignment_PRINTING = 0x80000000    ///< internal flag, indicates that I'm printing, so don't go beyond word wrap
                                          /// in order to make the text fit within the display rectangle.
@@ -289,6 +290,11 @@ enum DTAlignment
 
 
 /** \ingroup draw_text
+  * \struct __DT_WORD__
+  * \copydoc DT_WORD
+**/
+/** \ingroup draw_text
+  * \typedef DT_WORD
   * \brief Structure defining a 'word' for rendering purposes.
   *
   * A 'word' is defined as one or more characters as a group that is to be rendered in
@@ -297,7 +303,8 @@ enum DTAlignment
   * on text for line wrapping.  Multiple white space blocks can also be eliminated from the
   * output when it is at the end of a line, particularly when wrapping text.
   *
-\code
+  * \code
+
   typedef struct __DT_WORD__
   {
     const char *pText;      // pointer to start of word (most likely in the supplied buffer)
@@ -313,7 +320,7 @@ enum DTAlignment
     int iY;                 // Relative 'Y' pixel position for the beginning of this element (when pre-rendered, else -1)
   } DT_WORD;
 
-\endcode
+  * \endcode
   *
 **/
 typedef struct __DT_WORD__
@@ -331,14 +338,21 @@ typedef struct __DT_WORD__
   int iY;                 ///< Relative 'Y' pixel position for the beginning of this element (when pre-rendered, else -1)
 } DT_WORD;
 
+
 /** \ingroup draw_text
+  * \struct __DT_WORDS__
+  * \copydoc DT_WORDS
+**/
+/** \ingroup draw_text
+  * \typedef DT_WORDS
   * \brief A collection of DT_WORD structures along with a pointer to the original text
   *
   * A collection of DT_WORD structures, along with a pointer to the original text.  This structure is
   * typically used to render text and calculate bounding rectangles for the purpose of window sizing
   * and viewport scrolling.
   *
-\code
+  * \code
+
   typedef struct __DT_WORDS__
   {
     struct __DT_WORDS__ *pPrev; // pointer to previous structure in linked list (reserved)
@@ -350,7 +364,8 @@ typedef struct __DT_WORD__
     const char *szText;   // original text pointer
     DT_WORD aWords[1];    // The actual data (self-contained within the memory block)
   } DT_WORDS;
-\endcode
+
+  * \endcode
   *
 **/
 typedef struct __DT_WORDS__
@@ -497,37 +512,43 @@ DT_WORDS * DTGetWordsFromText(XFontStruct *pFont, const char *szText, int iAlign
 /** \ingroup draw_text
   * \brief Pre-render a 'DT_WORDS' structure for subsequent display
   *
+  * \param pDisplay the display that you intend to render on with DTRender().  NULL uses the default display.
   * \param pFont A pointer to an XFontStruct to be used, or NULL for the system default font
   * \param pWords A pointer to the DT_WORDS structure.  This structure can be part of a linked list.
   * \param iTabWidth A positive integer in 'characters', or negative integer in pixels, indicating tab width
   * \param iTabOrigin An unsigned integer indicating the tab origin, using the same units as iTabWidth, corresponding to the first character.
-  * \param prcBounds A pointer to the bounding rectangle (advisory with respect to available width and height, based on iAlignment)
+  * \param prcBounds A pointer to the bounding rectangle (advisory with respect to available width and height, based on iAlignment).
+  *  On return it contains the actual bounding rectangle, calculated from the passed-in value with alignment flags applied.
+  *  It is important to pass the updated rectangle values when calling DTRender().
   * \param iAlignment The desired text alignment, one or more of the DTAlignment bit flags
+  * \param iStartLine The starting line to begin pre-rendering the pWords array (0 is the first line)
+  * \param iEndLine The ending line (inclusive) to end pre-rendering the pWords array.  (0 is the first line; -1 implies 'all')
   *
   * This function will scan the DT_WORDS structure 'pWords', and using the alignment flags and prcBounds,
   * modify the 'iX' and 'iY' members for each DT_WORD entry in 'pWords' according to their rendered
   * position within the display surface described by 'prcBounds'.  It will also calculate the iMaxWidth
   * and iMaxHeight members for 'pWords'.\n
-  * Since the 'WB_RECT' elements are 32-bit integers, it is possible to create an 'inifinite' display area
+  * Since the 'WB_RECT' elements are 32-bit integers, it is possible to create an 'infinite' display area
   * by specifying a value of 0x7fffffffL for the 'right' and 'bottom' members.  Then, you can use 'DTRender()'
   * and specify 'iHScrollBy' and 'iVScrollBy' to modify the location of the 'viewport' area using scroll bars.
   *
   * Header File:  draw_text.h
 **/
-void DTPreRender(XFontStruct *pFont, DT_WORDS *pWords, int iTabWidth, int iTabOrigin,
-                 const WB_RECT *prcBounds, int iAlignment);
+void DTPreRender(Display *pDisplay, XFontStruct *pFont, DT_WORDS *pWords, int iTabWidth, int iTabOrigin,
+                 WB_RECT *prcBounds, int iAlignment, int iStartLine, int iEndLine);
 
 /** \ingroup draw_text
   * \brief Using pre-rendered 'DT_WORDS' structure, display
   *
+  * \param pDisplay the display associated with the GC and Drawable.
   * \param pFont A pointer to an XFontStruct to be used, or NULL for the system default font
   * \param pWords A pointer to the DT_WORDS structure.  This structure can be part of a linked list.
-  * \param pDisplay the display associated with the GC and Drawable.
   * \param gc The graphics context for the Drawable
   * \param dw The Drawable (Window or Pixmap, typically)
-  * \param iHScrollBy The amount to 'horizontally scroll by' (in 'units' of prcBounds)
-  * \param iVScrollBy The amount to 'vertically scroll by' (in 'units' of prcBounds)
-  * \param prcBounds A pointer to the bounding rectangle (advisory with respect to available width and height, based on iAlignment)
+  * \param iHScrollBy The amount to 'horizontally scroll by' in characters (positive values), or pixels (negative values)
+  * \param iVScrollBy The amount to 'vertically scroll by' in characters (positive values), or pixels (negative values)
+  * \param prcBounds A pointer to the bounding rectangle for pWords, the same rectangle calculated by DTPreRender()
+  * \param prcViewport A pointer to the bounding rectangle for the viewport, for the Drawable 'dw'.
   * \param iAlignment The desired text alignment, one or more of the DTAlignment bit flags
   *
   * This function will scan the DT_WORDS structure 'pWords', and using the other parameters,
@@ -535,8 +556,8 @@ void DTPreRender(XFontStruct *pFont, DT_WORDS *pWords, int iTabWidth, int iTabOr
   *
   * Header File:  draw_text.h
 **/
-void DTRender(XFontStruct *pFont, const DT_WORDS *pWords, Display *pDisplay, GC gc, Drawable dw,
-              int iHScrollBy, int iVScrollBy, const WB_RECT *prcBounds, int iAlignment);
+void DTRender(Display *pDisplay, XFontStruct *pFont, const DT_WORDS *pWords, GC gc, Drawable dw,
+              int iHScrollBy, int iVScrollBy, const WB_RECT *prcBounds, const WB_RECT *prcViewport, int iAlignment);
 
 #ifdef __cplusplus
 };

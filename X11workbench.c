@@ -66,8 +66,13 @@
 #include "conf_help.h"
 #include "draw_text.h"
 
+// pixmap data
 #include "application_icon.xpm" /* 19x19 icon presented to the OS for alt-tab etc. */
 #include "icon_app.xpm"   /* application icon that's the same size as the others, 36x36 */
+#include "textfiledoc.xpm"
+#include "newdoc.xpm"
+#include "clangdoc.xpm"
+#include "makefiledoc.xpm"
 
 
 //#define NO_SPLASH /* temporary, later put it as a configure option - need to get 'gleam' to work better */
@@ -101,6 +106,7 @@ static int FileSaveAllHandler(XClientMessageEvent *);
 static int FileSaveAllUIHandler(WBMenu *, WBMenuItem *);
 static int HelpAboutHandler(XClientMessageEvent *);
 static int HelpContentsHandler(XClientMessageEvent *);
+static int HelpContextHandler(XClientMessageEvent *);
 
 
 
@@ -164,7 +170,8 @@ static char szAppMenu[]="1\n"
                         "E_xit\tIDM_FILE_EXIT\tClose Application\tAlt+F4\n"
                         "\n"
                         "3\n"
-                        "_Contents\tIDM_HELP_CONTENTS\tHelp Contents\tF1\n"
+                        "_Contents\tIDM_HELP_CONTENTS\tHelp Contents\tAlt+F1\n"
+                        "Conte_xt\tIDM_HELP_CONTEXT\tContext Help\tF1\n"
                         "\tseparator\n"
                         "_About X11workbench\tIDM_HELP_ABOUT\tAbout X11workbench\tAlt+F1\n"
                         "\n"
@@ -190,7 +197,8 @@ static char szEditMenu[]="1\n"
                         "E_xit\tIDM_FILE_EXIT\tClose Application\tAlt+F4\n"
                         "\n"
                         "3\n"
-                        "_Contents\tIDM_HELP_CONTENTS\tHelp Contents\tF1\n"
+                        "_Contents\tIDM_HELP_CONTENTS\tHelp Contents\tAlt+F1\n"
+                        "Conte_xt\tIDM_HELP_CONTEXT\tContext Help\tF1\n"
                         "\tseparator\n"
                         "_About X11workbench\tIDM_HELP_ABOUT\tAbout X11workbench\tAlt+F1\n"
                         "\n"
@@ -221,6 +229,7 @@ FW_MENU_HANDLER_BEGIN(main_menu_handlers)
   FW_MENU_HANDLER_ENTRY("IDM_FILE_SAVE_AS",FileSaveAsHandler,FileSaveAsUIHandler)
   FW_MENU_HANDLER_ENTRY("IDM_FILE_SAVE_ALL",FileSaveAllHandler,FileSaveAllUIHandler)
   FW_MENU_HANDLER_ENTRY("IDM_HELP_ABOUT",HelpAboutHandler,NULL)
+  FW_MENU_HANDLER_ENTRY("IDM_HELP_CONTEXT",HelpContextHandler,NULL)
   FW_MENU_HANDLER_ENTRY("IDM_HELP_CONTENTS",HelpContentsHandler,NULL)
 FW_MENU_HANDLER_END
 
@@ -256,7 +265,7 @@ static void get_min_window_height_width(int *piMinHeight, int *piMinWidth)
 
   // calculating the actual font height for the default font
 
-  unsigned long fth = WBGetDefaultFont()->max_bounds.ascent
+  unsigned long fth = WBGetDefaultFont()->max_bounds.ascent  // default font height
                     + WBGetDefaultFont()->max_bounds.descent;
 
   // the pad and border are part of the 'hello world' text and green border displayed for the demo
@@ -677,14 +686,27 @@ static int FileExitHandler(XClientMessageEvent *pEvent)
 
 static int FileNewHandler(XClientMessageEvent *pEvent)
 {
-  Window wIDOwner = pMainFrame ? pMainFrame->wID : -1;
+WBEditWindow *pEW;
+
+  if(!pMainFrame)
+  {
+    DLGMessageBox(MessageBox_OK | MessageBox_Error, (Window)-1,
+                  "File New", "'File _New' and no container window");
+    return 1;
+  }
 
   // create a new child frame within the main frame
   // this should be pretty straightforward as I implement it properly
 
-  DLGMessageBox(MessageBox_OK | MessageBox_Warning, wIDOwner,
-                "File New",
-                "'File _New' not currently implemented");
+  // 1st, create a new 'WBEditWindow', attaching it to the frame
+
+  pEW = WBCreateEditWindow(pMainFrame, NULL, szEditMenu,main_menu_handlers, 0);
+
+  if(!pEW)
+  {
+    DLGMessageBox(MessageBox_OK | MessageBox_Error, (Window)-1,
+                  "File New", "'File _New' unable to create edit window");
+  }
 
   return 1; // handled
 }
@@ -781,15 +803,26 @@ static int HelpContentsHandler(XClientMessageEvent *pEvent)
 
     free(pTemp);
   }
-  else
-  {
-    DLGMessageBox(MessageBox_OK | MessageBox_Bang, wIDOwner,
-                  "Something Bad Happened", "Unexpected 'NULL' return from DLGInputBox");
-  }
+//  else
+//  {
+//    DLGMessageBox(MessageBox_OK | MessageBox_Bang, wIDOwner,
+//                  "Something Bad Happened", "Unexpected 'NULL' return from DLGInputBox");
+//  }
 
   return 1; // handled
 }
 
+static int HelpContextHandler(XClientMessageEvent *pEvent)
+{
+  Window wIDOwner = pMainFrame ? pMainFrame->wID : -1;
+
+  DLGMessageBox(MessageBox_OK | MessageBox_Bang, wIDOwner,
+                "Context Help", "TODO:  implement the context-sensitive help");
+
+//  DoContextSensitiveHelp(szWhateverWord);
+
+  return 1; // handled
+}
 
 
 
@@ -1306,6 +1339,8 @@ find_url_opener:
 //                   __FUNCTION__, szHelpBrowser, szDoxyTag);
     hProcess = WBRunAsync(szHelpBrowser, szDoxyTag, NULL);
 
+    // TODO:  does '--new-instance' work properly?
+
     if(hProcess != WB_INVALID_FILE_HANDLE)
     {
       // TODO:  display 'wait' cursor and wait for app window to appear ?
@@ -1388,6 +1423,9 @@ fail_to_run_man2html:
   // p2 contains the ".html" temp file name
 
   hProcess = WBRunAsync(szHelpBrowser, p2, NULL);
+
+  // TODO:  does '--new-instance' work properly?
+
 
   free(p2);
   free(p3);

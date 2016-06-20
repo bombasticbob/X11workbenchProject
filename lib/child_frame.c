@@ -192,7 +192,7 @@ int iRval = -1;
   pChildFrame->pOwner = pOwner;
   iRval = FWAddContainedWindow(pOwner, pChildFrame); // TODO:  make THIS assign the owner pointer?
 
-  if(iRval) // error?
+  if(iRval < 0) // error? (returns negative on error, otherwise the tab index)
   {
     FWDestroyChildFrame(pChildFrame); // this frees up all of the resources
   }
@@ -278,6 +278,10 @@ void FWSetChildFrameMenuHandlers(WBChildFrame *pChildFrame, const WBFWMenuHandle
 }
 
 void FWSetChildFrameDisplayName(WBChildFrame *pChildFrame, const char *szDisplayName)
+{
+}
+
+void FWSetChildFrameImageAtom(WBChildFrame *pChildFrame, Atom aImage)
 {
 }
 

@@ -119,6 +119,20 @@ XFontStruct *WBLoadFont(Display *pDisplay, const char *szFontName,
 XFontStruct *WBLoadModifyFont(Display *pDisplay, const XFontStruct *pOriginal,
                               int iFontSize, int iFlags);
 
+
+/** \ingroup font
+  * \brief Get the average character width for a font
+  *
+  * \param pDisplay A pointer to the Display ( NULL uses \ref WBGetDefaultDisplay() )
+  * \param pFont A pointer to an XFontStruct
+  * \returns The average width of a character for this font
+  *
+  * Use this function to query an XFontStruct about its average character width.
+  *
+**/
+int WBFontAvgCharWidth(Display *pDisplay, const XFontStruct *pFont);
+
+
 /** \ingroup font
   * \brief Creates an 'XFontSet' from an XFontStruct for a given display
   *

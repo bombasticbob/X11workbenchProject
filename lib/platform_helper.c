@@ -2559,11 +2559,11 @@ int iRval = -1;
 #ifdef WIN32
 #else  // WIN23
 
-  WB_ERROR_PRINT("TEMPORARY: %s - here I am\n", __FUNCTION__);
+//  WB_ERROR_PRINT("TEMPORARY: %s - here I am\n", __FUNCTION__);
 
   if(!pCond || !pMtx)
   {
-    WB_ERROR_PRINT("TEMPORARY: %s - returns -1 (NULL pCond)\n", __FUNCTION__);
+    WB_ERROR_PRINT("ERROR: %s - returns -1 (NULL pCond)\n", __FUNCTION__);
 
     return -1;
   }

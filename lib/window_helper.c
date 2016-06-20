@@ -248,13 +248,17 @@ Atom aDLG_FOCUS=None;
   * type == ClientMessage\n
   * message_type == aSET_FOCUS\n
   * format == 32 (always)\n
-  * data.l[0] is the window ID to set focus to
+  * data.l[0] is the window ID to set focus to (None for default)
   *
   * This message is typically sent to the application (.window = None)
   *
   * By posting a SET_FOCUS message to the application, you can ASYNCHRONOUSLY
   * fix focus-related problems, such as the window manager trying to set focus
-  * to the application window while a modal dialog is visible.
+  * to the application window while a modal dialog is visible.\n
+  * When sent to a frame window, you are requesting that it set the focus to
+  * the appropriate window, similar to \ref aDLG_FOCUS "aDLG_FOCUS"\n
+  * Assigning 'data.l[0]' to 'None' tells a frame window to set focus to the default.
+  * When sent to the application, a value of 'None' is meaningless.
 **/
 Atom aSET_FOCUS=None;
 
@@ -367,6 +371,15 @@ Atom aWM_DELETE_WINDOW=None; // WM command to delete a window (a click on the 'x
   * More information at freedesktop.org WM documentation\n
 **/
 Atom aWM_TAKE_FOCUS=None;
+
+
+/** \ingroup wmatom
+  * \hideinitializer
+  * \brief Atoms for fonts - Average Character Width
+  *
+  * Average Character Width (font property)
+**/
+Atom aAVERAGE_WIDTH=None;
 
 
 /** \ingroup wmatom
@@ -599,8 +612,12 @@ typedef struct // the structure that identifies the window and what to do with i
 #define WB_IS_WINDOW_MAPPED(X) ((X).iWindowState == WB_WINDOW_MAPPED)
 #define WB_IS_WINDOW_BEING_DESTROYED(X) ((X).iWindowState == WB_WINDOW_DESTROYING)
 #define WB_IS_WINDOW_DESTROYED(X) ((X).iWindowState == WB_WINDOW_DESTROYED || (X).iWindowState == WB_WINDOW_DELETE)
-#define WB_DELETE_WINDOW_ENTRY(X) ((X).iWindowState == WB_WINDOW_DELETE)
+#define WB_TO_DELETE_WINDOW_ENTRY(X) ((X).iWindowState == WB_WINDOW_DELETE)
 
+
+//------------------------------------------------------------------------------------------------------
+// NOT globally visible variables that define the application, default display params, hash table, etc.
+//------------------------------------------------------------------------------------------------------
 
 static _WINDOW_ENTRY_ sWBHashEntries[WINDOW_ENTRY_ARRAY_SIZE]={{0,0}};
 static volatile int nWBHashEntries = 0;
@@ -611,8 +628,14 @@ static Window wIDApplication = None; // application window ID
 int bIgnoreXErrors = 0;
 static WB_ERROR_INFO xErrorInfo = {NULL, NULL, 0, 0, 0, 0, 0, None};
 
+// the default display - if I manage more than one, I may need these to be display-specific
 Time tmDefaultDisplay = 0; // most recent time value for default display (from events)
 WB_UINT64 qwDefaultDisplayTick = 0LL; // the tick count for the last 'default display time'
+
+int bStandardColormap = 0; // flag that says 'cmapDefault' is initialized
+XStandardColormap cmapDefault; // a copy of teh XStandardColormap for the Colormap for the default display
+
+
 
 /**********************************************************************/
 /*                                                                    */
@@ -705,6 +728,7 @@ static __inline__ _WINDOW_ENTRY_ *Debug_WBGetWindowEntry(Window wID, const char 
 
 static void __WBInitEvent();
 static int __WBAddEvent(Display *pDisp, Window wID, XEvent *pEvent);
+static void __WBDelWindowPaintEvents(Display *pDisp, Window wID);
 static void __WBDelWindowEvents(Display *pDisp, Window wID);
 static int __WBInsertPriorityEvent(Display *pDisp, Window wID, XEvent *pEvent);
 static int __WBNextPaintEvent(Display *pDisp, XEvent *pEvent, Window wID);
@@ -897,6 +921,9 @@ int WBInitDisplay(Display *pDisplay)
   aWM_DELETE_WINDOW = XInternAtom(pDisplay, "WM_DELETE_WINDOW", False);
   aWM_TAKE_FOCUS    = XInternAtom(pDisplay, "WM_TAKE_FOCUS", False);
 
+  // atoms used for fonts
+  aAVERAGE_WIDTH    = XInternAtom(pDisplay, "AVERAGE_WIDTH", False);
+
   // additional 'window manager' messages generated internally by the toolkit
   aWM_CHAR          = XInternAtom(pDisplay, "WM_CHAR", False);
   aWM_TIMER         = XInternAtom(pDisplay, "WM_TIMER", False);
@@ -937,6 +964,8 @@ int WBInitDisplay(Display *pDisplay)
      aSET_FOCUS        == None ||
      aWM_PROTOCOLS     == None ||
      aWM_DELETE_WINDOW == None ||
+     aWM_TAKE_FOCUS    == None ||
+     aAVERAGE_WIDTH    == None ||
      aWM_CHAR          == None ||
      aWM_TIMER         == None ||
      aWM_POINTER       == None ||
@@ -1040,7 +1069,56 @@ void __InternalDestroyWindow(Display *pDisp, Window wID, _WINDOW_ENTRY_ *pEntry)
   Atom aNCW;
   XClientMessageEvent xMsg;
   Status st;
-  WB_UINT64 tmNow = WBGetTimeIndex();
+  int i1;
+
+
+//  WB_ERROR_PRINT("TEMPORARY - %s - Destroying window %u (%08xH), %d hash entries\n",
+//                 __FUNCTION__, (unsigned int)wID, (unsigned int)wID, nWBHashEntries);
+
+  // first, I want to destroy any child windows that have window entries, FIRST.  Do that now.
+
+  for(i1=0; i1 < WINDOW_ENTRY_ARRAY_SIZE; i1++)
+  {
+    if(WB_LIKELY(sWBHashEntries[i1].wID == WINDOW_ENTRY_UNUSED) ||
+       WB_LIKELY(sWBHashEntries[i1].wID == None))
+    {
+      continue;  // ignore 'None' and 'UNUSED'
+    }
+
+    if(sWBHashEntries[i1].wID == wID)
+    {
+//      WB_ERROR_PRINT("TEMPORARY - %s - Destroy child windows, found 'me' %u (%08xH)\n",
+//                     __FUNCTION__, (unsigned int)wID, (unsigned int)wID);
+      continue;  // ignore "me"
+    }
+
+    if(sWBHashEntries[i1].wParent == wID)
+    {
+      if(WB_IS_WINDOW_BEING_DESTROYED(sWBHashEntries[i1]))
+      {
+//        WB_ERROR_PRINT("TEMPORARY - %s - child window already being destroyed %u (%08xH)\n",
+//                       __FUNCTION__, (unsigned int)sWBHashEntries[i1].wID, (unsigned int)sWBHashEntries[i1].wID);
+      }
+      else if(WB_IS_WINDOW_DESTROYED(sWBHashEntries[i1])) // not already destroyed (or being deleted)
+      {
+//        WB_ERROR_PRINT("TEMPORARY - %s - child window already destroyed %u (%08xH)\n",
+//                       __FUNCTION__, (unsigned int)sWBHashEntries[i1].wID, (unsigned int)sWBHashEntries[i1].wID);
+      }
+      else if(WB_TO_DELETE_WINDOW_ENTRY(sWBHashEntries[i1]))
+      {
+//        WB_ERROR_PRINT("TEMPORARY - %s - child window entry to be deleted %u (%08xH)\n",
+//                       __FUNCTION__, (unsigned int)sWBHashEntries[i1].wID, (unsigned int)sWBHashEntries[i1].wID);
+      }
+      else
+      {
+//        WB_ERROR_PRINT("TEMPORARY - %s - Destroying child window %u (%08xH)\n",
+//                       __FUNCTION__, (unsigned int)sWBHashEntries[i1].wID, (unsigned int)sWBHashEntries[i1].wID);
+
+        __InternalDestroyWindow(pDisp, sWBHashEntries[i1].wID, &(sWBHashEntries[i1]));
+      }
+    }
+  }
+
 
   if(!pEntry || !(pEntry->eWMProtocols & WMPropertiesWMProtocols_DeleteWindow))
   {
@@ -1108,19 +1186,25 @@ destroy_without_wm:
   END_XCALL_DEBUG_WRAPPER
 
   BEGIN_XCALL_DEBUG_WRAPPER
-//  XFlush(pDefaultDisplay);
   XSync(pDefaultDisplay, FALSE);  // try sync'ing to avoid certain errors
   END_XCALL_DEBUG_WRAPPER
 
 //  WB_ERROR_PRINT("<<TEMPORARY: %s - message sent to %d to close %d (%s)\n", __FUNCTION__, (int)wIDTemp, (int)wID, pEntry->szClassName);
 
+#if 0 /* this section never works */
   // waiting for the entry to be marked "destroyed"
 
   if(st)
   {
+    WB_UINT64 tmNow = WBGetTimeIndex();
+
+    WB_ERROR_PRINT("INFO:  %s - 'DESTROY WINDOW' message sent OK to WM\n", __FUNCTION__);
+
     st = 0;
     while(pEntry && (WBGetTimeIndex() - tmNow) < 50000) // wait up to 0.05 seconds
     {
+      XEvent evt;
+
 #ifdef HAVE_NANOSLEEP
       struct timespec tsp;
       tsp.tv_sec = 0;
@@ -1132,19 +1216,30 @@ destroy_without_wm:
       usleep(100); // wait 0.1 msec
 #endif // HAVE_NANOSLEEP
 
+      // look for (and dispatch) destroy notify messages for my window
+      if(XCheckTypedEvent(pDisp, DestroyNotify, &evt))
+      {
+        WBDispatch(&evt); // process destroy notifications
+      }
+
       if(WB_IS_WINDOW_DESTROYED(*pEntry))
       {
         st = 1;
+
+        WB_ERROR_PRINT("INFO:  %s - 'DESTROY WINDOW' message acknowledged by WM\n", __FUNCTION__);
+
         break;
       }
     }
   }
 
   if(!st)
+#endif // 0
+
   {
-    WB_DEBUG_PRINT(DebugLevel_WARN | DebugSubSystem_Window,
-                   "WARNING - %s - did not destroy window via WM, calling XDestroyWindow for %d (%s)\n",
-                   __FUNCTION__, (int)wID, pEntry->szClassName);
+//    WB_DEBUG_PRINT(DebugLevel_WARN | DebugSubSystem_Window,
+//                   "WARNING - %s - did not destroy window via WM, calling XDestroyWindow for %d (%s)\n",
+//                   __FUNCTION__, (int)wID, pEntry->szClassName);
 
     pEntry->iWindowState = WB_WINDOW_DESTROYED; // so that there is no recursion problem or attempts to use the window
 
@@ -1153,7 +1248,6 @@ destroy_without_wm:
     END_XCALL_DEBUG_WRAPPER
 
     BEGIN_XCALL_DEBUG_WRAPPER
-//    XFlush(pDefaultDisplay);
     XSync(pDefaultDisplay, FALSE);  // try sync'ing to avoid certain problems
     END_XCALL_DEBUG_WRAPPER
   }
@@ -1739,7 +1833,12 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
   if(bMenuSplashFlag > 0)
   {
+//    WB_ERROR_PRINT("TEMPORARY:  %s - grabbing mouse and keyboard\n", __FUNCTION__);
+
+    // ----------------------------
     // mouse and keyboard grab time
+    // ----------------------------
+
     WBGetWindowGeom2(wID, &geom);  // geometry relative to root window
 
     BEGIN_XCALL_DEBUG_WRAPPER
@@ -1760,6 +1859,9 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 //    WB_ERROR_PRINT("TEMPORARY:  showing modal for NON-menu\n");
 //  }
 
+
+//  WB_ERROR_PRINT("TEMPORARY:  %s - begin modal event processing\n", __FUNCTION__);
+
   while(!bQuitFlag)
   {
     XEvent event;
@@ -1774,7 +1876,9 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
     pEntry = WBGetWindowEntry(wID);  // re-assign 'pEntry'
 
     if(!pEntry)
+    {
       break;
+    }
 
     if(!WBIsValid(pEntry->pDisplay, wID) ||
        !pEntry->iModalFlag)
@@ -1808,6 +1912,10 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
       WBAppDispatch(&event);
       continue;
     }
+
+//#ifndef NO_DEBUG
+//    WBDebugDumpEvent(&event); // TEMPORARY
+//#endif // NO_DEBUG
 
     // For menus, check for mousie events outside of my window.  If this happens
     // I want to cancel the modal loop and re-play the event.
@@ -1866,19 +1974,19 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
     // and if so, I want to dispatch it
 
     if(event.xany.window == wID ||
-       event.type == Expose ||  // always handle expose events
+       event.type == Expose ||                                              // always handle expose events
        event.type == GraphicsExpose ||
        event.type == NoExpose ||
-       event.type == DestroyNotify || // always allow destroy notifications
+       event.type == DestroyNotify ||                                       // always allow destroy notifications
        event.type == SelectionRequest ||
        event.type == SelectionClear ||
        event.type == SelectionNotify ||
-       (bMenuSplashFlag > 0 &&
+       (bMenuSplashFlag > 0 &&                                              // check for ANY KB+mouse events when NOT a splash window
         (event.type == KeyPress || event.type == KeyRelease ||
          event.type == ButtonPress || event.type == ButtonRelease ||
          event.type == MotionNotify || event.type == EnterNotify ||
          event.type == LeaveNotify)) ||
-       (bMenuSplashFlag >= 0 && WBIsChildWindow(wID, event.xany.window)) || // NOT splash windows
+       (bMenuSplashFlag >= 0 && WBIsChildWindow(wID, event.xany.window)) || // check for 'is a child of modal' when NOT a splash window
        WB_UNLIKELY(event.type == ClientMessage &&
                    (event.xclient.message_type == aWM_PROTOCOLS || // all of these get through
                     event.xclient.message_type == aWM_TIMER)))     // all timers get through
@@ -1919,7 +2027,6 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
                        WBEventName(event.type),
                        (int)event.xany.window, (int)event.xany.window);
       }
-#endif // NO_DEBUG
 
       if(event.type == KeyPress || event.type == KeyRelease)
       {
@@ -1928,8 +2035,11 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
                        __FUNCTION__, (int)event.xany.window, (int)event.xany.window, (int)wID, (int)wID);
       }
 
+#endif // NO_DEBUG
+
       WBWindowDispatch(event.xany.window, &event);
     }
+#ifndef NO_DEBUG
     else
     {
       // say something for debug purposes about messages that weren't processed
@@ -1946,13 +2056,16 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
                        __FUNCTION__, (int)event.xany.window, (int)event.xany.window, (int)wID, (int)wID);
       }
     }
+#endif // NO_DEBUG
 
     // other stuff gets ignored
 
   }
 
   if(!pEntry)
+  {
     return -1;
+  }
 
   if(bMenuSplashFlag > 0) // menus only
   {
@@ -2030,6 +2143,12 @@ void WBSetInputFocus(Window wID)  // set input focus to specific window (revert 
     }
     else
     {
+      WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Window,
+                     "%s:%d - %d (%08xH) calling XSetInputFocus\n",
+                     __FUNCTION__, __LINE__, (int)wID, (int)wID);
+
+//      WB_ERROR_PRINT("TEMPORARY - %s calling XSetInputFocus on wID=%u (%08xH)\n", __FUNCTION__, (int)wID, (uint32_t)wID);
+
       BEGIN_XCALL_DEBUG_WRAPPER
       XSetInputFocus(pDisp, wID, RevertToParent, CurrentTime);
       END_XCALL_DEBUG_WRAPPER
@@ -2049,6 +2168,9 @@ void WBDestroyWindow(Window wID)
   {
     WB_WARN_PRINT("%s - Recursive call, Window %d (%08xH)\n",
                   __FUNCTION__, (int)wID, (int)wID);
+
+    __WBDelWindowPaintEvents(pDisplay, wID); // make sure expose events go away
+
     return;
   }
 
@@ -2064,6 +2186,9 @@ void WBDestroyWindow(Window wID)
 //    XFlush(pDisplay);
     XSync(pDisplay, False);        // wait for server to actually do it - specific to debug output, really
     END_XCALL_DEBUG_WRAPPER
+
+    __WBDelWindowPaintEvents(pDisplay, wID); // make sure expose events go away
+
     return;
   }
 
@@ -2086,7 +2211,7 @@ void WBDestroyWindow(Window wID)
   {
     WB_WARN_PRINT("WARNING:  WBDestroyWindow for wID not in list - window already destroyed?\n");
 
-    XFlush(pDisplay);
+    XSync(pDisplay, 0);
 
     __WBDelWindowEvents(pDefaultDisplay, wID);
 
@@ -2146,7 +2271,7 @@ void WBDestroyWindow(Window wID)
 ////        WBAllowErrorOutput();
 //      }
     }
-    else if(!WB_DELETE_WINDOW_ENTRY(*pEntry)) // has not called 'WBUnregisterWindowCallback'
+    else if(!WB_TO_DELETE_WINDOW_ENTRY(*pEntry)) // has not called 'WBUnregisterWindowCallback'
     {
       WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Window,
                      "WBDestroyWindow - wID %d (%08xH), Marking 'unmapped' window 'destroyed'\n",
@@ -2159,7 +2284,7 @@ void WBDestroyWindow(Window wID)
 
     __WBDelWindowEvents(pDisplay, wID);
 
-    if(!WB_DELETE_WINDOW_ENTRY(*pEntry)) // in case 'Destroy' notification didn't make this happen
+    if(!WB_TO_DELETE_WINDOW_ENTRY(*pEntry)) // in case 'Destroy' notification didn't make this happen
     {
       WB_DEBUG_PRINT(DebugLevel_WARN | DebugSubSystem_Window,
                      "WARNING - %s - last ditch attempt, unregistering window callback for window %d\n", __FUNCTION__, (int)wID);
@@ -3718,9 +3843,32 @@ static unsigned long long ullLastTime = 0;
           pEntry->geomAbsolute.width = pEvent->xconfigure.width;
           pEntry->geomAbsolute.height = pEvent->xconfigure.height;
           pEntry->geomAbsolute.border = pEvent->xconfigure.border_width;
+
+          if(!pEntry->rgnClip) // first time through, create clip region that encompasses all of it
+          {
+            XRectangle xrct;
+
+            // NOTE:  I must do it THIS way because the window isn't mapped yet.
+
+            pEntry->width = pEvent->xconfigure.width;
+            pEntry->height = pEvent->xconfigure.height;
+            pEntry->border = pEvent->xconfigure.border_width;
+
+            pEntry->rgnClip = XCreateRegion();
+
+            if(pEntry->rgnClip)
+            {
+              xrct.x = 0;//(short)pEntry->x;
+              xrct.y = 0;//(short)pEntry->y;
+              xrct.width = (unsigned short)pEntry->width;
+              xrct.height = (unsigned short)pEntry->height;
+
+              XUnionRectWithRegion(&xrct, pEntry->rgnClip, pEntry->rgnClip);
+            }
+          }
         }
-        else
-        {
+        else if(WB_IS_WINDOW_MAPPED(*pEntry)) // get values from parent window(s) and adjust absolute coords
+        {                                     // NOTE:  this won't work if this OR the PARENT windows aren't mapped
           wIDTemp = pEvent->xconfigure.window;
           pEntry->geomAbsolute.x = pEntry->geomAbsolute.y = 0;
 
@@ -3739,6 +3887,10 @@ static unsigned long long ullLastTime = 0;
 
             wIDTemp = WBGetParentWindow(wIDTemp);
           }
+        }
+        else
+        {
+          WB_ERROR_PRINT("TEMPORARY:  %s - subsequent ConfigureNotify and window is not yet mapped\n", __FUNCTION__);
         }
 
         WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Window,
@@ -3830,6 +3982,12 @@ static unsigned long long ullLastTime = 0;
           }
           else
           {
+            WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Window,
+                           "%s:%d - %d (%08xH) calling XSetInputFocus\n",
+                           __FUNCTION__, __LINE__, (int)wID0, (int)wID0);
+
+//            WB_ERROR_PRINT("TEMPORARY - %s calling XSetInputFocus on wID=%u (%08xH)\n", __FUNCTION__, (int)wID0, (uint32_t)wID0);
+
             BEGIN_XCALL_DEBUG_WRAPPER
             XSetInputFocus(pDisplay, wID0, RevertToParent, CurrentTime);
             END_XCALL_DEBUG_WRAPPER
@@ -4501,6 +4659,8 @@ int WBWindowDispatch(Window wID, XEvent *pEvent)
                        "%s:%d - %d (%08xH) mapped, setting focus\n",
                        __FUNCTION__, __LINE__, (int)wID, (int)wID);
 
+//        WB_ERROR_PRINT("TEMPORARY - %s calling XSetInputFocus on wID=%u (%08xH)\n", __FUNCTION__, (int)wID, (uint32_t)wID);
+
         BEGIN_XCALL_DEBUG_WRAPPER
         XSetInputFocus(pEntry->pDisplay, wID, RevertToParent, CurrentTime);
         END_XCALL_DEBUG_WRAPPER
@@ -4540,6 +4700,8 @@ int WBWindowDispatch(Window wID, XEvent *pEvent)
       WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Window,
                       "%s:%d - %d (%08xH) mapped, setting focus\n",
                       __FUNCTION__, __LINE__, (int)wID, (int)wID);
+
+//      WB_ERROR_PRINT("TEMPORARY - %s calling XSetInputFocus on wID=%u (%08xH)\n", __FUNCTION__, (int)wID, (uint32_t)wID);
 
       BEGIN_XCALL_DEBUG_WRAPPER
       XSetInputFocus(pEntry->pDisplay, wID, RevertToParent, CurrentTime);
@@ -4652,7 +4814,41 @@ int WBDefault(Window wID, XEvent *pEvent)
        pEvent->xconfigure.height != pEntry->height ||
        pEvent->xconfigure.border_width != pEntry->border)
     {
-      WBInvalidateGeom(wID, NULL, 1);  // for simplicity, just re-paint it - note, NOT saying "do it now"
+      if(!WB_IS_WINDOW_MAPPED(*pEntry) ||   // if I'm not mapped, just change the numbers and create a region
+         !pEntry->width || !pEntry->height) // same if width/height was zero (but is no longer)
+      {
+        XRectangle xrct;
+
+        // NOTE:  I must do it THIS way because the window isn't mapped yet.
+
+        pEntry->width = pEvent->xconfigure.width;
+        pEntry->height = pEvent->xconfigure.height;
+        pEntry->border = pEvent->xconfigure.border_width;
+
+        if(pEntry->rgnClip != None)
+        {
+          XDestroyRegion(pEntry->rgnClip);
+        }
+
+        pEntry->rgnClip = XCreateRegion();
+
+        if(pEntry->rgnClip &&
+           pEntry->width && pEntry->height) // make sure non-zero
+        {
+          xrct.x = 0;//(short)pEntry->x;
+          xrct.y = 0;//(short)pEntry->y;
+          xrct.width = (unsigned short)pEntry->width;
+          xrct.height = (unsigned short)pEntry->height;
+
+          XUnionRectWithRegion(&xrct, pEntry->rgnClip, pEntry->rgnClip);
+        }
+      }
+      else
+      {
+//        WB_ERROR_PRINT("TEMPORARY:  %s - ConfigureNotify invalidating geometry\n", __FUNCTION__);
+
+        WBInvalidateGeom(wID, NULL, 1);  // for simplicity, just re-paint it - note, NOT saying "do it now"
+      }
     }
 
     return 1; // handled
@@ -4981,6 +5177,8 @@ int WBMapWindow(Display *pDisplay, Window wID)
                    "%s:%d - %d (%08xH) mapped, setting focus\n",
                    __FUNCTION__, __LINE__, (int)wID, (int)wID);
 
+//    WB_ERROR_PRINT("TEMPORARY - %s calling XSetInputFocus on wID=%u (%08xH)\n", __FUNCTION__, (int)wID, (uint32_t)wID);
+
     BEGIN_XCALL_DEBUG_WRAPPER
     XSetInputFocus(pEntry->pDisplay, wID, RevertToParent, CurrentTime);
     END_XCALL_DEBUG_WRAPPER
@@ -5021,6 +5219,8 @@ int WBMapRaised(Display *pDisplay, Window wID)
     WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Window,
                    "%s:%d - %d (%08xH) mapped, setting focus\n",
                    __FUNCTION__, __LINE__, (int)wID, (int)wID);
+
+//    WB_ERROR_PRINT("TEMPORARY - %s calling XSetInputFocus on wID=%u (%08xH)\n", __FUNCTION__, (int)wID, (uint32_t)wID);
 
     BEGIN_XCALL_DEBUG_WRAPPER
     XSetInputFocus(pEntry->pDisplay, wID, RevertToParent, CurrentTime);
@@ -5260,7 +5460,7 @@ GC WBGetWindowCopyGC(Window wID)
     {  // NOTE:  docs say that args 3 and 4 are reversed, but header says THIS way
        //        I have to believe that the header file is correct
 
-      WB_ERROR_PRINT("%s - ERROR:  XCopyGC for window %d (%08xH) returns %d\n", __FUNCTION__, (int)wID, (int)wID, i1);
+      WB_ERROR_PRINT("ERROR:  %s -  XCopyGC for window %d (%08xH) returns %d\n", __FUNCTION__, (int)wID, (int)wID, i1);
 
       XFreeGC(pEntry->pDisplay, gcRval);
       gcRval = 0;
@@ -5270,35 +5470,34 @@ GC WBGetWindowCopyGC(Window wID)
   return(gcRval);
 }
 
-GC WBGetWindowCopyGC2(Window wID, GC gcSrc)
+GC WBCopyDrawableGC(Display *pDisplay, Drawable dw, GC gcSrc)
 {
-  _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
-  GC gcRval = 0;
+GC gcRval;
 
-  if(!pEntry)
+  if(!pDisplay)
   {
-    WB_WARN_PRINT("%s - WARNING:  no window entry for %d (%08xH)\n",
-                  __FUNCTION__, (int)wID, (int)wID);
-    return NULL;
+    pDisplay = WBGetDefaultDisplay();
   }
 
-  gcRval = XCreateGC(pEntry->pDisplay, wID, 0, NULL);
-  if(gcRval)
+  gcRval = XCreateGC(pDisplay, dw, 0, NULL);
+
+  if(gcRval != None)
   {
-    int i1 = XCopyGC(pEntry->pDisplay, gcSrc, GCAll /*0x7fffff*/, gcRval);  // 23 bits in the mask
+    int i1 = XCopyGC(pDisplay, gcSrc, GCAll /*0x7fffff*/, gcRval);  // 23 bits in the mask
+
     if(i1 > 1)// != 0)  TODO: find out why it gives me that ridiculous error code 1
     {  // NOTE:  docs say that args 3 and 4 are reversed, but header says THIS way
        //        I have to believe that the header file is correct
 
-      WB_ERROR_PRINT("%s - ERROR:  XCopyGC for window %d (%08xH) returns %d\n", __FUNCTION__, (int)wID, (int)wID, i1);
+      WB_ERROR_PRINT("ERROR:  %s -  XCopyGC for Drawable %d (%08xH) returns %d\n", __FUNCTION__, (int)dw, (int)dw, i1);
 
-      XFreeGC(pEntry->pDisplay, gcRval);
-      gcRval = 0;
+      XFreeGC(pDisplay, gcRval);
+      gcRval = None;
     }
   }
   else
   {
-    WB_ERROR_PRINT("%s - ERROR:  XCreateGC for window %d (%08xH) returns NULL\n", __FUNCTION__, (int)wID, (int)wID);
+    WB_ERROR_PRINT("ERROR:  %s - XCreateGC for Drawable %d (%08xH) returns NULL\n", __FUNCTION__, (int)dw, (int)dw);
   }
 
   return(gcRval);
@@ -5310,6 +5509,11 @@ XGCValues val;
 Status ret;
 XFontStruct *pF, *pRval;
 
+
+  if(!pDisplay)
+  {
+    pDisplay = WBGetDefaultDisplay();
+  }
 
   BEGIN_XCALL_DEBUG_WRAPPER
   ret = XGetGCValues(pDisplay, gc, GCFont, &val);
@@ -5411,6 +5615,291 @@ Status ret;
 
   return val.background;
 }
+
+
+void WBDefaultStandardColormap(Display *pDisplay, XStandardColormap *pMap)
+{
+XStandardColormap *pMaps = NULL;
+XStandardColormap cmap;
+Colormap cmDefault;
+unsigned long lTemp; //, lWhite = WhitePixel(pDisplay, DefaultScreen(pDisplay));
+XColor clrRed, clrGreen, clrBlue;
+int i1, nMaps = 0;
+
+
+  if(!pMap)
+  {
+    return;
+  }
+
+  if(!pDisplay)
+  {
+    pDisplay = WBGetDefaultDisplay();
+  }
+
+  if(pDisplay == WBGetDefaultDisplay() &&
+     bStandardColormap)
+  {
+    // use the cached structure.  faster.
+
+    memcpy(pMap, &cmapDefault, sizeof(cmapDefault));
+
+    return;
+  }
+
+  bzero(&cmap, sizeof(cmap));
+
+  cmDefault = DefaultColormap(pDisplay, DefaultScreen(pDisplay));
+
+  // TRY to use the APIs to get this information.  I mean, REALLY TRY.
+  if(!XGetRGBColormaps(pDisplay, DefaultRootWindow(pDisplay), &pMaps, &nMaps, XA_RGB_DEFAULT_MAP) ||
+     nMaps == 0)
+  {
+    if(pMaps)
+    {
+      XFree(pMaps);
+    }
+
+    pMaps = NULL;
+
+    if(!XGetRGBColormaps(pDisplay, DefaultRootWindow(pDisplay), &pMaps, &nMaps, XA_RGB_BEST_MAP) ||
+       nMaps == 0)
+    {
+      if(pMaps)
+      {
+        XFree(pMaps);
+      }
+
+      pMaps = NULL;
+    }
+  }
+
+  if(pMaps) // meaning that the above 'thingy' actually worked (I never really see it work, though)
+  {
+    for(i1=0; i1 < nMaps; i1++)
+    {
+      if(pMaps[i1].colormap == cmDefault)
+      {
+        memcpy(&cmap, &(pMaps[i1]), sizeof(XStandardColormap));
+        break;
+      }
+    }
+
+    XFree(pMaps);
+
+    cmap.killid = None; // make sure
+    cmap.visualid = None;
+
+    if(i1 < nMaps) // I broke out of the loop?  I found one?
+    {
+      if(pDisplay == WBGetDefaultDisplay())
+      {
+        memcpy(&cmapDefault, &cmap, sizeof(cmap));
+      }
+
+      memcpy(pMap, &cmap, sizeof(cmap));
+      return;
+    }
+  }
+
+//  WB_ERROR_PRINT("TEMPORARY:  %s no matching XStandardColormap found - creating\n", __FUNCTION__);
+
+  // --------------------------------------------------------
+  // DERIVE A COLOR MAP FROM RGB COLORS AND KNOWN INFORMATION
+  // --------------------------------------------------------
+
+  bzero(&clrRed, sizeof(clrRed));
+  bzero(&clrGreen, sizeof(clrGreen));
+  bzero(&clrBlue, sizeof(clrBlue));
+
+  clrRed.red = 65535;
+  clrGreen.green = 65535;
+  clrBlue.blue = 65535;
+  XAllocColor(pDisplay, cmDefault, &clrRed);
+  XAllocColor(pDisplay, cmDefault, &clrGreen);
+  XAllocColor(pDisplay, cmDefault, &clrBlue);
+
+//  WB_ERROR_PRINT("TEMPORARY:  %s  red: %08lxH  green: %08lxH  blue: %08lxH\n", __FUNCTION__,
+//                 clrRed.pixel, clrGreen.pixel, clrBlue.pixel);
+
+  // black is my 'base' pixel.
+  cmap.base_pixel = BlackPixel(pDisplay, DefaultScreen(pDisplay));
+
+  // next, 'nuke out' how the pixel multipliers work, using the Red, Green, and Blue 'alloc'd colors
+  if(clrRed.pixel >= clrGreen.pixel && clrRed.pixel >= clrBlue.pixel)
+  {
+    if(clrGreen.pixel >= clrBlue.pixel)
+    {
+      cmap.blue_max = clrBlue.pixel - cmap.base_pixel;
+      cmap.blue_mult = 1;
+
+      cmap.green_mult = 1;
+      while(cmap.green_mult < cmap.blue_max)
+      {
+        cmap.green_mult <<= 1;
+      }
+
+      lTemp = (clrGreen.pixel - cmap.base_pixel);
+      cmap.green_max = lTemp / cmap.green_mult;
+
+      cmap.red_mult = cmap.green_mult;
+
+      while(cmap.red_mult < lTemp)
+      {
+        cmap.red_mult <<= 1;
+      }
+
+      cmap.red_max = (clrRed.pixel - cmap.base_pixel)
+                   / cmap.red_mult;
+    }
+    else
+    {
+      cmap.green_max = clrGreen.pixel - cmap.base_pixel;
+      cmap.green_mult = 1;
+
+      cmap.blue_mult = 1;
+
+      while(cmap.blue_mult < cmap.green_max)
+      {
+        cmap.blue_mult <<= 1;
+      }
+
+      lTemp = (clrBlue.pixel - cmap.base_pixel);
+      cmap.blue_max = lTemp / cmap.blue_mult;
+
+      cmap.red_mult = cmap.blue_mult;
+
+      while(cmap.red_mult < lTemp)
+      {
+        cmap.red_mult <<= 1;
+      }
+
+      cmap.red_max = (clrRed.pixel - cmap.base_pixel)
+                   / cmap.red_mult;
+    }
+  }
+  else if(clrGreen.pixel >= clrRed.pixel && clrGreen.pixel >= clrBlue.pixel)
+  {
+    if(clrRed.pixel >= clrBlue.pixel)
+    {
+      cmap.blue_max = clrBlue.pixel - cmap.base_pixel;
+      cmap.blue_mult = 1;
+
+      cmap.red_mult = 1;
+      while(cmap.red_mult < cmap.blue_max)
+      {
+        cmap.red_mult <<= 1;
+      }
+
+      lTemp = (clrRed.pixel - cmap.base_pixel);
+      cmap.red_max = lTemp / cmap.red_mult;
+
+      cmap.green_mult = cmap.red_mult;
+
+      while(cmap.green_mult < lTemp)
+      {
+        cmap.green_mult <<= 1;
+      }
+
+      cmap.green_max = (clrGreen.pixel - cmap.base_pixel)
+                     / cmap.green_mult;
+    }
+    else
+    {
+      cmap.red_max = clrRed.pixel - cmap.base_pixel;
+      cmap.red_mult = 1;
+
+      cmap.blue_mult = 1;
+
+      while(cmap.blue_mult < cmap.green_max)
+      {
+        cmap.blue_mult <<= 1;
+      }
+
+      lTemp = (clrBlue.pixel - cmap.base_pixel);
+      cmap.blue_max = lTemp / cmap.blue_mult;
+
+      cmap.green_mult = cmap.blue_mult;
+
+      while(cmap.green_mult < lTemp)
+      {
+        cmap.green_mult <<= 1;
+      }
+
+      cmap.green_max = (clrGreen.pixel - cmap.base_pixel)
+                     / cmap.green_mult;
+    }
+  }
+  else
+  {
+    if(clrRed.pixel >= clrGreen.pixel)
+    {
+      cmap.green_max = clrGreen.pixel - cmap.base_pixel;
+      cmap.green_mult = 1;
+
+      cmap.red_mult = 1;
+      while(cmap.red_mult < cmap.green_max)
+      {
+        cmap.red_mult <<= 1;
+      }
+
+      lTemp = (clrRed.pixel - cmap.base_pixel);
+      cmap.red_max = lTemp / cmap.red_mult;
+
+      cmap.blue_mult = cmap.red_mult;
+
+      while(cmap.blue_mult < lTemp)
+      {
+        cmap.blue_mult <<= 1;
+      }
+
+      cmap.blue_max = (clrBlue.pixel - cmap.base_pixel)
+                    / cmap.blue_mult;
+    }
+    else
+    {
+      cmap.red_max = clrRed.pixel - cmap.base_pixel;
+      cmap.red_mult = 1;
+
+      cmap.green_mult = 1;
+      while(cmap.green_mult < cmap.red_max)
+      {
+        cmap.green_mult <<= 1;
+      }
+
+      lTemp = (clrGreen.pixel - cmap.base_pixel);
+      cmap.green_max = lTemp / cmap.green_mult;
+
+
+      cmap.blue_mult = cmap.green_mult;
+
+      while(cmap.blue_mult < lTemp)
+      {
+        cmap.blue_mult <<= 1;
+      }
+
+      cmap.blue_max = (clrBlue.pixel - cmap.base_pixel)
+                    / cmap.blue_mult;
+    }
+  }
+
+  XFreeColors(pDisplay, cmDefault, &clrRed.pixel, 1, 0);
+  XFreeColors(pDisplay, cmDefault, &clrGreen.pixel, 1, 0);
+  XFreeColors(pDisplay, cmDefault, &clrBlue.pixel, 1, 0);
+
+//  WB_ERROR_PRINT("TEMPORARY:  red: %u,%u   grn: %u,%u   blu: %u,%u\n",
+//                 (unsigned int)cmap.red_max, (unsigned int)cmap.red_mult,
+//                 (unsigned int)cmap.green_max, (unsigned int)cmap.green_mult,
+//                 (unsigned int)cmap.blue_max, (unsigned int)cmap.blue_mult);
+
+  if(pDisplay == WBGetDefaultDisplay())
+  {
+    memcpy(&cmapDefault, &cmap, sizeof(cmap));
+  }
+
+  memcpy(pMap, &cmap, sizeof(cmap));
+}
+
 
 XFontStruct *WBGetWindowFontStruct(Window wID)
 {
@@ -5708,7 +6197,9 @@ void WBGetWindowGeom(Window wID, WB_GEOM *pGeom)
   unsigned int uiDepth = 0;
 
   if(!pGeom)
+  {
     return;
+  }
 
 //  bzero(&xwa, sizeof(xwa));
   bzero(pGeom, sizeof(*pGeom));
@@ -5727,14 +6218,39 @@ void WBGetWindowGeom(Window wID, WB_GEOM *pGeom)
                    "%s:%d - pEntry is NULL, %d (%08xH) may NOT be mapped\n",
                    __FUNCTION__, __LINE__, (int)wID, (int)wID);
   }
+  else if(!WB_IS_WINDOW_MAPPED(*pEntry) &&
+          pEntry->geomAbsolute.width > 0 && pEntry->geomAbsolute.height > 0)
+  {
+    // if not mapped, return the best guess geometry
+
+    pGeom->x = 0; // pEntry->geomAbsolute.x;
+    pGeom->y = 0; // pEntry->geomAbsolute.y;
+    pGeom->width = pEntry->geomAbsolute.width;
+    pGeom->height = pEntry->geomAbsolute.height;
+    pGeom->border = pEntry->geomAbsolute.border;
+
+    WB_ERROR_PRINT("TEMPORARY:  %s - unmapped window geometry %d, %d, %d, %d\n",
+                   __FUNCTION__, pGeom->x, pGeom->y, pGeom->width, pGeom->height);
+
+    return;
+  }
+//  else if(!WB_IS_WINDOW_MAPPED(*pEntry))
+//  {
+//    WB_ERROR_PRINT("TEMPORARY:  %s - unmapped window, no 'absolute' GEOM available (pre 'X' calls)\n", __FUNCTION__);
+//  }
 
   BEGIN_XCALL_DEBUG_WRAPPER
+  XSync(pDisp, 0);
   XGetGeometry(pDisp, wID, &winRoot,
                &(pGeom->x), &(pGeom->y),
                &(pGeom->width), &(pGeom->height),
                &(pGeom->border), &uiDepth);
   END_XCALL_DEBUG_WRAPPER
 
+//  if(pEntry && !WB_IS_WINDOW_MAPPED(*pEntry))
+//  {
+//    WB_ERROR_PRINT("TEMPORARY:  %s - unmapped window, no 'absolute' GEOM available (post 'X' calls)\n", __FUNCTION__);
+//  }
 
 //fprintf(stderr, "XGetGeometry: window %08xH  %d, %d, %d, %d\n",
 //        wID, pGeom->x, pGeom->y, pGeom->width, pGeom->height);
@@ -5775,6 +6291,27 @@ void WBGetWindowGeom2(Window wID, WB_GEOM *pGeom)
                   __FUNCTION__, __LINE__, (int)wID, (int)wID);
     return;
   }
+  else if(!WB_IS_WINDOW_MAPPED(*pEntry) &&
+          pEntry->geomAbsolute.width > 0 && pEntry->geomAbsolute.height > 0)
+  {
+    // if not mapped, return the best guess geometry
+
+    pGeom->x = pEntry->geomAbsolute.x;
+    pGeom->y = pEntry->geomAbsolute.y;
+    pGeom->width = pEntry->geomAbsolute.width;
+    pGeom->height = pEntry->geomAbsolute.height;
+    pGeom->border = pEntry->geomAbsolute.border;
+
+    WB_ERROR_PRINT("TEMPORARY:  %s - unmapped window geometry %d, %d, %d, %d\n",
+                   __FUNCTION__, pGeom->x, pGeom->y, pGeom->width, pGeom->height);
+
+    return;
+  }
+//  else if(!WB_IS_WINDOW_MAPPED(*pEntry))
+//  {
+//    WB_ERROR_PRINT("TEMPORARY:  %s - unmapped window, no 'absolute' GEOM available\n", __FUNCTION__);  
+//  }
+
 
   BEGIN_XCALL_DEBUG_WRAPPER
   XGetGeometry(pDisp, wID, &winRoot,
@@ -6342,9 +6879,33 @@ void WBUpdateWindow(Window wID)
   XExposeEvent evt;
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
+  XFlush(WBGetWindowDisplay(wID));
+
   if(pEntry)
   {
-    if(pEntry->rgnClip)
+    if(pEntry->rgnClip == None ||
+       XEmptyRegion(pEntry->rgnClip))
+    {
+#ifndef NO_DEBUG
+      if(pEntry->rgnClip == None) // should not happen in this case
+      {
+        WB_ERROR_PRINT("ERROR:  %s - clipping region is 'None'\n", __FUNCTION__);
+      }
+      else
+      {
+        XClipBox(pEntry->rgnClip, &xrct);
+
+        if(xrct.width != 0 && xrct.height != 0)
+        {
+          WB_ERROR_PRINT("ERROR:  %s - clipping region is 'empty', bounds = %d, %d, %d, %d\n", __FUNCTION__,
+                         xrct.x, xrct.y, xrct.width, xrct.height);
+
+//          WBDebugDumpRegion(pEntry->rgnClip, 1);
+        }
+      }
+#endif // NO_DEBUG
+    }
+    else
     {
       XClipBox(pEntry->rgnClip, &xrct);
       // generate an 'expose' event and post it
@@ -6363,8 +6924,8 @@ void WBUpdateWindow(Window wID)
       WBProcessExposeEvent(&evt); // better than posting it (this consolidates every Expose event for that window)
                                   // NOTE:  it also calls WBInvalidateGeom() internally but NOT 'WBUpdateWindow()'
                                   //        It also checks the message queue an combines *ALL* expose events that are waiting
-//      WBPostEvent(wID, (XEvent *)&evt);  // post message (see below for immediate)
     }
+
   }
 }
 
@@ -6375,35 +6936,42 @@ void WBUpdateWindowImmediately(Window wID)
   XEvent evt0; // NOTE if it's too small I get a stack overflow so MUST be 'XEvent'
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
-  if(pEntry)
-  {
-    if(pEntry->rgnClip)
-    {
-      XClipBox(pEntry->rgnClip, &xrct);
-      // generate an 'expose' event and post it
+#define WB_IS_WINDOW_UNMAPPED(X) ((X).iWindowState == WB_WINDOW_UNMAPPED || (X).iWindowState == WB_WINDOW_SET_FOCUS_ON_MAP)
+#define WB_IS_WINDOW_MAPPED(X) ((X).iWindowState == WB_WINDOW_MAPPED)
+#define WB_IS_WINDOW_BEING_DESTROYED(X) ((X).iWindowState == WB_WINDOW_DESTROYING)
+#define WB_IS_WINDOW_DESTROYED(X) ((X).iWindowState == WB_WINDOW_DESTROYED || (X).iWindowState == WB_WINDOW_DELETE)
 
-      bzero(&evt, sizeof(evt));
-      evt.type = Expose;
-      evt.display = pEntry->pDisplay;
-      evt.window = wID;
-      evt.x = xrct.x;
-      evt.y = xrct.y;
-      evt.width = xrct.width;
-      evt.height = xrct.height;
+  XFlush(WBGetWindowDisplay(wID));
+
+  if(pEntry &&
+     WB_IS_WINDOW_MAPPED(*pEntry) &&
+     pEntry->rgnClip != None && !XEmptyRegion(pEntry->rgnClip))
+  {
+    XClipBox(pEntry->rgnClip, &xrct);
+
+    // generate an 'expose' event and post it
+
+    bzero(&evt, sizeof(evt));
+    evt.type = Expose;
+    evt.display = pEntry->pDisplay;
+    evt.window = wID;
+    evt.x = xrct.x;
+    evt.y = xrct.y;
+    evt.width = xrct.width;
+    evt.height = xrct.height;
 
 //      WB_ERROR_PRINT("TEMPORARY:  %s:%d - %d,%d,%d,%d\n", __FUNCTION__, __LINE__, evt.x, evt.y, evt.width, evt.height);
 
-      WBInternalProcessExposeEvent(&evt); // better than posting it (this consolidates every Expose event for that window)
-                                          // NOTE:  it also calls WBInvalidateGeom() internally but NOT 'WBUpdateWindow()'
+    WBInternalProcessExposeEvent(&evt); // better than posting it (this consolidates every Expose event for that window)
+                                        // NOTE:  it also calls WBInvalidateGeom() internally but NOT 'WBUpdateWindow()'
 
-      if(__WBNextPaintEvent(pEntry->pDisplay, &evt0, wID) >= 0) // grab the 'combined' paint event from the queue
-      {
-        WBWindowDispatch(wID, &evt0); // send "combined painting" message synchronously
-      }
-      else
-      {
-        WBWindowDispatch(wID, (XEvent *)&evt); // send message synchronously
-      }
+    if(__WBNextPaintEvent(pEntry->pDisplay, &evt0, wID) >= 0) // grab the 'combined' paint event from the queue
+    {
+      WBWindowDispatch(wID, &evt0); // send "combined painting" message synchronously
+    }
+    else
+    {
+      WBWindowDispatch(wID, (XEvent *)&evt); // send message synchronously
     }
   }
 }
@@ -6412,8 +6980,13 @@ void WBInvalidateGeom(Window wID, const WB_GEOM *pGeom, int bPaintNow)
 {
   WB_GEOM geom;
   XRectangle xrct;
+#ifndef NO_DEBUG
+  XRectangle xrct2;
+#endif // NO_DEBUG
 
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
+
+  XFlush(WBGetWindowDisplay(wID));
 
   if(pEntry)
   {
@@ -6444,6 +7017,22 @@ void WBInvalidateGeom(Window wID, const WB_GEOM *pGeom, int bPaintNow)
     {
       XUnionRectWithRegion(&xrct, pEntry->rgnClip, pEntry->rgnClip);
 
+//#ifndef NO_DEBUG
+//      XClipBox(pEntry->rgnClip, &xrct2);
+//
+//      if(memcmp(&xrct, &xrct2, sizeof(xrct)))
+//      {
+//        WB_ERROR_PRINT("TEMPORARY:  %s - 'union' of %d,%d,%d,%d - result is %d, %d, %d, %d\n", __FUNCTION__,
+//                       xrct.x, xrct.y, xrct.width, xrct.height,
+//                       xrct2.x, xrct2.y, xrct2.width, xrct2.height);
+//      }
+//
+////      if(pGeom != &geom)
+////      {
+////        WBDebugDumpRegion(pEntry->rgnClip, 1);
+////      }
+//#endif // NO_DEBUG
+
       if(bPaintNow)
       {
         WBUpdateWindow(wID);
@@ -6457,6 +7046,8 @@ void WBInvalidateRegion(Window wID, Region rgn, int bPaintFlag)
 //  WB_GEOM geom;
 
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
+
+  XFlush(WBGetWindowDisplay(wID));
 
   if(pEntry)
   {
@@ -6482,21 +7073,30 @@ void WBValidateGeom(Window wID, const WB_GEOM *pGeom)
 //  WB_GEOM geom;
   Region rgnTemp;
   XRectangle xrct;
+  _WINDOW_ENTRY_ *pEntry;
 
-  _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
+  pEntry = WBGetWindowEntry(wID);
+
+  XFlush(WBGetWindowDisplay(wID));
 
   if(pEntry)
   {
     if(!pEntry->rgnClip)
-      return;
+    {
+      pEntry->rgnClip = XCreateRegion(); // put an empty one there
 
-    if(!pGeom)
+      return;
+    }
+
+    if(!pGeom) // validate everything
     {
       if(pEntry->rgnClip)
       {
         XDestroyRegion(pEntry->rgnClip);
-        pEntry->rgnClip = 0;
       }
+
+      pEntry->rgnClip = XCreateRegion(); // put an empty one there
+
       return;
     }
 
@@ -6509,7 +7109,7 @@ void WBValidateGeom(Window wID, const WB_GEOM *pGeom)
 
     if(!rgnTemp)
     {
-      return;
+      return; // oops (error)
     }
 
     XUnionRectWithRegion(&xrct, rgnTemp, rgnTemp);
@@ -6519,8 +7119,9 @@ void WBValidateGeom(Window wID, const WB_GEOM *pGeom)
 
     if(XEmptyRegion(pEntry->rgnClip)) // if it's empty, destroy it
     {
-      XDestroyRegion(pEntry->rgnClip);
-      pEntry->rgnClip = 0;
+      // now I leave the empty region alone
+//      XDestroyRegion(pEntry->rgnClip);
+//      pEntry->rgnClip = 0;
     }
   }
 }
@@ -6529,29 +7130,39 @@ void WBValidateRegion(Window wID, Region rgn)
 {
 //  WB_GEOM geom;
 //  Region rgnTemp;
+  _WINDOW_ENTRY_ *pEntry;
 
-  _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
+  pEntry = WBGetWindowEntry(wID);
+
+  XFlush(WBGetWindowDisplay(wID));
 
   if(pEntry)
   {
     if(!pEntry->rgnClip)
-      return;
+    {
+      pEntry->rgnClip = XCreateRegion(); // put an empty one there
 
-    if(!rgn)
+      return;
+    }
+
+    if(rgn == None) // validate everything
     {
       if(pEntry->rgnClip)
       {
         XDestroyRegion(pEntry->rgnClip);
-        pEntry->rgnClip = 0;
       }
+
+      pEntry->rgnClip = XCreateRegion(); // put an empty one there
+
       return;
     }
 
     XSubtractRegion(rgn, pEntry->rgnClip, pEntry->rgnClip);
     if(XEmptyRegion(pEntry->rgnClip))
     {
-      XDestroyRegion(pEntry->rgnClip);
-      pEntry->rgnClip = 0;
+      // now I leave the empty region alone
+//      XDestroyRegion(pEntry->rgnClip);
+//      pEntry->rgnClip = XCreateRegion(); // put an empty one there
     }
   }
 }
@@ -6560,11 +7171,17 @@ Region WBGetInvalidRegion(Window wID)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
+  XFlush(WBGetWindowDisplay(wID));
+
   if(pEntry && pEntry->rgnClip)
   {
     Region rgnRval = XCreateRegion();
 
-    if(rgnRval != None)
+    if(rgnRval == None)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - no region created\n", __FUNCTION__);
+    }
+    else
     {
       XUnionRegion(pEntry->rgnClip, rgnRval, rgnRval);
     }
@@ -6579,11 +7196,17 @@ Region WBGetPaintRegion(Window wID)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
+  XFlush(WBGetWindowDisplay(wID));
+
   if(pEntry && pEntry->rgnPaint)
   {
     Region rgnRval = XCreateRegion();
 
-    if(rgnRval != None)
+    if(rgnRval == None)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - no region created\n", __FUNCTION__);
+    }
+    else
     {
       XUnionRegion(pEntry->rgnPaint, rgnRval, rgnRval);
     }
@@ -6598,7 +7221,11 @@ Region WBCopyRegion(Region rgnSource)
 {
   Region rgnRval = XCreateRegion();
 
-  if(rgnRval != None)
+  if(rgnRval == None)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no region created\n", __FUNCTION__);
+  }
+  else
   {
     XUnionRegion(rgnSource, rgnRval, rgnRval);
   }
@@ -6618,7 +7245,11 @@ Region rgnRval;
 
   rgnRval = XCreateRegion();
 
-  if(rgnRval != None)
+  if(rgnRval == None)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no region created\n", __FUNCTION__);
+  }
+  else
   {
     xrct.x = (short)pRect->left;
     xrct.y = (short)pRect->top;
@@ -6643,7 +7274,11 @@ Region rgnRval;
 
   rgnRval = XCreateRegion();
 
-  if(rgnRval != None)
+  if(rgnRval == None)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no region created\n", __FUNCTION__);
+  }
+  else
   {
     xrct.x = (short)pGeom->x;
     xrct.y = (short)pGeom->y;
@@ -6687,7 +7322,7 @@ GC gcRval;
   return gcRval;
 }
 
-GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // GC has invalid region assigned
+GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // GC will get the 'invalid' region assigned as clip region
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
   GC gcRval;
@@ -6700,19 +7335,31 @@ GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // GC has invalid region assi
     return None;
   }
 
+  XSync(WBGetWindowDisplay(wID), 0);
+
   if(!pEntry->rgnClip || XEmptyRegion(pEntry->rgnClip)) // clipping region is empty?
   {
-    WB_ERROR_PRINT("TEMPORARY:  %s - empty or no clip region\n", __FUNCTION__);
-
-    if(pEntry->rgnClip)
+    if(!pEntry->rgnClip)
     {
-      XDestroyRegion(pEntry->rgnClip);
-//      pEntry->rgnClip = None;
+      WB_ERROR_PRINT("ERROR:  %s - no clip region!\n", __FUNCTION__);
+    }
+    else
+    {
+//      WBDebugDumpRegion(pEntry->rgnClip, 1);
+      
+      WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Expose,
+                     "%s - (WARNING) empty clip region - bounds = %d,%d,%d,%d\n",
+                     __FUNCTION__, pgBounds->x, pgBounds->y, pgBounds->width, pgBounds->height);
     }
 
-    pEntry->rgnClip = WBGeomToRegion(pgBounds); // for now do this, using a new clip region, like implicit 'WBInvalidateGeom'
-  }
+    // NOTE:  If I'm in the middle of painting, *AND* the region is empty, then additional 'Expose'
+    //        handlers might call this function.  I need to gracefully allow the empty region
 
+    if(!pEntry->rgnClip)
+    {
+      pEntry->rgnClip = XCreateRegion(); // create an empty region
+    }
+  }
 
   gcRval = XCreateGC(pEntry->pDisplay, wID, 0, NULL);
   if(gcRval)
@@ -7039,15 +7686,71 @@ static int __WBAddEvent(Display *pDisp, Window wID, XEvent *pEvent)
   return 0; // success
 }
 
+static void __WBDelWindowPaintEvents(Display *pDisp, Window wID)
+{
+  int iEvent, iPrev, iTemp;
+  XEvent event;
+
+  if(iWBPaintEvent < 0)
+  {
+    return;
+  }
+
+  iEvent = iWBPaintEvent;
+  iPrev = -1;
+
+  while(iEvent >= 0)
+  {
+    if(axWBEvt[iEvent].wID == wID &&
+       axWBEvt[iEvent].pDisplay == pDisp)
+    {
+      if(iPrev < 0)
+      {
+        iWBPaintEvent = axWBEvt[iEvent].iNext;  // remove from head
+        if(iWBPaintEvent < 0)
+        {
+          iWBPaintLast = -1;
+        }
+      }
+      else
+      {
+        axWBEvt[iPrev].iNext = axWBEvt[iEvent].iNext;  // remove from chain
+        if(axWBEvt[iPrev].iNext < 0)
+        {
+          iWBPaintLast = iPrev;
+        }
+      }
+
+      iTemp = iEvent;
+
+      // add 'iEvent' to the chain of free events
+      iEvent = axWBEvt[iTemp].iNext;
+      axWBEvt[iTemp].iNext = iWBFreeEvent;
+      iWBFreeEvent = iTemp;
+    }
+    else
+    {
+      iPrev = iEvent;
+      iEvent = axWBEvt[iEvent].iNext;
+    }
+  }
+
+  XSync(pDisp, 0);
+
+  // now the X events (remove them from the queue)
+  while(XCheckWindowEvent(pDisp, wID, ExposureMask, &event))
+    ;
+}
+
 static void __WBDelWindowEvents(Display *pDisp, Window wID)
 {
   int iEvent, iPrev, iTemp;
   XEvent event;
 
-  if(iWBQueuedEvent < 0)
-  {
-    return;
-  }
+//  if(iWBQueuedEvent < 0 && iWBPaintEvent < 0)
+//  {
+//    return;
+//  }
 
   // traverse iWBQueuedEvent
 
@@ -7129,17 +7832,19 @@ static void __WBDelWindowEvents(Display *pDisp, Window wID)
     }
   }
 
-  XFlush(pDisp);
+// do XSync and exit
 
-  // now the X events (remove them from the queue)
+  XSync(pDisp, 0);
+
+  // now the X 'expose' events (remove them from the queue)
   while(XCheckWindowEvent(pDisp, wID, EVENT_ALL_MASK, &event))
     ;
 
-  XFlush(pDisp);
-
-  // the X events again
-  while(XCheckWindowEvent(pDisp, wID, EVENT_ALL_MASK, &event))
-    ;
+//  XSync(pDisp);
+//
+//  // the X events again
+//  while(XCheckWindowEvent(pDisp, wID, EVENT_ALL_MASK, &event))
+//    ;
 }
 
 static int __WBInsertPriorityEvent(Display *pDisp, Window wID, XEvent *pEvent)
@@ -7947,6 +8652,22 @@ char *p1;
 
   switch(pEvent->xany.type)
   {
+    case ClientMessage:
+      p1 = XGetAtomName(pEvent->xany.display, pEvent->xclient.message_type);
+      WBDebugPrint(" message_type:   %s\n", p1);
+      XFree(p1);
+
+      WBDebugPrint("       format:   %d\n", pEvent->xclient.format);
+      WBDebugPrint("    data[0].l:   %ld (%08lxH)\n", pEvent->xclient.data.l[0], pEvent->xclient.data.l[0]);
+      WBDebugPrint("    data[1].l:   %ld (%08lxH)\n", pEvent->xclient.data.l[1], pEvent->xclient.data.l[1]);
+      WBDebugPrint("    data[2].l:   %ld (%08lxH)\n", pEvent->xclient.data.l[2], pEvent->xclient.data.l[2]);
+      WBDebugPrint("    data[3].l:   %ld (%08lxH)\n", pEvent->xclient.data.l[3], pEvent->xclient.data.l[3]);
+      WBDebugPrint("    data[4].l:   %ld (%08lxH)\n", pEvent->xclient.data.l[4], pEvent->xclient.data.l[4]);
+
+      WBDebugDump("** client event data dump **", &(pEvent->xclient.data), sizeof(pEvent->xclient.data));
+      break;
+
+
     case SelectionNotify:
       p1 = XGetAtomName(pEvent->xany.display, pEvent->xselection.selection);
       WBDebugPrint("    selection:   %s\n", p1);
@@ -7987,6 +8708,95 @@ char *p1;
   }
 }
 
+
+void WBDebugDumpRegion(Region hRgn, int bRotate)
+{
+XRectangle xrct;
+int iW, iH;
+
+  XClipBox(hRgn, &xrct);
+
+  WBDebugPrint("REGION %u (%08xH):  clip rect: %d, %d, %d, %d  bRotate=%d\n",
+               (unsigned int)(unsigned long long)hRgn,
+               (unsigned int)(unsigned long long)hRgn,
+               xrct.x, xrct.y, xrct.width + xrct.x, xrct.height + xrct.y,
+               bRotate);
+
+  if(xrct.width == 0 || xrct.height == 0)
+  {
+    WBDebugPrint("      (Region is empty)\n");
+    return;
+  }
+
+  if(bRotate)
+  {
+    iW = xrct.x;
+    xrct.x = xrct.y;
+    xrct.y = iW;
+    
+    iW = xrct.width;
+    xrct.width = xrct.height;
+    xrct.height = iW;
+  }
+
+  WBDebugPrint("      ");
+  for(iW=xrct.x; iW < xrct.x + xrct.width; iW++)
+  {
+    WBDebugPrint("%d", (iW / 100) % 10);
+  }
+
+  WBDebugPrint("\n      ");
+
+  for(iW=xrct.x; iW < xrct.x + xrct.width; iW++)
+  {
+    WBDebugPrint("%d", (iW / 10) % 10);
+  }
+
+  WBDebugPrint("\n      ");
+
+  for(iW=xrct.x; iW < xrct.x + xrct.width; iW++)
+  {
+    WBDebugPrint("%d", iW % 10);
+  }
+
+  WBDebugPrint("\n      ");
+
+  for(iW=xrct.x; iW < xrct.x + xrct.width; iW++)
+  {
+    WBDebugPrint("-");
+  }
+
+  WBDebugPrint("+\n");
+
+
+  for(iH=xrct.y; iH < xrct.y + xrct.height; iH++)
+  {
+    WBDebugPrint("%5d|", iH);
+    for(iW=xrct.x; iW < xrct.x + xrct.width; iW++)
+    {
+      if((!bRotate && XPointInRegion(hRgn, iW, iH)) ||
+         (bRotate && XPointInRegion(hRgn, iH, iW)))
+      {
+        WBDebugPrint(".");
+      }
+      else
+      {
+        WBDebugPrint(" ");
+      }
+    }
+    WBDebugPrint("|\r\n");
+  }
+
+  WBDebugPrint("      ");
+
+  for(iW=xrct.x; iW < xrct.x + xrct.width; iW++)
+  {
+    WBDebugPrint("=");
+  }
+
+  WBDebugPrint("+\n");
+
+}
 
 
 // ****************************************************
@@ -8059,7 +8869,10 @@ _WINDOW_ENTRY_ *pEntry;
 
   WB_ERROR_PRINT("    Minor Request Code:  %d (%08xH)\n", pError->minor_code, pError->minor_code);
 
-  if(pError->error_code == BadWindow)
+  if(pError->error_code == BadWindow ||
+     ((pError->error_code == BadMatch || pError->error_code == BadDrawable) &&
+      (pError->request_code == X_SetInputFocus ||
+       pError->request_code == X_GetGeometry)))
   {
     pEntry = WBGetWindowEntry((Window)pError->resourceid);
 

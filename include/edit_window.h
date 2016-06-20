@@ -104,14 +104,14 @@ extern "C" {
 //  WBEditWindowFlags_EncodingUTF16   = 0x2,
 //  WBEditWindowFlags_EncodingOther   = 0x3, // 'other' implies locales, etc. (reserved)
 //
-//  WBEditWindowFlags_Minimized       = 0x40000000L,  // minimized window within owner's client area
-//  WBEditWindowFlags_Maximized       = 0x80000000L,  // maximized window within owner's client area
-//
 //};
 
 
-/** \typedef WBEditWindow
+/** \ingroup edit_window
   * \struct __WBEditWindow__
+  * \copydoc WBEditWindow
+**/
+/** \typedef WBEditWindow
   * \ingroup edit_window
   * \brief Structure that defines an Edit Window
   *
@@ -124,6 +124,7 @@ extern "C" {
   * will be able to activate it.
   *
   * \code
+
   typedef struct __WBEditWindow__
   {
     WBChildFrame childframe;          // elements common to a 'child frame' (derived object)
@@ -133,9 +134,10 @@ extern "C" {
     int nTextObjects;                 // Total number of items in aTextObjects
     int nMaxTextObjects;              // Max number of items in aTextObjects
 
-    TEXT_OBJECT *aTextObjects[2];     // 'TEXT_OBJECT' array
+    TEXT_OBJECT *pTextObjects;        // pointer to the 'TEXT_OBJECT' array
 
   } WBEditWindow;
+
   * \endcode
   *
   * Additional 'Child Frame' API functions can be called directly by using a type cast from 'WBEditWindow *'
@@ -152,7 +154,7 @@ typedef struct __WBEditWindow__
   int nTextObjects;                 ///< Total number of items in aTextObjects
   int nMaxTextObjects;              ///< Max number of items in aTextObjects
 
-  TEXT_OBJECT *aTextObjects[2];     ///< 'TEXT_OBJECT' array (TODO:  just make this a pointer instead?)
+  TEXT_OBJECT *pTextObjects;        ///< pointer to the 'TEXT_OBJECT' array
 
 } WBEditWindow;
 

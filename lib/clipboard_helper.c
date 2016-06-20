@@ -598,11 +598,24 @@ Atom aUTF8_STRING;
           else
           {
             wOwn = XGetSelectionOwner(pDisplay, aSelection);
+
+#ifndef NO_DEBUG
+            if(aSelection != XA_PRIMARY && aSelection != aCLIPBOARD)
+            {
+              char *p1 = XGetAtomName(pDisplay, aSelection);
+              WB_ERROR_PRINT("TEMPORARY:  %s - selection = %d \"%s\"  owner = %u (%08xH)\n",
+                             __FUNCTION__, (int)aSelection, p1, (int)wOwn, (int)wOwn);
+              if(p1)
+              {
+                XFree(p1);
+              }
+            }
+#endif // NO_DEBUG
           }
 
           if(wOwn == wWindow) // it's me
           {
-            WB_ERROR_PRINT("TEMPORARY: %s - request clipboard and I own it\n", __FUNCTION__);
+//            WB_ERROR_PRINT("TEMPORARY: %s - request clipboard and I own it\n", __FUNCTION__);
 
             // re-acquire the mutex
 
@@ -661,8 +674,8 @@ Atom aUTF8_STRING;
 
                   bDoneAndSignal = 1; // put in 'done' queue, signal caller
 
-                  WB_ERROR_PRINT("TEMPORARY:  %s - return clipboard data %p len=%d (%d)\n",
-                                 __FUNCTION__, pT->pData, pT->cbLength, iLen);
+//                  WB_ERROR_PRINT("TEMPORARY:  %s - return clipboard data %p len=%d (%d)\n",
+//                                 __FUNCTION__, pT->pData, pT->cbLength, iLen);
                 }
                 else
                 {
@@ -728,7 +741,7 @@ null_data_me_own:
 
             // NOTE:  the function return does not indicate success/fail                              
 
-            WB_ERROR_PRINT("TEMPORARY: %s line %d - XConvertSelection, fState set to 1\n", __FUNCTION__, __LINE__);
+//            WB_ERROR_PRINT("TEMPORARY: %s line %d - XConvertSelection, fState set to 1\n", __FUNCTION__, __LINE__);
 
             pT->fState = 1; // this tells me I'm waiting for the first reply
             pT->ullTime = WBGetTimeIndex(); // the time I sent the message
@@ -838,7 +851,7 @@ null_data_me_own:
             }
           }
    
-          WB_ERROR_PRINT("TEMPORARY:  %s - empty clipboard assignment\n", __FUNCTION__);          
+//          WB_ERROR_PRINT("TEMPORARY:  %s - empty clipboard assignment\n", __FUNCTION__);          
         }
         else
         {
@@ -876,7 +889,7 @@ null_data_me_own:
             pD->nFormat    = pT->nFormat;
             pD->cbLength   = pT->cbLength;
 
-            WB_ERROR_PRINT("TEMPORARY:  %s - owning selection - length=%d (%d)\n", __FUNCTION__, pD->cbLength, iTrueLen);
+//            WB_ERROR_PRINT("TEMPORARY:  %s - owning selection - length=%d (%d)\n", __FUNCTION__, pD->cbLength, iTrueLen);
 
             if(pD->aSelection != None)
             {
@@ -884,7 +897,7 @@ null_data_me_own:
 
               XSetSelectionOwner(pDisplay, pD->aSelection, wWindow, CurrentTime);
 
-              WB_ERROR_PRINT("TEMPORARY:  %s - owned \"%s\"\n", __FUNCTION__, p1);
+//              WB_ERROR_PRINT("TEMPORARY:  %s - owned \"%s\"\n", __FUNCTION__, p1);
               XFree(p1);
             }
             else
@@ -892,7 +905,7 @@ null_data_me_own:
               XSetSelectionOwner(pDisplay, XA_PRIMARY, wWindow, CurrentTime);
               XSetSelectionOwner(pDisplay, aCLIPBOARD, wWindow, CurrentTime);
 
-              WB_ERROR_PRINT("TEMPORARY:  %s - owned XA_PRIMARY and CLIPBOARD\n", __FUNCTION__);
+//              WB_ERROR_PRINT("TEMPORARY:  %s - owned XA_PRIMARY and CLIPBOARD\n", __FUNCTION__);
             }
 
             // add 'pD' to my chain
@@ -990,7 +1003,7 @@ null_data_me_own:
         // signaling the completion of a task
         /////////////////////////////////////////////////////////////////
 
-        WB_ERROR_PRINT("TEMPORARY:  %s line %d - put thingy in done list, signal caller\n", __FUNCTION__, __LINE__);
+//        WB_ERROR_PRINT("TEMPORARY:  %s line %d - put thingy in done list, signal caller\n", __FUNCTION__, __LINE__);
 
         // after copying the data, remove it from the 'run' list
 

@@ -80,7 +80,40 @@ extern "C" {
 
 
 /** \ingroup pixmap
-  * \brief Convert R, G, B values to Y, U, V
+  * \brief Simple RGB assignment to pixel, 0-255 RGB
+  *
+  * \param R red color, 0-255
+  * \param G green color, 0-255
+  * \param B blue color, 0-255
+  * \param X An XColor structure
+  *
+  * Assigns the appropriate RGB elements of an XColor structure based on 0-255 RGB.
+  * This does NOT assign the 'pixel' element.  For that, use PXM_RGBToPixel()
+**/
+#define RGB255_TO_XCOLOR(R,G,B,X) { (X).red = ((unsigned int)(R) << 8) & 0xffff; \
+                                    (X).green = ((unsigned int)(G) << 8) & 0xffff; \
+                                    (X).blue = ((unsigned int)(B) << 8) & 0xffff; \
+                                    (X).flags = DoRed | DoGreen | DoBlue; }
+
+/** \ingroup pixmap
+  * \brief Simple RGB assignment to pixel, 0-65535 RGB
+  *
+  * \param R red color, 0-65535
+  * \param G green color, 0-65535
+  * \param B blue color, 0-65535
+  * \param X An XColor structure
+  *
+  * Assigns the appropriate elements of an XColor structure based on 0-65535 RGB
+  * This does NOT assign the 'pixel' element.  For that, use PXM_RGBToPixel()
+**/
+#define RGB_TO_XCOLOR(R,G,B,X) { (X).red = ((unsigned int)(R)) & 0xffff; \
+                                 (X).green = ((unsigned int)(G)) & 0xffff; \
+                                 (X).blue = ((unsigned int)(B)) & 0xffff; \
+                                 (X).flags = DoRed | DoGreen | DoBlue; }
+
+
+/** \ingroup pixmap
+  * \brief Convert R, G, B values to Y, U, V with 0-255 range
   *
   * \param iR the Red value (0-255)
   * \param iG the Green value (0-255)
@@ -110,7 +143,7 @@ extern "C" {
 void PXM_RGBToYUV(int iR, int iG, int iB, int *piY, int *piU, int *piV);
 
 /** \ingroup pixmap
-  * \brief Convert Y, U, V values to  R, G, B 
+  * \brief Convert Y, U, V values to  R, G, B with 0-255 range
   *
   * \param iY the 'Y' value (0-255)
   * \param iU the 'U' value (0-255)
@@ -326,6 +359,50 @@ XImage *PXM_PixmapToImage(Display *pDisplay, Pixmap pxImage);
   * Header File:  pixmap_helper.h
 **/
 void PXM_OnExit(void);
+
+
+//--------------------
+// HELPERS FOR XImage
+//--------------------
+
+
+/** \ingroup pixmap
+  * \brief Returns pointer to XImage data
+  *
+  * \param pImage A pointer to an XImage (must not be NULL)
+  * \returns The data pointer element from the XImage
+  *
+  * Call this to get the pointer to the data stored in an XImage.  This data can be copied
+  * and stored elsewhere, as needed, or restored from a stored copy.
+  *
+  * Header File:  pixmap_helper.h
+**/
+static __inline void *PXM_GetImageDataPtr(XImage *pImage)
+{
+  return pImage->data;
+}
+
+/** \ingroup pixmap
+  * \brief Returns the length of XImage data
+  *
+  * \param pImage A pointer to an XImage (must not be NULL)
+  * \returns The length of the data from the XImage
+  *
+  * Call this to get the length of the data stored in an XImage.  This data can be copied
+  * and stored elsewhere, as needed, or restored from a stored copy.
+  *
+  * Header File:  pixmap_helper.h
+**/
+static __inline unsigned long PXM_GetImageDataLength(XImage *pImage)
+{
+  if(pImage->depth <= 1)
+  {
+    return (unsigned long)pImage->bytes_per_line * (unsigned long)pImage->height; // TODO:  is this right?
+  }
+
+  return (unsigned long)pImage->bytes_per_line * (unsigned long)pImage->height
+         * (unsigned long)pImage->depth;
+}
 
 
 #ifdef __cplusplus

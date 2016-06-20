@@ -333,12 +333,18 @@ enum XSettingsType
 
 
 /** \ingroup desktop_settings
+  * \struct __XSETTINGS_DATA_COLOR__
+  * \copydoc XSETTINGS_DATA_COLOR
+**/
+/** \ingroup desktop_settings
+  * \typedef XSETTINGS_DATA_COLOR
   * \brief Structure for storing configuration color information, \ref XSettingsTypeColor
   *
   * This structure is part of the X11 Window Manager specification, and is defined here for use
   * by the X11Workbench toolkit.
   *
-\code
+  * \code
+
   typedef struct __XSETTINGS_DATA_COLOR__ // also used internally by XSettings
   {
     unsigned short sRed;    // 16-bit RGB value for RED
@@ -346,7 +352,8 @@ enum XSettingsType
     unsigned short sGreen;  // 16-bit RGB value for Green
     unsigned short sAlpha;  // 16-bit ALPHA value.  If not used, it will be 0xffff
   } __PACKED__ XSETTINGS_DATA_COLOR;
-\endcode
+
+  * \endcode
   *
 **/
 typedef struct __XSETTINGS_DATA_COLOR__ // also used internally by XSettings
@@ -358,14 +365,19 @@ typedef struct __XSETTINGS_DATA_COLOR__ // also used internally by XSettings
 } __PACKED__ XSETTINGS_DATA_COLOR;
 
 
-
 /** \ingroup desktop_settings
+  * \struct _CHXSetting_
+  * \copydoc CHXSetting
+**/
+/** \ingroup desktop_settings
+  * \typedef CHXSetting
   * \brief Structure for storing settings information internally
   *
   * This structure is used internally by the \ref conf_help to cache configuration information obtained
   * from the Window Manager or from the (deprecated) system configuration.
   *
-\code
+  * \code
+
   typedef struct _CHXSetting_
   {
     const char *szName;              // pointer to the NAME string within memory that follows CHXSettings::aData
@@ -381,7 +393,8 @@ typedef struct __XSETTINGS_DATA_COLOR__ // also used internally by XSettings
       char *szData;                  // 'char' typed pointer to data within string area
     } uData;                         // union of the data alias'
   }  __PACKED__ CHXSetting;
-\endcode
+
+  * \endcode
   *
 **/
 typedef struct _CHXSetting_
@@ -402,13 +415,19 @@ typedef struct _CHXSetting_
 
 
 /** \ingroup desktop_settings
+  * \struct _CHXSettings_
+  * \copydoc CHXSettings
+**/
+/** \ingroup desktop_settings
+  * \typedef CHXSettings
   * \brief Array wrapper for \ref CHXSetting cache
   *
   * This structure wraps the array of \ref CHXSetting structures and any variable length data that
   * it might reference.  It is the internal format for the settings array and can be retrieved by
   * calling \ref CHGetXSettings()
   *
-\code
+  * \code
+
   typedef struct _CHXSettings_
   {
     Display *pDisplay;      // identifies which display it belongs to (reserved)
@@ -416,7 +435,8 @@ typedef struct _CHXSetting_
     unsigned int uiSerial;  // serial number from last XSETTINGS query
     CHXSetting aData[1];    // An array of 'nSettings' \ref CHXSetting structures.  Binary and string data directly follows the array.
   } CHXSettings;
-\endcode
+
+  * \endcode
   *
 **/
 typedef struct _CHXSettings_

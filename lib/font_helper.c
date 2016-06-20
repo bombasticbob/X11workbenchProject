@@ -77,7 +77,7 @@ typedef struct WBFontInfo
 } WB_FONT_INFO;
 
 #ifndef NO_DEBUG
-static void WBDumpFontStruct(XFontStruct *pFont);
+static void WBDumpFontStruct(const XFontStruct *pFont);
 #endif // NO_DEBUG
 
 XFontStruct *WBCopyFont(XFontStruct *pOldFont)
@@ -960,6 +960,102 @@ char tbuf[512], tbuf2[512], tbuf3[512];
   return pRval;
 }
 
+int WBFontAvgCharWidth(Display *pDisplay, const XFontStruct *pFont)
+{
+unsigned long lName, lPoints;
+char *pName = NULL;
+WB_FONT_INFO *pFI;
+int iRval = 0;
+
+
+  // step 1:  generate font string from XFontStruct
+
+  if(!pFont)
+  {
+    return 0;
+  }
+
+//  WBDumpFontStruct(pFont);
+
+  // calculate from 'AVERAGE_WIDTH' (in pixels) using font height and point info
+
+  if(XGetFontProperty((XFontStruct *)pFont, aAVERAGE_WIDTH, &lName) &&
+     XGetFontProperty((XFontStruct *)pFont, XA_POINT_SIZE, &lPoints) &&
+     lPoints && lName)
+  {
+    iRval = (pFont->ascent + pFont->descent) * lName / lPoints;
+
+//    WB_ERROR_PRINT("TEMPORARY:  %s - avg font width=%d\n", __FUNCTION__, iRval);
+
+    return iRval; // this will be the width [fastest method]
+  }
+
+  if(XGetFontProperty((XFontStruct *)pFont, XA_QUAD_WIDTH, &lName) && lName)
+  {
+    return (int)lName; // 'QUAD_WIDTH' value
+  }
+
+  // if i didn't have an average character width property, do it the *HARD* way
+
+  if(XGetFontProperty((XFontStruct *)pFont, XA_FONT, &lName))
+  {
+    pName = XGetAtomName(pDisplay ? pDisplay : WBGetDefaultDisplay(), (Atom)lName);
+
+    if(!pName && pDisplay)
+    {
+      pName = XGetAtomName(WBGetDefaultDisplay(), (Atom)lName);
+    }
+  }
+
+  if(pName)
+  {
+
+    // if the user specified 'iFontSize' of zero, and did NOT include any
+    // font size flags, make sure I duplicate the correct font size
+
+    pFI = WBParseFontName(pName);
+
+    if(pFI)
+    {
+      if(pFI->iAvgWidth)
+      {
+        iRval = (pFI->iAvgWidth * pFI->iPixelSize) / pFI->iPointSize;
+      }
+      else
+      {
+        iRval = pFI->iWidth; // assuming this is right
+      }
+
+      if(!iRval)
+      {
+        iRval = pFI->iWidth;
+      }
+
+//      WB_ERROR_PRINT("TEMPORARY:  %s - width=%d, avg=%d, rval=%d\n", __FUNCTION__, pFI->iWidth, pFI->iAvgWidth, iRval);
+      free(pFI);
+
+      if(iRval)
+      {
+        return iRval;
+      }
+    }
+
+    XFree(pName);
+  }
+
+  iRval = XTextWidth((XFontStruct *)pFont, " ", 1); // return the width of the 'space' character as a last resort
+
+  if(!iRval)
+  {
+    iRval = (pFont->ascent + pFont->descent) / 2; // desperate measure, return half the height
+
+    WB_ERROR_PRINT("TEMPORARY:  %s - desperately returning 'half-height' avg font width %d\n", __FUNCTION__, iRval);
+  }
+
+  return iRval;
+}
+
+
 XFontStruct *WBLoadModifyFont(Display *pDisplay, const XFontStruct *pOriginal,
                               int iFontSize, int iFlags)
 {
@@ -1050,6 +1146,7 @@ XFontStruct *pRval;
 
   return pRval;  // the NEW font!
 }
+
 
 
 XFontSet WBFontSetFromFont(Display *pDisplay, const XFontStruct *pFont)
@@ -1165,7 +1262,7 @@ static const char szISO[]="-ISO8859-";
 
 #ifndef NO_DEBUG
 
-static void WBDumpFontStruct(XFontStruct *pFont)
+static void WBDumpFontStruct(const XFontStruct *pFont)
 {
 int i1;
 

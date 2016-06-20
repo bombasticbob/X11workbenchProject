@@ -81,16 +81,41 @@
 #define THIS_SUBSYSTEM DebugSubSystem_Dialog
 
 
-
-/** \ingroup dialog
+/** \ingroup dlgwindow
   * \struct __DIALOG_WINDOW__
-  * \brief DIALOG_WINDOW structure (internal)
+  * \copydoc DIALOG_WINDOW
+**/
+/** \ingroup dlgwindow
+  * \typedef DIALOG_WINDOW
+  * \brief DIALOG_WINDOW structure (internal), an extension of WBDialogWindow
+  *
+  * \code
+
+  typedef struct __DIALOG_WINDOW__
+  {
+    WBDialogWindow wbDLG;            // WBDialogWIndow structure, required to be at the beginning
+
+    WBDialogEntry *pwContents;       // malloc'd array of child window/control information as
+                                     // WBDialogEntry following order of windows creation and tab order
+
+    int nContents;                   // size of 'pwContents' when pwContents is not NULL
+    int nMaxContents;                // extent of 'pwContents' when pwContents is not NULL
+    char *szTitle;                   // title bar string (malloc'd pointer, must free on destroy)
+
+    WBWinEvent pDLGCallback;         // pointer to dialog window callback function
+
+    struct __DIALOG_WINDOW__ *pNext; // internal use only, pointer to next entry in chain (linked list)
+
+  } DIALOG_WINDOW;
+  
+  * \endcode
   *
   * Dialog 'owner' window structure, kept internally as part of a link list.
   * This structure keeps track of the child (control) windows and global
   * properties.  See also \ref WB_DIALOG_PROP and \ref WBDialogPropList.\n
+  *
+  * \sa WBDialogEntry, WBDialogWindow
 */
-
 typedef struct __DIALOG_WINDOW__
 {
   WBDialogWindow wbDLG;            ///< WBDialogWIndow structure, required to be at the beginning

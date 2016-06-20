@@ -1,6 +1,6 @@
 bin_PROGRAMS = X11workbench
 X11workbench_SOURCES = X11workbench.c X11workbench.h refactor.c refactor.h gizzard.c gizzard.h
-X11workbench_SOURCES += application_icon.xpm splash.xpm
+X11workbench_SOURCES += application_icon.xpm splash.xpm textfiledoc.xpm newdoc.xpm clangdoc.xpm makefiledoc.xpm
 X11workbench_SOURCES += doxy_comments.dox doxy.txt
 
 X11workbench_DEPENDENCIES = toolkit_lib
@@ -88,7 +88,13 @@ AM_CFLAGS = $(NO_OPT_FLAGS) -DX11WORKBENCH_PROJECT_BUILD
 
 if NO_DEBUG
 
-  AM_CFLAGS += -DNO_DEBUG -Wall -Werror -fno-strict-aliasing
+  AM_CFLAGS += -DNO_DEBUG -Wall -fno-strict-aliasing
+
+if FATAL_WARN
+
+  AM_CFLAGS += -Werror
+
+endif
 
 else
 

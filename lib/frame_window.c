@@ -61,6 +61,8 @@
 #include <signal.h>
 #include <time.h>
 
+#define _FRAME_WINDOW_C_ /* because of the atoms */
+
 #include "window_helper.h"
 #include "pixmap_helper.h"  // pixmap helpers, including pre-defined icons
 #include "frame_window.h"
@@ -69,12 +71,18 @@
 #include "draw_text.h"
 
 
-#define FRAME_WINDOW_MIN_WIDTH 160  /* re-sizable window absolute minimum width */
-#define FRAME_WINDOW_MIN_HEIGHT 120 /* re-sizable window absolute minimum height */
+#define TAB_BAR_HEIGHT           24 /* for now */
+#define TAB_BAR_TAB_WIDTH        20 /* 20 average characters wide */
+#define TAB_BAR_SCROLL_WIDTH     12 /* width of 'tab scroll' buttons */
+#define TAB_BAR_ADD_BUTTON_WIDTH 12 /* width of 'tab add' button */
+#define STATUS_BAR_HEIGHT        20
+#define DEFAULT_STATUS_BAR_TAB   16 /* default 16 characters per column */
 
-#define TAB_BAR_HEIGHT         20 /* for now */
-#define STATUS_BAR_HEIGHT      20
-#define DEFAULT_STATUS_BAR_TAB 16
+// NOTE:  estimating twice the average font char width as 12.  Should see at least 2 tabs, always, with min width (YMMV)
+#define FRAME_WINDOW_MIN_WIDTH  (100 + 12 * TAB_BAR_TAB_WIDTH)             /* re-sizable window absolute minimum width */
+#define FRAME_WINDOW_MIN_HEIGHT (100 + TAB_BAR_HEIGHT + STATUS_BAR_HEIGHT) /* re-sizable window absolute minimum height */
+
+
 
 typedef struct __FRAME_WINDOW__
 {
@@ -89,11 +97,15 @@ typedef struct __FRAME_WINDOW__
                                      // ctrl+alt+pageup/pagedown to navigate from one tab to another
   // NOTE:  'ppChildFrames' is a contiguous array, without any NULLs in between
 
-  int nFocusTab;                     // which tab has the focus?  normally 0
+  WB_RECT rctTabBar;                 // tab bar rectangle for mousie hits (from last Expose)
+  int nFocusTab;                     // which tab has the focus?  0 if no tabs
+  int nLastTab;                      // last tab to have focus; -1 when no tabs visible
   int nLeftTab, nRightTab;           // left and right tab indices, same order as in ppChildFrames (0 if no tabs)
 
   char *szTitle;                     // title bar string (malloc'd)
   char *szStatus;                    // status bar string (malloc'd)
+
+  int nAvgCharWidth;                 // average character width for the specified font
 
   int nStatusBarTabs;                // # of tab entries.  can be negative if pStatusBarTabs is NULL
   int *pStatusBarTabs;               // status bar tab values (malloc'd).  may be NULL.
@@ -102,21 +114,71 @@ typedef struct __FRAME_WINDOW__
 
   int (* pFWCallback)(Window wID, XEvent *pEvent); // registered callback function (for various things)
 
+  int bTabBarRectAntiRecurse;        // anti-recurse flag for calculating tab bar rect
+  WB_RECT rctLastTabBarRect;         // cached value of tab bar rectangle
+  int nTabBarTabWidth;               // cached calculated width of a tab on the tab bar
+  int nTabBarButtonFlags;            // button flags for tab bar ('pressed')
+
   struct __FRAME_WINDOW__ *pNext;    // next in chain (internal use)
 
 } FRAME_WINDOW;
 
+struct __status_tab_cols__
+{
+  int left;
+  int right;
+  int align;
+};
+
+enum __tab_bar_button_flags__
+{
+  tab_bar_button_PREV       = 1, // left-scroll button "clicked" - ctrl+alt+pageup
+  tab_bar_button_NEXT       = 2, // right-scroll button "clicked" - ctrl+alt_pagedown
+  tab_bar_button_NEW        = 4, // new tab - ctrl+N
+  tab_bar_button_BUTTONMASK = 7, // bitmask for the buttons (disables 'drag' handling)
+  tab_bar_button_GRAB       = 8  // mouse being grabbed
+};
+
+
+
 
 int FWDefaultCallback(Window wID, XEvent *pEvent);  // default callback for frame windows (call for default processing)
+
+static FRAME_WINDOW *InternalGet_FRAME_WINDOW(WBFrameWindow *pFW);
 
 static void InternalPaintTabBar(FRAME_WINDOW *pFrameWindow, XExposeEvent *pEvent);
 static void InternalPaintStatusBar(FRAME_WINDOW *pFrameWindow, XExposeEvent *pEvent);
 
+static int Internal_Tab_Bar_Event(FRAME_WINDOW *pFrameWindow, XEvent *pEvent);
+
+static void InternalCalcStatusBarRect(FRAME_WINDOW *pFrameWindow, WB_RECT *pRect);
+static void InternalCalcTabBarRect(FRAME_WINDOW *pFrameWindow, WB_RECT *pRect);
+
+int __internal_do_status_tab_cols(FRAME_WINDOW *pFrameWindow, const WB_RECT *prct, char ***pppCols, char **ppData,
+                                  struct __status_tab_cols__ **ppTabs, int *pnCol);
+
 
 static FRAME_WINDOW *pFrames = NULL;  // pointer to linked list of frame windows (malloc'd)
 
-static XColor clrFG, clrBG, clrBD, clrBD2, clrBD3;
+static XColor clrFG, clrBG, clrBD, clrBD2, clrBD3, clrABG;
 static int iInitColorFlag = 0;
+
+
+// ATOMS used by frame windows
+
+/** \ingroup frame_window
+  * \hideinitializer
+  * @{
+**/
+Atom aNEW_TAB = None;      ///< command sent by Client Message to create a new tab (also ctrl+N)
+Atom aNEXT_TAB = None;     ///< command sent by Client Message to switch to the next tab (also ctrl+alt+pgdn)
+Atom aPREV_TAB = None;     ///< command sent by Client Message to switch to the previous tab (also ctrl+alt+pgup)
+Atom aSET_TAB = None;      ///< command sent by Client Message to switch to the specified tab
+Atom aCLOSE_TAB = None;    ///< command sent by Client Message to close the specified tab
+Atom aREORDER_TAB = None;  ///< command sent by Client Message to re-order the specified tab (activate with mouse-drag)
+/**
+  * @}
+**/
 
 
 
@@ -193,10 +255,41 @@ void WBFrameWindowExit()
 
 }
 
+static void InternalCheckFWAtoms(void)
+{
+Display *pDisplay = WBGetDefaultDisplay();
+
+  if(aNEW_TAB      == None || // TODO:  use '&&' instad of '||' ?  only check ONE of them?  use a 'one time' flag?
+     aNEXT_TAB     == None ||
+     aPREV_TAB     == None ||
+     aSET_TAB      == None ||
+     aCLOSE_TAB    == None ||
+     aREORDER_TAB  == None)
+  {
+    aNEW_TAB          = XInternAtom(pDisplay, "FW_NEW_TAB", False);
+    aNEXT_TAB         = XInternAtom(pDisplay, "FW_NEXT_TAB", False);
+    aPREV_TAB         = XInternAtom(pDisplay, "FW_PREV_TAB", False);
+    aSET_TAB          = XInternAtom(pDisplay, "FW_SET_TAB", False);
+    aCLOSE_TAB        = XInternAtom(pDisplay, "FW_CLOSE_TAB", False);
+    aREORDER_TAB      = XInternAtom(pDisplay, "FW_REORDER_TAB", False);
+
+    if(aNEW_TAB      == None ||
+       aNEXT_TAB     == None ||
+       aPREV_TAB     == None ||
+       aSET_TAB      == None ||
+       aCLOSE_TAB    == None ||
+       aREORDER_TAB  == None)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - unable to initialize atom(s)\n", __FUNCTION__);
+    }
+  }
+}
+
+
 #define LOAD_COLOR0(X,Y) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) > 0) {  }
 #define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
 
-static void InternalCheckColors(void)
+static void InternalCheckFWColors(void)
 {
   Colormap colormap;
 
@@ -205,10 +298,16 @@ static void InternalCheckColors(void)
 
   if(!iInitColorFlag)
   {
-    static const char szBD2[]="#FFFFFF";
+    static const char szBD2[]="#FFFFFF"; // border colors (TODO:  derive them?)
     static const char szBD3[]="#9C9A94";
-    char szFG[16], szBG[16], szBD[16];
+    char szFG[16], szBG[16], szBD[16], szABG[16]; // note colors can typically be up to 13 characters + 0 byte
+
     colormap = DefaultColormap(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
+
+    // TODO:  add some sanity to this, maybe an API for loading colors?  *MOST* of this is now obsolete
+    //        and XSETTINGS uses completely different naming.
+
+    // (these color names and standards have changed *WAY* too many times...)
 
     LOAD_COLOR0("*Frame.foreground",szFG) else LOAD_COLOR0("*Form.foreground", szFG)
      else LOAD_COLOR0("*WmFrame.foreground",szFG) else LOAD_COLOR0("*WmForm.foreground", szFG)
@@ -221,6 +320,10 @@ static void InternalCheckColors(void)
      else LOAD_COLOR0("*borderColor", szBD)
      else LOAD_COLOR("*border", szBD, "black"); // default for gnome
 
+    LOAD_COLOR("selected_bg_color", szABG, "#0040FF"); // a slightly greenish blue for the 'selected' color
+
+    WB_ERROR_PRINT("TEMPORARY:  %s - szABG is \"%s\"\n", __FUNCTION__, szABG);
+
     XParseColor(WBGetDefaultDisplay(), colormap, szFG, &clrFG);
     XAllocColor(WBGetDefaultDisplay(), colormap, &clrFG);
     XParseColor(WBGetDefaultDisplay(), colormap, szBG, &clrBG);
@@ -232,31 +335,61 @@ static void InternalCheckColors(void)
     XParseColor(WBGetDefaultDisplay(), colormap, szBD3, &clrBD3);
     XAllocColor(WBGetDefaultDisplay(), colormap, &clrBD3);
 
+    XParseColor(WBGetDefaultDisplay(), colormap, szABG, &clrABG);
+    XAllocColor(WBGetDefaultDisplay(), colormap, &clrABG);
+
     iInitColorFlag = 1;
   }
 }
 
 XColor FWGetDefaultFG(void)
 {
-  InternalCheckColors();
+  InternalCheckFWColors();
 
   return clrFG;
 }
 
 XColor FWGetDefaultBG(void)
 {
-  InternalCheckColors();
+  InternalCheckFWColors();
 
   return clrBG;
 }
 
 XColor FWGetDefaultBD(void)
 {
-  InternalCheckColors();
+  InternalCheckFWColors();
 
   return clrBD;
 }
 
+
+static FRAME_WINDOW *InternalGet_FRAME_WINDOW(WBFrameWindow *pFW)
+{
+FRAME_WINDOW *pTemp;
+
+
+  if(!pFW || pFW->ulTag != FRAME_WINDOW_TAG)
+  {
+    return NULL; // not valid
+  }
+
+  // normally will not take long - there aren't many frame windows
+
+  pTemp = pFrames; // start at the head of the list
+
+  while(pTemp && pTemp != (FRAME_WINDOW *)pFW)
+  {
+    pTemp = pTemp->pNext;
+  }
+
+  if(pTemp)
+  {
+    return(pTemp);
+  }
+
+  return NULL; // not valid (this also helps with possible 'use after free' bugs)
+}
 
 
 WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *szMenuResource,
@@ -270,21 +403,24 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
   XWMHints xwmh;
 //  Atom aProto[3];
 
-  pNew = malloc(sizeof(*pNew)/*sizeof(FRAME_WINDOW)*/);
+  pNew = (FRAME_WINDOW *)malloc(sizeof(*pNew));
 
   if(!pNew)
+  {
     return NULL;
+  }
 
   pDisplay = WBGetDefaultDisplay();
 
-  InternalCheckColors(); // this assigns clrBD and clrBG properly
+  InternalCheckFWColors(); // this assigns clrBD and clrBG properly
+  InternalCheckFWAtoms(); // if not already done, assign atoms at this time
+
 
   bzero(pNew, sizeof(*pNew));  // NULL out the entire structure
   // assign the 'non-NULL' values for structure members
   pNew->wbFW.ulTag = FRAME_WINDOW_TAG;
   pNew->wbFW.wID = -1;         // initial (bad) value
   pNew->wbFW.iFlags = iFlags;  // save this while I'm at it
-
 
   if(szTitle)
   {
@@ -297,8 +433,12 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
     strcpy(pNew->szTitle, szTitle);
   }
 
-  pNew->nStatusBarTabs = DEFAULT_STATUS_BAR_TAB;
+  pNew->nStatusBarTabs = 0; // DEFAULT_STATUS_BAR_TAB;
   pNew->pStatusBarTabs = NULL;
+
+  pNew->nAvgCharWidth = -1; // mostly for status bar, marks that it needs to be re-calc'd
+  pNew->bTabBarRectAntiRecurse = 0; // must do this too (anti-recurse flag for tab bar)
+  pNew->nTabBarButtonFlags = 0;  // must do this as well (tab bar button bit flags)
 
   // do the default status now
 
@@ -473,9 +613,15 @@ void FWDestroyFrameWindow2(WBFrameWindow *pFrameWindow)
 //  int i1;
 
   if(!pFrameWindow || pFrameWindow->ulTag != FRAME_WINDOW_TAG)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - invalid frame window pointer!\n", __FUNCTION__);
+
     return;
+  }
 
   wID = pFrameWindow->wID;
+
+  // this next part validates that it's in the linked list
 
   while(pTemp && pTemp != (FRAME_WINDOW *)pFrameWindow)
   {
@@ -502,27 +648,54 @@ void FWDestroyFrameWindow2(WBFrameWindow *pFrameWindow)
   }
 }
 
-void FWSetUserCallback(WBFrameWindow *pFrameWindow, WBWinEvent pCallBack)
+void FWSetUserCallback(WBFrameWindow *pFW, WBWinEvent pCallBack)
 {
-  if(pFrameWindow->ulTag != FRAME_WINDOW_TAG)
-    return;
+FRAME_WINDOW *pFrameWindow;
 
-  ((FRAME_WINDOW *)pFrameWindow)->pFWCallback = pCallBack;
+
+  if(!pFW || pFW->ulTag != FRAME_WINDOW_TAG)
+  {
+    return;
+  }
+
+  pFrameWindow = InternalGet_FRAME_WINDOW(pFW);
+
+  if(!pFrameWindow)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
+
+    return;
+  }
+
+  pFrameWindow->pFWCallback = pCallBack;
 }
 
-void FWSetMenuHandlers(WBFrameWindow *pFrameWindow, const WBFWMenuHandler *pHandlerArray)
+void FWSetMenuHandlers(WBFrameWindow *pFW, const WBFWMenuHandler *pHandlerArray)
 {
 int i1;
 const WBFWMenuHandler *pH;
+FRAME_WINDOW *pFrameWindow;
+
+
+  if(!pFW || pFW->ulTag != FRAME_WINDOW_TAG)
+  {
+    return;
+  }
+
+  pFrameWindow = InternalGet_FRAME_WINDOW(pFW);
 
   if(!pFrameWindow)
-    return;
-
-  if(((FRAME_WINDOW *)pFrameWindow)->pMenuHandler)
   {
-    free(((FRAME_WINDOW *)pFrameWindow)->pMenuHandler);
+    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
 
-    ((FRAME_WINDOW *)pFrameWindow)->pMenuHandler = NULL;
+    return;
+  }
+
+  if(pFrameWindow->pMenuHandler)
+  {
+    free(pFrameWindow->pMenuHandler);
+
+    pFrameWindow->pMenuHandler = NULL;
   }
 
   if(!pHandlerArray)
@@ -531,23 +704,25 @@ const WBFWMenuHandler *pH;
   }
 
   // count the number of entries
-  for(i1=0, pH = pHandlerArray; pH->lMenuID || pH->callback || pH->UIcallback; i1++, pH++) { }
+  for(i1=0, pH = pHandlerArray; pH->lMenuID || pH->callback || pH->UIcallback; i1++, pH++)
+  {
+    // NOTHING inside the loop
+  }
 
   // allocate space and make a copy
 
-  ((FRAME_WINDOW *)pFrameWindow)->pMenuHandler =
-    (WBFWMenuHandler *)malloc(sizeof(WBFWMenuHandler) * (i1 + 2));
+  pFrameWindow->pMenuHandler = (WBFWMenuHandler *)malloc(sizeof(WBFWMenuHandler) * (i1 + 2));
 
-  if(((FRAME_WINDOW *)pFrameWindow)->pMenuHandler)
+  if(pFrameWindow->pMenuHandler)
   {
-    memcpy(((FRAME_WINDOW *)pFrameWindow)->pMenuHandler, pHandlerArray,
+    memcpy(pFrameWindow->pMenuHandler, pHandlerArray,
            sizeof(WBFWMenuHandler) * (i1 + 1));
   }
 }
 
 int FWDefaultCallback(Window wID, XEvent *pEvent)
 {
-  FRAME_WINDOW *pFrameWindow = (FRAME_WINDOW *)FWGetFrameWindowStruct(wID);
+  FRAME_WINDOW *pFrameWindow;
   Window wIDMenu;
   int iRval = 0;
 #ifndef NO_DEBUG
@@ -556,9 +731,12 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 #endif // NO_DEBUG
 
 
+  pFrameWindow = (FRAME_WINDOW *)FWGetFrameWindowStruct(wID);
+
   if(!pFrameWindow)
   {
-    WB_ERROR_PRINT("%s - ERROR - no frame window pointer!\n", __FUNCTION__);
+    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
+
     return 0;
   }
 
@@ -573,11 +751,18 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
       case ButtonPress:
       case ButtonRelease:
         WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
-                         "%s - BUTTON PRESS\n", __FUNCTION__);
+                         "%s - BUTTON PRESS/RELEASE\n", __FUNCTION__);
+
+        // check tab bar first since I might be grabbing the mouse
+        if(WBPointInRect(pEvent->xbutton.x, pEvent->xbutton.y, pFrameWindow->rctTabBar) ||
+           (pFrameWindow->nTabBarButtonFlags & tab_bar_button_GRAB))
+        {
+          return Internal_Tab_Bar_Event(pFrameWindow, pEvent);
+        }
 
         if(WBPointInWindow(pEvent->xbutton.window, pEvent->xbutton.x, pEvent->xbutton.y, wIDMenu))
         {
-          return(WBWindowDispatch(wIDMenu, pEvent));  // menu window should handle mousie events
+          return WBWindowDispatch(wIDMenu, pEvent);  // menu window should handle THESE mousie events
         }
 
         break;
@@ -585,6 +770,13 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
       case MotionNotify:
         WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
                          "%s - MOTION NOTIFY\n", __FUNCTION__);
+
+        // check tab bar first since I might be grabbing the mouse
+        if(WBPointInRect(pEvent->xbutton.x, pEvent->xbutton.y, pFrameWindow->rctTabBar) ||
+           (pFrameWindow->nTabBarButtonFlags & tab_bar_button_GRAB))
+        {
+          return Internal_Tab_Bar_Event(pFrameWindow, pEvent);
+        }
 
         if(WBPointInWindow(pEvent->xmotion.window, pEvent->xmotion.x, pEvent->xmotion.y, wIDMenu))
         {
@@ -645,7 +837,30 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
         }
 #endif // NO_DEBUG
 
-        if(pEvent->xclient.message_type == aRESIZE_NOTIFY)
+        if(pEvent->xclient.message_type == aSET_FOCUS)
+        {
+          // set focus to window in data.l[0], or "default" if it's 'None'
+
+          if(pEvent->xclient.data.l[0] == None)
+          {
+            // do I have a 'focus' child frame?
+            WBChildFrame *pFocus = FWGetFocusWindow(&(pFrameWindow->wbFW));
+
+            if(pFocus)
+            {
+              WBSetInputFocus(pFocus->wID);
+            }
+            else
+            {
+              WBSetInputFocus(wID); // set input focus to myself
+            }
+          }
+          else
+          {
+            WBSetInputFocus((Window)pEvent->xclient.data.l[0]);
+          }
+        }
+        else if(pEvent->xclient.message_type == aRESIZE_NOTIFY)
         {
           FWRecalcLayout(wID);
 
@@ -826,19 +1041,74 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
     }
   }
 
-  // expose event - painting the status bar and tab bar.
+  // TAB BAR (but with no menu)
 
-  if(pEvent->type == Expose &&
-     !(WBFrameWindow_NO_TABS & pFrameWindow->wbFW.iFlags))
+  if(!(WBFrameWindow_NO_TABS & pFrameWindow->wbFW.iFlags)) // I have a tab bar
   {
-    InternalPaintTabBar(pFrameWindow, &(pEvent->xexpose));  // this will 'validate' the tab bar area, preventing re-paint
+    if(pEvent->type == ButtonPress ||
+       pEvent->type == ButtonRelease ||
+       pEvent->type == MotionNotify)
+    {
+      if(WBPointInRect(pEvent->xbutton.x, pEvent->xbutton.y, pFrameWindow->rctTabBar) ||
+                       (pFrameWindow->nTabBarButtonFlags & tab_bar_button_GRAB)) // grabbing mouse means I get the event
+      {
+        return Internal_Tab_Bar_Event(pFrameWindow, pEvent);
+      }
+    }
+    else if(pEvent->type == Expose)
+    {
+      InternalPaintTabBar(pFrameWindow, &(pEvent->xexpose));  // this will 'validate' the tab bar area, preventing re-paint
+    }
+    else if(pEvent->type == ClientMessage && // tab-related client messages
+            (pEvent->xclient.message_type == aNEW_TAB ||
+             pEvent->xclient.message_type == aPREV_TAB ||
+             pEvent->xclient.message_type == aNEXT_TAB ||
+             pEvent->xclient.message_type == aSET_TAB))
+    {
+//      WB_ERROR_PRINT("TODO:  %s - handle ClientMessage for the tab bar\n", __FUNCTION__);
+//      WBDebugDumpEvent(pEvent);
+      if(pEvent->xclient.message_type == aNEW_TAB)
+      {
+        // TODO:  post a WM_FILE_NEW menu command to the owner
+      }
+      else if(pEvent->xclient.message_type == aPREV_TAB)
+      {
+        if(pFrameWindow->nFocusTab > 0)
+        {
+          FWSetFocusWindowIndex(&(pFrameWindow->wbFW), pFrameWindow->nFocusTab - 1);
+        }
+      }
+      else if(pEvent->xclient.message_type == aNEXT_TAB)
+      {
+        if((pFrameWindow->nFocusTab + 1) < pFrameWindow->nChildFrames)
+        {
+          FWSetFocusWindowIndex(&(pFrameWindow->wbFW), pFrameWindow->nFocusTab + 1);
+        }
+      }
+      else if(pEvent->xclient.message_type == aSET_TAB)
+      {
+        if((int)pEvent->xclient.data.l[0] >= 0 &&
+           (int)pEvent->xclient.data.l[0] < pFrameWindow->nChildFrames)
+        {
+          FWSetFocusWindowIndex(&(pFrameWindow->wbFW), (int)pEvent->xclient.data.l[0]);
+        }
+      }
+
+      return 1; // handled
+    }
   }
+
+
+  // expose event for status bar - painting the status bar and tab bar.
 
   if(pEvent->type == Expose &&
      (WBFrameWindow_STATUS_BAR & pFrameWindow->wbFW.iFlags))
   {
     InternalPaintStatusBar(pFrameWindow, &(pEvent->xexpose));  // this will 'validate' the status bar area, preventing re-paint
   }
+
+
+  // user callback function
 
   if(pFrameWindow->pFWCallback)
   {
@@ -885,7 +1155,8 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 
 
   // At this point iRval _COULD_  be non-zero (example, DestroyNotify)
-  // so don't do any handling for those messages.
+  // so don't do any handling for those messages.  For everything else,
+  // a return value of ZERO means "not handled", so handle them.
 
   if(!iRval)
   {
@@ -991,173 +1262,89 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
   WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Event | DebugSubSystem_Frame,
                  "%s - frame window callback returns %d\n", __FUNCTION__, iRval);
 
-  return iRval;  // what happens when nothing is handled
+  return iRval;  // return back the 'handled' status
 }
 
-void FWRecalcLayout(Window wID)
+
+
+static void InternalCalcStatusBarRect(FRAME_WINDOW *pFrameWindow, WB_RECT *pRect)
 {
-WB_RECT rct, rct2;
-FRAME_WINDOW *pFrameWindow;
-Window wIDMenu;
-WBMenuBarWindow *pMB;
-int i1, iMax;
+int iBarHeight;
+XFontStruct *pFont;
 
 
-  pFrameWindow = (FRAME_WINDOW *)FWGetFrameWindowStruct(wID);
+  WBGetClientRect(pFrameWindow->wbFW.wID, pRect); // get the rectangle for the client area
 
-  if(!pFrameWindow)
+  pFont = WBGetDefaultFont();
+
+  if(pFrameWindow->nAvgCharWidth <= 0)
   {
-    WB_ERROR_PRINT("%s - ERROR - no frame window pointer!\n", __FUNCTION__);
+    pFrameWindow->nAvgCharWidth = WBFontAvgCharWidth(WBGetDefaultDisplay(), pFont);
+  }
+
+  iBarHeight = pFont->ascent + pFont->descent + 8; // 8 pixels more than overall font height
+
+  if(iBarHeight < STATUS_BAR_HEIGHT) // the minimum value
+  {
+    iBarHeight = STATUS_BAR_HEIGHT;
+  }
+
+  pRect->top = pRect->bottom - iBarHeight; // TODO:  base this on font height
+}
+
+static void InternalCalcTabBarRect(FRAME_WINDOW *pFrameWindow, WB_RECT *pRect)
+{
+Window wIDMenu;
+WB_RECT rct, rct2;
+WBMenuBarWindow *pMB;
+int iBarHeight, nVisibleTabs;
+XFontStruct *pFont;
+
+
+  if(pFrameWindow->bTabBarRectAntiRecurse)
+  {
+    memcpy(pRect, &(pFrameWindow->rctLastTabBarRect), sizeof(*pRect));
+    return; // don't do anything if I'm recursing
+  }
+
+  WBGetClientRect(pFrameWindow->wbFW.wID, pRect); // get the rectangle for the client area (always)
+
+  if(WBFrameWindow_NO_TABS & pFrameWindow->wbFW.iFlags) // window has NO tabs
+  {
+    pRect->bottom = pRect->top; // no tab bar (empty rectangle where it WOULD be)
+
+    pFrameWindow->nFocusTab = 0;
+    pFrameWindow->nLastTab = -1;
+    pFrameWindow->nLeftTab = 0;
+    pFrameWindow->nRightTab = 0;
+
+    WB_ERROR_PRINT("TEMPORARY:  %s - EMPTY tab rectangle\n", __FUNCTION__);
+
+    memcpy(&(pFrameWindow->rctLastTabBarRect), pRect, sizeof(*pRect));
+
     return;
   }
 
-  // this callback happens any time I change the window size.  Use this
-  // also to re-size scrollbars and status bars and menus.
+  pFont = WBGetDefaultFont();
 
-  // calculate the actual size of the client area and inform all of the 'Child Frame'
-  // windows so that they can assign the size and fix scrollbars, etc. as appropriate
-
-  WBGetClientRect(wID, &rct); // get the rectangle for the client area
-
-  // obtain the height and position of the menu (if any), toolbar (if any), and tab area (if any)
-  // and subtract that from rct.top - then record this as my "client area" in the FRAME_WINDOW
-  // structure (iClientX, iClientY, iClientWidth, iClientHeight).
-
-  wIDMenu = WBGetMenuWindow(wID);
-
-  if(wIDMenu != None)
+  if(pFrameWindow->nAvgCharWidth <= 0)
   {
-    pMB = MBGetMenuBarWindowStruct(wIDMenu);
-
-    if(pMB)
-    {
-      WBGetWindowRect(wIDMenu, &rct2);
-
-      // what I want is the height.
-      rct.top += rct2.bottom - rct2.top + 1;  // regardless of rect, this will be the height, plus 1 pixel
-    }
+    pFrameWindow->nAvgCharWidth = WBFontAvgCharWidth(WBGetDefaultDisplay(), pFont);
   }
 
+  iBarHeight = pFont->ascent + pFont->descent + 14; // 14 pixels more than overall font height
 
-  if(!(WBFrameWindow_NO_TABS & pFrameWindow->wbFW.iFlags)) // window has tabs
+  if(iBarHeight < TAB_BAR_HEIGHT) // the minimum value
   {
-    rct.top += TAB_BAR_HEIGHT;  // TODO:  base this on font height.  use the same font as the menu.
+    iBarHeight = TAB_BAR_HEIGHT;
   }
-
-  // if this window has a status bar on the bottom, subtract an appropriate height
-  // from the bottom of the client area.
-
-  if(WBFrameWindow_STATUS_BAR & pFrameWindow->wbFW.iFlags) // window has a status bar
-  {
-    rct.bottom -= STATUS_BAR_HEIGHT;  // TODO:  base this on font height.  use the same font as the menu.
-  }
-
-
-  // Now that I've calculated the new client rectangle area, assign appropriate thingies
-  // (but if it matches, bail here, no need for anything else, since nothing changed)
-
-  rct.right -= rct.left; // now it's a width
-  rct.bottom -= rct.top;  // now it's a height
-
-  if(pFrameWindow->wbFW.iClientX == rct.left &&
-     pFrameWindow->wbFW.iClientY == rct.top &&
-     pFrameWindow->wbFW.iClientWidth == rct.right &&
-     pFrameWindow->wbFW.iClientHeight == rct.bottom)
-  {
-    return; // nothing changed
-  }
-
-  // assign the new values.  This will be the "true" client area
-  // of the frame window, excluding "things"
-  pFrameWindow->wbFW.iClientX      = rct.left;
-  pFrameWindow->wbFW.iClientY      = rct.top;
-  pFrameWindow->wbFW.iClientWidth  = rct.right;
-  pFrameWindow->wbFW.iClientHeight = rct.bottom;
-
-
-  // next, inform all of the child frames that I'm different now
-
-  iMax = FWGetNumContWindows(&(pFrameWindow->wbFW));
-
-  for(i1=0; i1 < iMax; i1++)
-  {
-    WBChildFrame *pCW = FWGetContainedWindowByIndex(&(pFrameWindow->wbFW), i1);
-
-    if(pCW)
-    {
-      FWChildFrameRecalcLayout(pCW); // inform the child frame of the layout change
-    }
-  }
-
-  // temporarily use 'error level' so I can always see this
-  WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
-                 "%s - %d, %d, %d, %d\n", __FUNCTION__,
-                 pFrameWindow->wbFW.iClientX, pFrameWindow->wbFW.iClientY,
-                 pFrameWindow->wbFW.iClientWidth, pFrameWindow->wbFW.iClientHeight);
-
-  WBInvalidateGeom(wID, NULL, 1); // and, finally, force a re-paint (mostly hidden by child frame, except tabs, borders, etc.)
-}
-
-
-// CONTAINED WINDOWS
-
-int FWGetNumContWindows(const WBFrameWindow *pFrameWindow)
-{
-  return -1;  // for now
-}
-
-WBChildFrame * FWGetContainedWindowByIndex(const WBFrameWindow *pFrameWindow, int iIndex)
-{
-  return NULL; // for now
-}
-
-int FWAddContainedWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pNew)
-{
-  return -1;  // for now
-}
-
-void FWRemoveContainedWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pCont)
-{
-}
-
-void FWSetFocusWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pCont)
-{
-}
-
-void FWSetFocusWindowIndex(WBFrameWindow *pFrameWindow, int iIndex)
-{
-}
-
-
-void FWSetStatusText(WBFrameWindow *pFrameWindow, const char *szText)
-{
-}
-
-void FWSetStatusTabInfo(WBFrameWindow *pFrameWindow, int nTabs, const int *pTabs)
-{
-}
-
-
-
-static void InternalPaintTabBar(FRAME_WINDOW *pFrameWindow, XExposeEvent *pEvent)
-{
-WB_RECT rct, rct2, rctExpose;
-WB_GEOM geom;
-Window wIDMenu;
-GC gc;
-WBMenuBarWindow *pMB;
-
-
-  if(WBFrameWindow_NO_TABS & pFrameWindow->wbFW.iFlags) // window has no tab bar?
-  {
-    return; // no tab bar, just bail
-  }
-
-  // calculate the location of the status bar
 
   WBGetClientRect(pFrameWindow->wbFW.wID, &rct); // get the rectangle for the client area
 
-  // how big is the menu?  (assuming there is one)
+  pRect->top = rct.top;
+  pRect->left = rct.left;
+  pRect->right = rct.right;
+  pRect->bottom = rct.bottom;
 
   wIDMenu = WBGetMenuWindow(pFrameWindow->wbFW.wID);
 
@@ -1169,139 +1356,1221 @@ WBMenuBarWindow *pMB;
     {
       WBGetWindowRect(wIDMenu, &rct2);
 
-      // what I want is the height.  Same calcuation done for 'recalc layout'
-      rct.top += rct2.bottom - rct2.top + 1;  // regardless of rect, this will be the height, plus 1 pixel
+      // what I want is the height.
+      pRect->top += rct2.bottom - rct2.top + 1;  // regardless of rct2 values, add the height, plus 1 pixel as calculated here
     }
   }
 
-  rct.bottom = rct.top + TAB_BAR_HEIGHT; // the rectangle for the tab bar
+  pRect->bottom = pRect->top + iBarHeight;
 
-//  WB_ERROR_PRINT("TEMPORARY: %s - tab bar rect %d, %d, %d, %d\n",
-//                 __FUNCTION__, rct.left, rct.top, rct.right, rct.bottom);
+#ifndef NO_DEBUG
+  if(memcmp(&(pFrameWindow->rctLastTabBarRect), pRect, sizeof(*pRect)))
+  {
+    WB_ERROR_PRINT("TEMPORARY:  %s - new 'last tab bar rect': %d, %d, %d, %d\n", __FUNCTION__,
+                   pRect->left, pRect->top, pRect->right, pRect->bottom);
 
-  // does the Expose event intersect my status bar?
+    // since the rectangle has changed, I need to re-paint things
+
+    WBInvalidateRect(pFrameWindow->wbFW.wID, pRect, 0); // make sure I re-paint the tab bar, but not *RIGHT* *NOW*
+  }
+#endif // NO_DEBUG
+
+  memcpy(&(pFrameWindow->rctLastTabBarRect), pRect, sizeof(*pRect)); // cache for later
+
+  // NOW, use the current 'focus tab' to determine which tabs should be visible.  AND, determine
+  // which tabs should be visible based on the WIDTH.
+
+  if(!pFrameWindow->nChildFrames) // there aren't any
+  {
+    pFrameWindow->nFocusTab = 0;
+    pFrameWindow->nLastTab = -1;
+    pFrameWindow->nLeftTab = 0;
+    pFrameWindow->nRightTab = 0;
+    
+    return;
+  }
+
+  // verify valid 'focus tab'
+  if(pFrameWindow->nFocusTab < 0)
+  {
+    pFrameWindow->bTabBarRectAntiRecurse = 1;
+
+    FWSetFocusWindowIndex(&(pFrameWindow->wbFW), 0);
+
+    pFrameWindow->bTabBarRectAntiRecurse = 0;
+  }
+  else if(pFrameWindow->nFocusTab >= pFrameWindow->nChildFrames)
+  {
+    pFrameWindow->bTabBarRectAntiRecurse = 1;
+
+    WB_ERROR_PRINT("TEMPORARY:  %s - focus tab exceeds # child frames - %d >= %d\n", __FUNCTION__,
+                   pFrameWindow->nFocusTab, pFrameWindow->nChildFrames);
+
+    FWSetFocusWindowIndex(&(pFrameWindow->wbFW), pFrameWindow->nChildFrames - 1);
+
+    pFrameWindow->bTabBarRectAntiRecurse = 0;
+  }
+
+  // figure out what the width of a single 'tab' will be
+  pFrameWindow->nTabBarTabWidth = (TAB_BAR_TAB_WIDTH * pFrameWindow->nAvgCharWidth)
+                                + 6 + 14;  // 6 is border and spacing plus 12 for doc icon and spacing
+
+  // verify the right/left tabs are 'in range' by calculating tab width and placement
+
+  // CALCULATE TOTAL WIDTH OF TAB AREA, THEN DIVIDE BY TAB BAR WIDTH
+  nVisibleTabs = pRect->right - pRect->left
+               - TAB_BAR_SCROLL_WIDTH * 2
+               - TAB_BAR_ADD_BUTTON_WIDTH
+               - 8; // 8 pixels for additional spacing - 1 per scroll button, 2 more for 'add' buttun, + 2 more
+
+  // figure out how many "full" tabs I can view in the current tab bar area
+  nVisibleTabs /= pFrameWindow->nTabBarTabWidth;
+  if(nVisibleTabs <= 0)
+  {
+    nVisibleTabs = 1; // always, just in case
+  }
+
+  // now, adjust the tab bar width UP to match "that"
+
+  pFrameWindow->nTabBarTabWidth = (pRect->right - pRect->left
+                                   - TAB_BAR_SCROLL_WIDTH * 2
+                                   - TAB_BAR_ADD_BUTTON_WIDTH
+                                   - 8) // 8 pixels for additional spacing - 1 per scroll button, 2 more for 'add' buttun, + 2 more
+                                / nVisibleTabs; // re-calculates based on # of visible tabs - so they're a tad bigger now...
+
+  if(nVisibleTabs >= pFrameWindow->nChildFrames) // enough room for everyone?  If so, show maximum # of tabs
+  {
+    pFrameWindow->nLeftTab = 0;
+    pFrameWindow->nRightTab = pFrameWindow->nChildFrames - 1;
+
+//    WB_ERROR_PRINT("TEMPORARY:  %s - left tab=%d, right tab=%d\n", __FUNCTION__,
+//                   pFrameWindow->nLeftTab, pFrameWindow->nRightTab);
+  }
+  else // mangling the right/left tabs to include focus tab, and fit in the width
+  {
+    // in case right/left are out of range, fix them first
+    if(pFrameWindow->nRightTab >= pFrameWindow->nChildFrames)
+    {
+      pFrameWindow->nRightTab = pFrameWindow->nChildFrames - 1;
+      pFrameWindow->nLeftTab = pFrameWindow->nChildFrames - nVisibleTabs;
+    }
+
+    if(pFrameWindow->nLeftTab < 0)
+    {
+      pFrameWindow->nLeftTab = 0;
+      pFrameWindow->nRightTab = pFrameWindow->nLeftTab + nVisibleTabs - 1;
+    }
+
+    // shrank window and not as many tabs are visible now??
+    if(pFrameWindow->nRightTab >= pFrameWindow->nLeftTab + nVisibleTabs)
+    {
+      pFrameWindow->nRightTab = pFrameWindow->nLeftTab + nVisibleTabs - 1;
+    }
+
+    // grew window and more than the previous visible tabs are visible now?
+    if(pFrameWindow->nLeftTab + nVisibleTabs >= pFrameWindow->nRightTab)
+    {
+      // extend left to include more tabs
+      pFrameWindow->nLeftTab = pFrameWindow->nRightTab - nVisibleTabs + 1;
+
+      if(pFrameWindow->nLeftTab < 0)
+      {
+        pFrameWindow->nRightTab -= pFrameWindow->nLeftTab;
+        pFrameWindow->nLeftTab = 0;
+      }
+    }
+
+    if(pFrameWindow->nFocusTab < pFrameWindow->nLeftTab)     // is my focus tab scrolled too far left?
+    {
+      pFrameWindow->nLeftTab = pFrameWindow->nFocusTab;
+      pFrameWindow->nRightTab = pFrameWindow->nLeftTab + nVisibleTabs - 1;
+    }
+    else if(pFrameWindow->nFocusTab > pFrameWindow->nRightTab)     // is my focus tab scrolled too far right?
+    {
+      pFrameWindow->nRightTab = pFrameWindow->nFocusTab;
+      pFrameWindow->nLeftTab = pFrameWindow->nRightTab - nVisibleTabs +1;
+    }
+
+//    WB_ERROR_PRINT("TEMPORARY:  %s - left tab=%d, right tab=%d, focus tab = %d\n", __FUNCTION__,
+//                   pFrameWindow->nLeftTab, pFrameWindow->nRightTab, pFrameWindow->nFocusTab);
+  }
+
+  // th-dya th-dya th-dya th-that's all, folks!
+}
+
+void FWRecalcLayout(Window wID)
+{
+WB_RECT rct, rct2;
+FRAME_WINDOW *pFrameWindow;
+Window wIDMenu;
+WBMenuBarWindow *pMB;
+WBChildFrame *pCW;
+int i1, iMax;
+
+
+  pFrameWindow = (FRAME_WINDOW *)FWGetFrameWindowStruct(wID);
+
+  if(!pFrameWindow)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
+
+    return;
+  }
+
+  // this callback happens any time I change the window size.  Use this
+  // also to re-size scrollbars and status bars and menus.
+
+  // calculate the actual size of the client area and inform all of the 'Child Frame'
+  // windows so that they can assign the size and fix scrollbars, etc. as appropriate
+
+  WBGetClientRect(wID, &rct); // get the rectangle for the entire client area
+
+  // obtain the height and position of the menu (if any), toolbar (if any), and tab area (if any)
+  // and subtract that from rct.top - then record this as my "client area" in the FRAME_WINDOW
+  // structure (iClientX, iClientY, iClientWidth, iClientHeight).
+
+
+  if(!(WBFrameWindow_NO_TABS & pFrameWindow->wbFW.iFlags)) // window has tabs
+  {
+    InternalCalcTabBarRect(pFrameWindow, &rct2);
+
+    rct.top = rct2.bottom + 1;
+  }
+  else if(None != (wIDMenu = WBGetMenuWindow(wID)))
+  {
+    pMB = MBGetMenuBarWindowStruct(wIDMenu);
+
+    if(pMB)
+    {
+      WBGetWindowRect(wIDMenu, &rct2);
+
+      // what I want is the height.
+      rct.top += rct2.bottom - rct2.top + 1;  // regardless of rct2 values, add the height, plus 1 pixel as calculated here
+    }
+  }
+
+
+  // if this window has a status bar on the bottom, subtract an appropriate height
+  // from the bottom of the client area.
+
+  if(WBFrameWindow_STATUS_BAR & pFrameWindow->wbFW.iFlags) // window has a status bar
+  {
+    InternalCalcStatusBarRect(pFrameWindow, &rct2);
+
+    rct.bottom = rct2.top - 1;
+  }
+
+  iMax = FWGetNumContWindows(&(pFrameWindow->wbFW)); // grab this value now.  will use it later
+
+  // Now that I've calculated the new client rectangle area, assign appropriate thingies
+  // (but if it matches, skip next part, since nothing changed)
+
+  rct.right -= rct.left; // now it's a width
+  rct.bottom -= rct.top;  // now it's a height
+
+  if(pFrameWindow->wbFW.iClientX == rct.left &&
+     pFrameWindow->wbFW.iClientY == rct.top &&
+     pFrameWindow->wbFW.iClientWidth == rct.right &&
+     pFrameWindow->wbFW.iClientHeight == rct.bottom)
+  {
+    goto check_curtab; // nothing changed
+  }
+
+  // assign the new values.  This will be the "true" client area
+  // of the frame window, excluding "things"
+  pFrameWindow->wbFW.iClientX      = rct.left;
+  pFrameWindow->wbFW.iClientY      = rct.top;
+  pFrameWindow->wbFW.iClientWidth  = rct.right; // which is now a width
+  pFrameWindow->wbFW.iClientHeight = rct.bottom; // which is now a height
+
+
+  // next, inform all of the child frames that I'm different now
+
+  for(i1=0; i1 < iMax; i1++)
+  {
+    pCW = FWGetContainedWindowByIndex(&(pFrameWindow->wbFW), i1);
+
+    if(pCW)
+    {
+      FWChildFrameRecalcLayout(pCW); // inform the child frame of the layout change.  should only invalidate, not re-paint
+    }
+  }
+
+  // temporarily use 'error level' so I can always see this
+  WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
+                 "%s - %d, %d, %d, %d\n", __FUNCTION__,
+                 pFrameWindow->wbFW.iClientX, pFrameWindow->wbFW.iClientY,
+                 pFrameWindow->wbFW.iClientWidth, pFrameWindow->wbFW.iClientHeight);
+
+  WBInvalidateGeom(wID, NULL, 1); // and, finally, force a re-paint (mostly hidden by child frame, except tabs, borders, etc.)
+
+check_curtab:
+
+  // if my tab focus has changed, notify all child windows
+
+  if(!iMax)
+  {
+    pFrameWindow->nLastTab = -1; // always assign to '-1' if there are no tabs
+
+    return; // no need to update anything
+  }
+
+  // did I switch tabs?  if so, notify the NEW focus window that it needs to display itself
+
+  pCW = FWGetContainedWindowByIndex(&(pFrameWindow->wbFW), pFrameWindow->nFocusTab);
+
+  if(pFrameWindow->nFocusTab != pFrameWindow->nLastTab)
+  {
+    pFrameWindow->nLastTab = pFrameWindow->nFocusTab;
+
+    if(pCW)
+    {
+      WBInvalidateRect(pCW->wID, NULL, 0);  // invalidate window
+    }
+  }
+
+  // if re-calc layout in any way caused a need to update the child window, do it NOW
+  // this is a do-nothing if the invalid region is empty
+
+  if(pCW)
+  {
+    WBUpdateWindow/*Immediately*/(pCW->wID);
+  }
+}
+
+
+// CONTAINED WINDOWS
+
+int FWGetNumContWindows(const WBFrameWindow *pFW)
+{
+const FRAME_WINDOW *pFrameWindow;
+
+
+  pFrameWindow = InternalGet_FRAME_WINDOW((WBFrameWindow *)pFW);
+
+  if(!pFrameWindow)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
+
+    return -1;
+  }
+
+  if(!pFrameWindow->ppChildFrames)
+  {
+    return 0;
+  }
+
+  return pFrameWindow->nChildFrames;
+}
+
+WBChildFrame * FWGetContainedWindowByIndex(const WBFrameWindow *pFW, int iIndex)
+{
+const FRAME_WINDOW *pFrameWindow;
+
+
+  pFrameWindow = InternalGet_FRAME_WINDOW((WBFrameWindow *)pFW);
+
+  if(!pFrameWindow)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
+
+    return NULL;
+  }
+
+  if(iIndex < 0) // implies "the current focus"
+  {
+    iIndex = pFrameWindow->nFocusTab;
+  }
+
+  if(iIndex < 0 || !pFrameWindow->ppChildFrames || iIndex >= pFrameWindow->nChildFrames)
+  {
+    return NULL;
+  }
+
+  return pFrameWindow->ppChildFrames[iIndex];
+}
+
+int FWAddContainedWindow(WBFrameWindow *pFW, WBChildFrame *pNew)
+{
+FRAME_WINDOW *pFrameWindow;
+int iRval;
+
+
+  pFrameWindow = InternalGet_FRAME_WINDOW(pFW);
+
+  if(!pFrameWindow)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
+
+    return -1;
+  }
+
+  if(!pFrameWindow->ppChildFrames)
+  {
+    pFrameWindow->nMaxChildFrames = 256; // for now
+
+    pFrameWindow->ppChildFrames = (WBChildFrame **)malloc(pFrameWindow->nMaxChildFrames * sizeof(WBChildFrame *));
+    if(!pFrameWindow->ppChildFrames)
+    {
+no_memory:
+      WB_ERROR_PRINT("ERROR:  %s - not enough memory\n", __FUNCTION__);
+      return -1;
+    }
+
+    pFrameWindow->nChildFrames = 0; // initially
+  }
+  else if((pFrameWindow->nChildFrames + 1) >= pFrameWindow->nMaxChildFrames)
+  {
+    void *pTemp = realloc(pFrameWindow->ppChildFrames,
+                          (pFrameWindow->nMaxChildFrames + 128) * sizeof(WBChildFrame *));
+
+    if(!pTemp)
+    {
+      goto no_memory;
+    }
+
+    pFrameWindow->nMaxChildFrames += 128;
+    pFrameWindow->ppChildFrames = (WBChildFrame **)pTemp; // re-assign new pointer    
+  }
+
+  // ADD NEW CHILD FRAME TO THE END [TODO insert just past current focus window instead?]
+
+  iRval = pFrameWindow->nChildFrames; // always add to end of list.
+  (pFrameWindow->nChildFrames)++;
+  pFrameWindow->ppChildFrames[iRval] = pNew;
+
+  WB_ERROR_PRINT("TEMPORARY:  %s - adding tab %d\n", __FUNCTION__, iRval);
+
+  FWSetFocusWindowIndex(pFW, iRval); // set focus to it
+
+  return iRval;
+}
+
+void FWRemoveContainedWindow(WBFrameWindow *pFW, WBChildFrame *pCont)
+{
+FRAME_WINDOW *pFrameWindow;
+int iIndex, i2;
+
+  pFrameWindow = InternalGet_FRAME_WINDOW(pFW);
+
+  if(!pFrameWindow)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
+
+    return;
+  }
+
+  if(!pFrameWindow->ppChildFrames || !pFrameWindow->nChildFrames)
+  {
+    return; // no child windows in list
+  }
+
+  for(iIndex=0; iIndex < pFrameWindow->nChildFrames; iIndex++)
+  {
+    if(pFrameWindow->ppChildFrames[iIndex] == pCont)
+    {
+      WB_ERROR_PRINT("TEMPORARY:  %s - removing tab %d\n", __FUNCTION__, iIndex);
+
+      for(i2=iIndex + 1; i2 < pFrameWindow->nChildFrames; i2++)
+      {
+        pFrameWindow->ppChildFrames[i2 - 1] = pFrameWindow->ppChildFrames[i2]; // slide 'em up
+      }
+
+      pFrameWindow->nChildFrames --;
+      pFrameWindow->ppChildFrames[pFrameWindow->nChildFrames] = NULL;  // by convention, to ensure no pointer re-use
+
+      if(pFrameWindow->nFocusTab >= pFrameWindow->nChildFrames)
+      {
+        pFrameWindow->nFocusTab--;
+      }
+
+      // invalidate the tab bar rectangle first, before I continue
+      WBInvalidateRect(pFW->wID, &(pFrameWindow->rctLastTabBarRect), 0);
+
+      FWRecalcLayout(pFW->wID); // recalculate layout (this also updates the frame window and whatnot)
+
+      // docs say "does not destroy the window".  it only gets removed, that's all
+
+      return;
+    }
+  }
+}
+
+void FWSetFocusWindow(WBFrameWindow *pFW, WBChildFrame *pCont)
+{
+FRAME_WINDOW *pFrameWindow;
+int iIndex;
+
+  pFrameWindow = InternalGet_FRAME_WINDOW(pFW);
+
+  if(!pFrameWindow)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
+
+    return;
+  }
+
+  // locate the contained window from my list.  then set as 'focus tab'
+
+  if(!pFrameWindow->ppChildFrames || !pFrameWindow->nChildFrames)
+  {
+    return; // no child windows in list
+  }
+
+  for(iIndex=0; iIndex < pFrameWindow->nChildFrames; iIndex++)
+  {
+    if(pFrameWindow->ppChildFrames[iIndex] == pCont)
+    {
+      FWSetFocusWindowIndex(pFW, iIndex);
+      return;
+    }
+  }
+}
+
+void FWSetFocusWindowIndex(WBFrameWindow *pFW, int iIndex)
+{
+FRAME_WINDOW *pFrameWindow;
+
+
+  pFrameWindow = InternalGet_FRAME_WINDOW(pFW);
+
+  if(!pFrameWindow || iIndex < 0)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
+
+    return;
+  }
+
+  // locate the contained window from my list.  then set as 'focus tab'
+
+  if(!pFrameWindow->ppChildFrames || iIndex >= pFrameWindow->nChildFrames)
+  {
+    return; // no child windows in list, or index is greater than the maximum
+  }
+
+  pFrameWindow->nFocusTab = iIndex; // set focus to THIS one
+
+  // invalidate the tab bar rectangle first, before I continue
+  WBInvalidateRect(pFW->wID, &(pFrameWindow->rctLastTabBarRect), 0);
+
+  FWRecalcLayout(pFW->wID); // recalculate layout (this also updates the frame window and whatnot)
+  // note that recalc'ing the layout does NOT re-paint the window.
+
+  WBUpdateWindow(pFW->wID);  // update the window now
+}
+
+
+void FWSetStatusText(WBFrameWindow *pFW, const char *szText)
+{
+WB_RECT rct;
+FRAME_WINDOW *pFrameWindow;
+
+
+  pFrameWindow = InternalGet_FRAME_WINDOW(pFW);
+
+  if(!pFrameWindow)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
+
+    return;
+  }
+
+  if(pFrameWindow->szStatus)
+  {
+    free(pFrameWindow->szStatus);
+    pFrameWindow->szStatus = NULL;
+  }
+
+  if(szText)
+  {
+    pFrameWindow->szStatus = WBCopyString(szText);
+
+    if(!pFrameWindow->szStatus)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - no memory\n", __FUNCTION__);
+    }
+  }
+
+  InternalCalcStatusBarRect(pFrameWindow, &rct);
+
+  WBInvalidateRect(pFrameWindow->wbFW.wID, &rct, 1); // and, finally, invalidate the status bar and force a re-paint
+}
+
+void FWSetStatusTabInfo(WBFrameWindow *pFW, int nTabs, const int *pTabs)
+{
+WB_RECT rct;
+FRAME_WINDOW *pFrameWindow;
+
+
+  pFrameWindow = InternalGet_FRAME_WINDOW(pFW);
+
+  if(!pFrameWindow)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
+
+    return;
+  }
+
+  if(pFrameWindow->pStatusBarTabs)
+  {
+    free(pFrameWindow->pStatusBarTabs);
+
+    pFrameWindow->pStatusBarTabs = NULL;
+  }
+
+  pFrameWindow->nStatusBarTabs = nTabs;
+
+  if(pTabs)
+  {
+    pFrameWindow->pStatusBarTabs = (int *)malloc(sizeof(int) * (nTabs + 1));
+
+    if(!pFrameWindow->pStatusBarTabs)
+    {
+      WB_ERROR_PRINT("ERROR: %s - no memory (attempt to allocate %d integers)\n", __FUNCTION__, nTabs);
+
+      return;
+    }
+
+    memcpy(pFrameWindow->pStatusBarTabs, pTabs, sizeof(int) * nTabs);
+    pFrameWindow->pStatusBarTabs[nTabs] = 0;  // always end in a zero, for now    
+  }
+
+  InternalCalcTabBarRect(pFrameWindow, &rct);
+
+  WBInvalidateRect(pFrameWindow->wbFW.wID, &rct, 0); // and, finally, invalidate the status bar but don't re-paint yet
+}
+
+static void Internal_CalcTabRect(FRAME_WINDOW *pFrameWindow, int iIndex, WB_RECT *prctTab)
+{
+  if(!pFrameWindow->ppChildFrames || iIndex >= pFrameWindow->nChildFrames ||
+     iIndex < pFrameWindow->nLeftTab || iIndex > pFrameWindow->nRightTab)
+  {
+    prctTab->left = prctTab->right = prctTab->top = prctTab->bottom = 0;
+    return;
+  }   
+
+  prctTab->top = pFrameWindow->rctLastTabBarRect.top + 2;
+  prctTab->bottom = pFrameWindow->rctLastTabBarRect.bottom;
+  prctTab->left = (iIndex - pFrameWindow->nLeftTab) * pFrameWindow->nTabBarTabWidth
+                + TAB_BAR_SCROLL_WIDTH + 2;
+  prctTab->right = prctTab->left + pFrameWindow->nTabBarTabWidth;
+}
+
+static void Internal_CalcTabGeom(FRAME_WINDOW *pFrameWindow, int iIndex, WB_GEOM *pgTab)
+{
+  if(!pFrameWindow->ppChildFrames || iIndex >= pFrameWindow->nChildFrames ||
+     iIndex < pFrameWindow->nLeftTab || iIndex > pFrameWindow->nRightTab)
+  {
+    pgTab->x = pgTab->y = pgTab->width = pgTab->height = 0;
+    return;
+  }   
+
+  pgTab->y = pFrameWindow->rctLastTabBarRect.top + 2;
+  pgTab->height = pFrameWindow->rctLastTabBarRect.bottom - pgTab->y;
+  pgTab->x = (iIndex - pFrameWindow->nLeftTab) * pFrameWindow->nTabBarTabWidth
+           + TAB_BAR_SCROLL_WIDTH + 2;
+  pgTab->width = pFrameWindow->nTabBarTabWidth;
+}
+
+static int Internal_Tab_Bar_Event(FRAME_WINDOW *pFrameWindow, XEvent *pEvent)
+{
+WB_RECT rctLeft, rctRight, rctNew, rctTemp;
+Display *pDisplay = WBGetWindowDisplay(pFrameWindow->wbFW.wID);
+XClientMessageEvent evt;
+int i1;
+
+
+  if(pEvent->type == ButtonPress)
+  {
+    // button press within the tab zone means "grab the mouse"
+
+    BEGIN_XCALL_DEBUG_WRAPPER
+    XGrabPointer(pDisplay, pFrameWindow->wbFW.wID, 1,
+                 ButtonPressMask | ButtonReleaseMask | ButtonMotionMask | PointerMotionMask
+                  | EnterWindowMask | LeaveWindowMask,
+                 GrabModeAsync, // pointer mode
+                 GrabModeAsync, // keyboard mode
+                 None, None, CurrentTime);
+    END_XCALL_DEBUG_WRAPPER
+
+    pFrameWindow->nTabBarButtonFlags |= tab_bar_button_GRAB;
+    pFrameWindow->nTabBarButtonFlags &= ~tab_bar_button_BUTTONMASK;
+
+    // calculate the rectangle for each tab, the scroll left, the scroll right, the 'x'
+    // buttons for each of the tabs, *AND* the 'new tab' button.  Handle each one as needed.
+
+    // scroll buttons first
+    // if I'm clicking within one of the scroll buttons, or the 'new tab' button, I can
+    // leave now, after setting the appropriate bit.  Drags won't be relevant.
+
+    rctLeft.top = rctRight.top = rctNew.top = pFrameWindow->rctLastTabBarRect.top + 2;
+    rctLeft.bottom = rctRight.bottom = rctNew.bottom = pFrameWindow->rctLastTabBarRect.bottom - 2;
+
+    rctLeft.left = pFrameWindow->rctLastTabBarRect.left + 2;
+    rctLeft.right = rctLeft.left + TAB_BAR_SCROLL_WIDTH - 2;
+
+    rctRight.right = pFrameWindow->rctLastTabBarRect.right - 2;
+    rctRight.left = rctRight.right - TAB_BAR_SCROLL_WIDTH + 2;
+
+    // TODO:  verify this formula works correctly
+    rctNew.right = rctRight.right - TAB_BAR_SCROLL_WIDTH - 2;
+    rctNew.left = rctNew.right - TAB_BAR_ADD_BUTTON_WIDTH - 2;
+
+    if(WBPointInRect(pEvent->xbutton.x, pEvent->xbutton.y, rctLeft))
+    {
+      pFrameWindow->nTabBarButtonFlags |= tab_bar_button_PREV; // TODO:  handle if button 'inactive'
+    }
+    else if(WBPointInRect(pEvent->xbutton.x, pEvent->xbutton.y, rctRight))
+    {
+      pFrameWindow->nTabBarButtonFlags |= tab_bar_button_NEXT; // TODO:  handle if button 'inactive'
+    }
+    else if(WBPointInRect(pEvent->xbutton.x, pEvent->xbutton.y, rctNew))
+    {
+      pFrameWindow->nTabBarButtonFlags |= tab_bar_button_NEW;
+    }
+
+    if(pFrameWindow->nTabBarButtonFlags & tab_bar_button_BUTTONMASK) // I set a button flag?
+    {
+      // force re-paint of tab bar rect
+//      WB_ERROR_PRINT("TEMPORARY:  %s - invalidate rect: %d, %d, %d, %d\n", __FUNCTION__,
+//                     pFrameWindow->rctLastTabBarRect.left,
+//                     pFrameWindow->rctLastTabBarRect.top,
+//                     pFrameWindow->rctLastTabBarRect.right,
+//                     pFrameWindow->rctLastTabBarRect.bottom);
+
+      WBInvalidateRect(pFrameWindow->wbFW.wID, &(pFrameWindow->rctLastTabBarRect), 1);
+
+      return 1; // and return, saying "I did it"
+    }
+
+//    WB_ERROR_PRINT("TODO:  %s - see if I'm clicking on a tab, a tab 'close' button, etc.\n", __FUNCTION__);
+
+    // check to see which tab I might be clicking in
+
+    if(pFrameWindow->nChildFrames)
+    {
+      for(i1=pFrameWindow->nLeftTab; i1 <= pFrameWindow->nRightTab; i1++)
+      {
+        Internal_CalcTabRect(pFrameWindow, i1, &rctTemp);
+
+        if(WBPointInRect(pEvent->xbutton.x, pEvent->xbutton.y, rctTemp))
+        {
+          XFontStruct *pFont = WBGetDefaultFont();
+          
+          // did I click on the 'x' button in the upper right corner?
+          // form a square equal to half the height (wide
+          rctTemp.right -= 2; // 2 from the right edge
+          rctTemp.left = rctTemp.right - (pFont->ascent + pFont->descent) / 2; // approximate font width
+          rctTemp.top += 2 + pFont->ascent / 2; // 2 pixels plus half of the ascent down
+          rctTemp.bottom = rctTemp.top + pFont->ascent / 2 + pFont->descent / 2; // bottom is 'rest of font'
+
+// TODO:  do I really want to post/send message or should i wait until mouse release?  In the
+//        case of tab delete, I might query for "are you sure" like if the file has not been saved
+
+          bzero(&evt, sizeof(evt));
+          evt.type = ClientMessage;
+
+          evt.display = pDisplay;
+          evt.window = pFrameWindow->wbFW.wID;
+
+          if(WBPointInRect(pEvent->xbutton.x, pEvent->xbutton.y, rctTemp))
+          {
+            // clicking on the 'x' button to close the tab
+
+            evt.message_type = aCLOSE_TAB;
+          }
+          else
+          {
+            // set focus to tab (do it on button press)
+
+            if(i1 == pFrameWindow->nFocusTab)
+            {
+              return 1;  // do nothing (already there)
+            }
+
+            evt.message_type = aSET_TAB;
+          }
+
+          evt.data.l[0] = i1; // the tab index
+          evt.format = 32;  // always
+
+          WBPostEvent(pFrameWindow->wbFW.wID, (XEvent *)&evt); // this will re-paint
+
+          return 1;
+        }
+      }
+    }
+    
+    return 1; // for now assume "I handled it" since the mousie was grabbed
+  }
+  else if(pEvent->type == ButtonRelease)
+  {
+    if(!(pFrameWindow->nTabBarButtonFlags & tab_bar_button_GRAB)) // mouse grabbed?
+    {
+      pFrameWindow->nTabBarButtonFlags &= ~tab_bar_button_BUTTONMASK; // turn off button mask if not grabbed
+      return 0; // "not handled"
+    }
+
+    BEGIN_XCALL_DEBUG_WRAPPER
+    XUngrabPointer(pDisplay, CurrentTime);
+    END_XCALL_DEBUG_WRAPPER
+
+    pFrameWindow->nTabBarButtonFlags &= ~tab_bar_button_GRAB;
+
+    if(!(pFrameWindow->nTabBarButtonFlags & tab_bar_button_BUTTONMASK)) // clicked on a tab, did we?
+    {
+      // if I'm releasing on a tab, and I dragged it, change the tab order according to the tab
+      // that I'm sitting on at the moment...
+
+// TODO:  enable this while dragging stuff, to re-paint the tabs during the drag.  but until then, don't
+//      WBInvalidateRect(pFrameWindow->wbFW.wID, &(pFrameWindow->rctLastTabBarRect), 1);
+
+      WB_ERROR_PRINT("TODO:  %s - handle tab-drags, except when I clicked the 'delete tab' button\n", __FUNCTION__);
+    }
+    else
+    {
+      // notifications
+
+      bzero(&evt, sizeof(evt));
+      evt.type = ClientMessage;
+
+      evt.display = pDisplay;
+      evt.window = pFrameWindow->wbFW.wID;
+
+      if(pFrameWindow->nTabBarButtonFlags & tab_bar_button_NEXT)
+      {
+        if(pFrameWindow->nRightTab < (pFrameWindow->nChildFrames - 1))
+        {
+          evt.message_type = aNEXT_TAB;
+        }
+        else
+        {
+          goto no_message;
+        }
+      }
+      else if(pFrameWindow->nTabBarButtonFlags & tab_bar_button_PREV)
+      {
+        if(pFrameWindow->nLeftTab > 0)
+        {
+          evt.message_type = aPREV_TAB;
+        }
+        else
+        {
+          goto no_message;
+        }
+      }
+      else if(pFrameWindow->nTabBarButtonFlags & tab_bar_button_NEW)
+      {
+        evt.message_type = aNEW_TAB;
+      }
+
+      evt.format = 32;  // always
+
+      WBPostEvent(pFrameWindow->wbFW.wID, (XEvent *)&evt);
+
+no_message:
+
+      pFrameWindow->nTabBarButtonFlags &= ~tab_bar_button_BUTTONMASK;
+
+      WBInvalidateRect(pFrameWindow->wbFW.wID, &(pFrameWindow->rctLastTabBarRect), 1);
+    }
+
+    return 1;
+  }
+  else if(pEvent->type == MotionNotify)
+  {
+    if(pFrameWindow->nTabBarButtonFlags & tab_bar_button_GRAB) // mouse grabbed?
+    {
+      if(!(pFrameWindow->nTabBarButtonFlags & tab_bar_button_BUTTONMASK)) // drag not relevant for these
+      {
+        WB_ERROR_PRINT("TODO:  %s - handle tab-drags via visual feedback\n", __FUNCTION__);
+
+        return 1; // "handled" (by ignoring it)
+      }
+    }
+  }
+
+  return 0; // not handled
+}
+
+
+static void InternalPaintTabBar(FRAME_WINDOW *pFrameWindow, XExposeEvent *pEvent)
+{
+WB_RECT rct0, rctExpose;
+WB_GEOM geom0;
+GC gc0;
+XFontStruct *fontBold = NULL;
+
+
+  if(WBFrameWindow_NO_TABS & pFrameWindow->wbFW.iFlags) // window has no tab bar?
+  {
+    return; // no tab bar, just bail
+  }
+
+  // obtain the most recent cached location of the tab bar.  this is important.
+
+  memcpy(&rct0, &(pFrameWindow->rctLastTabBarRect), sizeof(rct0));
+
+  // cache the tab bar rectangle for mouse hit tests.  not the same rect as rctLastTabBarRect
+  
+  pFrameWindow->rctTabBar.left   = rct0.left + 1;   // add 1 pixel for border
+  pFrameWindow->rctTabBar.top    = rct0.top + 1;
+  pFrameWindow->rctTabBar.right  = rct0.right - 1;  // subtract 1 pixel for border
+  pFrameWindow->rctTabBar.bottom = rct0.bottom - 1;
+
+
+  // does the Expose event intersect my tab bar?
 
   rctExpose.left   = pEvent->x;
   rctExpose.top    = pEvent->y;
   rctExpose.right  = rctExpose.left + pEvent->width;
   rctExpose.bottom = rctExpose.top + pEvent->height;
 
-  if(!WBRectOverlapped(rct, rctExpose))
+  if(!WBRectOverlapped(rct0, rctExpose))
   {
-//    WB_ERROR_PRINT("INFO: %s - expose event excludes tab bar\n", __FUNCTION__);
+//    WB_ERROR_PRINT("TEMPORARY: %s - expose event excludes tab bar\n", __FUNCTION__);
 
     return; // do nothing (no overlap)
   }
 
   // intersect the two rectangles so I only re-paint what I have to
 
-  if(rctExpose.top < rct.top)
+  if(rctExpose.top < rct0.top)
   {
-    rctExpose.top = rct.top;
+    rctExpose.top = rct0.top;
   }
 
-  if(rctExpose.bottom > rct.bottom)
+  if(rctExpose.bottom > rct0.bottom)
   {
-    rctExpose.bottom = rct.bottom;
+    rctExpose.bottom = rct0.bottom;
   }
 
-  if(rctExpose.left < rct.left)
+  if(rctExpose.left < rct0.left)
   {
-    rctExpose.left = rct.left;
+    rctExpose.left = rct0.left;
   }
 
-  if(rctExpose.right > rct.right)
+  if(rctExpose.right > rct0.right)
   {
-    rctExpose.right = rct.right;
+    rctExpose.right = rct0.right;
   }
 
   // time to start painting
 
-  geom.x      = rctExpose.left;
-  geom.y      = rctExpose.top;
-  geom.width  = rctExpose.right - rctExpose.left;
-  geom.height = rctExpose.bottom - rctExpose.top;
+  geom0.x      = rctExpose.left;
+  geom0.y      = rctExpose.top;
+  geom0.width  = rctExpose.right - rctExpose.left;
+  geom0.height = rctExpose.bottom - rctExpose.top;
 
 //  WB_ERROR_PRINT("TEMPORARY: %s - tab bar EXPOSE rect %d, %d, %d, %d\n",
 //                 __FUNCTION__, rctExpose.left, rctExpose.top, rctExpose.right, rctExpose.bottom);
 
-  gc = WBBeginPaintGeom(pFrameWindow->wbFW.wID, &geom);
+  gc0 = WBBeginPaintGeom(pFrameWindow->wbFW.wID, &geom0);
 
-  if(gc == None)
+  if(gc0 == None)
   {
     WB_ERROR_PRINT("ERROR: %s - no GC from WBBeginPaintGeom\n", __FUNCTION__);
   }
   else
   {
     Display *pDisplay = WBGetWindowDisplay(pFrameWindow->wbFW.wID);
-    XPoint xpt[3];
+    Drawable dw;
+    WB_GEOM geom, g2;
+    GC gc;
+    WB_RECT rct, rctTemp;
+    XColor clr;
+
+
+    gc = WBGetWindowCopyGC2(pFrameWindow->wbFW.wID, gc0);
+
+    if(gc != None)
+    {
+      BEGIN_XCALL_DEBUG_WRAPPER
+      XCopyGC(pDisplay, gc0,
+              GCFont | GCFillStyle | GCForeground | GCBackground | GCCapStyle | GCFunction | GCLineWidth,
+              gc);
+      END_XCALL_DEBUG_WRAPPER
+    }
+
+    BEGIN_XCALL_DEBUG_WRAPPER
+    dw = (Drawable)XCreatePixmap(pDisplay, pFrameWindow->wbFW.wID,
+                                 rct0.right - rct0.left, rct0.bottom - rct0.top,
+                                 DefaultDepth(pDisplay, DefaultScreen(pDisplay)));
+    END_XCALL_DEBUG_WRAPPER
+
+    if(gc == None || dw == None)
+    {
+      BEGIN_XCALL_DEBUG_WRAPPER
+      if(gc != None)
+      {
+        XFreeGC(pDisplay, gc);
+      }
+
+      if(dw != None)
+      {
+        XFreePixmap(pDisplay, (Pixmap)dw);
+      }
+      END_XCALL_DEBUG_WRAPPER
+
+      dw = pFrameWindow->wbFW.wID;
+      gc = gc0; // as a fallback
+
+      memcpy(&rct, &rct0, sizeof(rct));
+      memcpy(&geom, &geom0, sizeof(geom));
+
+      WB_ERROR_PRINT("ERROR:  %s - unable to create pixmap or 2nd gc; fallback invoked\n", __FUNCTION__);
+    }
+    else
+    {
+      Region rgn;
+
+      rct.left = rct.top = 0;
+
+      rct.right = rct0.right - rct0.left;
+      rct.bottom = rct0.bottom - rct0.top;
+
+      geom.x = geom.y = 0;
+      geom.width = geom0.width;
+      geom.height = geom0.height;
+      geom.border = geom0.border;
+
+      rgn = WBRectToRegion(&rct);
+
+      BEGIN_XCALL_DEBUG_WRAPPER
+      XSetRegion(pDisplay, gc, rgn); // new GC has different clip region
+      END_XCALL_DEBUG_WRAPPER
+
+      if(rgn != None)
+      {
+        XDestroyRegion(rgn);
+      }
+    }
 
 //    WB_ERROR_PRINT("TEMPORARY: %s - filling display geom %d, %d, %d, %d\n",
 //                   __FUNCTION__, geom.x, geom.y, geom.width, geom.height);
 
     // fill the rectangle with the background color
 
-    WBClearWindow(pFrameWindow->wbFW.wID, gc); // should only paint my little rectangle
+    BEGIN_XCALL_DEBUG_WRAPPER
+    XSetForeground(pDisplay, gc, clrBG.pixel);
+
+    XFillRectangle(pDisplay, dw, gc, rct.left, rct.top, rct.right - rct.left, rct.bottom - rct.top);
+
+    XSetForeground(pDisplay, gc, clrFG.pixel);
+    END_XCALL_DEBUG_WRAPPER
 
     // draw some lines in some colors for the border
 
-    // paint the 3D-looking border (a 'sunken' appearance for tab bar)
-    XSetForeground(pDisplay, gc, clrBD3.pixel);
-    xpt[0].x=rct.left;
-    xpt[0].y=rct.bottom - 2;  // exclude first point
-    xpt[1].x=rct.left;
-    xpt[1].y=rct.top;
-    xpt[2].x=rct.right - 2;   // exclude last point
-    xpt[2].y=rct.top;
+    g2.x = rct.left;
+    g2.y = rct.top;
+    g2.width = rct.right - rct.left;
+    g2.height = rct.bottom - rct.top;
 
-    XDrawLines(pDisplay, pFrameWindow->wbFW.wID, gc, xpt, 3, CoordModeOrigin);
+    WBDraw3DBorderRect(pDisplay, dw, gc, &g2, clrBD3.pixel, clrBD2.pixel); // sunken
 
-    XSetForeground(pDisplay, gc, clrBD2.pixel);
-    xpt[0].x=rct.right - 1;
-    xpt[0].y=rct.top + 1;              // exclude first point
-    xpt[1].x=rct.right - 1;
-    xpt[1].y=rct.bottom - 1;
-    xpt[2].x=rct.left + 1;              // exclude final point
-    xpt[2].y=rct.bottom - 1;
 
-    XDrawLines(pDisplay, pFrameWindow->wbFW.wID, gc, xpt, 3, CoordModeOrigin);
+    // draw the 'left' (aka 'PREV') button
 
-    XSetForeground(pDisplay, gc, clrFG.pixel); // by convention, set it to FG [for text I need this]
+    g2.x = rct.left + 1;
+    g2.y = rct.top + 1;
+    g2.width = TAB_BAR_SCROLL_WIDTH;
+    g2.height = rct.bottom - rct.top - 2;
+
+    if((pFrameWindow->nTabBarButtonFlags & tab_bar_button_PREV) && pFrameWindow->nLeftTab > 0)
+    {
+      WBDraw3DBorderRect(pDisplay, dw, gc, &g2, clrBD3.pixel, clrBD2.pixel);
+    }
+    else
+    {
+      WBDraw3DBorderRect(pDisplay, dw, gc, &g2, clrBD2.pixel, clrBD3.pixel);
+    }
+
+    g2.y += g2.height >> 2;
+    g2.height = (g2.height >> 2) + (g2.height >> 2);
+
+    WBDrawLeftArrow(pDisplay, dw, gc, &g2,
+                    (pFrameWindow->nLeftTab > 0) ? clrFG.pixel : clrBD3.pixel);
+
+
+    // draw the 'right' (aka 'NEXT') button
+
+    g2.x = rct.right - TAB_BAR_SCROLL_WIDTH - 1;
+    g2.y = rct.top + 1;
+    g2.width = TAB_BAR_SCROLL_WIDTH;
+    g2.height = rct.bottom - rct.top - 2;
+
+    if((pFrameWindow->nTabBarButtonFlags & tab_bar_button_NEXT) && pFrameWindow->nRightTab < (pFrameWindow->nChildFrames - 1))
+    {
+      WBDraw3DBorderRect(pDisplay, dw, gc, &g2, clrBD3.pixel, clrBD2.pixel);
+    }
+    else
+    {
+      WBDraw3DBorderRect(pDisplay, dw, gc, &g2, clrBD2.pixel, clrBD3.pixel);
+    }
+
+    g2.y += g2.height >> 2;
+    g2.height = (g2.height >> 2) + (g2.height >> 2);
+
+    WBDrawRightArrow(pDisplay, dw, gc, &g2,
+                     (pFrameWindow->nRightTab < (pFrameWindow->nChildFrames - 1)) ? clrFG.pixel : clrBD3.pixel);
+
+
+    // draw the '+' button for new document
+
+    g2.x = (rct.right - TAB_BAR_SCROLL_WIDTH - 1) - (TAB_BAR_ADD_BUTTON_WIDTH + 1);
+    g2.y = rct.top + 1;
+    g2.width = TAB_BAR_ADD_BUTTON_WIDTH;
+    g2.height = rct.bottom - rct.top - 2;
+
+    if(pFrameWindow->nTabBarButtonFlags & tab_bar_button_NEW)
+    {
+      WBDraw3DBorderRect(pDisplay, dw, gc, &g2, clrBD3.pixel, clrBD2.pixel);
+    }
+    else
+    {
+      WBDraw3DBorderRect(pDisplay, dw, gc, &g2, clrBD2.pixel, clrBD3.pixel);
+    }
+
+    g2.y += 2;
+    g2.height -= 4;
+
+    // invent my own color for the '+' button, in this case #0040A0
+    RGB255_TO_XCOLOR(0, 0x40, 0xa0, clr);
+
+    PXM_RGBToPixel(NULL, &clr);
+//    WB_ERROR_PRINT("TEMPORARY:  red=%d, green=%d, blue=%d, pixel=%d\n",
+//                   clr.red, clr.green, clr.blue, clr.pixel);
+    
+    BEGIN_XCALL_DEBUG_WRAPPER
+    XSetForeground(pDisplay, gc, clr.pixel/*clrFG.pixel*/); // for now use foreground color; later, ??
+    END_XCALL_DEBUG_WRAPPER
+
+    rctTemp.left = g2.x;
+    rctTemp.top = g2.y;
+    rctTemp.right = g2.x + g2.width;
+    rctTemp.bottom = g2.y + g2.height;
+
+    // NEXT, load a BOLD version of the default font to display the '+'
+
+    fontBold = WBLoadModifyFont(pDisplay, WBGetDefaultFont(), 0, WBFontFlag_WT_BOLD);
+
+    // put a 'splat' in the middle of this button
+    DTDrawSingleLineText(fontBold ? fontBold : WBGetDefaultFont(),
+                         "+", pDisplay, gc, dw, 0, 0, &rctTemp,
+                         DTAlignment_HCENTER | DTAlignment_VCENTER);
+
+    BEGIN_XCALL_DEBUG_WRAPPER
+    XSetForeground(pDisplay, gc, clrFG.pixel); // by convention, (re)set FG color again [for text I need this]
+    END_XCALL_DEBUG_WRAPPER
 
     // TODO:  draw the actual tabs and the text within them
 
-//    if(pFrameWindow->szStatus)
-//    {
-//      WB_RECT rctTemp;
-//
-//      rctTemp.left = rct.left + 8;
-//      rctTemp.top = rct.top + 4;
-//      rctTemp.right = rct.right - 8;
-//      rctTemp.bottom = rct.bottom - 4;
-//
-//      // temporary:  just paint the text
-////      DTDrawSingleLineText(WBGetDefaultFont(),
-////                           pFrameWindow->szStatus, pDisplay,
-////                           gc, pFrameWindow->wbFW.wID, 0, 0, &rctTemp, 0);
-//      XDrawString(pDisplay, pFrameWindow->wbFW.wID, gc, rctTemp.left, rctTemp.bottom - 2,
-//                  pFrameWindow->szStatus, strlen(pFrameWindow->szStatus));
-//    }                         
+//  WB_RECT rctLastTabBarRect;         // cached value of tab bar rectangle
+//  int nTabBarTabWidth;               // cached calculated width of a tab on the tab bar
+//  int nTabBarButtonFlags;            // button flags for tab bar ('pressed')
 
-    WBEndPaint(pFrameWindow->wbFW.wID, gc);  // and that's it!
+    if(pFrameWindow->ppChildFrames && pFrameWindow->nChildFrames)
+    {
+      WBChildFrame *pC;
+      int i1;
+
+      for(i1=pFrameWindow->nRightTab; i1 >= pFrameWindow->nLeftTab; i1--)
+      {
+        if(i1 != pFrameWindow->nFocusTab)
+        {
+          if(i1 >= pFrameWindow->nChildFrames)
+          {
+            continue;
+          }
+
+          pC = pFrameWindow->ppChildFrames[i1];
+
+          if(!pC)
+          {
+            continue;
+          }
+
+          Internal_CalcTabGeom(pFrameWindow, i1, &g2); // the geom in window coordinates
+          g2.x -= rct0.left; // translate to 'drawable' coordinates
+          g2.y -= rct0.top;
+
+          WBDraw3DBorderTab(pDisplay, dw, gc, &g2, 0, clrFG.pixel, clrBG.pixel,
+                            clrBD2.pixel, clrBD3.pixel, clrABG.pixel,
+                            WBGetDefaultFont(), fontBold,
+                            pC->aImageAtom, pC->szDisplayName);
+        }
+      }
+
+      i1 = pFrameWindow->nFocusTab; // this one is done last
+
+      if(i1 < pFrameWindow->nChildFrames)
+      {
+        pC = pFrameWindow->ppChildFrames[i1];
+
+        if(pC)
+        {
+          Internal_CalcTabGeom(pFrameWindow, i1, &g2); // the geom in window coordinates
+          g2.x -= rct0.left; // translate to 'drawable' coordinates
+          g2.y -= rct0.top;
+
+          WBDraw3DBorderTab(pDisplay, dw, gc, &g2, 1, clrFG.pixel, clrBG.pixel,
+                            clrBD2.pixel, clrBD3.pixel, clrABG.pixel,
+                            WBGetDefaultFont(), fontBold,
+                            pC->aImageAtom, pC->szDisplayName);
+        }
+      }
+    }
+
+    // if I'm using a pixmap, now I copy it to the window
+
+    if(dw != pFrameWindow->wbFW.wID)
+    {
+      BEGIN_XCALL_DEBUG_WRAPPER
+      // copy my drawn pixmap onto the window
+      XCopyArea(pDisplay, dw, pFrameWindow->wbFW.wID, gc0,
+                rct.left, rct.top, rct.right - rct.left, rct.bottom - rct.top,
+                rct0.left, rct0.top);
+      END_XCALL_DEBUG_WRAPPER
+    }
+
+    // RESOURCE CLEANUP
+
+    BEGIN_XCALL_DEBUG_WRAPPER
+    if(fontBold)
+    {
+      XFreeFont(pDisplay, fontBold);
+
+      fontBold = NULL; // avoid re-use
+    }
+
+    if(gc != gc0)
+    {
+      XFreeGC(pDisplay, gc);
+      gc = None;
+    }
+
+    if(dw != pFrameWindow->wbFW.wID)
+    {
+      XFreePixmap(pDisplay, (Pixmap)dw);
+      dw = None;
+    }
+    END_XCALL_DEBUG_WRAPPER
+
+    WBEndPaint(pFrameWindow->wbFW.wID, gc0);  // and that's it!
   }
 
   // finally, alter the expose event slightly so that it reflects the 'painted' area
 
-  if(pEvent->height + pEvent->y < rct.bottom)
+  if(pEvent->y < rct0.bottom)
   {
 //    WB_ERROR_PRINT("TEMPORARY: %s - altering x and height in Expose event\n", __FUNCTION__);
 
-    if(pEvent->y < rct.bottom)
+    if(pEvent->y >= rct0.top && pEvent->y < rct0.bottom) // so it only includes the tab area but overlaps it
     {
-      pEvent->height -= rct.bottom - pEvent->y;
-      pEvent->y = rct.bottom;
+      pEvent->height -= rct0.bottom - pEvent->y;
+      pEvent->y = rct0.bottom;
 
-      if(pEvent->height < 0)
+      if(pEvent->height < 0) // just in case
       {
         pEvent->height = 0;
       }
@@ -1310,12 +2579,13 @@ WBMenuBarWindow *pMB;
 }
 
 
-
 static void InternalPaintStatusBar(FRAME_WINDOW *pFrameWindow, XExposeEvent *pEvent)
 {
-WB_RECT rct, rctExpose;
+WB_RECT rct, rctExpose, rctTemp, rctPrev;
 WB_GEOM geom;
 GC gc;
+int i1;
+
 
 
   if(!(WBFrameWindow_STATUS_BAR & pFrameWindow->wbFW.iFlags)) // window has a status bar?
@@ -1325,9 +2595,7 @@ GC gc;
 
   // calculate the location of the status bar
 
-  WBGetClientRect(pFrameWindow->wbFW.wID, &rct); // get the rectangle for the client area
-
-  rct.top = rct.bottom - STATUS_BAR_HEIGHT;
+  InternalCalcStatusBarRect(pFrameWindow, &rct);
 
   // does the Expose event intersect my status bar?
 
@@ -1338,7 +2606,7 @@ GC gc;
 
   if(!WBRectOverlapped(rct, rctExpose))
   {
-    WB_ERROR_PRINT("INFO: %s - expose event excludes status bar\n", __FUNCTION__);
+//    WB_ERROR_PRINT("TEMPORARY: %s - expose event excludes status bar\n", __FUNCTION__);
 
     return; // do nothing (no overlap)
   }
@@ -1380,6 +2648,7 @@ GC gc;
   }
   else
   {
+    XFontStruct *pFont = WBGetDefaultFont(); // for now, use the default font
     Display *pDisplay = WBGetWindowDisplay(pFrameWindow->wbFW.wID);
     XPoint xpt[3];
 
@@ -1412,23 +2681,63 @@ GC gc;
 
     XSetForeground(pDisplay, gc, clrFG.pixel); // by convention, set it to FG [for text I need this]
 
-    // TODO:  the tabbed columns and their enclosed text
-
-    if(pFrameWindow->szStatus)
+    if(pFrameWindow->szStatus && pFont)
     {
-      WB_RECT rctTemp;
-
-      rctTemp.left = rct.left + 8;
-      rctTemp.top = rct.top + 4;
+      rctTemp.left = rct.left + 8;     // this is the outside bounding rectangle
+      rctTemp.top = rct.top + 2;       // for the entire status bar.
       rctTemp.right = rct.right - 8;
-      rctTemp.bottom = rct.bottom - 4;
+      rctTemp.bottom = rct.bottom - 2;
 
-      // temporary:  just paint the text
-//      DTDrawSingleLineText(WBGetDefaultFont(),
-//                           pFrameWindow->szStatus, pDisplay,
-//                           gc, pFrameWindow->wbFW.wID, 0, 0, &rctTemp, 0);
-      XDrawString(pDisplay, pFrameWindow->wbFW.wID, gc, rctTemp.left, rctTemp.bottom - 2,
-                  pFrameWindow->szStatus, strlen(pFrameWindow->szStatus));
+      if(!pFrameWindow->pStatusBarTabs || !pFrameWindow->nStatusBarTabs) // fixed tab width (or no tabs)
+      {
+        int iFixedTab = pFrameWindow->nStatusBarTabs;
+        
+        if(!iFixedTab)
+        {
+          iFixedTab = DEFAULT_STATUS_BAR_TAB;
+        }
+
+        iFixedTab *= pFrameWindow->nAvgCharWidth; //WBFontAvgCharWidth(pDisplay, pFont);
+
+        DTDrawSingleLineText(pFont,
+                             pFrameWindow->szStatus, pDisplay,
+                             gc, pFrameWindow->wbFW.wID,
+                             iFixedTab, 0, // fixed tab widths
+                             &rctTemp, DTAlignment_VCENTER | DTAlignment_HLEFT);
+      }
+      else
+      {
+        char **ppCols = NULL;
+        char *pData = NULL;
+        struct __status_tab_cols__ *pTabs;
+        int nCol;
+
+        // create the tab and column list using a utility (to simplify THIS code)
+        
+        if(!__internal_do_status_tab_cols(pFrameWindow, &rctTemp, &ppCols, &pData, &pTabs, &nCol))
+        {
+          memcpy(&rctPrev, &rctTemp, sizeof(rctTemp));
+
+          for(i1=0; i1 < nCol && ppCols[i1]; i1++)
+          {
+            rctTemp.left = pTabs[i1].left;
+            rctTemp.right = pTabs[i1].right;
+
+            DTDrawSingleLineText(pFont, ppCols[i1],
+                                 pDisplay, gc, pFrameWindow->wbFW.wID,
+                                 0, 0, // no tabs (won't be any)
+                                 &rctTemp, DTAlignment_VCENTER | pTabs[i1].align);
+
+            rctTemp.top = rctPrev.top;
+            rctTemp.bottom = rctPrev.bottom; // restore these two 'just in case'
+          }
+
+          // free the 3 'malloc'd arrays
+          free(ppCols);
+          free(pData);
+          free(pTabs);
+        }
+      }
     }                         
 
     WBEndPaint(pFrameWindow->wbFW.wID, gc);  // and that's it!
@@ -1452,153 +2761,200 @@ GC gc;
 }
 
 
-
-
-#if 0 /* these are handled separately - don't do this */
-
-// CLIPBOARD / SELECTION EVENTS
-//
-// NOTES:
-//
-// KDE wants _QT_SELECTION
-// GNOME wants GDK_SELECTION
-// 'libXt' wants _XT_SELECTION (see XtOwnSelection, XtGetSelectionValue, etc.)
-//
-// (nothing else seen so far)
-
-int FWDoSelectionEvents(WBFrameWindow *pFrameWindow, Window wID, Window wIDMenu, XEvent *pEvent)
+int __internal_do_status_tab_cols(FRAME_WINDOW *pFrameWindow, const WB_RECT *prct, char ***pppCols, char **ppData,
+                                  struct __status_tab_cols__ **ppTabs, int *pnCol)
 {
-Display *pDisplay = WBGetWindowDisplay(wID);
-FRAME_WINDOW *pFW = (FRAME_WINDOW *)pFrameWindow;
+int i1, i2, i3, i4, iTab, nCol;
+char *p1;
 
-  // this is what the libXt function 'RequestSelectionValue' does
-  // XConvertSelection(info->ctx->dpy, selection, target,   // 'selection' and 'target' are Atoms
-  //                   info->property, XtWindow(info->widget), info->time);
+//      if(!pFrameWindow->pStatusBarTabs || !pFrameWindow->nStatusBarTabs) // fixed tab width (or no tabs)
 
+  // this is where things get a bit more fun.  Look through 'pStatusBarTabs' for
+  // left-aligned and right-aligned tabs.  Sort them accordingly to determine the width
+  // of each column.  THEN, create the 'pTabs' and associated 'pCols' entries from that
+  // so that strings and columns align to one another.
 
-  // TEMPORARY:  doing what WBDefault does
+  // step 1: how many columns?
 
-  if(pEvent->type == SelectionRequest)
+  *ppTabs = NULL;
+  *pppCols = NULL;
+
+  *ppData = WBCopyString(pFrameWindow->szStatus);
+
+  if(!*ppData)
   {
-    char *p1 = pEvent->xselectionrequest.selection != None ? XGetAtomName(pDisplay, pEvent->xselectionrequest.selection) : NULL;
-    char *p2 = pEvent->xselectionrequest.target != None ? XGetAtomName(pDisplay, pEvent->xselectionrequest.target) : NULL;
-    char *p3 = pEvent->xselectionrequest.property != None ? XGetAtomName(pDisplay, pEvent->xselectionrequest.property) : NULL;
+error_return:
 
-    WB_ERROR_PRINT("TEMPORARY - %s - SelectionRequest owner=%d requestor=%d selection=%s target=%s property=%s\n",
-                   __FUNCTION__,
-                   (int)pEvent->xselectionrequest.owner,
-                   (int)pEvent->xselectionrequest.requestor,
-                   p1 ? p1 : "NULL",
-                   p2 ? p2 : "NULL",
-                   p3 ? p3 : "NULL");
+    *pnCol = 0;
 
-    if(p1)
+    WB_ERROR_PRINT("ERROR:  %s - no memory\n", __FUNCTION__);
+
+    return 1; // error return
+  }
+
+
+  p1 = *ppData;
+  nCol = 0;
+
+  if(*p1)
+  {
+    for(nCol = 1; *p1; )
     {
-      XFree(p1);
-    }                   
-    if(p2)
+      while(*p1 && *p1 != '\t')
+      {
+        p1++;
+      }
+
+      if(*p1 == '\t')
+      {
+        *p1 = 0;
+
+        nCol++;
+        p1++;
+      }
+    }
+  }
+
+  if(nCol > pFrameWindow->nStatusBarTabs)
+  {
+    nCol = pFrameWindow->nStatusBarTabs; // this may get even smaller
+  }
+
+  *pnCol = nCol;
+
+  // 'nCol' is now the total # of columns I'll be printing to.  Allocate pppCols now
+
+  *pppCols = (char **)malloc(sizeof(char *)*(nCol + 2));
+
+  if(!*pppCols)
+  {
+error_return2:
+
+    free(*ppData);
+    *ppData = NULL;
+
+    goto error_return;
+  }
+
+  *ppTabs = (struct __status_tab_cols__ *)malloc(sizeof(**ppTabs) * (pFrameWindow->nStatusBarTabs + 1));
+  if(!*ppTabs)
+  {
+    free(*pppCols);
+    *pppCols = NULL;
+
+    goto error_return2;    
+  }
+
+  // time to build up 'pppCols'
+  p1 = *ppData;
+
+  for(i1=0; i1 < nCol; i1++)
+  {
+    (*pppCols)[i1] = p1;
+
+    p1 += strlen(p1) + 1;
+  }
+
+  // now, set up the tabs so the represent 'columns'.  'left-oriented' tabs will assign
+  // the 'left' member and 'right' will be -1.  'right-oriented' tabs will assign the
+  // 'right' member and 'left' will be -1.  Then I'll generate columns from the other tab info.
+
+  for(i1=0, iTab=0; i1 < pFrameWindow->nStatusBarTabs; i1++)
+  {
+    i2 = pFrameWindow->pStatusBarTabs[i1];
+    if(i2 & WBStatusTabInfo_BREAK) // a 'tab break', not an actual column
     {
-      XFree(p2);
-    }                   
-    if(p3)
-    {
-      XFree(p3);
-    }                   
-
-    // the default rejects the request.  Send a 'SelectionNotify' to indicate the failure
-
-    if(pEvent->xselectionrequest.owner == wID) // only if I'm the selection owner
-    {
-      XSelectionEvent evtN;
-
-      memset(&evtN, 0, sizeof(evtN));
-
-      evtN.type = SelectionNotify;
-      evtN.send_event = True; // 'cause I'm going to use 'XSendEvent' to reply immediately
-      evtN.requestor = pEvent->xselectionrequest.requestor;
-      evtN.selection = pEvent->xselectionrequest.selection;
-      evtN.target = pEvent->xselectionrequest.target;
-      evtN.property = None; // to indicate failure
-      evtN.time = pEvent->xselectionrequest.time; // same time as request (for now)
-
-      BEGIN_XCALL_DEBUG_WRAPPER
-      XSendEvent(pDisplay, evtN.requestor, False, 0, (XEvent *)&evtN);
-      END_XCALL_DEBUG_WRAPPER
+      continue;
     }
 
-    return 1; // "handled"
-  }
-  else if(pEvent->type == SelectionClear)
-  {
-    char *p1 = XGetAtomName(pDisplay, pEvent->xselectionclear.selection);
-
-    WB_ERROR_PRINT("TEMPORARY - %s - SelectionClear window=%d selection=%s\n",
-                   __FUNCTION__,
-                   (int)pEvent->xselectionclear.window,
-                   p1 ? p1 : "NULL");
-
-    if(p1)
+    if(i2 & WBStatusTabInfo_RTL_COLUMN)
     {
-      XFree(p1);
-    }                   
-
-    // the default rejects the request.  Send a 'SelectionNotify' to indicate the failure
-
-    if(pEvent->xselectionrequest.owner == wID) // only if I'm the selection owner
+      (*ppTabs)[iTab].left = -1;
+      (*ppTabs)[iTab].right = prct->right
+                            - (i2 & WBStatusTabInfo_MASK) * pFrameWindow->nAvgCharWidth;
+      (*ppTabs)[iTab].align = i2 & WBStatusTabInfo_JUSTIFY_MASK;
+    }
+    else
     {
-      XSelectionEvent evtN;
-
-      memset(&evtN, 0, sizeof(evtN));
-
-      evtN.type = SelectionNotify;
-      evtN.send_event = True; // 'cause I'm going to use 'XSendEvent' to reply immediately
-      evtN.requestor = pEvent->xselectionrequest.requestor;
-      evtN.selection = pEvent->xselectionrequest.selection;
-      evtN.target = None;
-      evtN.property = None; // to indicate failure (?)
-      evtN.time = pEvent->xselectionrequest.time; // same time as request (for now)
-
-      BEGIN_XCALL_DEBUG_WRAPPER
-      XSendEvent(pDisplay, evtN.requestor, False, 0, (XEvent *)&evtN);
-      END_XCALL_DEBUG_WRAPPER
+      (*ppTabs)[iTab].left = prct->left 
+                           + (i2 & WBStatusTabInfo_MASK) * pFrameWindow->nAvgCharWidth;
+      (*ppTabs)[iTab].right = -1;
+      (*ppTabs)[iTab].align = i2 & WBStatusTabInfo_JUSTIFY_MASK;
     }
 
-    return 1; // "handled"
+    iTab++; // increment total count of actual tabs
   }
-  else if(pEvent->type == SelectionNotify)
+
+  *pnCol = iTab; // the real # of columns when I have tabs specified
+
+
+  // NOW, go through this list and determine how wide each column should be
+  // 
+
+  for(i1=0; i1 < iTab; i1++)
   {
-    char *p1 = XGetAtomName(pDisplay, pEvent->xselection.selection);
-    char *p2 = XGetAtomName(pDisplay, pEvent->xselection.target);
-    char *p3 = XGetAtomName(pDisplay, pEvent->xselection.property);
-
-    WB_ERROR_PRINT("TEMPORARY - %s - SelectionNotify requestor=%d selection=%s target=%s property=%s\n",
-                   __FUNCTION__,
-                   (int)pEvent->xselection.requestor,
-                   p1 ? p1 : "NULL",
-                   p2 ? p2 : "NULL",
-                   p3 ? p3 : "NULL");
-
-    if(p1)
+    if((*ppTabs)[i1].left < 0) // RTL column
     {
-      XFree(p1);
-    }                   
-    if(p2)
+      i3 = prct->left; // use the left edge for my new 'left'.  initially
+    }
+    else
     {
-      XFree(p2);
-    }                   
-    if(p3)
-    {
-      XFree(p3);
-    }                   
+      i3 = prct->right; // use the right edge for my new 'right'.  initially
+    }
 
-    return 1; // "handled"
+    for(i2=0; i2 < pFrameWindow->nStatusBarTabs; i2++)
+    {
+      // find the minimum 'right' or maximum 'left' position for this column
+
+      i4 = pFrameWindow->pStatusBarTabs[i2];
+
+      if(i4 & WBStatusTabInfo_RTL_COLUMN)
+      {
+        i4 = prct->right - (i4 & WBStatusTabInfo_MASK) * pFrameWindow->nAvgCharWidth;
+      }
+      else
+      {
+        i4 = prct->left + (i4 & WBStatusTabInfo_MASK) * pFrameWindow->nAvgCharWidth;
+      }
+
+      if((*ppTabs)[iTab].left < 0) // right-justified tab
+      {
+        if(i4 >= (*ppTabs)[iTab].right) // don't do this, it's further right than me
+        {
+          continue;
+        }
+
+        if(i4 >= i3) // further right than the most current 'left'?
+        {
+          i3 = i4 + 1; // note I add 1 to this for column spacing
+        }
+      }
+      else
+      {
+        if(i4 <= (*ppTabs)[iTab].left) // don't do this, it's further left than me
+        {
+          continue;
+        }
+
+        if(i4 <= i3) // further left than the most current 'right'?
+        {
+          i3 = i4 - 1; // note I add 1 to this for column spacing
+        }
+      }
+    }
+
+    if((*ppTabs)[i1].left < 0) // RTL column
+    {
+      (*ppTabs)[i1].left = i3;
+    }
+    else
+    {
+      (*ppTabs)[i1].right = i3;
+    }
   }
 
-
-
-
-  return 0; // for now
+  return 0; // ok!
 }
 
-#endif // 0
+
 

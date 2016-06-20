@@ -55,20 +55,74 @@
 #include "edit_window.h"
 
 
+int FWEditWindowEvent(Window wID, XEvent *pEvent);
+
+
+
 WBEditWindow *WBCreateEditWindow(WBFrameWindow *pOwner, XFontStruct *pFont,
                                  const char *szFocusMenu, const WBFWMenuHandler *pHandlerArray,
                                  int fFlags)
 {
-  return NULL;
+WBEditWindow *pRval;
+
+  pRval = (WBEditWindow *)malloc(sizeof(*pRval));
+
+  if(!pRval)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - not enough memory\n", __FUNCTION__);
+    return NULL;
+  }
+
+  bzero(pRval, sizeof(*pRval));
+
+  pRval->szFileName = NULL;  // explicitly do this, though the bzero would've
+  pRval->nTextObjects = 0;
+  pRval->nMaxTextObjects = 0;
+  pRval->pTextObjects = NULL;
+
+
+  if(0 > FWInitChildFrame(&(pRval->childframe), pOwner, pFont, szFocusMenu, pHandlerArray,
+                          FWEditWindowEvent, fFlags))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - unable to initialize child frame\n", __FUNCTION__);
+
+    free(pRval);
+
+    return NULL;
+  }                    
+
+  // TODO:  any other initialization
+
+  return pRval;
 }
 
 void WBDestroyEditWindow(WBEditWindow *pEditWindow)
 {
+  FWDestroyChildFrame(&(pEditWindow->childframe));
+
+  if(pEditWindow->szFileName)
+  {
+    free(pEditWindow->szFileName);
+    pEditWindow->szFileName = NULL;
+  }
+  if(pEditWindow->pTextObjects)
+  {
+    // TODO:  destroy them individually
+
+    free(pEditWindow->pTextObjects);
+    pEditWindow->pTextObjects = NULL;
+  }
+
+  free(pEditWindow); // TODO:  put this in a 'garbage collector' instead?
 }
 
 WBEditWindow *WBEditWindowFromWindowID(Window wID)
 {
-  return NULL;
+  return (WBEditWindow *)FWGetChildFrameStruct(wID); // for now; later, use a tag to verify
 }
 
+int FWEditWindowEvent(Window wID, XEvent *pEvent)
+{
+  return 0; // for now, NONE are handled
+}
 

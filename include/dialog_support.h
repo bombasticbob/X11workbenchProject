@@ -56,6 +56,16 @@
 #include "dialog_controls.h" // make sure this is included first
 #include "text_object.h" // needed for  _WB_EDIT_CONTROL_
 
+
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
+
+/** \ingroup dlglist
+  * \struct __LISTINFO__
+  * \copydoc LISTINFO
+**/
 /** \ingroup dlglist
   * \typedef LISTINFO
   * \brief Structure containing data for list-related dialog controls
@@ -63,40 +73,36 @@
   * Internally maintained structure containing list-related control data
   * including selection information and function callbacks for allocation,
   * de-allocation, display, and sorting.
-\code
-typedef struct __LISTINFO__
-{
-  int nItems, nMaxItems;              // size/max size of aItems (must re-alloc to increase nMaxItems)
-  int nPos, nTop;                     // scroll position and position of top item
-  int nHeight, nItemHeight;           // height (in items) and height of item (in pixels)
-  int nFlags;                         // flags (sorted, etc.)
-  Window wOwner;                      // owning window [to be notified on change]
-  void *(*pfnAllocator)(const void *, int); // copy constructor to call for each item that's added
-                                      // typically this will call 'malloc' followed by 'memcpy'
-                                      // if NULL, the caller-supplied pointer is assigned to 'aItems' as-is
-  void (*pfnDestructor)(void *);      // destructor to call for each item that's removed
-                                      // typically this will point to 'free'
-                                      // if NULL, the caller-supplied pointer is ignored
-
-  void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, GC gcPaint, WB_GEOM *pGeom);
-                                      // generic function to display contents of item within 'pGeom' using GC
-                                      // typically one of the listbox 'display item' functions
-
-  int (*pfnSort)(const void *, const void *); // sort proc (NULL implies strcmp)
-
-  void *aItems[1];                    // array of item data (remainder of struct)
-} LISTINFO;
-\endcode
   *
-  * \sa  __LISTINFO__  DLGInitControlListInfo()
-  *
-**/
+  * \code
 
-/** \ingroup dlglist
-  * \struct __LISTINFO__
-  * \brief Structure containing data for list-related dialog controls
+  typedef struct __LISTINFO__
+  {
+    int nItems, nMaxItems;              // size/max size of aItems (must re-alloc to increase nMaxItems)
+    int nPos, nTop;                     // scroll position and position of top item
+    int nHeight, nItemHeight;           // height (in items) and height of item (in pixels)
+    int nFlags;                         // flags (sorted, etc.)
+    Window wOwner;                      // owning window [to be notified on change]
+    void *(*pfnAllocator)(const void *, int); // copy constructor to call for each item that's added
+                                        // typically this will call 'malloc' followed by 'memcpy'
+                                        // if NULL, the caller-supplied pointer is assigned to 'aItems' as-is
+    void (*pfnDestructor)(void *);      // destructor to call for each item that's removed
+                                        // typically this will point to 'free'
+                                        // if NULL, the caller-supplied pointer is ignored
+
+    void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, GC gcPaint, WB_GEOM *pGeom);
+                                        // generic function to display contents of item within 'pGeom' using GC
+                                        // typically one of the listbox 'display item' functions
+
+    int (*pfnSort)(const void *, const void *); // sort proc (NULL implies strcmp)
+
+    void *aItems[1];                    // array of item data (remainder of struct)
+  } LISTINFO;
+
+  * \endcode
   *
-  * \sa  \ref LISTINFO
+  * \sa  DLGInitControlListInfo()
+  *
 **/
 typedef struct __LISTINFO__
 {
@@ -139,11 +145,27 @@ typedef struct __LISTINFO__
 
 // specialized structures 'derived' from WBDialogControl (internal only)
 /** \ingroup dlgctrl
+  * \struct _WB_IMAGE_CONTROL_
+  * \copydoc WBImageControl
+*/
+/** \ingroup dlgctrl
+  * \typedef WBImageControl
   * \brief Static 'Image' control structure
+  *
+  * \code
+
+  typedef struct _WB_IMAGE_CONTROL_
+  {
+    WBDialogControl wbDLGCtrl; // Standard dialog control members
+    Pixmap pixmap;             // foreground pixmap
+    Pixmap pixmap2;            // background (transparency) pixmap
+  } WBImageControl;
+
+  * \endcode
   *
   * Structure allocated for Image control
 **/
-struct _WB_IMAGE_CONTROL_
+typedef struct _WB_IMAGE_CONTROL_
 {
   WBDialogControl wbDLGCtrl; ///< Standard dialog control members
   Pixmap pixmap;             ///< foreground pixmap
@@ -151,11 +173,27 @@ struct _WB_IMAGE_CONTROL_
 } WBImageControl;
 
 /** \ingroup dlgctrl
+  * \struct _WB_PUSHBUTTON_CONTROL_
+  * \copydoc WBPushButtonControl
+**/
+/** \ingroup dlgctrl
+  * \typedef WBPushButtonControl
   * \brief Button 'pushbutton' control structure
+  *
+  * \code
+
+  typedef struct _WB_PUSHBUTTON_CONTROL_
+  {
+    WBDialogControl wbDLGCtrl; // Standard dialog control members
+    Pixmap pixmap;             // foreground pixmap
+    Pixmap pixmap2;            // background (transparency) pixmap
+  } WBPushButtonControl;
+
+  * \endcode
   *
   * Structure allocated for pushbuttons.  allows assigning an image or icon
 **/
-struct _WB_PUSHBUTTON_CONTROL_
+typedef struct _WB_PUSHBUTTON_CONTROL_
 {
   WBDialogControl wbDLGCtrl; ///< Standard dialog control members
   Pixmap pixmap;             ///< foreground pixmap
@@ -163,7 +201,22 @@ struct _WB_PUSHBUTTON_CONTROL_
 } WBPushButtonControl;
 
 /** \ingroup dlgctrl
+  * \struct _WB_EDIT_CONTROL_
+  * \copydoc WBEditControl
+**/
+/** \ingroup dlgctrl
+  * \typedef WBEditControl
   * \brief Edit control structure
+  *
+  * \code
+
+  typedef struct _WB_EDIT_CONTROL_
+  {
+    WBDialogControl wbDLGCtrl; // Standard dialog control members
+    TEXT_OBJECT xTextObject;   // A Text Object associated with the edit text
+  } WBEditControl;
+
+  * \endcode
   *
   * Structure allocated for Edit control, allows for an edit state buffer
 **/
@@ -173,9 +226,26 @@ typedef struct _WB_EDIT_CONTROL_
   TEXT_OBJECT xTextObject;   ///< A Text Object associated with the edit text
 } WBEditControl;
 
+
+/** \ingroup dlglist
+  * \struct _WB_LIST_CURSEL_
+  * \copydoc WBListCurSel
+**/
 /** \ingroup dlglist
   * \typedef WBListCurSel
   * \brief Structure containing information about the current selection in a list
+  *
+  * \code
+
+  typedef struct _WB_LIST_CURSEL_
+  {
+    int iCurSel;      // current selection
+    int iTopIndex;    // index of item at top of window
+    int iHeight;      // calculated height of window in "entries" (see next member)
+    int iEntryHeight; // cached display height of each entry (calculated by Expose handler)
+  } WBListCurSel;
+
+  * \endcode
   *
   * Typically used in a listbox or combo box, this structure specifies the current list
   * selection info for a listbox, combo box, or tree control.\n
@@ -192,7 +262,24 @@ typedef struct _WB_LIST_CURSEL_
 
 
 /** \ingroup dlgctrl
+  * \struct _WB_LIST_CONTROL_
+  * \copydoc  WBListControl
+**/
+/** \ingroup dlgctrl
+  * \typedef  WBListControl
   * \brief List control structure
+  *
+  * \code
+
+  typedef struct _WB_LIST_CONTROL_
+  {
+    WBDialogControl wbDLGCtrl; // Standard dialog control members
+    WBListCurSel sel;          // selection state, must follow wbDLGCtrl
+    int *pSelBitmap;           // bitmap of selections (when applicable) (use 'malloc/free')
+    int cbBitmap;              // size of bitmap (in bytes, granular at sizeof(int))
+  } WBListControl;
+
+  * \endcode
   *
   * Structure allocated for List control
 **/
@@ -204,8 +291,25 @@ typedef struct _WB_LIST_CONTROL_
   int cbBitmap;              ///< size of bitmap (in bytes, granular at sizeof(int))
 } WBListControl;
 
+
 /** \ingroup dlgctrl
+  * \struct _WB_COMBO_CONTROL_
+  * \copydoc WBComboControl
+*/
+/** \ingroup dlgctrl
+  * \typedef WBComboControl
   * \brief List control structure
+  *
+  * \code
+
+  typedef struct _WB_COMBO_CONTROL_
+  {
+    WBDialogControl wbDLGCtrl; // Standard dialog control members
+    WBListCurSel sel;          // selection state, must follow wbDLGCtrl
+    TEXT_OBJECT xTextObject;   // A Text Object associated with the editable text
+  } WBComboControl;
+
+  * \endcode
   *
   * Structure allocated for List control
 **/
@@ -216,8 +320,24 @@ typedef struct _WB_COMBO_CONTROL_
   TEXT_OBJECT xTextObject;   ///< A Text Object associated with the editable text
 } WBComboControl;
 
+
 /** \ingroup dlgctrl
+  * \struct _WB_TREE_CONTROL_
+  * \copydoc WBTreeControl
+**/
+/** \ingroup dlgctrl
+  * \typedef WBTreeControl
   * \brief Static 'Image' control structure
+  *
+  * \code
+
+  typedef struct _WB_TREE_CONTROL_
+  {
+    WBDialogControl wbDLGCtrl; // Standard dialog control members
+    WBListCurSel sel;          // must follow wbDLGCtrl
+  } WBTreeControl;
+
+  * \endcode
   *
   * Structure allocated for Tree control
 **/
@@ -313,6 +433,10 @@ extern const Atom aDLGC_LISTINFO;
 void DEBUG_DUMP_LIST(WBDialogControl *pCtrl);
 #endif // NO_DEBUG
 
+
+#ifdef __cplusplus
+};
+#endif // __cplusplus
 
 #endif // _DIALOG_SUPPORT_H_INCLUDED_
 

@@ -49,7 +49,8 @@
 #ifndef FRAME_WINDOW_H_INCLUDED
 #define FRAME_WINDOW_H_INCLUDED
 
-#include "window_helper.h"
+//#include "window_helper.h"
+#include "window_dressing.h"
 #include "menu_bar.h"
 
 #ifdef __cplusplus
@@ -168,12 +169,18 @@ extern "C" {
 
 
 
+/** \ingroup frame_window
+  * \brief TAG for the WBFrameWindow structure
+**/
 #define FRAME_WINDOW_TAG (*((const unsigned int *)"FWFW"))
 
 
-/** \typedef WBFWMenuHandler
-  * \struct __WB_FW_MENU_HANDLER_
+/** \struct __WB_FW_MENU_HANDLER__
   * \ingroup frame_menu
+  * \copydoc WBFWMenuHandler
+**/
+/** \typedef WBFWMenuHandler
+  * \ingroup frame_menu  
   * \brief structure for managing menu callbacks
   *
   * The WBFWMenuHandler structure is designed to be initialized via macros, so
@@ -186,7 +193,7 @@ extern "C" {
   *
   * \code
 
-  typedef struct __WB_FW_MENU_HANDLER_
+  typedef struct __WB_FW_MENU_HANDLER__
   {
     unsigned long lMenuID;                       // menu ID (< 0x10000L) or const pointer to string
 
@@ -198,26 +205,29 @@ extern "C" {
 
   * \endcode
   *
-  * \sa \ref FW_MENU_HANDLER_ENTRY
+  * \sa \ref FW_MENU_HANDLER_ENTRY "FW_MENU_HANDLER_ENTRY", \ref FW_MENU_HANDLER_BEGIN "FW_MENU_HANDLER_BEGIN"
 **/
-typedef struct __WB_FW_MENU_HANDLER_
+typedef struct __WB_FW_MENU_HANDLER__
 {
   unsigned long lMenuID;                       ///< menu ID (< 0x10000L) or const pointer to string
 
-  int (* callback)(XClientMessageEvent *);     ///< menu callback (gets pointer to the 'XClientMessageEvent')
+  int (* callback)(XClientMessageEvent *);     ///< menu callback (gets pointer to the 'XClientMessageEvent').
 
   /** \brief menu 'UI' callback to handle displaying menu states.
     *
-    * A return value of '0' displays normaly, -1 disables.\n
+    * This callback function handles the menu states.  A return value of '0' displays normaly, -1 disables.\n
     * Other return values are reserved.
   **/
   int (* UIcallback)(WBMenu *, WBMenuItem *);
-
 } WBFWMenuHandler;
 
 
+
+/** \struct __WB_FRAME_WINDOW__
+  * \ingroup frame_window
+  * \copydoc WBFrameWindow
+**/
 /** \typedef WBFrameWindow
-  * \struct __WB_FRAME_WINDOW__
   * \ingroup frame_window
   * \brief main controlling structure for frame windows
   *
@@ -244,7 +254,6 @@ typedef struct __WB_FW_MENU_HANDLER_
     int iFirstTab;                       // The first visible tab index (0 if none)
     int iTabWidth;                       // The width of each tab (in pixels)
     int iNumTabs;                        // The total number of visible tabs
-
   } WBFrameWindow;
 
   * \endcode
@@ -264,8 +273,9 @@ typedef struct __WB_FRAME_WINDOW__
   int iFirstTab;                       ///< The first visible tab index (0 if none)
   int iTabWidth;                       ///< The width of each tab (in pixels)
   int iNumTabs;                        ///< The total number of visible tabs
-
 } WBFrameWindow;
+
+
 
 /** \ingroup frame_window
   * \enum WBFrameWindow_FLAGS
@@ -304,8 +314,11 @@ enum WBStatusTabInfo_FLAGS
 
 // WBChildFrame is defined HERE to avoid circular header file dependencies
 
+/** \struct __WBChildFrame__
+  * \ingroup child_frame
+  * \copydoc WBChildFrame
+**/
 /** \typedef WBChildFrame
-  * \struct __WBChildFrame__
   * \ingroup child_frame
   * \brief Structure that defines a Child Frame within a Frame Window
   *
@@ -318,6 +331,7 @@ enum WBStatusTabInfo_FLAGS
   * will be able to activate it.
   *
   * \code
+
   typedef struct __WBChildFrame__
   {
     unsigned int ulTag;               // tag indicating I'm a 'Child Frame' window
@@ -333,30 +347,23 @@ enum WBStatusTabInfo_FLAGS
     int iXExtent;                     // X extent for the display surface (determines scrolling behavior)
     int iYExtent;                     // Y extent for the display surface (determines scrolling behavior)
 
-    int iHScrollMin;                  // min horizontal scroll (-1 if none)
-    int iHScrollPos;                  // position for horizontal scroll (-1 if none)
-    int iHScrollMax;                  // max horizontal scroll (-1 if none)
-
-    int iVScrollMin;                  // min vertical scroll (-1 if none)
-    int iVScrollPos;                  // position for vertical scroll (-1 if none)
-    int iVScrollMax;                  // max vertical scroll (-1 if none)
+    WB_SCROLLINFO scroll;             // 'scroll info' (horizontal and vertical min/max/pos and other details)
 
     int iSplit;                       // reserved - position for 'split'
 
-    int iSplitScrollMin;              // min 'split' scroll (-1 if none)
-    int iSplitScrollPos;              // position for 'split' scroll (-1 if none)
-    int iSplitScrollMax;              // max 'split' scroll (-1 if none)
+    WB_SCROLLINFO scrollSplit;        // 'scroll info' for 'split' area (vertical only)
 
     int iTabIndex;                    // Current tab index (for tabbed versions; -1 for "no tabs") - set by owner
     int fFlags;                       // various bitflags defining features.
 
-    char *szDisplayName;              // display name shown in tab and title bar.  You should not alter this member.
+    char *szDisplayName;              // display name shown in tab and title bar.  You should not alter this member directly.
+    Atom aImageAtom;                  // 'image' atom for display in tabs.  default is 'None'.  You should not alter this member directly.
 
     WBWinEvent pUserCallback;         // message callback function pointer (can be NULL)
 
     struct __WBChildFrame__ *pNext;   // 'Next Object' pointer in an internally stored linked list
-
   } WBChildFrame;
+
   * \endcode
   *
   * \sa \ref frame "Frame Windows"
@@ -379,30 +386,24 @@ typedef struct __WBChildFrame__
   int iXExtent;                     ///< X extent for the display surface (determines scrolling behavior)
   int iYExtent;                     ///< Y extent for the display surface (determines scrolling behavior)
 
-  int iHScrollMin;                  ///< min horizontal scroll (-1 if none)
-  int iHScrollPos;                  ///< position for horizontal scroll (-1 if none)
-  int iHScrollMax;                  ///< max horizontal scroll (-1 if none)
-
-  int iVScrollMin;                  ///< min vertical scroll (-1 if none)
-  int iVScrollPos;                  ///< position for vertical scroll (-1 if none)
-  int iVScrollMax;                  ///< max vertical scroll (-1 if none)
+  WB_SCROLLINFO scroll;             ///< 'scroll info' (horizontal and vertical min/max/pos and other details)
 
   int iSplit;                       ///< reserved - position for 'split'
 
-  int iSplitScrollMin;              ///< min 'split' scroll (-1 if none)
-  int iSplitScrollPos;              ///< position for 'split' scroll (-1 if none)
-  int iSplitScrollMax;              ///< max 'split' scroll (-1 if none)
+  WB_SCROLLINFO scrollSplit;        ///< 'scroll info' for 'split' area (vertical only)
 
   int iTabIndex;                    ///< Current tab index (for tabbed versions; -1 for "no tabs") - set by owner
   int fFlags;                       ///< various bitflags defining features.  See WBChildFrame_FLAGS enum.
 
-  char *szDisplayName;              ///< display name shown in tab and title bar.  You should not alter this member.
+  char *szDisplayName;              ///< display name shown in tab and title bar.  You should not alter this member directly.
+  Atom aImageAtom;                  ///< 'image' atom for display in tabs.  default is 'None'.  You should not alter this member directly.
 
   WBWinEvent pUserCallback;         ///< message callback function pointer (can be NULL)
 
   struct __WBChildFrame__ *pNext;   ///< 'Next Object' pointer in an internally stored linked list
-
 } WBChildFrame;
+
+
 
 
 
@@ -420,6 +421,23 @@ enum WBChildFrame_FLAGS
   WBChildFrame_SPLIT_MASK = 12,   ///< RESERVED - bit mask for 'splitter' flags
   WBChildFrame_SPLIT_NOSIZE = 16, ///< RESERVED - bit set if split cannot be sized with the mouse
 };
+
+
+// FRAME WINDOW ATOMS
+
+#if !defined(_FRAME_WINDOW_C_) && !defined(_CLIPBOARD_HELPER_C)
+     /* this declares the atoms 'const' outside of frame_window.c, and does NOT declare them in clipboard_helper.c */
+     /* These atoms are GLOBAL variables, assigned by the DEFAULT Display, and may not work for other threads.     */
+
+extern const Atom aNEW_TAB;      // command sent by Client Message to create a new tab (also ctrl+N)
+extern const Atom aNEXT_TAB;     // command sent by Client Message to switch to the next tab (also ctrl+alt+pgdn)
+extern const Atom aPREV_TAB;     // command sent by Client Message to switch to the previous tab (also ctrl+alt+pgup)
+extern const Atom aSET_TAB;      // command sent by Client Message to switch to the specified tab
+extern const Atom aCLOSE_TAB;    // command sent by Client Message to close the specified tab
+extern const Atom aREORDER_TAB;  // command sent by Client Message to re-order the specified tab (activate with mouse-drag)
+
+#endif // !defined(_FRAME_WINDOW_C_) && !defined(_CLIPBOARD_HELPER_C)
+
 
 
 
@@ -643,7 +661,7 @@ void FWSetFocusWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pCont);
 void FWSetFocusWindowIndex(WBFrameWindow *pFrameWindow, int iIndex);
 
 /** \ingroup frame_window
-  * \brief Sets the 'status' text for a Frame Window with a status bar
+  * \brief Sets the 'status' text for a Frame Window with a status bar, forcing a re-paint
   *
   * \param pFrameWindow A pointer to a WBFrameWindow structure for the frame window
   * \param szText A tab-delimited character string containing UTF8 or ASCII status text. A copy of this will be stored internally.
@@ -651,7 +669,9 @@ void FWSetFocusWindowIndex(WBFrameWindow *pFrameWindow, int iIndex);
   *
   * Use this function to update the status text.  Status text can contain multiple 'columns' that
   * are displayed using the tab stop information assigned by FWSetStatusTabInfo().  Each column's
-  * text data will be 'appropriately justified' and displayed in the status bar according to the tab info.
+  * text data will be 'appropriately justified' and displayed in the status bar according to the tab info.\n
+  * This function forces a re-paint of the status bar.  If you also want to change the tabs, call
+  * FWSetStatusTabInfo() first, followed by this function.
   *
   * Header File:  frame_window.h
 **/
@@ -672,7 +692,9 @@ void FWSetStatusText(WBFrameWindow *pFrameWindow, const char *szText);
   * 'WBStatusTabInfo_BREAK' flag to create a 'blank' area that defines the width of the previous column
   * but does not have anything displayed within it.\n
   * To left, right, or center text within a column, use one of the WBStatusTabInfo_JUSTIFY_ constants.  The
-  * default (zero) is left-justification (even for RTL columns).
+  * default (zero) is left-justification (even for RTL columns).\n
+  * This function does NOT force a re-paint of the status bar.  It does invalidate the status bar rectangle,
+  * however. To force a re-paint after updating the tabs, call WBUpdateWindow() for the frame window.
   *
   * Header File:  frame_window.h
 **/

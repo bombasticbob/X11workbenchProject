@@ -73,8 +73,11 @@ extern "C" {
 
 #define MENU_WINDOW_TAG (*((const unsigned int *)"MWMW"))
 
-/** \typedef WBMenuBarWindow
+/** \ingroup menu_bar
   * \struct  __WBMenuBarWindow__
+  * \copydoc WBMenuBarWindow
+**/
+/** \typedef WBMenuBarWindow
   * \ingroup menu_bar
   * \brief structure for defining a menu bar window
   *
@@ -102,7 +105,7 @@ extern "C" {
 
   * \endcode
   *
-  * \sa \ref \_\_WBMenu "WBMenu"
+  * \sa WBMenu
   *
 **/
 typedef struct __WBMenuBarWindow__

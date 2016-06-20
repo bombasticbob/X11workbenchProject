@@ -73,8 +73,15 @@ extern "C" {
 **/
 
 
+/** \ingroup dlgctrl
+  * \brief TAG for the WBDialogControl structure
+**/
 #define DIALOG_CONTROL_TAG (*((const unsigned int *)"DLGC"))
 
+/** \ingroup dlgctrl
+  * \struct __WB_DIALOG_PROP__
+  * \copydoc WB_DIALOG_PROP
+**/
 /** \ingroup dlgctrl
   * \typedef WB_DIALOG_PROP
   * \brief Dialog property storage structure
@@ -84,22 +91,21 @@ extern "C" {
   * dialog control that has properties.  Certain properties, however,
   * are mapped to structure members within the \ref WBDialogControl
   * structure.\n
-\code
-typedef struct __WB_DIALOG_PROP__
-{
-  Atom aProp;          // Atom identifying the property
-  unsigned long lVal;  // 'long' data value, assigned as needed
-  void *pVal;          // pointer to data, as needed (may be allocated, some property types auto-free the data)
-} WB_DIALOG_PROP;
-\endcode
-  *  /sa  __WB_DIALOG_PROP__ and WBDialogPropList
-*/
-/** \ingroup dlgctrl
-  * \struct __WB_DIALOG_PROP__
-  * \brief Dialog property storage structure (one structure per property)
+  * \code
+
+  typedef struct __WB_DIALOG_PROP__
+  {
+    Atom aProp;          // Atom identifying the property
+    unsigned long lVal;  // 'long' data value, assigned as needed
+    void *pVal;          // pointer to data, as needed (may be allocated, some property types auto-free the data)
+  } WB_DIALOG_PROP;
+
+  * \endcode
   *
   * Dialog property storage structure.  Additional details can be found in the
   * documentation for \ref WB_DIALOG_PROP and \ref WBDialogPropList.\n
+  *
+  *  \sa  __WB_DIALOG_PROP__ and WBDialogPropList
 */
 typedef struct __WB_DIALOG_PROP__
 {
@@ -108,6 +114,11 @@ typedef struct __WB_DIALOG_PROP__
   void *pVal;          ///< pointer to data, as needed (may be allocated, some property types auto-free the data)
 } WB_DIALOG_PROP;
 
+
+/** \ingroup dlgctrl
+  * \struct __WB_DIALOG_PROPLIST__
+  * \copydoc WBDialogPropList
+**/
 /** \ingroup dlgctrl
   * \typedef WBDialogPropList
   * \brief Dialog Property List, container for \ref WB_DIALOG_PROP
@@ -115,34 +126,28 @@ typedef struct __WB_DIALOG_PROP__
   * Container structure for WB_DIALOG_PROP structures, pre-allocated
   * to hold 'nMaxProps'.  Can be re-allocated as necessary to increase
   * the total number of properties so long as the pointer to this
-  * structure isn't being cached outside of the \ref WBDialogConrol\n
+  * structure isn't being cached outside of the \ref WBDialogControl\n
   *
-\code
-typedef struct __WB_DIALOG_PROPLIST__
-{
-  int nProps, nMaxProps;      // total number of active properties and maximum size of aDlgProp
-  WB_DIALOG_PROP aDlgProp[1]; // Array of property definitions (contiguous, pre-allocated)
-} WBDialogPropList;
-\endcode
+  * \code
+
+  typedef struct __WB_DIALOG_PROPLIST__
+  {
+    int nProps, nMaxProps;      // total number of active properties and maximum size of aDlgProp
+    WB_DIALOG_PROP aDlgProp[1]; // Array of property definitions (contiguous, pre-allocated)
+  } WBDialogPropList;
+
+  * \endcode
   *
-  * /sa  \ref __WB_DIALOG_PROPLIST__, \ref __WB_DIALOG_PROP__
+  * \sa  WB_DIALOG_PROP
   *
   * Properties are maintained using the following X11 Work Bench Toolkit API functions:\n
-  * low-level functions:  WBDialogControlSetDialogProp(), WBDialogControlDelDialogProp(), WBDialogControlGetDialogProp()\n
-  * mid-level functions:  WBDialogControlSetProperty(), WBDialogControlSetProperty2(), WBDialogControlGetProperty(), WBDialogControlGetProperty2()\n
-  * high-level functions:  WBDialogControlSetCaption(), WBDialogControlGetCaption(), WBDialogControlSetPixmap(), WBDialogControlGetPixmap()
+  * \li low-level functions:  WBDialogControlSetDialogProp(), WBDialogControlDelDialogProp(), WBDialogControlGetDialogProp()\n
+  * \li mid-level functions:  WBDialogControlSetProperty(), WBDialogControlSetProperty2(), WBDialogControlGetProperty(), WBDialogControlGetProperty2()\n
+  * \li high-level functions:  WBDialogControlSetCaption(), WBDialogControlGetCaption(), WBDialogControlSetPixmap(), WBDialogControlGetPixmap()
   * WBDialogControlSetIconPixmap(), WBDialogControlGetIconPixmap(), WBDialogControlSetText(), WBDialogControlGetText()\n
-  * simplified string property functions:  DLGSetControlProperty(), DLGGetControlProperty()\n
-  * combined with dialog window:  DLGSetControlCaption(), DLGGetControlCaption()\n
-*/
-/** \ingroup dlgctrl
-  * \struct __WB_DIALOG_PROPLIST__
-  * \brief Container structure for the dialog property storage structures
+  * \li simplified string property functions:  DLGSetControlProperty(), DLGGetControlProperty()\n
+  * \li combined with dialog window:  DLGSetControlCaption(), DLGGetControlCaption()\n
   *
-  * Pre-allocated container structure for dialog property storage.  Maintenance of this
-  * structure should NOT be performed outside of the X11 Work Bench Toolkit API functions.
-  * Additional details, and a list of API functions, can be found in the
-  * documentation for \ref WBDialogPropList.\n
 */
 typedef struct __WB_DIALOG_PROPLIST__
 {
@@ -163,6 +168,10 @@ typedef struct __WB_DIALOG_PROPLIST__
 
 
 /** \ingroup dlgctrl
+  * \struct __WB_DIALOG_CONTROL__
+  * \copydoc WBDialogControl
+**/
+/** \ingroup dlgctrl
   * \typedef WBDialogControl
   * \brief Structure identifying the properties of a dialog box control
   *
@@ -172,39 +181,41 @@ typedef struct __WB_DIALOG_PROPLIST__
   * and additional properties in an allocated WBDialogPropList (as needed)\n
   * For performance reasons, some control types may allocate a 'superclass' of this
   * structure with additional data members.\n
-\code
-typedef struct __WB_DIALOG_CONTROL__
-{
-  unsigned int ulTag;               // The value DIALOG_CONTROL_TAG
-  Window wID;                       // Window ID of the dialog control window
-  Atom aClass;                      // basic control class atom
-  WBDialogWindow *pOwner;           // pointer to owner dialog box
-  WBDialogEntry *pDlgControlEntry;  // pointer to dialog box's WBDialogEntry
-  WBWinEvent pDLGControlCallback;   // control's callback function
-  unsigned long ulFlags;            // generic flag bits
-  XColor clrFG, clrBG, clrBD;       // FG, BG, and border colors
-  XColor clrBD2, clrBD3;            // additional 3D border colors
-  XColor clrHFG, clrHBG;            // highlight BG and FG colors
-  XColor clrAFG, clrABG;            // active BG and FG colors
-  char *pCaption;                   // in lieu of using WM_NAME property
-  WBDialogPropList *pPropList;      // property list
-  int cbStructSize;                 // assigned at allocation time, the total size of this structure
+  *
+  * \code
 
-  // unique per-control data members follow (see cbStructSize for validation)
+  typedef struct __WB_DIALOG_CONTROL__
+  {
+    unsigned int ulTag;               // The value DIALOG_CONTROL_TAG
+    Window wID;                       // Window ID of the dialog control window
+    Atom aClass;                      // basic control class atom
+    WBDialogWindow *pOwner;           // pointer to owner dialog box
+    WBDialogEntry *pDlgControlEntry;  // pointer to dialog box's WBDialogEntry
+    WBWinEvent pDLGControlCallback;   // control's callback function
+    unsigned long ulFlags;            // generic flag bits
+    XColor clrFG, clrBG, clrBD;       // FG, BG, and border colors
+    XColor clrBD2, clrBD3;            // additional 3D border colors
+    XColor clrHFG, clrHBG;            // highlight BG and FG colors
+    XColor clrAFG, clrABG;            // active BG and FG colors
+    char *pCaption;                   // in lieu of using WM_NAME property
+    WBDialogPropList *pPropList;      // property list
+    int cbStructSize;                 // assigned at allocation time, the total size of this structure
 
-} WBDialogControl;
-\endcode
+    // unique per-control data members follow (see cbStructSize for validation)
+
+  } WBDialogControl;
+
+  * \endcode
+  *
+  * This data structure identifies a dialog control's properties.  For more information,
+  * see \ref WBDialogControl .  Typically, a dialog control will allocate a structure that is
+  * at LEAST the size of WBDialogControl.  Additional private data can then be stored following
+  * the 'cbStructSize' member, which will identify the ACTUAL size of the structure.
+  *
   * For each dialog control, a pointer to this structure is assigned to window property index 0, and can be
   * easily obtained using DLGGetDialogControlStruct() (preferred method)
   *
-  * /sa  __WB_DIALOG_CONTROL__ and WBDialogPropList
-*/
-/** \ingroup dlgctrl
-  * \struct __WB_DIALOG_CONTROL__
-  * \brief Structure identifying the properties of a dialog box control
-  *
-  * This data structure identifies a dialog control's properties.  For more information,
-  * see \ref WBDialogControl
+  * \sa  __WB_DIALOG_CONTROL__ and WBDialogPropList
 */
 typedef struct __WB_DIALOG_CONTROL__
 {
@@ -1267,9 +1278,13 @@ void DLGSetControlListSelectionValue(WBDialogControl *pCtrl, int iIndex, int iSe
   * The 'piBits' and 'nSize' parameters must indicate a memory block of sufficient size, or an error will be returned.
   * Use a NULL value of 'piBits' to obtain the necessary size of the array, if it is not known.
   * To determine if a specific bit is set, use a formula similar to the following\n
-\code
+  *
+  * \code
+
     piBits[(iIndex >> 32)] & (1 << (iIndex & 31)) ? TRUE : FALSE
-\endcode
+
+  * \endcode
+  *
   * where 'iIndex' represents the index of the bit you wish to query.
   *
   * Header File:  dialog_controls.h

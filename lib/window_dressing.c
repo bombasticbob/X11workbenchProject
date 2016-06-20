@@ -55,8 +55,12 @@
 #include <strings.h>
 #include <errno.h>
 #include <X11/Xlib.h>
+
 #include "window_dressing.h"
+#include "pixmap_helper.h"
 #include "conf_help.h"
+#include "draw_text.h"
+
 
 // also in window_helper.c
 #define GCAll (GCFunction | GCPlaneMask | GCForeground | GCBackground | GCLineWidth | \
@@ -76,10 +80,13 @@ static int iInitScrollColorFlag = 0;
 
 static void CheckInitScrollColors(void)
 {
+  // TODO:  consider freeing the colors with XFreeColors on exit
+  // TODO:  consider not even bothering with 'XAllocColor' and just use PXM_RGBToPixel()
+
   if(!iInitScrollColorFlag)
   {
     static const char *szBorder2="#FFFFFF", *szBorder2W="#C8C6C0", *szBorder3="#9C9A94"; // for 3D borders
-    char szFG[16], szBG[16], szBD[16], szHFG[16], szHBG[16], szAFG[16], szABG[16];
+    char szFG[16], szBG[16], szBD[16], szHFG[16], szHBG[16], szAFG[16], szABG[16]; // must be at least 14 characters
     static const char szFGName[]="Scrollbar.foreground";
     static const char szBGName[]="Scrollbar.background";
     static const char szHFGName[]="Scrollbar.highlightForeground";
@@ -94,21 +101,16 @@ static void CheckInitScrollColors(void)
     LOAD_COLOR0(szFGName,szFG) else LOAD_COLOR0("*Dialog.foreground",szFG) else LOAD_COLOR0("*Form.foreground", szFG)
      else LOAD_COLOR0("*WmDialogShell.foreground",szFG) else LOAD_COLOR0("*WmForm.foreground", szFG)
      else LOAD_COLOR("*foreground", szFG, "#000000");
-//    if(bUseStaticColors)
-//    {
-      LOAD_COLOR0(szBGName,szBG) else LOAD_COLOR0("*Dialog.background",szBG) else LOAD_COLOR0("*Form.background", szBG)
-       else LOAD_COLOR0("*WmDialogShell.background",szBG)
-       else LOAD_COLOR("*WmForm.background", szBG, "#dcdad5"); // default for gnome is dcdad5
-//    }
-//    else
-//    {
-//      LOAD_COLOR0(szBGName,szBG) else LOAD_COLOR0("*Window.background",szBG)
-//       else LOAD_COLOR("*background", szBG, "white");
-//    }
+
+    LOAD_COLOR0(szBGName,szBG) else LOAD_COLOR0("*Dialog.background",szBG) else LOAD_COLOR0("*Form.background", szBG)
+     else LOAD_COLOR0("*WmDialogShell.background",szBG)
+     else LOAD_COLOR("*WmForm.background", szBG, "#dcdad5"); // default for gnome is dcdad5
+
     LOAD_COLOR(szHFGName,szHFG,szFG);
     LOAD_COLOR(szHBGName,szHBG,szBG);
     LOAD_COLOR(szAFGName,szAFG,szFG);
     LOAD_COLOR(szABGName,szABG,szBG);
+
     LOAD_COLOR0(szBDName,szBD) else LOAD_COLOR0("*Dialog.border",szBD) else LOAD_COLOR0("*Form.border", szBD)
      else LOAD_COLOR0("*WmDialogShell.border",szBD) else LOAD_COLOR0("*WmForm.border", szBD)
      else LOAD_COLOR0("*borderColor", szBD)
@@ -138,6 +140,7 @@ static void CheckInitScrollColors(void)
     {
       XParseColor(WBGetDefaultDisplay(), colormap, szBorder2, &clrScrollBD2);
     }
+
     XAllocColor(WBGetDefaultDisplay(), colormap, &clrScrollBD2);
     XParseColor(WBGetDefaultDisplay(), colormap, szBorder3, &clrScrollBD3);
     XAllocColor(WBGetDefaultDisplay(), colormap, &clrScrollBD3);
@@ -479,7 +482,7 @@ int i1, i2;
 
 }
 
-void WBDrawBorderRect(Display *pDisplay, Window wID, GC gc,
+void WBDrawBorderRect(Display *pDisplay, Drawable wID, GC gc,
                       WB_GEOM *pgeomBorder, unsigned long lBorderColor)
 {
 XPoint xpt[5];
@@ -509,12 +512,11 @@ XPoint xpt[5];
   XDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
 }
 
-void WBDraw3DBorderRect(Display *pDisplay, Window wID, GC gc, WB_GEOM *pgeomBorder,
+void WBDraw3DBorderRect(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomBorder,
                         unsigned long lBorderColor1, unsigned long lBorderColor2)
 {
 XPoint xpt[4];
 XColor clr;
-//unsigned long lBorderColorAvg;
 int iR, iG, iB;
 
 
@@ -547,35 +549,37 @@ int iR, iG, iB;
 
   XDrawLines(pDisplay, wID, gc, xpt, 3, CoordModeOrigin);
 
-
-  // must use XQueryColor or pass in XColor pointers to get 'average' color
-  // between the two for the 'corner' pixels
+  // Use the RGB info to calculate an 'average' color for the corners
 
   bzero(&clr, sizeof(clr));
   clr.pixel = lBorderColor1;
-  XQueryColor(pDisplay, DefaultColormap(pDisplay, DefaultScreen(pDisplay)), &clr);
+
+  PXM_PixelToRGB(NULL, &clr);
+
   iR = (clr.flags & DoRed) ? (unsigned int)clr.red : 0;
   iG = (clr.flags & DoGreen) ? (unsigned int)clr.green : 0;
   iB = (clr.flags & DoBlue) ? (unsigned int)clr.blue : 0;
 
-//  WB_ERROR_PRINT("TEMPORARY 1 : %d %d %d %d \n", clr.pixel, iR, iG, iB);
-
   bzero(&clr, sizeof(clr));
   clr.pixel = lBorderColor2;
-  XQueryColor(pDisplay, DefaultColormap(pDisplay, DefaultScreen(pDisplay)), &clr);
+
+  PXM_PixelToRGB(NULL, &clr);
+
   iR += (clr.flags & DoRed) ? (unsigned int)clr.red : 0;
   iG += (clr.flags & DoGreen) ? (unsigned int)clr.green : 0;
   iB += (clr.flags & DoBlue) ? (unsigned int)clr.blue : 0;
 
-//  WB_ERROR_PRINT("TEMPORARY 2 : %d %d %d %d \n", clr.pixel, iR, iG, iB);
-
-
   bzero(&clr, sizeof(clr));
+
   clr.red = iR >> 1;
   clr.green = iG >> 1;
   clr.blue = iB >> 1;
 
-  XAllocColor(pDisplay, DefaultColormap(pDisplay, DefaultScreen(pDisplay)), &clr);
+  PXM_RGBToPixel(NULL, &clr); // TODO:  alloc the color as well?
+
+//  WB_ERROR_PRINT("TEMPORARY:  %s - average of %08xH and %08xH is %08xH (%d, %d, %d)\n", __FUNCTION__,
+//                 (unsigned int)lBorderColor1, (unsigned int)lBorderColor2,
+//                 (unsigned int)clr.pixel, clr.red, clr.green, clr.blue);
 
   XSetForeground(pDisplay, gc, clr.pixel);
 
@@ -589,42 +593,18 @@ int iR, iG, iB;
 
   XSetForeground(pDisplay, gc, lBorderColor1);
 
-  XFreeColors(pDisplay, DefaultColormap(pDisplay, DefaultScreen(pDisplay)),
-              &clr.pixel, 1, 0);
-
 }
 
-void WBDrawDashedRect(Display *pDisplay, Window wID, GC gc, WB_GEOM *pgeomRect, unsigned long lColor)
+void WBDrawDashedRect(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect, unsigned long lColor)
 {
 static const char dash_list[4]={1,2,2,1};
-//int i1;
-//XGCValues val;
 GC gc2;
 
 
   gc2 = WBGetWindowCopyGC2(wID, gc);
 
-//  bzero(&val, sizeof(val));
-//  i1 = XGetGCValues(pDisplay, gc, GCAll & ~(GCClipMask | GCDashOffset | GCDashList), &val);
-//
-//  if(!i1)  // zero on failure
-//  {
-//    WB_ERROR_PRINT("%s:%d - unable to get GC values, %d\n", __FUNCTION__, __LINE__, i1);
-//    for(i1=0; i1 < 32; i1++)
-//    {
-//      if(XGetGCValues(pDisplay, gc, 1L << i1, &val))
-//      {
-//        WB_ERROR_PRINT("TEMPORARY:  %d works\n", i1);
-//      }
-//    }
-//    return;
-//  }
-//
-//  gc2 = XCreateGC(pDisplay, wID, (GCFont | GCForeground | GCBackground), &val);
-
   if(gc2)
   {
-//    XChangeGC(pDisplay, gc2, GCAll & ~(GCClipMask | GCDashOffset | GCDashList), &val);
     WBDrawBorderRect(pDisplay, wID, gc2, pgeomRect, WhitePixel(pDisplay, DefaultScreen(pDisplay)));
     XSetDashes(pDisplay, gc2, 1, dash_list, 4);
     XSetLineAttributes(pDisplay, gc2, 1, LineOnOffDash, CapNotLast, JoinBevel);
@@ -640,12 +620,9 @@ GC gc2;
 }
 
 // this assumes WB_SCROLLINFO is valid.  TO make it so, call ListCalcVScrollBar or similar
-void WBPaintVScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Window wID,
+void WBPaintVScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable wID,
                        GC gc, WB_GEOM *pgeomClient)
 {
-//WB_GEOM geomBar, geomUp, geomDown, geomKnob;
-XPoint xpt[5];
-
   CheckInitScrollColors();
 
   // fill scrollbar with background color
@@ -677,44 +654,14 @@ XPoint xpt[5];
 
   // draw arrows
 
-  XSetForeground(pDisplay, gc, clrScrollFG.pixel);
-
-  xpt[0].x = pScrollInfo->geomVUp.x + (pScrollInfo->geomVUp.width >> 2) + (pScrollInfo->geomVUp.width >> 2);
-  xpt[0].y = pScrollInfo->geomVUp.y + (pScrollInfo->geomVUp.height >> 2);
-  xpt[1].x = pScrollInfo->geomVUp.x + (pScrollInfo->geomVUp.width >> 2);
-  xpt[1].y = xpt[0].y + (pScrollInfo->geomVUp.height >> 1) - 1;
-  xpt[2].x = pScrollInfo->geomVUp.x + pScrollInfo->geomVUp.width - 1 - (pScrollInfo->geomVUp.width >> 2);
-  xpt[2].y = xpt[1].y;
-  xpt[3].x = xpt[2].x - (pScrollInfo->geomVUp.width >> 2);
-  xpt[3].y = xpt[0].y;
-  xpt[4].x = xpt[0].x;
-  xpt[4].y = xpt[0].y;
-
-  XDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
-  XFillPolygon(pDisplay, wID, gc, xpt, 4, Convex, CoordModeOrigin);
-
-  xpt[0].x = pScrollInfo->geomVDown.x + (pScrollInfo->geomVDown.width >> 2) + (pScrollInfo->geomVDown.width >> 2);
-  xpt[0].y = pScrollInfo->geomVDown.y + pScrollInfo->geomVDown.height - 1 - (pScrollInfo->geomVDown.height >> 2);
-  xpt[1].x = pScrollInfo->geomVDown.x + (pScrollInfo->geomVUp.width >> 2);
-  xpt[1].y = xpt[0].y - (pScrollInfo->geomVDown.height >> 1) + 1;
-  xpt[2].x = pScrollInfo->geomVDown.x + pScrollInfo->geomVDown.width - 1 - (pScrollInfo->geomVDown.width >> 2);
-  xpt[2].y = xpt[1].y;
-  xpt[3].x = xpt[2].x - (pScrollInfo->geomVUp.width >> 2);
-  xpt[3].y = xpt[0].y;
-  xpt[4].x = xpt[0].x;
-  xpt[4].y = xpt[0].y;
-
-  XDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
-  XFillPolygon(pDisplay, wID, gc, xpt, 4, Convex, CoordModeOrigin);
+  WBDrawUpArrow(pDisplay, wID, gc, &(pScrollInfo->geomVUp), clrScrollFG.pixel);
+  WBDrawDownArrow(pDisplay, wID, gc, &(pScrollInfo->geomVDown), clrScrollFG.pixel);
 }
 
 // this assumes WB_SCROLLINFO is valid.  TO make it so, call ListCalcHScrollBar or similar
-void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Window wID,
+void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable wID,
                        GC gc, WB_GEOM *pgeomClient)
 {
-//WB_GEOM geomBar, geomLeft, geomRight, geomKnob;
-//XPoint xpt[5];
-
   CheckInitScrollColors();
 
   // fill scrollbar with background color
@@ -746,36 +693,458 @@ void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Window wID
 
   // draw arrows
 
-  XSetForeground(pDisplay, gc, clrScrollFG.pixel);
-
-// TODO this is copied from painting the vertical scroll bar - fix it for horizontal!
-//  xpt[0].x = pScrollInfo->geomVUp.x + (pScrollInfo->geomVUp.width >> 2) + (pScrollInfo->geomVUp.width >> 2);
-//  xpt[0].y = pScrollInfo->geomVUp.y + (pScrollInfo->geomVUp.height >> 2);
-//  xpt[1].x = pScrollInfo->geomVUp.x + (pScrollInfo->geomVUp.width >> 2);
-//  xpt[1].y = xpt[0].y + (pScrollInfo->geomVUp.height >> 1) - 1;
-//  xpt[2].x = pScrollInfo->geomVUp.x + pScrollInfo->geomVUp.width - 1 - (pScrollInfo->geomVUp.width >> 2);
-//  xpt[2].y = xpt[1].y;
-//  xpt[3].x = xpt[2].x - (pScrollInfo->geomVUp.width >> 2);
-//  xpt[3].y = xpt[0].y;
-//  xpt[4].x = xpt[0].x;
-//  xpt[4].y = xpt[0].y;
-//
-//  XDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
-//  XFillPolygon(pDisplay, wID, gc, xpt, 4, Convex, CoordModeOrigin);
-//
-//  xpt[0].x = pScrollInfo->geomVDown.x + (pScrollInfo->geomVDown.width >> 2) + (pScrollInfo->geomVDown.width >> 2);
-//  xpt[0].y = pScrollInfo->geomVDown.y + pScrollInfo->geomVDown.height - 1 - (pScrollInfo->geomVDown.height >> 2);
-//  xpt[1].x = pScrollInfo->geomVDown.x + (pScrollInfo->geomVUp.width >> 2);
-//  xpt[1].y = xpt[0].y - (pScrollInfo->geomVDown.height >> 1) + 1;
-//  xpt[2].x = pScrollInfo->geomVDown.x + pScrollInfo->geomVDown.width - 1 - (pScrollInfo->geomVDown.width >> 2);
-//  xpt[2].y = xpt[1].y;
-//  xpt[3].x = xpt[2].x - (pScrollInfo->geomVUp.width >> 2);
-//  xpt[3].y = xpt[0].y;
-//  xpt[4].x = xpt[0].x;
-//  xpt[4].y = xpt[0].y;
-//
-//  XDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
-//  XFillPolygon(pDisplay, wID, gc, xpt, 4, Convex, CoordModeOrigin);
+  WBDrawLeftArrow(pDisplay, wID, gc, &(pScrollInfo->geomHLeft), clrScrollFG.pixel);
+  WBDrawRightArrow(pDisplay, wID, gc, &(pScrollInfo->geomHRight), clrScrollFG.pixel);
 }
+
+
+void WBDrawLeftArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect, unsigned long lColor)
+{
+XPoint xpt[5];
+long lBG, lFG;
+
+  lBG = WBGetGCBGColor(pDisplay, gc);
+  lFG = WBGetGCFGColor(pDisplay, gc); // save color context
+
+  XSetForeground(pDisplay, gc, lColor);
+  XSetBackground(pDisplay, gc, lColor);
+
+  // LEFT ARROW
+  xpt[0].x = pgeomRect->x + (pgeomRect->width >> 2);
+  xpt[0].y = pgeomRect->y + (pgeomRect->height >> 2) + (pgeomRect->height >> 2);
+  xpt[1].x = xpt[0].x + (pgeomRect->width >> 1) - 1;
+  xpt[1].y = pgeomRect->y + (pgeomRect->height >> 2);
+  xpt[2].x = xpt[1].x;
+  xpt[2].y = pgeomRect->y + pgeomRect->height - 1 - (pgeomRect->height >> 2);
+  xpt[3].x = xpt[0].x;
+  xpt[3].y = xpt[2].y - (pgeomRect->height >> 2);
+  xpt[4].x = xpt[0].x;
+  xpt[4].y = xpt[0].y;
+
+  XDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
+  XFillPolygon(pDisplay, wID, gc, xpt, 5, /*Convex*/Nonconvex, CoordModeOrigin);
+
+  XSetForeground(pDisplay, gc, lFG);
+  XSetBackground(pDisplay, gc, lBG); // restore color context
+}
+
+void WBDrawUpArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect, unsigned long lColor)
+{
+XPoint xpt[5];
+long lBG, lFG;
+
+  lBG = WBGetGCBGColor(pDisplay, gc);
+  lFG = WBGetGCFGColor(pDisplay, gc); // save color context
+
+  XSetForeground(pDisplay, gc, lColor);
+  XSetBackground(pDisplay, gc, lColor);
+
+  xpt[0].x = pgeomRect->x + (pgeomRect->width >> 2) + (pgeomRect->width >> 2);
+  xpt[0].y = pgeomRect->y + (pgeomRect->height >> 2);
+  xpt[1].x = pgeomRect->x + (pgeomRect->width >> 2);
+  xpt[1].y = xpt[0].y + (pgeomRect->height >> 1) - 1;
+  xpt[2].x = pgeomRect->x + pgeomRect->width - 1 - (pgeomRect->width >> 2);
+  xpt[2].y = xpt[1].y;
+  xpt[3].x = xpt[2].x - (pgeomRect->width >> 2);
+  xpt[3].y = xpt[0].y;
+  xpt[4].x = xpt[0].x;
+  xpt[4].y = xpt[0].y;
+
+  XDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
+  XFillPolygon(pDisplay, wID, gc, xpt, 5, /*Convex*/Nonconvex, CoordModeOrigin);
+
+  XSetForeground(pDisplay, gc, lFG);
+  XSetBackground(pDisplay, gc, lBG); // restore color context
+}
+
+void WBDrawRightArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect, unsigned long lColor)
+{
+XPoint xpt[5];
+long lBG, lFG;
+
+  lBG = WBGetGCBGColor(pDisplay, gc);
+  lFG = WBGetGCFGColor(pDisplay, gc); // save color context
+
+  XSetForeground(pDisplay, gc, lColor);
+  XSetBackground(pDisplay, gc, lColor);
+
+  // RIGHT ARROW
+  xpt[0].x = pgeomRect->x + pgeomRect->width - 1 - (pgeomRect->width >> 2);
+  xpt[0].y = pgeomRect->y + (pgeomRect->height >> 2) + (pgeomRect->height >> 2);
+  xpt[1].x = xpt[0].x - (pgeomRect->width >> 1) + 1;
+  xpt[1].y = pgeomRect->y + (pgeomRect->height >> 2);
+  xpt[2].x = xpt[1].x;
+  xpt[2].y = pgeomRect->y + pgeomRect->height - 1 - (pgeomRect->height >> 2);
+  xpt[3].x = xpt[0].x;
+  xpt[3].y = xpt[2].y - (pgeomRect->height >> 2);
+  xpt[4].x = xpt[0].x;
+  xpt[4].y = xpt[0].y;
+
+  XDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
+  XFillPolygon(pDisplay, wID, gc, xpt, 5, /*Convex*/Nonconvex, CoordModeOrigin);
+
+  XSetForeground(pDisplay, gc, lFG);
+  XSetBackground(pDisplay, gc, lBG); // restore color context
+}
+
+void WBDrawDownArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect, unsigned long lColor)
+{
+XPoint xpt[5];
+long lBG, lFG;
+
+  lBG = WBGetGCBGColor(pDisplay, gc);
+  lFG = WBGetGCFGColor(pDisplay, gc); // save color context
+
+  XSetForeground(pDisplay, gc, lColor);
+  XSetBackground(pDisplay, gc, lColor);
+
+  xpt[0].x = pgeomRect->x + (pgeomRect->width >> 2) + (pgeomRect->width >> 2);
+  xpt[0].y = pgeomRect->y + pgeomRect->height - 1 - (pgeomRect->height >> 2);
+  xpt[1].x = pgeomRect->x + (pgeomRect->width >> 2);
+  xpt[1].y = xpt[0].y - (pgeomRect->height >> 1) + 1;
+  xpt[2].x = pgeomRect->x + pgeomRect->width - 1 - (pgeomRect->width >> 2);
+  xpt[2].y = xpt[1].y;
+  xpt[3].x = xpt[2].x - (pgeomRect->width >> 2);
+  xpt[3].y = xpt[0].y;
+  xpt[4].x = xpt[0].x;
+  xpt[4].y = xpt[0].y;
+
+  XDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
+  XFillPolygon(pDisplay, wID, gc, xpt, 5, /*Convex*/Nonconvex, CoordModeOrigin);
+
+  XSetForeground(pDisplay, gc, lFG);
+  XSetBackground(pDisplay, gc, lBG); // restore color context
+}
+
+
+// integer square root of a value 0-255
+static unsigned char isqrt(unsigned char iVal)
+{
+unsigned char aAnswers[256] =
+{
+  0,1,1,2,2,2,2,3,3,3,3,3,3,4,4,4,
+  4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,6,
+  6,6,6,6,6,6,6,6,6,6,6,7,7,7,7,7,
+  7,7,7,7,7,7,7,7,7,8,8,8,8,8,8,8,
+  8,8,8,8,8,8,8,8,8,9,9,9,9,9,9,9,
+  9,9,9,9,9,9,9,9,9,9,9,10,10,10,10,10,
+  10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11,
+  11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,
+  11,11,11,11,11,12,12,12,12,12,12,12,12,12,12,12,
+  12,12,12,12,12,12,12,12,12,12,12,12,12,13,13,13,
+  13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,
+  13,13,13,13,13,13,13,14,14,14,14,14,14,14,14,14,
+  14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,
+  14,14,14,15,15,15,15,15,15,15,15,15,15,15,15,15,
+  15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
+  15,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16
+};
+
+
+  return aAnswers[iVal & 0xff];
+}
+
+static unsigned char icos(unsigned char iVal)
+{
+unsigned char aAnswers[256] =
+{
+255,255,255,255,255,255,255,255,255,255,255,254,254,254,254,254,
+254,254,253,253,253,253,253,252,252,252,252,252,251,251,251,250,
+250,250,249,249,249,248,248,248,247,247,247,246,246,245,245,244,
+244,244,243,243,242,242,241,241,240,240,239,238,238,237,237,236,
+236,235,234,234,233,232,232,231,231,230,229,228,228,227,226,226,
+225,224,223,223,222,221,220,220,219,218,217,216,215,215,214,213,
+212,211,210,209,208,208,207,206,205,204,203,202,201,200,199,198,
+197,196,195,194,193,192,191,190,189,188,187,186,185,184,183,181,
+180,179,178,177,176,175,174,172,171,170,169,168,167,165,164,163,
+162,161,159,158,157,156,154,153,152,151,149,148,147,146,144,143,
+142,140,139,138,136,135,134,132,131,130,128,127,126,124,123,122,
+120,119,117,116,115,113,112,110,109,108,106,105,103,102,100,99,
+98,96,95,93,92,90,89,87,86,84,83,81,80,79,77,76,
+74,73,71,70,68,67,65,63,62,60,59,57,56,54,53,51,
+50,48,47,45,44,42,41,39,37,36,34,33,31,30,28,27,
+25,23,22,20,19,17,16,14,13,11,9,8,6,5,3,2
+};
+
+
+  return aAnswers[iVal & 0xff];
+}
+
+void WBDraw3DBorderTab(Display *pDisplay, Drawable dw, GC gc, WB_GEOM *pgeomOutline,
+                       int bFocus, unsigned long lFGColor, unsigned long lBGColor,
+                       unsigned long lBorderColor1, unsigned long lBorderColor2,
+                       unsigned long lHighlightColor,
+                       XFontStruct *pFont, XFontStruct *pBoldFont,
+                       Atom aGraphic, const char *szText)
+{
+XPoint xpt[13];
+XColor clrAvg, clrTemp;
+int i1, i2, iR, iG, iB, iY, iU, iV, iYBG;
+Region rgnClip;
+GC gc2;
+WB_RECT rctTemp;
+
+
+  // begin by creating a region that consists of my 'rounded rect' polygon
+
+  // create a rounded-corner trapezoid the encompasses the tab.  corner pixels will
+  // be averages of the border colors.
+
+  // lower left corner
+  xpt[0].x = pgeomOutline->x;
+  xpt[0].y = pgeomOutline->y + pgeomOutline->height + 1; // for clip rgn, I do this
+
+  // left side
+  xpt[1].x = xpt[0].x + 2; // slight trapezoid
+  xpt[1].y = pgeomOutline->y + 3;  // room for corner
+
+  // upper left corner
+  xpt[2].x = xpt[1].x + 1;
+  xpt[2].y = xpt[1].y - 1; // 45 degrees
+  xpt[3].x = xpt[2].x + 1;
+  xpt[3].y = xpt[2].y - 1; // again  
+  xpt[4].x = xpt[3].x + 1;
+  xpt[4].y = xpt[3].y - 1; // now we're "on point"
+
+  // top row
+  xpt[5].x = xpt[0].x + pgeomOutline->width - 5;
+  xpt[5].y = xpt[4].y;
+
+  // upper right corner
+  xpt[6].x = xpt[5].x + 1;
+  xpt[6].y = xpt[5].y + 1; // 45 degrees
+  xpt[7].x = xpt[6].x + 1;
+  xpt[7].y = xpt[6].y + 1; // 45 degrees
+  xpt[8].x = xpt[7].x + 1;
+  xpt[8].y = xpt[7].y + 1; // 45 degrees
+
+  // right side
+  xpt[9].x = pgeomOutline->x + pgeomOutline->width;
+  xpt[9].y = xpt[0].y; // same y as 1st point
+
+  xpt[10].x = xpt[0].x;
+  xpt[10].y = xpt[0].y; // close up the polygon
+
+  rgnClip = XPolygonRegion(xpt, 11, WindingRule);
+  if(rgnClip == None)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - unable to create polygon region\n", __FUNCTION__);
+    return;
+  }  
+
+  // create GC copy and select the clipping region
+
+  gc2 = WBCopyDrawableGC(pDisplay, dw, gc);
+
+  if(gc2 == None)
+  {
+    XDestroyRegion(rgnClip);
+
+    WB_ERROR_PRINT("ERROR:  %s - unable to create GC\n", __FUNCTION__);
+    return;
+  }
+
+  // select the clip region
+  XSetRegion(pDisplay, gc2, rgnClip);
+
+  if(bFocus)
+  {
+    // do the background color in the tab.  this will use the clip region to help me
+
+    clrTemp.pixel = lBGColor; // default background color
+    PXM_PixelToRGB(NULL, &clrTemp);
+
+    iR = clrTemp.red >> 8;
+    iG = clrTemp.green >> 8;
+    iB = clrTemp.blue >> 8;
+
+    PXM_RGBToYUV(iR, iG, iB, &iYBG, NULL, NULL); // get 'Y' for the background (assume grey)
+
+    i2 = 3 * (xpt[0].y - xpt[5].y - 2) / 5;
+
+//    WB_ERROR_PRINT("TEMPORARY:  %s - i2 is %d, from %d and %d\n", __FUNCTION__,
+//                   i2, xpt[0].y, xpt[5].y);
+
+    for(i1=xpt[5].y; i1 < xpt[0].y - 2; i1++)
+    {
+      XPoint xpt2[2];
+      int iR2 = abs(i1 - (xpt[5].y + i2));
+
+//      iR2 *= iR2;
+      iR2 = icos(iR2 * 232 / i2); // 255 would be pi/2, so go slightly less than that
+//      iR2 = isqrt(iR2);
+
+      clrTemp.pixel = lHighlightColor;
+      PXM_PixelToRGB(NULL, &clrTemp);
+
+      iR = clrTemp.red >> 8;
+      iG = clrTemp.green >> 8;
+      iB = clrTemp.blue >> 8;
+
+      PXM_RGBToYUV(iR, iG, iB, &iY, &iU, &iV);
+
+      iY = iYBG * 3 / 4 + ((384 - iYBG) * iR2) / 384; // allows brightness to drop to a bit less than the background's brightness
+
+      if(iY > 255)
+      {
+        iU = 128 + (iU - 128) * 255 / iY * 255 / iY;
+        iV = 128 + (iV - 128) * 255 / iY * 255 / iY;
+        iY = 255;
+      }
+
+      PXM_YUVToRGB(iY, iU, iV, &iR, &iG, &iB);
+
+      clrTemp.red = (iR << 8) + 128;
+      clrTemp.green = (iG << 8) + 128;
+      clrTemp.blue = (iB << 8) + 128;      
+      clrTemp.flags = DoRed | DoGreen | DoBlue;
+
+      PXM_RGBToPixel(NULL, &clrTemp);
+
+//      WB_ERROR_PRINT("TEMPORARY:  %s - YUV is %d, %d, %d, RGB is %d, %d, %d  for %lu (%08lxH)\n", __FUNCTION__,
+//                     iY, iU, iV,
+//                     clrTemp.red, clrTemp.green, clrTemp.blue, clrTemp.pixel, clrTemp.pixel);
+
+      XSetForeground(pDisplay, gc2, clrTemp.pixel); // select this color
+
+      xpt2[0].x = pgeomOutline->x + 1;
+      xpt2[0].y = i1;
+      xpt2[1].x = pgeomOutline->x + pgeomOutline->width - 2;
+      xpt2[1].y = xpt2[0].y;
+
+      if(i1 < xpt[5].y + 2) // corner hack, based on observation
+      {
+        xpt2[0].x += (xpt[5].y + 2) - i1;
+        xpt2[1].x -= (xpt[5].y + 2) - i1;
+      }
+
+      // draw the line
+      XDrawLines(pDisplay, dw, gc2, xpt2, 2, CoordModeOrigin); // stop at point 6 (don't paint 6 to 7)
+    }
+  }
+
+
+  // next, squeeze in the right/left edges of my points.  I've observed I need to do this
+  // as a hack, don't do the left squeeze for the 'focus' tab
+
+  if(!bFocus)
+  {
+    for(i1=0; i1 < 5; i1++)
+    {
+      xpt[i1].x ++;
+    }
+  }
+
+  for(i1=5; i1 < 10; i1++)
+  {
+    xpt[i1].x --;
+  }
+
+  if(!bFocus)
+  {
+    xpt[0].y -= 3; // one above 'bottom' (where I'll draw a line)
+  }
+  else
+  {
+    xpt[0].y -= 2;
+  }
+
+  xpt[9].y = xpt[0].y; // same y as 1st point
+
+  xpt[10].x = xpt[0].x; // re-close up polygon (again)
+  xpt[10].y = xpt[0].y; // close up the polygon
+
+
+  // make a copy of the GC
+
+  XSetForeground(pDisplay, gc2, lFGColor);
+  XSetBackground(pDisplay, gc2, lBGColor);
+
+  // Use the RGB info to calculate an 'average' color for the corner transition
+
+  bzero(&clrAvg, sizeof(clrAvg));
+  clrAvg.pixel = lBorderColor1;
+
+  PXM_PixelToRGB(NULL, &clrAvg);
+
+  iR = (clrAvg.flags & DoRed) ? (unsigned int)clrAvg.red : 0;
+  iG = (clrAvg.flags & DoGreen) ? (unsigned int)clrAvg.green : 0;
+  iB = (clrAvg.flags & DoBlue) ? (unsigned int)clrAvg.blue : 0;
+
+  bzero(&clrAvg, sizeof(clrAvg));
+  clrAvg.pixel = lBorderColor2;
+
+  PXM_PixelToRGB(NULL, &clrAvg);
+
+  iR += (clrAvg.flags & DoRed) ? (unsigned int)clrAvg.red : 0;
+  iG += (clrAvg.flags & DoGreen) ? (unsigned int)clrAvg.green : 0;
+  iB += (clrAvg.flags & DoBlue) ? (unsigned int)clrAvg.blue : 0;
+
+  bzero(&clrAvg, sizeof(clrAvg));
+
+  clrAvg.red = iR >> 1;
+  clrAvg.green = iG >> 1;
+  clrAvg.blue = iB >> 1;
+
+  PXM_RGBToPixel(NULL, &clrAvg); // TODO:  alloc the color as well?
+
+  // next, draw polygon using 3D colors
+
+  XSetForeground(pDisplay, gc2, lBorderColor1);
+  XDrawLines(pDisplay, dw, gc2, xpt, 7, CoordModeOrigin); // stop at point 6 (don't paint 6 to 7)
+
+  XSetForeground(pDisplay, gc2, lBorderColor2);
+  XDrawLines(pDisplay, dw, gc2, xpt + 8, 2, CoordModeOrigin); // stop at point 6 (don't paint 6 or 7)
+
+  if(bFocus)
+  {
+    // for non-focus, draw the bottom (7 to 8) using border color 2.  for focus, draw as background color
+
+    XSetForeground(pDisplay, gc2, lBGColor);
+  }
+
+  XDrawLines(pDisplay, dw, gc2, xpt + 9, 2, CoordModeOrigin); // the bottom line
+ 
+  // paint pixels 6 and 7 with the 'average' color
+  XSetForeground(pDisplay, gc2, clrAvg.pixel);
+  XDrawPoints(pDisplay, dw, gc2, xpt + 6, 2, CoordModeOrigin);
+
+  if(!bFocus)
+  {
+    // when not in focus, also do avg color for the first pixel.  this completes the 3D effect 'color transition'
+    XDrawPoints(pDisplay, dw, gc2, xpt, 1, CoordModeOrigin);
+  }
+
+
+
+  // TAB TEXT (TODO: image atom)
+
+  rctTemp.left = pgeomOutline->x;
+  rctTemp.top = pgeomOutline->y;
+  rctTemp.right = rctTemp.left + pgeomOutline->width;
+  rctTemp.bottom = rctTemp.top + pgeomOutline->height;
+
+  if(!szText)
+  {
+    szText = "{untitled}";
+  }
+
+  XSetForeground(pDisplay, gc2, lFGColor);
+
+  // for now just do centered text
+  DTDrawSingleLineText(pFont ? pFont : WBGetDefaultFont(),
+                       szText, pDisplay, gc, dw, 0, 0, &rctTemp,
+                       DTAlignment_HCENTER | DTAlignment_VCENTER);
+
+
+
+
+  XFreeGC(pDisplay, gc2);
+  XDestroyRegion(rgnClip);
+
+
+  WB_ERROR_PRINT("TEMPORARY:  %s - only partially implemented\n", __FUNCTION__);
+}
+
 
 

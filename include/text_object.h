@@ -56,12 +56,16 @@
 
 #include "window_helper.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif // __cplusplus
+
 
 // FILE TYPE CONSTANTS
 
 /** \ingroup text_object
   * \brief file types for TEXT_OBJECT
-  */
+**/
 enum _FileType_
 {
   FileType_MAKEFILE      = -1,
@@ -83,7 +87,7 @@ enum _FileType_
 
 /** \ingroup text_object
   * \brief line feed (line ending) types for TEXT_OBJECT
-  */
+**/
 enum _LineFeed_
 {
   LineFeed_NONE          = -1,  ///< single line
@@ -97,7 +101,7 @@ enum _LineFeed_
 
 /** \ingroup text_object
   * \brief select mode types for TEXT_OBJECT
-  */
+**/
 enum _SelectMode_
 {
   SelectMode_DEFAULT    = 0,    ///< DEFAULT (typically CHAR)
@@ -108,7 +112,7 @@ enum _SelectMode_
 
 /** \ingroup text_object
   * \brief Insert/Overwrite mode for TEXT_OBJECT
-  */
+**/
 enum _InsertMode_
 {
   InsertMode_DEFAULT     = 0,   ///< system default, usually 'insert'
@@ -118,7 +122,7 @@ enum _InsertMode_
 
 /** \ingroup text_object
   * \brief State flags for mouse/cursor 'drag' (i.e. selection)
-  */
+**/
 enum _DragState_
 {
   DragState_NONE         = 0,   ///< no drag in progress
@@ -127,23 +131,23 @@ enum _DragState_
 };
 
 /** \ingroup text_object
-  */
+**/
 #define HARD_TAB_CHAR '\xa0' /**< A 'hard tab' is represented internally by this character */
 
 /** \ingroup text_object
-  */
+**/
 #define DEFAULT_TAB_WIDTH 8 /**< the default width for a hard tab in a TEXT_OBJECT */
 
 /** \ingroup text_object
-  */
+**/
 #define AUTO_HSCROLL_SIZE 8 /**< the number of characters to auto-hscroll by to get the cursor inside the viewport */
 
 /** \ingroup text_object
-  */
+**/
 #define MIN_LINE_SPACING 2 /**< the minimum number of pixels by which lines are separated (normally will be 'descent / 2') */
 
 /** \ingroup text_object
-  */
+**/
 #define MIN_BORDER_SPACING 2 /**< the minimum number of pixels separating the text from the window border (when unspecified) */
 
 
@@ -251,18 +255,18 @@ struct _text_object_; // forward declaration
 
   } TEXT_OBJECT_VTABLE;
   * \endcode
-  */
+**/
 typedef struct _text_object_vtable_
 {
   /** \brief Call this prior to de-allocating memory to free up any internal objects or storage
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \return void
-    */
+  **/
   void (* destroy)(struct _text_object_ *pThis);
   /** \brief Call this to initialize or re-initialize an object.  Must call 'destroy' first for an existing object.
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \return void
-    */
+  **/
   void (* init)(struct _text_object_ *pThis);
 
   /** \brief Call this to assign the highlight colors.  Default colors are GC's BG and FG
@@ -270,7 +274,7 @@ typedef struct _text_object_vtable_
     * \param clrHFG The XColor for the highlighted foreground
     * \param clrHBG The XColor for the highlighted background
     * \return void
-    */
+  **/
   void (* highlight_colors)(struct _text_object_ *pThis, XColor clrHFG, XColor clrHBG);
 
   /** \brief Call this function to get all text, formatted so that it can be saved to a file
@@ -279,7 +283,7 @@ typedef struct _text_object_vtable_
     *
     * This function allocates a buffer, then copies all of the text to the buffer using
     * the specified line endings and other information.
-    */
+  **/
   char * (* get_text)(struct _text_object_ *pThis);
 
   /** \brief Call this function to re-assign all text in the control
@@ -292,7 +296,7 @@ typedef struct _text_object_vtable_
     * Typically this is called when a file is (re)loaded or when the 'caption' is changed for the control.
     * Calling this function will perform a number of related functions, such as cursor positioning.\n
     * You should manually force a re-draw of the control displaying the text.  It will not happen automatically.
-    */
+  **/
   void (* set_text)(struct _text_object_ *pThis, const char *szText, unsigned long cbLen);
 
   /** \brief Call this function to obtain the total number of rows for display purposes
@@ -304,7 +308,7 @@ typedef struct _text_object_vtable_
     * The return value is intended to assist scrolling the viewable area, so a final blank line must still
     * be counted.  Single-line text always returns a 1 unless the text is empty.  A zero is always returned
     * whenever there is no text in the object.  This allows you to detect an 'empty' text object.
-    */
+  **/
   int (* get_rows)(const struct _text_object_ *pThis);
   /** \brief Call this function to obtain the estimated column extent of the document.
     *
@@ -317,7 +321,7 @@ typedef struct _text_object_vtable_
     * changes to the text.\n
     * NOTE:  the pointer to the TEXT_OBJECT cannot be a 'const' in this case, since cached values may need
     * to be re-evaluated as part of the process of obtaining the desired information.
-    */
+  **/
   int (* get_cols)(struct _text_object_ *pThis);
 
   /** \brief Get the current linefeed type for the object
@@ -326,7 +330,7 @@ typedef struct _text_object_vtable_
     *
     * A file type of 0 is 'plain text'.  A file type of '-1' is 'Makefile' and by default, preserves hard tabs.
     * Other file types are defined as one of the 'file type' constants
-    */
+  **/
   int (* get_filetype)(const struct _text_object_ *pThis);
   /** \brief Set the current file type for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
@@ -335,7 +339,7 @@ typedef struct _text_object_vtable_
     *
     * A file type of 0 is 'plain text'.  A file type of '-1' is 'Makefile' and by default, preserves hard tabs.
     * Other file types are defined as one of the 'file type' constants
-    */
+  **/
   void (* set_filetype)(struct _text_object_ *pThis, int iLineFeed);
 
   /** \brief Get the current linefeed type for the object
@@ -343,7 +347,7 @@ typedef struct _text_object_vtable_
     * \return an integer indicating the current 'linefeed' type for end of line
     *
     * iLineFeed  values:  0 (single line)  1 (newline) 2 (return) 3 (crlf) 4 (lfcr)
-    */
+  **/
   int (* get_linefeed)(const struct _text_object_ *pThis);
   /** \brief Set the current linefeed type for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
@@ -351,31 +355,31 @@ typedef struct _text_object_vtable_
     * \return void
     *
     * iLineFeed  values:  0 (single line)  1 (newline) 2 (return) 3 (crlf) 4 (lfcr)
-    */
+  **/
   void (* set_linefeed)(struct _text_object_ *pThis, int iLineFeed);
 
   /** \brief Get the current insert mode for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \return an integer indicating the current insert mode
-    */
+  **/
   int (* get_insmode)(const struct _text_object_ *pThis);
   /** \brief Set the current insert mode for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param iInsMode An integer indicating the new insert mode
     * \return void
-    */
+  **/
   void (* set_insmode)(struct _text_object_ *pThis, int iInsMode);
 
   /** \brief Get the current selection mode for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \return an integer indicating the current selection mode
-    */
+  **/
   int (* get_selmode)(const struct _text_object_ *pThis);
   /** \brief Set the current selection mode for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param iSelMode An integer indicating the new selection mode
     * \return void
-    */
+  **/
   void (* set_selmode)(struct _text_object_ *pThis, int iSelMode);
 
   /** \brief Get the current tab type for the object
@@ -387,7 +391,7 @@ typedef struct _text_object_vtable_
     * NOTE:  Existing hard tabs within the text will be preserved even if a negative tab
     * type is selected, so long as the white space covered by the tab is not modified.\n
     * A tab type of zero uses the 'default' behavior for the application and file type.
-    */
+  **/
   int (* get_tab)(const struct _text_object_ *pThis);
   /** \brief Set the current tab type for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
@@ -399,38 +403,38 @@ typedef struct _text_object_vtable_
     * NOTE:  Existing hard tabs within the text will be preserved even if a negative tab
     * type is selected, so long as the white space covered by the tab is not modified.\n
     * A tab type of zero uses the 'default' behavior for the application and file type.
-    */
+  **/
   void (* set_tab)(struct _text_object_ *pThis, int iTab);
 
   /** \brief Get the current scroll mode for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \return an integer indicating the current scroll mode
-    */
+  **/
   int (* get_scrollmode)(const struct _text_object_ *pThis);
   /** \brief Set the current scroll mode for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param iSelMode An integer indicating the new selection mode
     * \return void
-    */
+  **/
   void (* set_scrollmode)(struct _text_object_ *pThis, int iScrollMode);
 
   /** \brief Get the current selection rectangle as WB_RECT
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param pRct A pointer to the destination WB_RECT, receives the return value.  'No select' returns {0,0,0,0}
     * \return void
-    */
+  **/
   void (* get_select)(const struct _text_object_ *pThis, WB_RECT *pRct);
   /** \brief Set the current selection rectangle as WB_RECT
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param pRct A const pointer to the source WB_RECT containing the new selection rectangle, or NULL for 'no selection'
     * \return void
-    */
+  **/
   void (* set_select)(struct _text_object_ *pThis, const WB_RECT *pRct);
 
   /** \brief Returns a non-zero value if there is currently a 'selection'
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \return A non-zero integer if the selection rectangle is valid and not empty, otherwise zero.
-    */
+  **/
   int (* has_select)(const struct _text_object_ *pThis);
 
   /** \brief get the current selection rectangle as WB_RECT
@@ -444,25 +448,25 @@ typedef struct _text_object_vtable_
     * for the 'special case' noted below\n
     * In the special case of *pRct == {0,0,0,0}, all of the text will be copied, regardless of the select mode, in a format
     * consistent with saving the text as a file, using the assigned line ending.
-    */
+  **/
   char* (* get_sel_text)(const struct _text_object_ *pThis, const WB_RECT *pRct);
 
   /** \brief Get the current row cursor for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \return an integer indicating the current row
-    */
+  **/
   int (* get_row)(const struct _text_object_ *pThis);
   /** \brief Set the current row cursor for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param iRow The row position, where 0 is the top row
     * \return void
-    */
+  **/
   void (* set_row)(struct _text_object_ *pThis, int iRow);
 
   /** \brief Get the current column cursor for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \return an integer indicating the current column (independent of hard tabs or end of line)
-    */
+  **/
   int (* get_col)(const struct _text_object_ *pThis);
   /** \brief Set the current column cursor for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
@@ -472,27 +476,27 @@ typedef struct _text_object_vtable_
     * Passing '-1' for the 'iCol' parameter will place the cursor on the first non-white-space character on the line (if any).\n
     * Passing '-2' for the 'iCol' parameter will place the cursor at the end of the line, excluding any trailing white space.\n
     * Passing any other negative value is the same as passing '0'.
-    */
+  **/
   void (* set_col)(struct _text_object_ *pThis, int iCol);
 
   /** \brief Delete the current selection assigned via 'set_select'
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \return void
-    */
+  **/
   void (* del_select)(struct _text_object_ *pThis);
   /** \brief Replace the current selection assigned via 'set_select' with new text
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param szText A pointer to the text to replace the selection with (NULL or "" effectively performs 'del_select')
     * \param cbLen The length of the text to replace the selection with (zero implies 'zero-byte terminated string' for szText)
     * \return void
-    */
+  **/
   void (* replace_select)(struct _text_object_ *pThis, const char *szText, unsigned long cbLen);
 
   /** \brief Delete 'n' characters from the current cursor.  Negative deletes BEFORE the cursor.  'newline' counts as 1 character.
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param nChar The number of characters to delete. Negative values delete BEFORE the cursor.  Zero does nothing.
     * \return void
-    */
+  **/
   void (* del_chars)(struct _text_object_ *pThis, int nChar); // delete 1 or more chars, negative deletes BEFORE cursor, 0 does nothing
   /** \brief Insert 'n' characters (including new lines) from the current cursor.
     * \param pThis A pointer to the TEXT_OBJECT structure
@@ -507,7 +511,7 @@ typedef struct _text_object_vtable_
     * insertion and converted to white space.  It is assumed that the length of each line in 'box' select mode will be
     * identical, but if it is not, the results will follow the length of the actual text.  If the 'box' select length
     * exceeds the last line of the file, the additional lines will be added as if in 'line' mode.
-    */
+  **/
   void (* ins_chars)(struct _text_object_ *pThis, const char *pChar, int nChar);
 
   /** \brief Indent selected text by 'n' columns
@@ -517,28 +521,28 @@ typedef struct _text_object_vtable_
     *
     * indents the selected text by 'n' columns.  Indent starts at the cursor and continues for each line within
     * the selected text.
-    */
+  **/
   void (* indent)(struct _text_object_ *pThis, int nCol);
 
   /** \brief Indicate whether an 'undo' operation is possible (mostly for menu UI)
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \return An integer indicating whether 'undo' is possible.  A non-zero value is 'TRUE', zero 'FALSE.
-    */
+  **/
   int (* can_undo)(struct _text_object_ *pThis);
   /** \brief Perform a single 'undo' operation
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \return void
-    */
+  **/
   void (* undo)(struct _text_object_ *pThis);
   /** \brief Indicate whether a 'redo' operation is possible (mostly for menu UI)
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \return An integer indicating whether 'undo' is possible.  A non-zero value is 'TRUE', zero 'FALSE.
-    */
+  **/
   int (* can_redo)(struct _text_object_ *pThis);
   /** \brief Perform a single 'redo' operation
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \return void
-    */
+  **/
   void (* redo)(struct _text_object_ *pThis);
 
   /** \brief Get the current viewport (in characters)\.  The return value is not relevant if the expose method has not (yet) been called.
@@ -548,7 +552,7 @@ typedef struct _text_object_vtable_
     * \return void
     *
     * The 'viewport' is the currently visible area (in characters).  It is independent of the cursor's row and column.
-    */
+  **/
   void (* get_view)(const struct _text_object_ *pThis, WB_RECT *pRct);
   /** \brief Set the current viewport (in characters)\. Only 'left' and 'top' are relevant if the expose method has not (yet) been called.
     *
@@ -557,7 +561,7 @@ typedef struct _text_object_vtable_
     * \return void
     *
     * The 'viewport' is the currently visible area (in characters).  It is independent of the cursor's row and column.
-    */
+  **/
   void (* set_view)(struct _text_object_ *pThis, const WB_RECT *pRct);
 
   /** \brief Begin a highlight block
@@ -570,7 +574,7 @@ typedef struct _text_object_vtable_
     * cursor motion will extend the highlight block.  A begin_highlight() will effectively do an end_mouse_drag()
     * but will not clear the current selection.  It is safe to call this function multiple times while selecting with
     * cursor keys from the keyboard; hence, a 'shift' cursor should call this every time to avoid state flag checks.
-    */
+  **/
   void (* begin_highlight)(struct _text_object_ *pThis);
   /** \brief End a highlight block
     * \param pThis A pointer to the TEXT_OBJECT structure
@@ -580,7 +584,7 @@ typedef struct _text_object_vtable_
     * This function is essentially a UI helper for cursor select.  Normally a keystroke that is NOT a cursor
     * motion will automatically end the highlighting.  Calling this function does not affect the highlighted area.
     * It is safe to call this function at any time, whether highlighting is taking place or not.
-    */
+  **/
   void (* end_highlight)(struct _text_object_ *pThis);
 
   // mouse conversion
@@ -598,7 +602,7 @@ typedef struct _text_object_vtable_
     * area to be extended, depending on the nature of the mouse click.  Use begin_mouse_drag() and end_mouse_drag()
     * to indicate if a mouse drag operation (highlight an area) is in progress.\n
     * Mouse clicks automatically do an end_highlight() and clear the highlight area if a 'drag' is not in progress.
-    */
+  **/
   void (* mouse_click)(struct _text_object_ *pThis, int iMouseXDelta, int iMouseYDelta, int iType, int iACS);
 
   /** \brief Begin a mouse 'drag' operation.
@@ -608,7 +612,7 @@ typedef struct _text_object_vtable_
     * This function is essentially a UI helper for mouse drag-select.  Call this function in response to
     * a WB_POINTER_DRAG notification, then call mouse_click() with the WB_POINTER_MOVE notifications.
     * When the WB_POINTER_DROP notification arrives, call end_mouse_drag() to complete the operation.
-    */
+  **/
   void (* begin_mouse_drag)(struct _text_object_ *pThis);
   /** \brief End a mouse 'drag' operation
     *
@@ -616,60 +620,60 @@ typedef struct _text_object_vtable_
     *
     * This function is essentially a UI helper for mouse drag-select.
     * It is safe to call this function at any time, whether highlighting is taking place or not.
-    */
+  **/
   void (* end_mouse_drag)(struct _text_object_ *pThis);
 
   // cursor motion
 
   /** \brief Move the current cursor position up one line
     * \param pThis A pointer to the TEXT_OBJECT structure
-    */
+  **/
   void (* cursor_up)(struct _text_object_ *pThis);
   /** \brief Move the current cursor position down one line
     * \param pThis A pointer to the TEXT_OBJECT structure
-    */
+  **/
   void (* cursor_down)(struct _text_object_ *pThis);
   /** \brief Move the current cursor position left one column
     * \param pThis A pointer to the TEXT_OBJECT structure
-    */
+  **/
   void (* cursor_left)(struct _text_object_ *pThis);
   /** \brief Move the current cursor position right one column
     * \param pThis A pointer to the TEXT_OBJECT structure
-    */
+  **/
   void (* cursor_right)(struct _text_object_ *pThis);
 
   /** \brief Move the current cursor position up one page
     * \param pThis A pointer to the TEXT_OBJECT structure
-    */
+  **/
   void (* page_up)(struct _text_object_ *pThis);
   /** \brief Move the current cursor position down one page
     * \param pThis A pointer to the TEXT_OBJECT structure
-    */
+  **/
   void (* page_down)(struct _text_object_ *pThis);
   /** \brief Move the current cursor position left one page
     * \param pThis A pointer to the TEXT_OBJECT structure
-    */
+  **/
   void (* page_left)(struct _text_object_ *pThis);
   /** \brief Move the current cursor position right one page
     * \param pThis A pointer to the TEXT_OBJECT structure
-    */
+  **/
   void (* page_right)(struct _text_object_ *pThis);
 
   /** \brief Move the cursor 'home' (left or BOL)
     * \param pThis A pointer to the TEXT_OBJECT structure
-    */
+  **/
   void (* cursor_home)(struct _text_object_ *pThis);
   /** \brief Move the cursor to 'end' (full doc width or EOL)
     * \param pThis A pointer to the TEXT_OBJECT structure
-    */
+  **/
   void (* cursor_end)(struct _text_object_ *pThis);
   /** \brief Move the cursor to the top line
     * \param pThis A pointer to the TEXT_OBJECT structure
-    */
+  **/
   void (* cursor_top)(struct _text_object_ *pThis);
   /** \brief Move the cursor to the last line
     * \param pThis A pointer to the TEXT_OBJECT structure
-    */
+  **/
   void (* cursor_bottom)(struct _text_object_ *pThis);
 
 
@@ -708,7 +712,7 @@ typedef struct _text_object_vtable_
     *
     * TODO:  a 'context text color' callback function that can be assigned either to the vtable,
     * or as a function pointer, in which the default text color would be the GC foreground color.
-    */
+  **/
   void (* do_expose)(struct _text_object_ *pThis, Display *pDisplay, Window wID,
                      GC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
                      XFontSet rFontSet);
@@ -720,7 +724,7 @@ typedef struct _text_object_vtable_
     * This function will alter the 'blink' state of the cursor, generating Expose events as needed
     * to re-paint it within the window.  An owning window should call this function using the time
     * period specified by the system settings, but ONLY AFTER at least one 'do_expose' call.
-    */
+  **/
   void (* cursor_blink)(struct _text_object_ *pThis, int bHasFocus);
 
 } TEXT_OBJECT_VTABLE;
@@ -728,7 +732,7 @@ typedef struct _text_object_vtable_
 
 /** \ingroup text_object
   * \brief returns the default vtable for a TEXT_OBJECT structure
-  */
+**/
 static __inline__ const TEXT_OBJECT_VTABLE *WBGetDefaultTextObjectVTable(void)
 {
 extern const TEXT_OBJECT_VTABLE WBDefaultTextObjectVTable;
@@ -737,7 +741,11 @@ extern const TEXT_OBJECT_VTABLE WBDefaultTextObjectVTable;
 }
 
 
+/** \ingroup text_object
+  * \brief The 'tag' for a TEXT_OBJECT structure
+**/
 #define TEXT_OBJECT_TAG (*((const unsigned int *)"WBTX"))
+
 
 /** \ingroup text_object
   * \brief 'base class' structure for TEXT_OBJECT
@@ -798,10 +806,9 @@ extern const TEXT_OBJECT_VTABLE WBDefaultTextObjectVTable;
 
     char *pDesc;               // descriptive text (optional, owner-maintained)
     char *pFileName;           // filename (optional, owner-maintained)
-
   } TEXT_OBJECT;
   * \endcode
-  */
+**/
 typedef struct _text_object_
 {
   const TEXT_OBJECT_VTABLE *vtable;  ///< method function pointers (similar to C++ virtual member functions)
@@ -863,7 +870,7 @@ typedef struct _text_object_
   * \brief 'TEXT_OBJECT' validator
   * \param pObj A const pointer to a (possible) TEXT_OBJECT structure
   * \return non-zero if the object is a valid TEXT_OBJECT, zero otherwise
-  */
+**/
 static __inline__ int WBIsValidTextObject(const TEXT_OBJECT *pObj)
 {
   return pObj && pObj->ulTag == TEXT_OBJECT_TAG;
@@ -876,7 +883,7 @@ static __inline__ int WBIsValidTextObject(const TEXT_OBJECT *pObj)
   *
   * Use this function to initialize a TEXT_OBJECT as an automatic variable or as part of an array.\n
   * Make sure you call the 'destroy' API function right before de-allocating.
-  */
+**/
 static __inline__ void WBInitializeTextObject(TEXT_OBJECT *pTextObject)
 {
   if(pTextObject)
@@ -925,7 +932,7 @@ static __inline__ void WBInitializeTextObject(TEXT_OBJECT *pTextObject)
   * To allocate a new structure, call WBAllocTextBuffer().  To free an allocated structure, call WBFreeTextBuffer().\n
   * The 'cached information' data members are maintained internally.  You should not alter them.  You can
   * re-evaluate them at any time by calling WBTextBufferLineChange() and WBTextBufferRefreshCache()
-  */
+**/
 typedef struct _text_buffer_
 {
   unsigned long nArraySize; ///< allocated size of aLines array
@@ -950,7 +957,7 @@ typedef struct _text_buffer_
   * \param pBuf Optional initializer text.  Can be NULL or 'blank', which will pre-allocate space for a default number of lines
   * \param cbBufSize Length of data pointed to by 'pBuf'.  Zero implies zero-byte terminated string
   * \return A 'malloc'd pointer to a TEXT_BUFFER object.  Use 'WBFreeTextBuffer' to free it safely.
-  */
+**/
 TEXT_BUFFER * WBAllocTextBuffer(const char *pBuf, unsigned int cbBufSize);
 /** \ingroup text_object
   * \brief Re-allocator for TEXT_BUFFER object
@@ -958,14 +965,14 @@ TEXT_BUFFER * WBAllocTextBuffer(const char *pBuf, unsigned int cbBufSize);
   * \param ppBuf A pointer to a TEXT_BUFFER pointer that may be re-assigned (as needed).
   * \param nLinesToAdd The number of additional lines that need to be added [or have space reserved for]
   * \return A non-zero value on error, or zero on success
-  */
+**/
 int WBCheckReAllocTextBuffer(TEXT_BUFFER **ppBuf, int nLinesToAdd);
 /** \ingroup text_object
   * \brief Re-allocator for TEXT_BUFFER object, returns ZERO on success.  Pointer may be modified (or not).
   *
   * \param pBuf A pointer to a TEXT_BUFFER that has been previously allocated.  It assumes that valid 'aLines' entries contain pointers allocated via 'WBAlloc'
   * \return void
-  */
+**/
 void WBFreeTextBuffer(TEXT_BUFFER *pBuf);
 
 /** \ingroup text_object
@@ -981,7 +988,7 @@ void WBFreeTextBuffer(TEXT_BUFFER *pBuf);
   * For complex edits, use WBTextBufferRefreshCache().\n
   * If you join a pair of lines, call this function once for the deleted line, then again
   * for the new (joined) line.
-  */
+**/
 void WBTextBufferLineChange(TEXT_BUFFER *pBuf, unsigned long nLine, int nNewLen);
 /** \ingroup text_object
   * \brief Text buffer 'cached information' refresh function
@@ -995,7 +1002,7 @@ void WBTextBufferLineChange(TEXT_BUFFER *pBuf, unsigned long nLine, int nNewLen)
   * You should call this function following an 'undo' or other complex edit operation,
   * in lieu of WBTextBufferLineChange().  Also, for single-line edits, it may be better
   * to ALWAYS use this function.
-  */
+**/
 void WBTextBufferRefreshCache(TEXT_BUFFER *pBuf);
 
 
@@ -1004,7 +1011,7 @@ void WBTextBufferRefreshCache(TEXT_BUFFER *pBuf);
   *
   * \param nSize The length of memory being requested
   * \return A pointer to the allocated buffer, always aligned on a 'pointer size' boundary.  Do NOT overrun the buffer!
-  */
+**/
 void *WBAlloc(int nSize);
 
 /** \ingroup sub_alloc
@@ -1012,7 +1019,7 @@ void *WBAlloc(int nSize);
   *
   * \param pBuf A pointer to the previously sub-allocated memory
   * \return void
-  */
+**/
 void WBFree(void *pBuf);
 
 /** \ingroup sub_alloc
@@ -1021,12 +1028,12 @@ void WBFree(void *pBuf);
   * \param pBuf A pointer to the previously sub-allocated memory
   * \param nNewSize The desired 'new' size of the memory block
   * \return A pointer to the new allocated memory block, or NULL on error.  If the return value is NOT NULL, the previous pointer becomes invalid.
-  */
+**/
 void * WBReAlloc(void *pBuf, int nNewSize);
 
 /** \ingroup sub_alloc
   * \brief High performance memory sub-allocator 'trash masher' - call periodically to minimize wasted memory
-  */
+**/
 void WBSubAllocTrashMasher(void);
 
 
@@ -1041,7 +1048,7 @@ void WBSubAllocTrashMasher(void);
   *
   * This is being implemented as an object, similar to a C++ class with virtual member functions,
   * for the purpose of being able to re-assign the vtable and thereby overload its functionality.
-  */
+**/
 TEXT_OBJECT *WBTextObjectConstructor(unsigned long cbStructSize, const char *szText, unsigned long cbLen, Window wIDOwner);
 
 
@@ -1052,9 +1059,12 @@ TEXT_OBJECT *WBTextObjectConstructor(unsigned long cbStructSize, const char *szT
   * \return void
   *
   * Use this function to SAFELY destroy an object allocated using WBTextObjectConstructor
-  */
+**/
 void WBTextObjectDestructor(TEXT_OBJECT *pObj);
 
+#ifdef __cplusplus
+};
+#endif // __cplusplus
 
 #endif // _TEXT_OBJECT_H_INCLUDED_
 

@@ -267,23 +267,29 @@ typedef HANDLE WB_MUTEX;        // equivalent to a mutex handle
 
 #include <X11/xpm.h>
 
+// no need for doxygen doc comments here, see '!defined(__DOXYGEN__)' above
+// these definitions are for when libXpm is being used
 #define XPM_ATTRIBUTES XpmAttributes
 #define XPM_CREATE_PIXMAP_FROM_DATA(A,B,C,D,E,F) XpmCreatePixmapFromData(A,B,C,D,E,F)
 #define XPM_FREE_ATTRIBUTES(pAttr) XpmFreeAttributes(pAttr)
 
-#else // X11WORKBENCH_TOOLKIT_HAVE_XPM or __DOXYGEN__
+#else // !X11WORKBENCH_TOOLKIT_HAVE_XPM or __DOXYGEN__
 
 /** \ingroup pixmap
-  * \typedef typedef struct _XPM_ATTRIBUTES_ XPM_ATTRIBUTES
+  * \struct _XPM_ATTRIBUTES_
+  * \copydoc XPM_ATTRIBUTES
+**/
+/** \ingroup pixmap
+  * \typedef XPM_ATTRIBUTES
   * \brief Compatibility structure for use with MyLoadPixmapFromData() whenever libXpm is not in use.
   *
-  * When libXpm is in use, XPM_ATTRIBUTES becomes a #define for XpmAttributes, the structure used
+  * When libXpm is in use, XPM_ATTRIBUTES becomes a \#define for XpmAttributes, the structure used
   * by XpmCreatePixmapFromData().  Because so many elements are not needed, MyLoadPixmapFromData()
   * uses this scaled-down version when libXpm is not available.
   *
   * When libXpm is NOT in use, the follow structure is defined:
   *
-\code
+  * \code
 
   typedef struct _XPM_ATTRIBUTES_
   {
@@ -293,26 +299,21 @@ typedef HANDLE WB_MUTEX;        // equivalent to a mutex handle
 
   } XPM_ATTRIBUTES;
 
-\endcode
+  * \endcode
   *
   * When libXpm IS in use, the following macro is defined:
   *
-\code
+  * \code
 
   #define XPM_ATTRIBUTES XpmAttributes
 
-\endcode
-  *
-**/
-
-/** \ingroup pixmap
-  * \struct _XPM_ATTRIBUTES_
-  * \brief Compatibility structure for use with MyLoadPixmapFromData() whenever libXpm is not in use.
+  * \endcode
   *
   * This structure is a scaled-down version of the standard X11 structure 'XpmAttributes', and is defined
   * ONLY when libXpm is not in use (that is, the configure script did not discover it).  Only those
   * structure members that are needed by this toolkit have been defined.\n
-  * For more information, see \ref XPM_ATTRIBUTES and \ref MyLoadPixmapFromData()
+  * For more information, see MyLoadPixmapFromData()
+  *
 **/
 typedef struct _XPM_ATTRIBUTES_
 {
@@ -326,7 +327,6 @@ typedef struct _XPM_ATTRIBUTES_
 
 
 /** \ingroup pixmap
-  * \fn int MyLoadPixmapFromData(Display *pDisplay, Window wID, char *aData[], Pixmap *pPixmap, Pixmap *pMask, XPM_ATTRIBUTES *pAttr)
   * \brief Alternate for XpmCreatePixmapFromData() when libXpm is not present
   *
   * \param pDisplay A pointer to the display to use when creating the pixmaps
@@ -350,7 +350,6 @@ int MyLoadPixmapFromData(Display *pDisplay, Window wID, char *aData[],
                          Pixmap *pPixmap, Pixmap *pMask, XPM_ATTRIBUTES *pAttr);
 
 /** \ingroup pixmap
-  * \def XPM_CREATE_PIXMAP_FROM_DATA
   * \brief Platform helper macro to create a pixmap from data
   *
   * \param A A pointer to the Display
@@ -367,7 +366,6 @@ int MyLoadPixmapFromData(Display *pDisplay, Window wID, char *aData[],
 #define XPM_CREATE_PIXMAP_FROM_DATA(A,B,C,D,E,F) MyLoadPixmapFromData(A,B,C,D,E,F)
 
 /** \ingroup pixmap
-  * \def XPM_FREE_ATTRIBUTES
   * \brief Platform helper macro to free XPM_ATTRIBUTES filled in by XPM_CREATE_PIXMAP_FROM_DATA()
   *
   * \param pAttr A pointer to the XPM_ATTRIBUTES that was filled in by a successful call to XPM_CREATE_PIXMAP_FROM_DATA()
@@ -467,7 +465,8 @@ void my_qsort_r(void *base, int nmemb, int size, void *thunk,
   * Use this wrapper macro to properly declare a compare function for \ref QSORT_R,
   * similar to the following example:
   *
-\code
+  * \code
+
   DECLARE_SORT_FUNCTION(MySort,pThunk,pParam1,pParam2)
   {
     const char **pStringArray = (const char **)pThunk; // the real data
@@ -480,8 +479,12 @@ void my_qsort_r(void *base, int nmemb, int size, void *thunk,
 
     return strcmp(pStringArray[*pP1],pStringArray[*pP2]);
   }
-\endcode
+
+  * \endcode
   *
+  * this helps resolve the known platform differences in qsort_r() for POSIX systems
+  *
+  * \sa QSORT_R
 **/
 #define DECLARE_SORT_FUNCTION(fn_name,p0,p1,p2) int fn_name(void *p0, const void *p1, const void *p2)
 
@@ -496,7 +499,8 @@ void my_qsort_r(void *base, int nmemb, int size, void *thunk,
   * \param compar The comparison function, declared using DECLARE_SORT_FUNCTION
   *
   * Use this UNIVERSALLY whenever you need to use qsort_r(), as it is platform independent and
-  * deals with the incompatibilities associated with the BSD version and the Linux version.
+  * deals with the incompatibilities associated with the BSD version and the Linux version, as
+  * well as implementing qsort_r() for systems that do not support it directly.
 **/
 #define QSORT_R(base,nmemb,size,thunk,compar) my_qsort_r((base),(nmemb),(size),(thunk),(compar))
 

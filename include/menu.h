@@ -81,8 +81,11 @@ extern "C" {
 **/
 
 
+/** \ingroup menu
+  * \struct __WBMenuItem__
+  * \copydoc WBMenuItem
+**/
 /** \typedef WBMenuItem
-  * \struct  __WBMenuItem__
   * \ingroup menu
   * \brief structure for managing menu items
   *
@@ -113,7 +116,7 @@ extern "C" {
 
   * \endcode
   *
-  * \sa \ref \_\_WBMenu "WBMenu"
+  * \sa WBMenu
   *
 **/
 typedef struct __WBMenuItem__
@@ -137,8 +140,12 @@ typedef struct __WBMenuItem__
 
 } WBMenuItem;
 
+
+/** \ingroup menu
+  * \struct __WBMenu
+  * \copydoc WBMenu
+**/
 /** \typedef WBMenu
-  * \struct  __WBMenu
   * \ingroup menu
   * \brief structure for managing menu items
   *
@@ -163,7 +170,7 @@ typedef struct __WBMenuItem__
 
   * \endcode
   *
-  * \sa \ref \_\_WBMenuItem\_\_ "WBMenuItem"
+  * \sa WBMenuItem
   *
 **/
 typedef struct __WBMenu

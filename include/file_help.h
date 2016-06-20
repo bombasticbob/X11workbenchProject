@@ -94,8 +94,12 @@ extern "C" {
   * make a backup copy of an existing file, get a file's type or permissions, or canonicalize a file name.\n
 **/
 
-
 /** \ingroup file_help_buf
+  * \struct __file_help_buf__
+  * \copydoc file_help_buf_t
+**/
+/** \ingroup file_help_buf
+  * \typedef file_help_buf_t
   * \brief basic 'buffered I/O' object structure for 'FileBuf' APIs
   *
   * This structure is intended to assist implementing buffered I/O for files
@@ -105,7 +109,8 @@ extern "C" {
   * also be possible to construct a \ref file_help_buf_t object from a
   * memory buffer as well as from a text file.
   *
-\code
+  * \code
+
   typedef struct __file_help_buf__
   {
     struct __file_help_buf__ *pPrev; // pointer to 'previous' item in linked list (NULL for owner object)
@@ -118,7 +123,8 @@ extern "C" {
     char **ppLineBuf;                // array of pointers to beginning of each line (malloc'd TODO: make it part of 'cData'?)
     char cData[sizeof(char *)];      // the data itself (aligned to size of a pointer)
   } file_help_buf_t;
-\endcode
+
+  * \endcode
   *
   * TODO:  'ppLineBuf' should point to an area within cData.  If 'pNext' is valid, subsequent lines
   * could be pointed to by the 'ppLineBuf' within the structure pointed to by 'pNext'.  In this
@@ -143,6 +149,8 @@ typedef struct __file_help_buf__
 } file_help_buf_t;
 
 /** \ingroup file_help_buf
+  * \enum __file_help_buf_flags__
+  * \hideinitializer
   * \brief bit flags for \ref file_help_buf_t 'iFlags' member
   *
   * These are the bit flag definitions for the \ref file_help_buf_t 'iFlags' member

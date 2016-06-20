@@ -92,9 +92,13 @@ typedef struct _CONF_FILE_
 static const char * const *argv_copy = NULL;
 static int argc_copy = 0;
 
+static CHXSettings *pXSettings = NULL;
+
+
 // PROTOTYPES
 
 static void __settings_cleanup(void);
+
 
 
 // INLINE UTILITIES
@@ -192,6 +196,8 @@ void CHOnExit(void)
 
 
 // OLD version - uses XResourceManagerSring and XScreenResourceString (deprecated)
+// this version typically won't return anything useful any more.
+
 int CHGetResourceString_Old(Display *pDisplay, const char *szIdentifier, char *szData, int cbData)
 {
 char *pData;
@@ -324,49 +330,148 @@ int iRval = -1, iLen;
 }
 
 
+static const char * TranslateColorRequest(const char *szIdentifier)
+{
+int iLen;
+
+  if(szIdentifier[0] != '*')
+  {
+    // is it one of the color names I might return?
+
+    if(!strcmp(szIdentifier, "fg_color") ||
+       !strcmp(szIdentifier, "bg_color") ||
+       !strcmp(szIdentifier, "text_color") ||
+       !strcmp(szIdentifier, "base_color") ||
+       !strcmp(szIdentifier, "selected_fg_color") ||
+       !strcmp(szIdentifier, "selected_bg_color") ||
+       !strcmp(szIdentifier, "tooltip_fg_color") ||
+       !strcmp(szIdentifier, "tooltip_bg_color"))
+    {
+//      WB_ERROR_PRINT("TEMPORARY:  %s - returning %s 'pass through'\n", __FUNCTION__, szIdentifier);
+      return szIdentifier;
+    }
+
+    // TODO:  any OTHER pre-qualifiers?  or is returning 'NULL' correct?
+    //        perhaps having the suffix '_color' ?
+
+    return NULL;
+  }
+
+  // SPECIAL entries come first
+
+  // menu colors slightly different
+
+  if(!strcmp(szIdentifier, "*Menu.activeForeground"))
+  {
+    return "selected_fg_color";
+  }
+
+  if(!strcmp(szIdentifier, "*Menu.activeBackground"))
+  {
+    return "selected_bg_color";
+  }
+
+  // and text box and list box use 'input' colors
+
+  if(!strcmp(szIdentifier, "*Text.foreground") ||
+     !strcmp(szIdentifier, "*List.foreground") ||
+     !strcmp(szIdentifier, "*Combo.foreground"))
+  {
+    return "text_color";
+  }
+
+  if(!strcmp(szIdentifier, "*Text.background") ||
+     !strcmp(szIdentifier, "*List.background") ||
+     !strcmp(szIdentifier, "*Combo.background"))
+  {
+    return "base_color";
+  }
+
+
+  // and then the (other) generic ones
+
+  iLen = strlen(szIdentifier);
+
+  if(iLen >= 11 &&
+     (iLen == 11 || szIdentifier[iLen - 11] == '.') &&
+     !strcmp(szIdentifier + iLen - 10, "foreground"))
+  {
+    return "fg_color";
+  }
+
+  if(iLen >= 11 &&
+     (iLen == 11 || szIdentifier[iLen - 11] == '.') &&
+     !strcmp(szIdentifier + iLen - 10, "background"))
+  {
+    return "bg_color";
+  }
+
+  if(iLen >= 7 &&
+     (iLen == 7 || szIdentifier[iLen - 7] == '.') &&
+     !strcmp(szIdentifier + iLen - 6, "border"))
+  {
+    return "fg_color"; // TODO:  return NULL instead?
+  }
+
+  if(iLen >= 12 &&
+     (iLen == 12 || szIdentifier[iLen - 12] == '.') &&
+     !strcmp(szIdentifier + iLen - 11, "borderColor"))
+  {
+    return "fg_color"; // TODO:  return NULL instead? or actual color?
+  }
+
+  if(iLen >= 17 &&
+     (iLen == 17 || szIdentifier[iLen - 17] == '.') &&
+     !strcmp(szIdentifier + iLen - 16, "activeForeground"))
+  {
+    return "text_color"; // instead of 'fg_color'
+  }
+
+  if(iLen >= 17 &&
+     (iLen == 17 || szIdentifier[iLen - 17] == '.') &&
+     !strcmp(szIdentifier + iLen - 16, "activeBackground"))
+  {
+    return "base_color"; // "bg_color"; - TODO:  derive this maybe?
+  }
+
+  if(iLen >= 17 &&
+     (iLen == 17 || szIdentifier[iLen - 17] == '.') &&
+     !strcmp(szIdentifier + iLen - 16, "selectForeground"))
+  {
+    return "selected_fg_color";
+  }
+
+  if(iLen >= 17 &&
+     (iLen == 17 || szIdentifier[iLen - 17] == '.') &&
+     !strcmp(szIdentifier + iLen - 16, "selectBackground"))
+  {
+    return "selected_bg_color";
+  }
+
+  if(iLen >= 20 &&
+     (iLen == 20 || szIdentifier[iLen - 20] == '.') &&
+     !strcmp(szIdentifier + iLen - 19, "highlightForeground"))
+  {
+    return "selected_fg_color";
+  }
+
+  if(iLen >= 20 &&
+     (iLen == 20 || szIdentifier[iLen - 20] == '.') &&
+     !strcmp(szIdentifier + iLen - 19, "highlightBackground"))
+  {
+    return "selected_bg_color";
+  }
+
+  // TODO:  others (like tooltips) - might return  text_color, base_color, tooltip_fg_color, tooltip_bg_color
+
+
+  return NULL; // not recognized
+}
+
 
 int CHGetResourceString(Display *pDisplay, const char *szIdentifier, char *szData, int cbData)
 {
 int iRval = -1;//, iFormat;
-//unsigned long cbData0;
-//void *pData;
-//Atom a_XSETTINGS_Sn, a_XSETTINGS_SETTINGS, a_MANAGER;
-//Atom aType, aTARGET;
-
-
-
-#if 0 // TODO:  implement an XSETTINGS (gnome-settings-manager) 'collection' object and query it
-
-// NOTE:  so far gnome-settings-manager doesn't provide anything really useful except the theme name
-//        and everything else is either cloned from or implemented as the old-style resource manager
-
-{
-static int iOnce = 0;
-if(!iOnce)
-{
-Atom XA_CLIPBOARD, XA_CLIPBOARD_MANAGER;
-  iOnce = 1;
-
-//  a_MANAGER = XInternAtom(pDisplay, "MANAGER", False);
-  a_XSETTINGS_Sn = XInternAtom(pDisplay, "_XSETTINGS_S0", False);
-  a_XSETTINGS_SETTINGS = XInternAtom(pDisplay, "_XSETTINGS_SETTINGS", False);
-//  aTARGET = XInternAtom(pDisplay, "TARGET", False);
-//  XA_CLIPBOARD=XInternAtom(pDisplay, "CLIPBOARD", False);
-//  XA_CLIPBOARD_MANAGER=XInternAtom(pDisplay, "CLIPBOARD_MANAGER", False);
-
-  pData = CHGetSelectionData(pDisplay, a_XSETTINGS_Sn, a_XSETTINGS_SETTINGS, a_XSETTINGS_SETTINGS, &aType, &iFormat, &cbData0);
-
-  if(pData)
-  {
-    WBDebugDump("TEMPORARY, return from CHGetSelectionData", pData, cbData0);
-  }
-  else
-  {
-    WB_ERROR_PRINT("TEMPORARY:  didn't work\n");
-  }
-}
-}
-#endif // 0
 
   // TODO:  use XSETTINGS first, then resource manager
   // TODO:  see listres and appres and the 'X TOOLKIT' resource management system
@@ -381,7 +486,104 @@ Atom XA_CLIPBOARD, XA_CLIPBOARD_MANAGER;
 // http://developer.gnome.org/integration-guide/stable/startup-notification.html.en
 // http://standards.freedesktop.org/startup-notification-spec/startup-notification-latest.txt
 
+  if(WB_LIKELY(pXSettings))
+  {
+    const CHXSetting *pXS;
+    
+    // mapping the string accordingly
+    
+    pXS = CHGetXSetting(pXSettings->pDisplay, szIdentifier); // exact match.
 
+    if(!pXS)
+    {
+      // color schemes are stored hierarchically - look in Gtk/ColorScheme for now
+
+      const char *pTemp = TranslateColorRequest(szIdentifier);
+      
+      if(pTemp && *pTemp)
+      {
+//        WB_ERROR_PRINT("TEMPORARY:  %s - found color %s from %s\n", __FUNCTION__, pTemp, szIdentifier);
+
+        pXS = CHGetXSetting(pXSettings->pDisplay, "Gtk/ColorScheme"); // get color scheme info
+
+        if(pXS && pXS->iType == XSettingsTypeString)
+        {
+          int iLen0 = strlen(pTemp);
+          const char *p1 = pXS->uData.szData;
+          // format is "colorname=#colordef\n"
+
+          while(*p1)
+          {
+            const char *p2 = p1;
+
+            p1 = p2;
+            
+            while(*p1 && *p1 != '\n')
+            {
+              p1++;
+            }
+
+//            WB_ERROR_PRINT("TEMPORARY:  %s - %-.*s\n", __FUNCTION__, p1 - p2, p2);
+
+            if(!memcmp(p2, pTemp, iLen0) && p2[iLen0] == ':')
+            {
+              p2 = p2 + iLen0 + 1;
+              iLen0 = p1 - p2;
+
+              if(iLen0 >= cbData)
+              {
+                iLen0 = cbData - 1;
+              }
+              if(iLen0 > 0)
+              {
+                memcpy(szData, p2, iLen0);
+              }
+
+              szData[iLen0] = 0;
+              return iLen0;
+            }
+
+            if(*p1 == '\n')
+            {
+              p1++;
+            }
+          }
+        }        
+      
+        pXS = NULL; // not found if it gets here
+      }
+    }
+
+    if(pXS)
+    {
+      if(pXS->iType == XSettingsTypeInteger)
+      {
+        iRval = snprintf(szData, cbData, "%d", pXS->uData.iData);
+      }
+      else if(pXS->iType == XSettingsTypeString)
+      {
+        iRval = strlen(pXS->uData.szData);
+
+        if(iRval >= cbData)
+        {
+          iRval = cbData - 1;
+        }
+
+        if(iRval > 0)
+        {
+          memcpy(szData, pXS->uData.szData, iRval);
+        }
+
+        szData[iRval] = 0;
+      }
+      else
+      {
+        iRval = -1; // for now... (later try and fix this)
+      }
+    }
+
+//    iRval = something
+  }
 
   if(iRval < 0)  // i.e. "not found"
   {
@@ -1515,8 +1717,6 @@ typedef struct __XSETTINGS_DATA_STRING__
 } __attribute__((__packed__)) XSETTINGS_DATA_STRING;
 
 
-static CHXSettings *pXSettings = NULL;
-
 const CHXSettings * CHGetXSettings(Display *pDisplay)
 {
   return pXSettings;  // for now, just do this (if NULL do I call CHSettingsRefresh ?)
@@ -1550,32 +1750,113 @@ void CHSettingsRefresh(Display *pDisplay)
 // NOTE:  so far gnome-settings-manager doesn't provide anything really useful except the theme name
 //        and everything else is either cloned from or implemented as the old-style resource manager
 
-int i1, iFormat, /*iRval,*/ nItems, cbSize, cbNameLen, cbStrLen;
-unsigned long cbData0;
+int i1, iLen, nLen, iFormat, nItems, cbSize, cbNameLen, cbStrLen;
+//unsigned long cbData0;
 void *pData;
+unsigned long cbLeft, nI;
 char *pCur, *pDataEnd, *pXSCur, *pXSEnd;
 Atom a_XSETTINGS_Sn, a_XSETTINGS_SETTINGS, aType;
-//Atom aTARGET, a_MANAGER, aFormat;
-//Atom XA_CLIPBOARD, XA_CLIPBOARD_MANAGER;
+Window wOwn;
 XSETTINGS_HEADER *pHdr;
 XSETTINGS_DATAHDR *pDHdr;
 char tbuf[256];
 
 
-//  a_MANAGER = XInternAtom(pDisplay, "MANAGER", False);
 //  aTARGET = XInternAtom(pDisplay, "TARGET", False);
+//  a_MANAGER = XInternAtom(pDisplay, "MANAGER", False);
 //  XA_CLIPBOARD=XInternAtom(pDisplay, "CLIPBOARD", False);
 //  XA_CLIPBOARD_MANAGER=XInternAtom(pDisplay, "CLIPBOARD_MANAGER", False);
   a_XSETTINGS_Sn = XInternAtom(pDisplay, "_XSETTINGS_S0", False);
   a_XSETTINGS_SETTINGS = XInternAtom(pDisplay, "_XSETTINGS_SETTINGS", False);
 
-  aType = a_XSETTINGS_SETTINGS; // what I expect to get
+  // see https://specifications.freedesktop.org/xsettings-spec/xsettings-spec-0.5.html
 
-  pData = WBGetSelectionData(pDisplay, a_XSETTINGS_Sn, &aType, &iFormat, &cbData0);
+  XGrabServer(pDisplay); // required by above documentation
+  wOwn = XGetSelectionOwner(pDisplay, a_XSETTINGS_Sn);
+
+  if(wOwn == None)
+  {
+    XUngrabServer(pDisplay);
+    WB_ERROR_PRINT("%s:%d - %s unable to retrieve XSETTINGS data (no owner)\n",
+                   __FILE__, __LINE__, __FUNCTION__);
+    return;
+  }
+
+  // read the property now
+
+  pData = NULL;
+  aType = None; //a_MANAGER;
+  iFormat = 32;
+  nI = 0;
+  cbLeft = 0;
+
+  if(XGetWindowProperty(pDisplay, wOwn, a_XSETTINGS_SETTINGS, 0, 0, False,
+                        AnyPropertyType, &aType, &iFormat, &nI, &cbLeft, (unsigned char **)&pData))
+  {
+    XUngrabServer(pDisplay);
+    WB_ERROR_PRINT("%s:%d - %s unable to retrieve XSETTINGS data (XSETTINGS_SETTINGS)(a)\n",
+                   __FILE__, __LINE__, __FUNCTION__);
+    return;
+  }
 
   if(pData)
   {
-//    WBDebugDump("TEMPORARY, return from WBGetSelectionData", pData, cbData0);
+    XFree(pData);
+    pData = NULL;
+  }
+
+  // is this the actual data, or a return that says "do it incrementally" ?
+
+  if(aType == aINCR) // incremental
+  {
+    XUngrabServer(pDisplay);
+    WB_ERROR_PRINT("%s:%d - %s unable to retrieve XSETTINGS data (INCR)\n",
+                   __FILE__, __LINE__, __FUNCTION__);
+    return;
+  }
+
+  nLen = iLen = cbLeft; // the RAW length (in bytes)
+
+  if(iFormat == 16)
+  {
+    nLen /= 2;
+  }
+  else if(iFormat == 32)
+  {
+    nLen /= 4;
+  }
+
+  // now get it for reals
+
+  if(XGetWindowProperty(pDisplay, wOwn, a_XSETTINGS_SETTINGS, 0, nLen, False,
+                        AnyPropertyType, &aType, &iFormat, &nI, &cbLeft, (unsigned char **)&pData)
+     || !pData)
+  {
+    XUngrabServer(pDisplay);
+    WB_ERROR_PRINT("%s:%d - %s unable to retrieve XSETTINGS data (XSETTINGS_SETTINGS)(b)\n",
+                   __FILE__, __LINE__, __FUNCTION__);
+    return;
+  }                        
+
+  XUngrabServer(pDisplay); // MUST do this or else bad things happen
+
+
+  if(pData)
+  {
+    if(aType != a_XSETTINGS_SETTINGS)
+    {
+#ifndef NO_DEBUG
+      char *p1 = XGetAtomName(pDisplay, aType);
+      WB_ERROR_PRINT("TEMPORARY:  %s:%d - %s returned type %d (%s)\n",
+                     __FILE__, __LINE__, __FUNCTION__, (int)aType, p1);
+      if(p1)
+      {
+        XFree(p1);
+      }
+#endif // NO_DEBUG
+
+      // TODO:  is this an error??
+    }
   }
   else
   {
@@ -1588,7 +1869,7 @@ char tbuf[256];
   // first part is __XSETTINGS_HEADER__ header
   pHdr = (XSETTINGS_HEADER *)pData;
   pCur = (char *)(pHdr + 1);
-  pDataEnd = (char *)pData + cbData0;
+  pDataEnd = (char *)pData + iLen;//cbData0;
 
   if(pCur >= pDataEnd)
   {
@@ -2545,12 +2826,12 @@ int i1, nSettings;
         break;
 
       case XSettingsTypeString:
-        if(pXSettings->aData[i1].iLen > 32)
-        {
-          WBDebugPrint("  \"%-.32s ...\n",
-                        pXSettings->aData[i1].uData.szData);
-        }
-        else
+//        if(pXSettings->aData[i1].iLen > 32)
+//        {
+//          WBDebugPrint("  \"%-.32s ...\n",
+//                        pXSettings->aData[i1].uData.szData);
+//        }
+//        else
         {
           WBDebugPrint("  \"%s\"\n",
                         pXSettings->aData[i1].uData.szData);

@@ -834,12 +834,6 @@
   * more generic functionality.
 */
 
-/** \defgroup printer Printer utility functions
-  *
-  * Utility functions for sending prepared output to a printer, querying printer capabilities,
-  * and listing available printers.
-*/
-
 /** \defgroup font Font Utilities
   * GC Utility functions for font selection and modification
   *
@@ -862,6 +856,14 @@
   * support for 'Xft' fonts and rendering is currently 'reserved for future implementation'.
   * Current support includes use of the 'Xmb' versions of the API for multi-byte character
   * strings, though actual 'core' font support for UTF-8 characters seems to be a bit limited.
+*/
+
+/** \defgroup window_dressing 'Window Dressing' Graphics Drawing Utilities
+  * GC Utility functions for drawing 'Window Dressing', i.e. various standard windows components
+  *
+  * GC Utility functions for drawing various standard window components, collectively known here
+  * as 'Window Dressing'.  This includes scroll bars, 3D effects, rectangles, tabs, buttons, and
+  * other 'standard' components of modern GUI interfaces.
 */
 
 /** \defgroup text_object Text Editing Utilities and Objects
@@ -887,6 +889,12 @@
   * with performance.  The 'edit text' utilities are designed for hyper-efficient editing of extremely large text files.\n
   * Since I have seen 'malloc a boatload of tiny memory fragments' cause PERFORMANCE PROBLEMS in the past, I want to avoid that.
   */
+
+/** \defgroup printer Printer utility functions
+  *
+  * Utility functions for sending prepared output to a printer, querying printer capabilities,
+  * and listing available printers.
+*/
 
 // this one is last
 

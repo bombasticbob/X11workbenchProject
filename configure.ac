@@ -22,11 +22,13 @@ AC_PROG_LN_S
 # --enable-release (default has debugging enabled)
 # --enable-noopt (default is optimization enabled)
 # --enable-libXpm (default is NOT to link to libXpm)
+# --enable-fatalwarn (default is warnings NOT fatal)
+
 
 AC_ARG_ENABLE(release,
               [  --enable-release        CUSTOM - Turn off all debugging for release version],
               [case "${enableval}" in
-               yes) release=true ;;
+               yes) release=true ; AC_MSG_RESULT([CONFIGURE INFORMATION:  building a RELEASE version]) ;;
                no)  release=false ;;
                *) AC_MSG_ERROR(bad value ${enableval} for --enable-release) ;;
                esac],
@@ -35,7 +37,7 @@ AC_ARG_ENABLE(release,
 AC_ARG_ENABLE(noopt,
               [  --enable-noopt          CUSTOM - removes optimized code, useful for debug],
               [case "${enableval}" in
-               yes) noopt=true ;;
+               yes) noopt=true ; AC_MSG_WARN([code optimization disabled; for debug only]) ;;
                no)  noopt=false ;;
                *) AC_MSG_ERROR(bad value ${enableval} for --enable-noopt) ;;
                esac],
@@ -44,14 +46,26 @@ AC_ARG_ENABLE(noopt,
 AC_ARG_ENABLE(libXpm,
               [  --enable-libXpm         CUSTOM - use libXpm, rather than the (faster) internal implementation],
               [case "${enableval}" in
-               yes)  libXpm=true ;;
+               yes)  libXpm=true ; AC_MSG_WARN([linking with libXpm - this could impact application performance]) ;;
                no)   libXpm=false ;;
                *) AC_MSG_ERROR(bad value ${enableval} for --enable-libXpm) ;;
                esac],
               [libXpm=false])
 
+AC_ARG_ENABLE(fatalwarn,
+              [  --enable-fatalwarn      CUSTOM - cause warnings to be treated as errors],
+              [case "${enableval}" in
+               yes)  fatalwarn=true ; AC_MSG_RESULT([CONFIGURE INFORMATION:  Warnings are now fatal, treated as errors]) ;;
+               no)   fatalwarn=false ;;
+               *) AC_MSG_ERROR(bad value ${enableval} for --enable-fatalwarn) ;;
+               esac],
+              [fatalwarn=false])
+
+
 AM_CONDITIONAL(NO_DEBUG, test x$release = xtrue)
 AM_CONDITIONAL(NO_OPT, test x$noopt = xtrue)
+AM_CONDITIONAL(FATAL_WARN, test x$fatalwarn = xtrue)
+
 
 local_incdir="\$(top_srcdir)/include"
 local_xpmdir="\$(top_srcdir)/xpm"
@@ -110,7 +124,7 @@ AC_CHECK_LIB(dl, dlopen, test_need_ldl=true)
 
 AC_CHECK_FUNC(malloc_usable_size, [AC_DEFINE(HAVE_MALLOC_USABLE_SIZE,[1],[whether or not malloc_usable_size is available] ) ])
 
-
+############################################################################################
 #    qsort_r - definition for GNU C and BSD differ, other platforms may not have it at all
 #              best to use libc version if available; otherwise, internal implementation
 
@@ -170,9 +184,10 @@ if test "$ac_cv_func_qsort_r" == yes ; then
     ] )
     AC_LANG_POP([C])
 else
-  AC_MSG_WARN([using internal qsort_r implementation])
+  AC_MSG_WARN([qsort_r not compatible; using internal qsort_r implementation])
 fi
 
+############################################################################################
 
 AC_C_CONST
 AC_HEADER_STDC
@@ -209,10 +224,15 @@ esac
 AM_CONDITIONAL(IS_CYGWIN, test x$is_cygwin = xtrue)
 AM_CONDITIONAL(NOT_CYGWIN, test x$is_cygwin = xfalse)
 
-# XPM library (program will use its own implementation when libXpm is not available)
+########################
+## LIBRARY LINKAGE STUFF
+########################
 
+# XPM library (program will use its own implementation when libXpm is not available)
+# note that this conditional defines the linkage, not the library include symbols
 AM_CONDITIONAL(HAVE_XPM_LIB, test x$test_have_xpm = xtrue )
 
+# additional library linkages
 AM_CONDITIONAL(NEED_LRT, test x$test_need_lrt = xtrue)
 AM_CONDITIONAL(NEED_LDL, test x$test_need_ldl = xtrue)
 

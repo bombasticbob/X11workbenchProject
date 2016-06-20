@@ -123,7 +123,7 @@
   *
 **/
 static int InternalCalcIdealBounds(XFontStruct *pFont, DT_WORDS *pWords, int iTabWidth, unsigned int iTabOrigin,
-                                   const WB_RECT *prcSource, WB_RECT *prcDest, int iAlignment);
+                                   const WB_RECT *prcSource, WB_RECT *prcDest, int iAlignment, int iStartLine, int iEndLine);
 
 
 static void InternalDebugDumpWords(DT_WORDS *pWords);
@@ -690,8 +690,18 @@ DT_WORDS * DTGetWordsFromText(XFontStruct *pFont, const char *szText, int iAlign
 
         pRval->aWords[pRval->nCount].pText = NULL;
         pRval->aWords[pRval->nCount].nLength = 1;
-        pRval->aWords[pRval->nCount].iIsWhiteSpace = 0;
-        pRval->aWords[pRval->nCount].iIsLineFeed = 1;
+
+        if(iAlignment & DTAlignment_SINGLELINE) // treat line feed as white space
+        {
+          pRval->aWords[pRval->nCount].iIsWhiteSpace = 1;
+          pRval->aWords[pRval->nCount].iIsLineFeed = 0;
+        }
+        else
+        {
+          pRval->aWords[pRval->nCount].iIsWhiteSpace = 0;
+          pRval->aWords[pRval->nCount].iIsLineFeed = 1;
+        }
+
         pRval->aWords[pRval->nCount].iIsTab = 0;
         pRval->aWords[pRval->nCount].iX = -1;
         pRval->aWords[pRval->nCount].iY = -1;
@@ -824,7 +834,10 @@ int DTCalcIdealBounds(XFontStruct *pFont, const char *szText, int iTabWidth, uns
                       const WB_RECT *prcSource, WB_RECT *prcDest, int iAlignment)
 {
 int iRval;
-DT_WORDS *pWords = DTGetWordsFromText(pFont, szText, iAlignment);
+DT_WORDS *pWords;
+
+
+  pWords = DTGetWordsFromText(pFont, szText, iAlignment);
 
   if(!pWords)
   {
@@ -836,7 +849,7 @@ DT_WORDS *pWords = DTGetWordsFromText(pFont, szText, iAlignment);
 
 //  InternalDebugDumpWords(pWords);
 
-  iRval = InternalCalcIdealBounds(pFont, pWords, iTabWidth, iTabOrigin, prcSource, prcDest, iAlignment);
+  iRval = InternalCalcIdealBounds(pFont, pWords, iTabWidth, iTabOrigin, prcSource, prcDest, iAlignment, 0, -1);
 
   free(pWords);
 
@@ -922,12 +935,14 @@ DT_WORD *pW;
 //  * prcSource A pointer to the 'source' bounding rectangle in which the text is intended to fit
 //  * prcDest A pointer to the 'destination' bounding rectangle, based on the actual text size
 //  * iAlignment The desired text alignment, one or more of the DTAlignment bit flags
+//  * iStartLine A zero-based index for the first line on which to start calculating things
+//  * iEndLine A zero-based index for the last line on which to start calculating things (-1 for 'all')
 //  * zero if the text will fit within prcSource, -1 error, or 1 to indicate that prcDest is larger than prcSource
 
 static int InternalCalcIdealBounds(XFontStruct *pFont, DT_WORDS *pWords, int iTabWidth, unsigned int iTabOrigin,
-                                   const WB_RECT *prcSource, WB_RECT *prcDest, int iAlignment)
+                                   const WB_RECT *prcSource, WB_RECT *prcDest, int iAlignment, int iStartLine, int iEndLine)
 {
-int iFontWidth, iFontHeight, iLineSpacing;  // average font width/height and line spacing
+int iFontWidth, iFontHeight, iFontAscent, iLineSpacing;  // average font width/height and line spacing
 int iHPos, iHPos0, iMaxLen, iLines;
 int i1, i2, i3;
 //const char *p1;
@@ -969,11 +984,19 @@ DT_WORD *pW, *pW2;
 //  WB_ERROR_PRINT("%s - TEMPORARY:  bounds rectangle is INITIALLY %d,%d,%d,%d\n",
 //                 __FUNCTION__, rctBounds.left, rctBounds.top, rctBounds.right, rctBounds.bottom);
 
+  // TODO:  make use of iStartLine and iEndLine - for now "do all" every time so I can avoid a re-write
 
   // get a few things straight 'round here
 
-  iFontWidth = DTGetTextWidth(pFont, " ", 1);  // width of a single space
+  iFontWidth = WBFontAvgCharWidth(WBGetDefaultDisplay(), pFont);
+
+  if(!iFontWidth)
+  {
+    iFontWidth = DTGetTextWidth(pFont, " ", 1);  // width of a single space
+  }
+
   iFontHeight = pFont->ascent + pFont->descent;
+  iFontAscent = pFont->ascent; // cache for performance
 
   // for now, line spacing equals 1/2 descent or 2 pixels
   iLineSpacing = pFont->descent / 2;
@@ -1119,8 +1142,8 @@ do_the_tab:
         iLines++;  // indicate at least one line of printable stuff
       }
 
-      pW->iX = iHPos - iHPos0;        // relative X position
-      pW->iY = iLines * iFontHeight;  // relative Y position for 'top of text'
+      pW->iX = iHPos - iHPos0;             // relative X position
+      pW->iY = (iLines - 1) * iFontHeight + iFontAscent;  // relative Y position for 'base of text'
 
       iHPos += pW->iWidth;
     }
@@ -1133,15 +1156,31 @@ do_the_tab:
 
   // Now I know the current (unmodified) text extents.  Let's see what they SHOULD be
 
+//  WB_ERROR_PRINT("TEMPORARY:  %s - iHPos=%d, iMaxLen=%d, iLines=%d, iFontHeight=%d, *=%d\n", __FUNCTION__,
+//                 iHPos, iMaxLen, iLines, iFontHeight, (iLines * iFontHeight));
+
   rctBounds.left = rctSource.left;
   rctBounds.top  = rctSource.top;
-  rctBounds.right = rctBounds.left + iMaxLen;
+  rctBounds.right = /*rctBounds.left +*/ iMaxLen;
   rctBounds.bottom = rctBounds.top + (iLines * iFontHeight);
+
+//  WB_ERROR_PRINT("TEMPORARY:  %s - rctSource %d,%d,%d,%d  rctBounds: %d,%d,%d,%d\n", __FUNCTION__,
+//                 rctSource.left, rctSource.top, rctSource.right, rctSource.bottom,
+//                 rctBounds.left, rctBounds.top, rctBounds.right, rctBounds.bottom);
 
   if(iLines > 1)
   {
     rctBounds.bottom += (iLines - 1) * iLineSpacing; // inter-line spacing
   }
+
+#ifndef NO_DEBUG
+
+  if(rctBounds.top < rctSource.top || rctBounds.bottom > rctSource.bottom)
+  {
+    WB_ERROR_PRINT("WARNING:  %d - source rectangle too small, alignment flags may not work\n", __FUNCTION__);
+  }
+
+#endif // NO_DEBUG
 
   if(rctBounds.right <= rctSource.right &&
      rctBounds.bottom <= rctSource.bottom)
@@ -1173,6 +1212,9 @@ it_fits:
         {
           case DTAlignment_HJUSTIFY: // treat like 'center' for now
           case DTAlignment_HCENTER:
+//            WB_ERROR_PRINT("TEMPORARY:  %s - here I am, %d, %d, %d, %d\n", __FUNCTION__,
+//                           rctSource.left, rctSource.right, rctBounds.left, rctBounds.right);
+
             i1 = rctSource.right - rctBounds.right;
             i1 -= (i1 >> 1); // so that it's balanced properly, do it THIS way
             rctBounds.left += i1;
@@ -1205,17 +1247,17 @@ it_fits:
           rctBounds.bottom = rctSource.bottom;
           break;
         case DTAlignment_VCENTER:
-          i1 = (rctSource.bottom - rctBounds.bottom) >> 1;
+          i1 = ((rctSource.bottom - rctBounds.bottom + 1) >> 1) - 1; // favors being slightly closer to top
           rctBounds.top += i1;
           rctBounds.bottom += i1;
           break;
 
         case DTAlignment_VCENTERASCENT:  // only works properly with single line
           i2 = pFont->descent >> 1; // 1/2 ascent is top + a / 2; 1/2 font is top + (a + d) / 2; diff is d / 2
-          i1 = (rctSource.bottom - rctBounds.bottom) >> 1;
-          if(i1 >= i2) // subtracting i2 won't exceed 'top'
+          i1 = ((rctSource.bottom - rctBounds.bottom + 1) >> 1) - 1; // favors being slightly closer to top
+          i1 -= i2;
+          if(i1 > 0) // subtracting i2 from i1 didn't make it negative
           {
-            i1 -= i2;
             rctBounds.top += i1;
             rctBounds.bottom += i1;
           }
@@ -1223,10 +1265,10 @@ it_fits:
 
         case DTAlignment_VCENTERBASELINE:
           i2 = (pFont->ascent - pFont->descent) >> 1; //  ascent is top + a; 1/2 font is top + (a + d) / 2; diff is (a - d) / 2
-          i1 = (rctSource.bottom - rctBounds.bottom) >> 1;
-          if(i1 >= i2) // adding i2 won't exceed 'bottom'
+          i1 = ((rctSource.bottom - rctBounds.bottom + 1) >> 1) - 1; // favors being slightly closer to top
+          i1 += i2;
+          if(i1 < rctSource.bottom) // adding i2 won't exceed 'bottom'
           {
-            i1 += i2;
             rctBounds.top += i1;
             rctBounds.bottom += i1;
           }
@@ -1257,7 +1299,8 @@ it_fits:
 
   if(rctSource.right > 0 && // if prcSource is NULL, rctSource.right will be zero
      rctBounds.right > rctSource.right &&
-     rctBounds.bottom <= rctSource.bottom)
+     rctBounds.bottom <= rctSource.bottom &&
+     !(iAlignment & DTAlignment_NO_WORD_WRAP)) // disable this if I'm bit allowing word wrap
   {
     iMaxLen = 0;
     iHPos0 = iHPos = rctSource.left;
@@ -1438,7 +1481,7 @@ do_the_tab2:
         }
 
         pW->iX = iHPos - iHPos0;        // relative X position
-        pW->iY = iLines * iFontHeight;  // relative Y position for 'top of text'
+        pW->iY = (iLines - 1) * iFontHeight + iFontAscent;  // relative Y position for 'base of text'
 
         if(iHPos + pW->iWidth > rctSource.right) // word is "too wide"
         {
@@ -1545,7 +1588,7 @@ void DTDrawSingleLineText(XFontStruct *pFont, const char *szText, Display *pDisp
 XGCValues xgc;
 int iAvgChar
 
-  iAvgChar = DTGetTextWidth(pFont, " ", 1);  // width of 1 space for text border (TODO:  RTL text)
+  iAvgChar = WBFontAvgCharWidth(pDisplay, pFont); // was DTGetTextWidth(pFont, " ", 1);  // width of 1 space for text border (TODO:  RTL text)
 
   // height pFont->max_bounds.ascent + pFont->max_bounds.descent + 2;
 
@@ -1560,6 +1603,9 @@ int iAvgChar
   END_XCALL_DEBUG_WRAPPER
 #endif // 0
   // TODO:  implement
+
+  DTDrawMultiLineText(pFont, szText, pDisplay, gc, dw, iTabWidth, iTabOrigin, prcBounds,
+                      iAlignment | DTAlignment_SINGLELINE | DTAlignment_NO_WORD_WRAP);
 }
 
 void DTDrawMultiLineText(XFontStruct *pFont, const char *szText, Display *pDisplay, GC gc, Drawable dw,
@@ -1585,6 +1631,11 @@ XFontSet fSet;
     }
   }
 
+  if(iAlignment & DTAlignment_SINGLELINE)
+  {
+    iAlignment |= DTAlignment_NO_WORD_WRAP; // make sure
+  }
+
   fSet = WBFontSetFromFont(pDisplay, pFont);
 
   if(fSet == None)
@@ -1597,7 +1648,7 @@ XFontSet fSet;
   // get a few things straight 'round here
 
 // NOTE:  iFontWidth and iFontHeight not being used; commented out because of linux gcc warnings
-//  iFontWidth = DTGetTextWidth(pFont, " ", 1);  // width of a single space
+//  iFontWidth = WBFontAvgCharWidth(pDisplay, pFont); // was DTGetTextWidth(pFont, " ", 1);  // width of a single space
 //  iFontHeight = pFont->ascent + pFont->descent;
 
   pWords = DTGetWordsFromText(pFont, szText, iAlignment);
@@ -1618,7 +1669,7 @@ XFontSet fSet;
 //                 __FUNCTION__, rcDest.left, rcDest.top, rcDest.right, rcDest.bottom);
 
   if(InternalCalcIdealBounds(pFont, pWords, iTabWidth, iTabOrigin, prcBounds, &rcDest,
-                             iAlignment | DTAlignment_PRINTING)
+                             iAlignment | DTAlignment_PRINTING, 0, -1)
     < 0)
   {
     InternalDebugDumpWords(pWords);
@@ -1656,6 +1707,7 @@ XFontSet fSet;
 //        WB_ERROR_PRINT("%s - TEMPORARY (a), WB_DRAW_STRING at %d,%d  %d chars of %s\n",
 //                       __FUNCTION__, rcDest.left + pW->iX, rcDest.top + pW->iY, pW->nLength, pW->pText);
 
+        // draw the entire string. 'pW->iY' is the BASE of the font
         WB_DRAW_STRING(pDisplay, dw, fSet, gc, rcDest.left + pW->iX, rcDest.top + pW->iY,
                        pW->pText, pW->nLength);
       }
@@ -1682,7 +1734,7 @@ XFontSet fSet;
 //            WB_ERROR_PRINT("%s - TEMPORARY (b), WB_DRAW_STRING at %d,%d  %d chars of %s\n",
 //                           __FUNCTION__, iH, rcDest.top + pW->iY, pW->nLength - i3, (char *)(pW->pText) + i3);
 
-            // print i3 through i2 - 1
+            // print i3 through i2 - 1.  'pW->iY' is the BASE of the font
             WB_DRAW_STRING(pDisplay, dw, fSet, gc, iH, rcDest.top + pW->iY,
                            (char *)(pW->pText) + i3, i2 - i3);
 
@@ -1713,7 +1765,7 @@ XFontSet fSet;
 
         if(i3 < pW->nLength)
         {
-          // draw the last part of the string
+          // draw the last part of the string.  'pW->iY' is the BASE of the font
           WB_DRAW_STRING(pDisplay, dw, fSet, gc, iH, rcDest.top + pW->iY,
                          (char *)(pW->pText) + i3, pW->nLength - i3);
 
@@ -1737,14 +1789,68 @@ XFontSet fSet;
 }
 
 
-void DTPreRender(XFontStruct *pFont, DT_WORDS *pWords, int iTabWidth, int iTabOrigin,
-                 const WB_RECT *prcBounds, int iAlignment)
+// TODO:  consider whether either of these is really necessary.  each line could stand on its own,
+//        and it would be more efficient.  where it MIGHT help is a simple 'edit window' with limited
+//        text length, which could be stored as a 'DT_WORDS'. Probably NOT practical.
+//        (so perhaps these should be deprecated?)
+
+
+void DTPreRender(Display *pDisplay, XFontStruct *pFont, DT_WORDS *pWords, int iTabWidth, int iTabOrigin,
+                 WB_RECT *prcBounds, int iAlignment, int iStartLine, int iEndLine)
 {
-  // TODO:  implement
+WB_RECT rcDest;
+XFontSet fSet;
+
+  if(!pDisplay)
+  {
+    pDisplay = WBGetDefaultDisplay();
+  }
+
+  if(!pFont)
+  {
+    pFont = WBGetDefaultFont();
+    if(!pFont)
+    {
+      WB_ERROR_PRINT("%s - ERROR:  WBGetDefaultFont returns NULL\n",
+                     __FUNCTION__);
+
+      return; // bad
+    }
+  }
+
+  if(iAlignment & DTAlignment_SINGLELINE)
+  {
+    iAlignment |= DTAlignment_NO_WORD_WRAP; // make sure
+  }
+
+  fSet = WBFontSetFromFont(pDisplay, pFont);
+
+  if(fSet == None)
+  {
+    WB_ERROR_PRINT("Unable to get font set!\n");
+
+    return;
+  }
+
+  memcpy(&rcDest, prcBounds, sizeof(rcDest));
+
+  if(InternalCalcIdealBounds(pFont, pWords, iTabWidth, iTabOrigin, prcBounds, &rcDest,
+                             iAlignment | DTAlignment_PRINTING, iStartLine, iEndLine)
+    < 0)
+  {
+    InternalDebugDumpWords(pWords);
+
+    WB_ERROR_PRINT("%s - ERROR:  InternalCalcIdealBounds returns error\n",
+                   __FUNCTION__);
+
+    XFreeFontSet(pDisplay, fSet);
+
+    return; // bad (error)
+  }
 }
 
-void DTRender(XFontStruct *pFont, const DT_WORDS *pWords, Display *pDisplay, GC gc, Drawable dw,
-              int iHScrollBy, int iVScrollBy, const WB_RECT *prcBounds, int iAlignment)
+void DTRender(Display *pDisplay, XFontStruct *pFont, const DT_WORDS *pWords, GC gc, Drawable dw,
+              int iHScrollBy, int iVScrollBy, const WB_RECT *prcBounds, const WB_RECT *prcViewport, int iAlignment)
 {
   // TODO:  implement
 }

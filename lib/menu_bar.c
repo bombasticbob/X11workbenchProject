@@ -193,7 +193,7 @@ int MBInitGlobal(void)
 
     colormap = DefaultColormap(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
     LOAD_COLOR("*Menu.foreground",szMenuFG,"#000000");
-    LOAD_COLOR("*Menu.background",szMenuBG,"#DCDAC5");
+    LOAD_COLOR("*Menu.background",szMenuBG,"#DCDAD5");
     LOAD_COLOR("*Menu.activeForeground",szMenuActiveFG,"#FFFFFF");
     LOAD_COLOR("*Menu.activeBackground",szMenuActiveBG,"#4B6983");
     LOAD_COLOR("*Menu.disabledForeground",szMenuDisabledFG,"#808080");  // TODO:  verify these Menu.xxx strings for DISABLED
@@ -560,12 +560,14 @@ static int MBMenuHandleMenuItemUI(Display *pDisplay, WBMenuBarWindow *pSelf, WBM
 // this next callback is assigned via WBRegisterWindowCallback
 int MBMenuWinEvent(Window wID, XEvent *pEvent)
 {
-  Display *pDisplay = WBGetWindowDisplay(wID);
-  WBMenuBarWindow *pSelf = MBGetMenuBarWindowStruct(wID);
-  WBMenu *pMenu = pSelf ? pSelf->pMenu : NULL;
-  int i1; //, iHPos, iVPos;
-  WBMenuItem *pItem;
-  WB_GEOM geom;
+Display *pDisplay = WBGetWindowDisplay(wID);
+WBMenuBarWindow *pSelf = MBGetMenuBarWindowStruct(wID);
+WBMenu *pMenu = pSelf ? pSelf->pMenu : NULL;
+WBMenuItem *pItem;
+WB_GEOM geom;
+Window wIDParent;
+XEvent xevt;
+int i1; //, iHPos, iVPos;
 
 
   if(pSelf && pEvent->type == Expose)
@@ -605,6 +607,9 @@ int MBMenuWinEvent(Window wID, XEvent *pEvent)
     }
   }
 
+
+  wIDParent = WBGetParentWindow(wID); // grab the parent window's ID
+
   if(pSelf &&
      (pEvent->type == KeyPress ||
       pEvent->type == KeyRelease))
@@ -617,6 +622,26 @@ int MBMenuWinEvent(Window wID, XEvent *pEvent)
       // see if this is a hotkey for a menu item
 //      if(pEvent->xkey.
     }
+
+    // send to parent window for processing
+
+    memcpy(&xevt, pEvent, sizeof(*pEvent));
+    xevt.xkey.window = wIDParent;
+
+    WBWindowDispatch(wIDParent, &xevt); // have the parent process it
+
+    // NEXT, post a 'set focus' request to the parent so it gets the other events
+
+    bzero(&xevt, sizeof(xevt));
+    xevt.type = ClientMessage;
+
+    xevt.xclient.display = pDisplay;
+    xevt.xclient.window = wIDParent;
+    xevt.xclient.message_type = aSET_FOCUS;
+    xevt.xclient.format = 32;  // always
+    xevt.xclient.data.l[0] = 0; // default
+
+    WBPostEvent(wIDParent, &xevt); // post this (parent should fix it now, asynchronously)
   }
 
   if(pSelf &&
@@ -674,12 +699,30 @@ int MBMenuWinEvent(Window wID, XEvent *pEvent)
 
         WB_DEBUG_PRINT(DebugLevel_WARN | DebugSubSystem_Menu | DebugSubSystem_Mouse,
                        "%s - couldn't find the menu item - mouse at %d, %d\n", __FUNCTION__, iX, iY);
+
+let_parent_process_it:
+
+        // mouse outside of menu means parent should re-take the focus
+        // So, post a 'set focus' request to the parent so it gets the other events
+
+        bzero(&xevt, sizeof(xevt));
+        xevt.type = ClientMessage;
+
+        xevt.xclient.display = pDisplay;
+        xevt.xclient.window = wIDParent;
+        xevt.xclient.message_type = aSET_FOCUS;
+        xevt.xclient.format = 32;  // always
+        xevt.xclient.data.l[0] = 0; // default
+
+        WBPostEvent(wIDParent, &xevt); // post this (parent should fix it now, asynchronously)
       }
       else
       {
         WB_DEBUG_PRINT(DebugLevel_WARN | DebugSubSystem_Menu | DebugSubSystem_Mouse,
                        "%s - Mouse pointer is out of range - %d, %d, %d, %d, %d, %d\n",
                        __FUNCTION__, iX, iY, pSelf->iX, pSelf->iY, pSelf->iWidth, pSelf->iHeight);
+
+        goto let_parent_process_it;
       }
     }
     else // if(pEvent->type == ButtonRelease)

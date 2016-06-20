@@ -449,9 +449,12 @@ static void alloc_control_colors(WBDialogControl *pDialogControl,
   static const char *szBorder2="#FFFFFF", *szBorder2W="#C8C6C0", *szBorder3="#9C9A94"; // for 3D borders
   static const char *szHFGDef="#E0E0E0", *szHBGDef="#0000A0";  // highlight FG/BG
   static const char *szAFGDef="#000000", *szABGDef="white";  // active FG/BG
-  char szFG[16], szBG[16], szBD[16], szHFG[16], szHBG[16], szAFG[16], szABG[16];
+  char szFG[18], szBG[18], szBD[18], szHFG[18], szHBG[18], szAFG[18], szABG[18];
   Colormap colormap = DefaultColormap(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
 
+
+  // TODO:  add some sanity to this, maybe an API for loading colors?  *MOST* of this is now obsolete
+  //        and XSETTINGS uses completely different naming.
 
   LOAD_COLOR0(szFGName,szFG) else LOAD_COLOR0("*Dialog.foreground",szFG) else LOAD_COLOR0("*Form.foreground", szFG)
    else LOAD_COLOR0("*WmDialogShell.foreground",szFG) else LOAD_COLOR0("*WmForm.foreground", szFG)
@@ -483,6 +486,18 @@ static void alloc_control_colors(WBDialogControl *pDialogControl,
    else LOAD_COLOR0("*WmDialogShell.border",szBD) else LOAD_COLOR0("*WmForm.border", szBD)
    else LOAD_COLOR0("*borderColor", szBD)
    else LOAD_COLOR("*border", szBD, "black"); // default for gnome
+
+
+//  // TEMPORARILY DUMP COLOR MAPPING
+//  WB_ERROR_PRINT("TEMPORARY:  %s - control colors:\n", __FUNCTION__);
+//  WB_ERROR_PRINT("   %s=%s  default=%s\n", szFGName, szFG, "#000000");
+//  WB_ERROR_PRINT("   %s=%s  default=%s\n", szBGName, szBG, "#dcdad5 or 'white'");
+//  WB_ERROR_PRINT("   %s=%s  default=%s\n", szHFGName, szHFG, szHFGDef);
+//  WB_ERROR_PRINT("   %s=%s  default=%s\n", szHBGName, szHBG, szHBGDef);
+//  WB_ERROR_PRINT("   %s=%s  default=%s\n", szAFGName, szAFG, szAFGDef);
+//  WB_ERROR_PRINT("   %s=%s  default=%s\n", szABGName, szABG, szABGDef);
+//  WB_ERROR_PRINT("   %s=%s  default=%s\n", szBDName, szBD, "black");
+
 
   XParseColor(WBGetDefaultDisplay(), colormap, szFG, &(pDialogControl->clrFG));
   XAllocColor(WBGetDefaultDisplay(), colormap, &(pDialogControl->clrFG));
@@ -906,7 +921,7 @@ BEGIN_CREATE_CONTROL(PUSHBUTTON_CONTROL);
 
   alloc_control_colors(pDialogControl, "*Button.foreground", "*Button.background",
                        "*Button.highlightForeground", "*Button.highlightBackground",
-                       "*Button.activeForeground", "*Button.activebackground",
+                       "*Button.activeForeground", "*Button.activeBackground",
                        "*Button.border", 1);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
@@ -959,7 +974,7 @@ BEGIN_CREATE_CONTROL(DEFPUSHBUTTON_CONTROL);
 
   alloc_control_colors(pDialogControl, "*Button.foreground", "*Button.background",
                        "*Button.highlightForeground", "*Button.highlightBackground",
-                       "*Button.activeForeground", "*Button.activebackground",
+                       "*Button.activeForeground", "*Button.activeBackground",
                        "*Button.border", 1);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
@@ -1011,7 +1026,7 @@ BEGIN_CREATE_CONTROL(CANCELBUTTON_CONTROL);
 
   alloc_control_colors(pDialogControl, "*Button.foreground", "*Button.background",
                        "*Button.highlightForeground", "*Button.highlightBackground",
-                       "*Button.activeForeground", "*Button.activebackground",
+                       "*Button.activeForeground", "*Button.activeBackground",
                        "*Button.border", 1);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
@@ -1062,7 +1077,7 @@ BEGIN_CREATE_CONTROL(RADIOBUTTON_CONTROL);
 
   alloc_control_colors(pDialogControl, "*Radiobutton.foreground", "*Radiobutton.background",
                        "*Radiobutton.highlightForeground", "*Radiobutton.highlightBackground",
-                       "*Radiobutton.activeForeground", "*Radiobutton.activebackground",
+                       "*Radiobutton.activeForeground", "*RadioButton.activeBackground",
                        "*Radiobutton.border", 1);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
@@ -1113,7 +1128,7 @@ BEGIN_CREATE_CONTROL(FIRSTRADIOBUTTON_CONTROL);
 
   alloc_control_colors(pDialogControl, "*Radiobutton.foreground", "*Radiobutton.background",
                        "*Radiobutton.highlightForeground", "*Radiobutton.highlightBackground",
-                       "*Radiobutton.activeForeground", "*Radiobutton.activebackground",
+                       "*Radiobutton.activeForeground", "*RadioButton.activeBackground",
                        "*Radiobutton.border", 1);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
@@ -1165,7 +1180,7 @@ BEGIN_CREATE_CONTROL(CHECKBUTTON_CONTROL);
 
   alloc_control_colors(pDialogControl, "*Checkbutton.foreground", "*Checkbutton.background",
                        "*Checkbutton.highlightForeground", "*Checkbutton.highlightBackground",
-                       "*Checkbutton.activeForeground", "*Checkbutton.activebackground",
+                       "*Checkbutton.activeForeground", "*CheckButton.activeBackground",
                        "*Checkbutton.border", 1);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
@@ -1216,7 +1231,7 @@ BEGIN_CREATE_CONTROL(TRISTATEBUTTON_CONTROL);
 
   alloc_control_colors(pDialogControl, "*Checkbutton.foreground", "*Checkbutton.background",
                        "*Checkbutton.highlightForeground", "*Checkbutton.highlightBackground",
-                       "*Checkbutton.activeForeground", "*Checkbutton.activebackground",
+                       "*Checkbutton.activeForeground", "*CheckButton.activeBackground",
                        "*Checkbutton.border", 1);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
@@ -1312,7 +1327,7 @@ BEGIN_CREATE_CONTROL(LIST_CONTROL);
 
   alloc_control_colors(pDialogControl, "*List.foreground", "*List.background",
                        "*List.highlightForeground", "*List.highlightBackground",
-                       "*List.activeForeground", "*List.activebackground",
+                       "*List.activeForeground", "*List.activeBackground",
                        "*List.border", 0);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
@@ -1426,7 +1441,7 @@ BEGIN_CREATE_CONTROL(COMBO_CONTROL);
 
   alloc_control_colors(pDialogControl, "*Combo.foreground", "*Combo.background",
                        "*Combo.highlightForeground", "*Combo.highlightBackground",
-                       "*Combo.activeForeground", "*Combo.activebackground",
+                       "*Combo.activeForeground", "*Combo.activeBackground",
                        "*Combo.border", 0);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
@@ -1494,7 +1509,7 @@ BEGIN_CREATE_CONTROL(TREE_CONTROL);
 
   alloc_control_colors(pDialogControl, "*List.foreground", "*List.background",
                        "*List.highlightForeground", "*List.highlightBackground",
-                       "*List.activeForeground", "*List.activebackground",
+                       "*List.activeForeground", "*List.activeBackground",
                        "*List.border", 0);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
@@ -2006,7 +2021,13 @@ static int button_callback(Window wID, XEvent *pEvent)
           pDialogControl->aClass == aCANCELBUTTON_CONTROL)
         && ((XButtonEvent *)pEvent)->button == 1) // left button only
       {
-        // TODO:  re-paint button "pressed"
+        // re-paint button "pressed"
+        pDialogControl->pDlgControlEntry->iFlags |= WBDialogEntry_PRESSED;
+
+        WB_ERROR_PRINT("TEMPORARY:  %s - button press\n", __FUNCTION__);
+
+        WBInvalidateRect(wID, NULL, 0);
+        WBUpdateWindowImmediately(wID); // make sure I paint it NOW
 
         return 0;  // not handled - button release will activate these buttons
       }
@@ -2033,6 +2054,15 @@ static int button_callback(Window wID, XEvent *pEvent)
                        (int)pDialogControl->pDlgControlEntry->iID, pDialogControl);
 
 //        WBEndModal(wID, pItem->iAction);
+
+        if(pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_PRESSED)
+        {
+          pDialogControl->pDlgControlEntry->iFlags &= ~WBDialogEntry_PRESSED; // flip the bit back off
+          
+          WBInvalidateRect(wID, NULL, 0);
+          WBUpdateWindowImmediately(wID); // make sure I paint it NOW
+        }
+
         return 1;  // handled
       }
     }
@@ -2049,17 +2079,19 @@ static int button_callback(Window wID, XEvent *pEvent)
       {
         int iACS = 0, iKey = WBKeyEventProcessKey((XKeyEvent *)pEvent, NULL, NULL, &iACS);
 
-//        WB_ERROR_PRINT("TEMPORARY:  keydown event, %d iACS=%d\n", iKey, iACS);
+        WB_ERROR_PRINT("TEMPORARY:  %s- keydown event, %d iACS=%d\n", __FUNCTION__, iKey, iACS);
 
         if((iKey == ' ' || iKey == '\n' || iKey == '\r')
             && iACS == 0 && pDialogControl->pDlgControlEntry)
         {
+          WB_ERROR_PRINT("TEMPORARY:  %s - key press\n", __FUNCTION__);
+
           pDialogControl->pDlgControlEntry->iFlags |= WBDialogEntry_PRESSED;
 
           WBInvalidateRect(wID, NULL, 0);
           WBUpdateWindowImmediately(wID); // make sure I paint it NOW
 
-          pDialogControl->pDlgControlEntry->iFlags &= ~WBDialogEntry_PRESSED; // flip the bit back off
+//          pDialogControl->pDlgControlEntry->iFlags &= ~WBDialogEntry_PRESSED; // flip the bit back off
         }
 
         return 1;  // handled
@@ -2090,6 +2122,14 @@ static int button_callback(Window wID, XEvent *pEvent)
                        "%s:%d - Post Event: %08xH %08xH %08xH %pH\n", __FUNCTION__, __LINE__,
                        (int)aCONTROL_NOTIFY, (int)aBUTTON_PRESS,
                        (int)pDialogControl->pDlgControlEntry->iID, pDialogControl);
+
+        if(pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_PRESSED)
+        {
+          pDialogControl->pDlgControlEntry->iFlags &= ~WBDialogEntry_PRESSED; // flip the bit back off
+          
+          WBInvalidateRect(wID, NULL, 0);
+          WBUpdateWindowImmediately(wID); // make sure I paint it NOW
+        }
 
 //        WBEndModal(wID, pItem->iAction);
         return 1;  // handled
@@ -4000,76 +4040,6 @@ static int StaticDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 
     DTDrawMultiLineText(pFont, pSelf->pCaption, pDisplay, gc, wID, DEFAULT_STATIC_TAB_WIDTH, 0,
                         &rctText, DTAlignment_UNDERSCORE | DTAlignment_VCENTER);
-
-#if 0
-    const char *szText = pSelf->pCaption;
-    int iU1=0, iU2=0;
-
-//    if(i1 == pSelf->iSelected)  // selected item
-//    {
-//      XSetForeground(pDisplay, gc, pSelf->clrABG.pixel);
-//      XSetBackground(pDisplay, gc, pSelf->clrABG.pixel);
-//
-//      XFillRectangle(pDisplay, wID, gc, pItem->iPosition, pSelf->iY, pItem->iTextWidth, pSelf->iHeight + 2);
-//
-//      XSetForeground(pDisplay, gc, pSelf->clrAFG.pixel);
-//    }
-
-
-    if(strchr(szText, '_'))  // underline in text?  TODO:  use this info to set hotkey
-    {
-      char *p1;
-      strcpy(tbuf, szText);
-      p1 = tbuf;
-      while(*p1)
-      {
-        if(*p1 == '_')
-        {
-          *p1 = 0;
-
-          if(p1 == tbuf)
-          {
-            iU1 = 0;
-          }
-          else
-          {
-            iU1 = XTextWidth(pFont, tbuf, p1 - tbuf);
-          }
-
-          if(p1[1])
-          {
-            iU2 = XTextWidth(pFont, p1, 1);
-            strcpy(p1, p1 + 1);
-          }
-          else
-          {
-            iU2 = iU1;  // shouldn't happen
-          }
-        }
-        p1++;
-      }
-
-      szText = tbuf;
-    }
-
-    if(*szText)
-      XDrawString(pDisplay, wID, gc, iHPos, iVPos, szText, strlen(szText));
-
-    if(strlen(szText) < strlen(pSelf->pCaption))
-    {
-      xpt[0].x=iHPos + iU1 - 1;
-      xpt[0].y=iVPos + pFont->max_bounds.descent + 1;// + pFont->max_bounds.ascent;
-      xpt[1].x=iHPos + iU1 + iU2;
-      xpt[1].y=xpt[0].y;
-
-      XDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
-    }
-//    if(i1 == pSelf->iSelected)  // selected item
-//    {
-//      XSetForeground(pDisplay, gc, clrMenuFG.pixel);
-//      XSetBackground(pDisplay, gc, clrMenuBG.pixel);
-//    }
-#endif // 0
   }
 
   // by convention, restore original objects/state
@@ -4360,96 +4330,20 @@ static int ButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 
   if(pSelf->pCaption)
   {
+    WB_RECT rctText;
     const char *szText = pSelf->pCaption;
-//    int iU1=0, iU2=0;
 
-////    if(i1 == pSelf->iSelected)  // selected item
-//    {
-//      XSetForeground(pDisplay, gc, pSelf->clrABG.pixel);
-      XSetBackground(pDisplay, gc, pSelf->clrABG.pixel);
-//
-//      XFillRectangle(pDisplay, wID, gc, pItem->iPosition, pSelf->iY, pItem->iTextWidth, pSelf->iHeight + 2);
+    XSetBackground(pDisplay, gc, pSelf->clrABG.pixel);
+    XSetForeground(pDisplay, gc, pSelf->clrAFG.pixel);
 
-      XSetForeground(pDisplay, gc, pSelf->clrAFG.pixel);
-//    }
+    rctText.left = geomBorder.x + iHPos;
+    rctText.right = rctText.left + geomBorder.width - 2 * iHPos;
+    rctText.top = geomBorder.y + pFont->max_bounds.ascent / 2
+                - pFont->max_bounds.descent / 2; // better centering
+    rctText.bottom = rctText.top + geomBorder.height - pFont->max_bounds.ascent;
 
-    // TODO:  use DTDrawSingleLineText or DTDrawMultiLineText instead
-
-    {
-      WB_RECT rctText;
-
-      rctText.left = geomBorder.x + iHPos;
-      rctText.right = rctText.left + geomBorder.width - 2 * iHPos;
-      rctText.top = geomBorder.y + pFont->max_bounds.ascent / 2
-                  - pFont->max_bounds.descent / 2; // better centering
-      rctText.bottom = rctText.top + geomBorder.height - pFont->max_bounds.ascent;
-
-      DTDrawMultiLineText(pFont, szText, pDisplay, gc, wID, DEFAULT_BUTTON_TAB_WIDTH, 0,
-                          &rctText, DTAlignment_UNDERSCORE | DTAlignment_VCENTER | DTAlignment_HCENTER);
-    }
-
-#if 0
-
-    // TODO:  get title text
-//    szText = pItem->data + pItem->iMenuItemText;
-
-    if(strchr(szText, '_'))  // underline in text?  TODO:  use this info to set hotkey
-    {
-      char *p1;
-      strcpy(tbuf, szText);
-      p1 = tbuf;
-      while(*p1)
-      {
-        if(*p1 == '_')
-        {
-          *p1 = 0;
-
-          if(p1 == tbuf)
-            iU1 = 0;
-          else
-            iU1 = XTextWidth(pFont, tbuf, p1 - tbuf);
-
-          if(p1[1])
-          {
-            iU2 = XTextWidth(pFont, p1, 1);
-            strcpy(p1, p1 + 1);
-          }
-          else
-            iU2 = iU1;  // shouldn't happen
-        }
-        p1++;
-      }
-
-      szText = tbuf;
-    }
-
-//    if(pItem->iPosition < 0)
-//        pItem->iPosition = iHPos;  // also needed for mousie/clickie
-//    if(pItem->iTextWidth < 0)
-//        pItem->iTextWidth = XTextWidth(pFont, szText, strlen(szText));
-
-    // TODO:  change string into a series of XTextItem structures and
-    //        then call XDrawText to draw the array of 'XTextItem's
-    if(*szText)
-      XDrawString(pDisplay, wID, gc, iHPos, iVPos, szText, strlen(szText));
-
-//    if(strlen(szText) < strlen(pItem->data + pItem->iMenuItemText))
-//    {
-//      xpt[0].x=iHPos + iU1 - 1;
-//      xpt[0].y=pSelf->iY + pFont->max_bounds.descent + 1;// + pFont->max_bounds.ascent;
-//      xpt[0].y=pSelf->iY + pSelf->iHeight - 1;  or is it THIS ????
-//      xpt[1].x=iHPos + iU1 + iU2;
-//      xpt[1].y=xpt[0].y;
-//
-//      XDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
-//    }
-//
-//    if(i1 == pSelf->iSelected)  // selected item
-//    {
-//      XSetForeground(pDisplay, gc, clrMenuFG.pixel);
-//      XSetBackground(pDisplay, gc, clrMenuBG.pixel);
-//    }
-#endif // 0
+    DTDrawMultiLineText(pFont, szText, pDisplay, gc, wID, DEFAULT_BUTTON_TAB_WIDTH, 0,
+                        &rctText, DTAlignment_UNDERSCORE | DTAlignment_VCENTER | DTAlignment_HCENTER);
   }
 
   // by convention, restore original objects/state
@@ -4560,8 +4454,18 @@ static int PushButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
     geomBorder.width -= 2;
   }
 
-  WBDraw3DBorderRect(pDisplay, wID, gc, &geomBorder,
-                     pSelf->clrBD2.pixel, pSelf->clrBD3.pixel);
+  // note - if a button is 'pressed' I draw the colors inverted
+
+  if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_PRESSED)
+  {
+    WBDraw3DBorderRect(pDisplay, wID, gc, &geomBorder,
+                       pSelf->clrBD3.pixel, pSelf->clrBD2.pixel);
+  }
+  else
+  {
+    WBDraw3DBorderRect(pDisplay, wID, gc, &geomBorder,
+                       pSelf->clrBD2.pixel, pSelf->clrBD3.pixel);
+  }
 
   // painting the window text
 
@@ -4579,99 +4483,20 @@ static int PushButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 
   if(pSelf->pCaption)
   {
+    WB_RECT rctText;
     const char *szText = pSelf->pCaption;
-//    int iU1=0, iU2=0;
 
-//    if(i1 == pSelf->iSelected)  // selected item
-//    {
-//      XSetForeground(pDisplay, gc, pSelf->clrABG.pixel);
-      XSetBackground(pDisplay, gc, pSelf->clrABG.pixel);
+    XSetBackground(pDisplay, gc, pSelf->clrABG.pixel);
+    XSetForeground(pDisplay, gc, pSelf->clrAFG.pixel);
 
-//      XFillRectangle(pDisplay, wID, gc, pItem->iPosition, pSelf->iY, pItem->iTextWidth, pSelf->iHeight + 2);
+    rctText.left = geomBorder.x + iHPos;
+    rctText.right = rctText.left + geomBorder.width - 2 * iHPos;
+    rctText.top = geomBorder.y + pFont->max_bounds.ascent / 2
+                - pFont->max_bounds.descent / 2; // better centering
+    rctText.bottom = rctText.top + geomBorder.height - pFont->max_bounds.ascent;
 
-      XSetForeground(pDisplay, gc, pSelf->clrAFG.pixel);
-//    }
-
-    {
-      WB_RECT rctText;
-
-      rctText.left = geomBorder.x + iHPos;
-      rctText.right = rctText.left + geomBorder.width - 2 * iHPos;
-      rctText.top = geomBorder.y + pFont->max_bounds.ascent / 2
-                  - pFont->max_bounds.descent / 2; // better centering
-      rctText.bottom = rctText.top + geomBorder.height - pFont->max_bounds.ascent;
-
-      DTDrawMultiLineText(pFont, szText, pDisplay, gc, wID, DEFAULT_BUTTON_TAB_WIDTH, 0, &rctText,
-                          DTAlignment_UNDERSCORE | DTAlignment_VCENTER | DTAlignment_HCENTER);
-    }
-
-    // TODO:  get title text
-//    szText = pItem->data + pItem->iMenuItemText;
-
-#if 0
-    if(strchr(szText, '_'))  // underline in text?  TODO:  use this info to set hotkey
-    {
-      char *p1;
-      strcpy(tbuf, szText);
-      p1 = tbuf;
-      while(*p1)
-      {
-        if(*p1 == '_')
-        {
-          *p1 = 0;
-
-          if(p1 == tbuf)
-            iU1 = 0;
-          else
-            iU1 = XTextWidth(pFont, tbuf, p1 - tbuf);
-
-          if(p1[1])
-          {
-            iU2 = XTextWidth(pFont, p1, 1);
-            strcpy(p1, p1 + 1);
-          }
-          else
-            iU2 = iU1;  // shouldn't happen
-        }
-        p1++;
-      }
-
-      szText = tbuf;
-    }
-
-//    if(pItem->iPosition < 0)
-//        pItem->iPosition = iHPos;  // also needed for mousie/clickie
-//    if(pItem->iTextWidth < 0)
-//        pItem->iTextWidth = XTextWidth(pFont, szText, strlen(szText));
-
-    // TODO:  change string into a series of XTextItem structures and
-    //        then call XDrawText to draw the array of 'XTextItem's
-    if(*szText)
-    {
-      i2 = strlen(szText);
-      iHPos = (xwa.width - XTextWidth(pFont, szText, i2))
-            / 2;  // centered within the button display area
-
-      XDrawString(pDisplay, wID, gc, iHPos, iVPos, szText, i2);
-    }
-
-//    if(strlen(szText) < strlen(pItem->data + pItem->iMenuItemText))
-//    {
-//      xpt[0].x=iHPos + iU1 - 1;
-//      xpt[0].y=pSelf->iY + pFont->max_bounds.descent + 1;// + pFont->max_bounds.ascent;
-//      xpt[0].y=pSelf->iY + pSelf->iHeight - 1;  or is it THIS ????
-//      xpt[1].x=iHPos + iU1 + iU2;
-//      xpt[1].y=xpt[0].y;
-//
-//      XDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
-//    }
-//
-//    if(i1 == pSelf->iSelected)  // selected item
-//    {
-//      XSetForeground(pDisplay, gc, clrMenuFG.pixel);
-//      XSetBackground(pDisplay, gc, clrMenuBG.pixel);
-//    }
-#endif // 0
+    DTDrawMultiLineText(pFont, szText, pDisplay, gc, wID, DEFAULT_BUTTON_TAB_WIDTH, 0, &rctText,
+                        DTAlignment_UNDERSCORE | DTAlignment_VCENTER | DTAlignment_HCENTER);
   }
 
   // by convention, restore original objects/state
