@@ -280,7 +280,9 @@ static __inline__ WBMenu * MBGetMenuBarMenu(WBMenuBarWindow *pMenuBar)
   * \param pMenu A pointer to a new WBMenu to be assigned to the Menu Bar window.  Can be NULL.
   * \returns previously assigned WBMenu
   *
-  * Use this function to safely assign a new WBMenu to a Menu Bar window.
+  * Use this function to safely assign a new WBMenu to a Menu Bar window.  This resource will be
+  * destroyed when the Menu Bar window is destroyed, so if you keep a cached copy and maintain it
+  * outside of the Menu Bar, be sure and assign a WBMenu of 'NULL' before destroying the menu bar.
   *
   * Header File:  menu_bar.h
 **/
@@ -294,7 +296,7 @@ WBMenu *pRval;
   }
 
   pRval = pMenuBar->pMenu;
-  pMenuBar->pMenu = pMenu;
+  pMenuBar->pMenu = pMenu; // TODO:  reference counting?
   pMenuBar->iSelected = -1;
   pMenuBar->iPrevSel = -1;
 
@@ -302,6 +304,20 @@ WBMenu *pRval;
 
   return pRval; // the old menu
 }
+
+/** \ingroup menu_bar
+  * \brief Assign a new WBMenu for a Menu Bar window
+  *
+  * \param pMenuBar A pointer to the WBMenuBarWindow structure associated with a Menu Bar window
+  * \param pszMenuResource A pionter to a 'menu resource' (const) character string that will be used to replace the current menu
+  *
+  * Use this function to safely replace the menu resource for a Menu Bar window.  The existing WBMenu
+  * will be destroyed.  If you want to preserve the existing WBMenu, use MBSetMenuBarMenu() instead,
+  * after constructing the replacement WBMenu from the resource.
+  *
+  * Header File:  menu_bar.h
+**/
+void MBSetMenuBarMenuResource(WBMenuBarWindow *pMenuBar, const char *pszMenuResource);
 
 
 #ifdef __cplusplus

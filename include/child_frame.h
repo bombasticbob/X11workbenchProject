@@ -223,6 +223,24 @@ void FWChildFrameRecalcLayout(WBChildFrame *pChildFrame);
 
 
 /** \ingroup child_frame
+  * \brief Returns if it's safe to close the child frame; prompts user as needed
+  *
+  * \param pChildFrame The pointer to the WBChildFrame structure for the desired Child Frame window
+  * \returns An integer value, 0 for 'ok to close', 1 for 'not ok to close', -1 on error
+  *
+  * Use this function to safely determine whether it's ok to close a WBChildFrame window.  The user may be prompted.
+  *
+  * Internally, this will send a QUERY_CLOSE Client Message Event to the handler function.  the default is to return
+  * a zero value, which is 'ok to close'.  Your own function needs to handle this to prompt to save unsaved data and
+  * allow the user to cancel (thus returning a '1').  The message is invoked via an 'internal' Send Event which will
+  * directly call the handler functions.
+  *
+  * Header File:  child_frame.h
+**/
+int FWChildFrameQueryClose(WBChildFrame *pChildFrame);
+
+
+/** \ingroup child_frame
   * \brief Default event handler for Child Frame window
   *
   * \param wID A valid Window ID for a Child Frame window
@@ -234,7 +252,6 @@ void FWChildFrameRecalcLayout(WBChildFrame *pChildFrame);
   * Header File:  child_frame.h
 **/
 int FWChildFrameEvent(Window wID, XEvent *pEvent);
-
 
 
 /** \ingroup child_frame

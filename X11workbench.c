@@ -104,9 +104,17 @@ static int FileSaveAsHandler(XClientMessageEvent *);
 static int FileSaveAsUIHandler(WBMenu *, WBMenuItem *);
 static int FileSaveAllHandler(XClientMessageEvent *);
 static int FileSaveAllUIHandler(WBMenu *, WBMenuItem *);
+static int FileCloseHandler(XClientMessageEvent *);
+
 static int HelpAboutHandler(XClientMessageEvent *);
 static int HelpContentsHandler(XClientMessageEvent *);
 static int HelpContextHandler(XClientMessageEvent *);
+
+static int TabLeftHandler(XClientMessageEvent *);
+static int TabRightHandler(XClientMessageEvent *);
+static int TabMoveLeftHandler(XClientMessageEvent *);
+static int TabMoveRightHandler(XClientMessageEvent *);
+static int TabUIHandler(WBMenu *, WBMenuItem *);
 
 
 
@@ -185,6 +193,8 @@ static char szEditMenu[]="1\n"
                         "_Edit\tpopup\t4\n"
                         "_Tools\tpopup\t5\n"
                         "\tseparator\n"
+                        "_Window\tpopup\t6\n"
+                        "\tseparator\n"
                         "_Help\tpopup\t3\n"
                         "\n"
                         "2\n"
@@ -193,6 +203,8 @@ static char szEditMenu[]="1\n"
                         "_Save File\tIDM_FILE_SAVE\tSave File\tCtrl+S\n"
                         "Save _As\tIDM_FILE_SAVE_AS\tSave As\n"
                         "Save A_ll\tIDM_FILE_SAVE_ALL\tSave All\n"
+                        "\tseparator\n"
+                        "_Close File\tIDM_FILE_CLOSE\tClose File\tCtrl+F4\n"
                         "\tseparator\n"
                         "E_xit\tIDM_FILE_EXIT\tClose Application\tAlt+F4\n"
                         "\n"
@@ -215,11 +227,20 @@ static char szEditMenu[]="1\n"
                         "\n"
                         "5\n"
                         "_Options\tIDM_TOOLS_OPTIONS\tDisplay Options Editor\n"
+                        "\n"
+                        "6\n"
+                        "Tab _Left\tIDM_TAB_LEFT\tScroll Tab Left\tCtrl+Alt+PgUp\n"
+                        "Tab _Right\tIDM_TAB_RIGHT\tScroll Tab Right\tCtrl+Alt+PgDown\n"
+                        "\tseparator\n"
+                        "Re-order Le_ft\tIDM_TAB_MOVE_LEFT\tScroll Tab Left\tCtrl+Alt+Shift+PgUp\n"
+                        "Re-order R_ight\tIDM_TAB_MOVE_RIGHT\tScroll Tab Right\tCtrl+Alt+Shift+PgDown\n"
+                        "\tseparator\n" // NOTE:  I can add a list of windows here, with hotkeys
                         "\n";
 
 // menu handler, similar to what MFC does
 // in theory I can swap in a new menu handler when the window focus changes
-// this is the DEFAULT handler, when no 'child frame' has the focus
+// this is the DEFAULT handler, when no 'child frame' has the focus.  It also handles
+// all of the OTHER menu stuff, out of convenience
 
 FW_MENU_HANDLER_BEGIN(main_menu_handlers)
   FW_MENU_HANDLER_ENTRY("IDM_FILE_EXIT",FileExitHandler,NULL)
@@ -228,6 +249,14 @@ FW_MENU_HANDLER_BEGIN(main_menu_handlers)
   FW_MENU_HANDLER_ENTRY("IDM_FILE_SAVE",FileSaveHandler,FileSaveUIHandler)
   FW_MENU_HANDLER_ENTRY("IDM_FILE_SAVE_AS",FileSaveAsHandler,FileSaveAsUIHandler)
   FW_MENU_HANDLER_ENTRY("IDM_FILE_SAVE_ALL",FileSaveAllHandler,FileSaveAllUIHandler)
+
+  FW_MENU_HANDLER_ENTRY("IDM_FILE_CLOSE",FileCloseHandler,NULL) // TODO:  do a UI handler?
+
+  FW_MENU_HANDLER_ENTRY("IDM_TAB_LEFT",TabLeftHandler, TabUIHandler)
+  FW_MENU_HANDLER_ENTRY("IDM_TAB_RIGHT",TabRightHandler, TabUIHandler)
+  FW_MENU_HANDLER_ENTRY("IDM_TAB_MOVE_LEFT",TabMoveLeftHandler, TabUIHandler)
+  FW_MENU_HANDLER_ENTRY("IDM_TAB_MOVE_RIGHT",TabMoveRightHandler, TabUIHandler)
+
   FW_MENU_HANDLER_ENTRY("IDM_HELP_ABOUT",HelpAboutHandler,NULL)
   FW_MENU_HANDLER_ENTRY("IDM_HELP_CONTEXT",HelpContextHandler,NULL)
   FW_MENU_HANDLER_ENTRY("IDM_HELP_CONTENTS",HelpContentsHandler,NULL)
@@ -466,7 +495,6 @@ next_argument:
 
   FWSetMenuHandlers(pMainFrame, main_menu_handlers);
 
-
   //=========================
   //   MAIN MESSAGE LOOP
   //=========================
@@ -506,7 +534,9 @@ next_argument:
   }
 
   if(pMainFrame)
+  {
     WBDestroyWindow(pMainFrame->wID);
+  }
 
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Application,
                  "%s - Application about to exit\n", __FUNCTION__);
@@ -540,12 +570,29 @@ int iRval = 0;
     WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Application,
                    "%s - DestroyNotify\n", __FUNCTION__);
 
-    if(pMainFrame->wID == wID)
+    if(pMainFrame && pMainFrame->wID == wID)
     {
       pMainFrame = NULL;  // because I'm destroying it
     }
 
-    return iRval;  // let default processing happen
+    return 0;  // let remaining default processing happen
+  }
+
+  if(pEvent->type == ClientMessage &&
+     pEvent->xclient.message_type == aQUERY_CLOSE)
+  {
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Application,
+                   "%s - QUERY_CLOSE\n", __FUNCTION__);
+
+    if(pEvent->xclient.data.l[0]) // close is imminent if I return 0
+    {
+      if(pMainFrame && pMainFrame->wID == wID)
+      {
+        pMainFrame = NULL;  // because I'm destroying it
+      }
+    }
+
+    return 0; // "ok to close" (let frame window handle anything else)
   }
 
   if (pEvent->type == Expose && pEvent->xexpose.count == 0)
@@ -790,6 +837,115 @@ static int HelpAboutHandler(XClientMessageEvent *pEvent)
 
   return 1; // handled
 }
+
+static int FileCloseHandler(XClientMessageEvent *pEvent)
+{
+  WBChildFrame *pC;
+
+  if(!pMainFrame)
+  {
+    return 0;
+  }
+    
+  pC = FWGetFocusWindow(pMainFrame);
+
+  if(pC)
+  {
+    // TODO:  check for 'safe to close it' ?
+
+    FWRemoveContainedWindow(pMainFrame, pC);
+
+    FWDestroyChildFrame(pC); // this will destroy the super-class as well
+  }
+
+  return 1;
+}
+
+static int TabLeftHandler(XClientMessageEvent *pEvent)
+{
+int iIndex;
+
+  if(!pMainFrame)
+  {
+    return 0;
+  }
+    
+  iIndex = FWGetChildFrameIndex(pMainFrame, NULL);
+
+  WB_ERROR_PRINT("TEMPORARY:  %s - move left %d\n", __FUNCTION__, iIndex);
+
+  if(iIndex > 0)
+  {
+    FWSetFocusWindowIndex(pMainFrame, iIndex - 1);
+  }
+
+  return 1;
+}
+
+static int TabRightHandler(XClientMessageEvent *pEvent)
+{
+int iIndex;
+
+  if(!pMainFrame)
+  {
+    return 0;
+  }
+    
+  iIndex = FWGetChildFrameIndex(pMainFrame, NULL);
+
+  WB_ERROR_PRINT("TEMPORARY:  %s - move right %d\n", __FUNCTION__, iIndex);
+
+  if(iIndex >= 0)
+  {
+    FWSetFocusWindowIndex(pMainFrame, iIndex + 1);
+  }
+
+  return 1;
+}
+
+static int TabMoveLeftHandler(XClientMessageEvent *pEvent)
+{
+  WBChildFrame *pC;
+
+  if(!pMainFrame)
+  {
+    return 0;
+  }
+    
+  pC = FWGetFocusWindow(pMainFrame);
+
+  if(pC)
+  {
+    FWMoveChildFrameTabIndex(pMainFrame, pC, -1);
+  }
+
+  return 1;
+}
+
+static int TabMoveRightHandler(XClientMessageEvent *pEvent)
+{
+  WBChildFrame *pC;
+
+  if(!pMainFrame)
+  {
+    return 0;
+  }
+    
+  pC = FWGetFocusWindow(pMainFrame);
+
+  if(pC)
+  {
+    FWMoveChildFrameTabIndex(pMainFrame, pC, -2);
+  }
+
+  return 1;
+}
+
+static int TabUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem)
+{
+  return 1; // enabled  (TODO:  check # of tabs, etc.)
+}
+
 
 static int HelpContentsHandler(XClientMessageEvent *pEvent)
 {

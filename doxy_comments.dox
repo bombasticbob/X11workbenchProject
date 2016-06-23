@@ -40,7 +40,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  BSD-like license.  See COPYING and README.md files for more information.
 
 
   Additional information at:
@@ -146,7 +146,7 @@
   * 'about the application' dialog boxes.
   *
   * Use and distribution are in accordance with GPL, LGPL, and/or the above
-  * BSD-like license.  See COPYING and README files for more information.
+  * BSD-like license.  See COPYING and README.md files for more information.
   *
   * You will find similar language and copyright statements at the beginning of most of the source
   * files (and related files) that comprise the X11workbench and X11workbench Toolkit.  If

@@ -225,6 +225,29 @@ Atom aCONTROL_NOTIFY=None;
 
 /** \ingroup xatoms
   * \hideinitializer
+  * \brief query if it's ok to close (and optionally destroy yourself if ok) a window
+  *
+  * CONTROL_NOTIFY message format (relative to XEvent.xclient)\n
+  * type == ClientMessage\n
+  * message_type == aQUERY_CLOSE\n
+  * format == 32 (always)\n
+  * data.l[0] contains a non-zero value if the window should destroy its private data NOW; 0 otherwise\n
+  *
+  * Window callbacks should check for this and return '0' when it's ok to destroy the window, a positive
+  * value if it's NOT ok, or a negative value on error.
+  *
+  * Whenever data.l[0] contains a non-zero value, and it's ok to close the window, the window event handler
+  * should destroy all of its private data, zero out data element '0' for the window data (if it pointed
+  * to the private data), and call WBUnregisterWindowCallback() for itself.  The window will be destroyed
+  * by the sender as soon as the callback returns.
+  *
+  * If the callback returns a non-zero value, it should not destroy any of its own private data.  The
+  * sender will assume that it's not ok to close the window and will try to leave everything 'as-is'.
+**/
+Atom aQUERY_CLOSE=None;      ///< command sent by Client Message to .  Return 0 if ok to close 1 if NOT ok to close, '-1' on error
+
+/** \ingroup xatoms
+  * \hideinitializer
   * \brief dialog focus messages
   *
   * DLG_FOCUS message format (relative to XEvent.xclient)\n
@@ -564,7 +587,9 @@ typedef struct // the structure that identifies the window and what to do with i
     *
     * The callback function defines the behavior of the window.  Each event that is dispatched
     * for the matching Window ID will be passed once to the callback function.  The callback
-    * function must return an appropriate non-zero value if it processes the message,
+    * function must return an appropriate non-zero value if it processes the message.
+    *
+    * This will never be NULL unless the window entry is being destroyed.
   **/
   int (* pCallback)(Window wIDEvent, XEvent *pEvent);
   WB_GEOM geomAbsolute;                      ///< absolute window geometry (from notification)
@@ -605,7 +630,7 @@ typedef struct // the structure that identifies the window and what to do with i
 #define WB_WINDOW_UNMAPPED  0        /* window created, but not yet mapped */
 #define WB_WINDOW_MAPPED    1        /* window mapped */
 #define WB_WINDOW_SET_FOCUS_ON_MAP 2 /* focus is to be set when the window is mapped */
-#define WB_WINDOW_DELETE_TIMEOUT 30  /* seconds to wait before deleting hash entry */
+#define WB_WINDOW_DELETE_TIMEOUT 5   /* seconds to wait before deleting hash entry (was 30, now 5) */
 
 #define WB_CHECK_SET_FOCUS_ON_MAP(X) ((X).iWindowState == WB_WINDOW_SET_FOCUS_ON_MAP)
 #define WB_IS_WINDOW_UNMAPPED(X) ((X).iWindowState == WB_WINDOW_UNMAPPED || (X).iWindowState == WB_WINDOW_SET_FOCUS_ON_MAP)
@@ -908,10 +933,17 @@ int WBInitDisplay(Display *pDisplay)
     }
   }
 
+  // NOTE:  the documentation for 'XInternAtom' does _NOT_ include a provision to
+  //        free up unused atoms.  There's no obvious way to get rid of the ones that
+  //        are not being used any more.  The docs say the following:
+  //        "It will become undefined only when the last connection to the X server closes."
+  //        (As such, I should minimize introducing NEW atoms, even though it's kinda necessary)
+
   aMENU_COMMAND     = XInternAtom(pDisplay, "MENU_COMMAND", False);
   aMENU_UI_COMMAND  = XInternAtom(pDisplay, "MENU_UI_COMMAND", False);
   aRESIZE_NOTIFY    = XInternAtom(pDisplay, "RESIZE_NOTIFY", False);
   aCONTROL_NOTIFY   = XInternAtom(pDisplay, "CONTROL_NOTIFY", False);
+  aQUERY_CLOSE      = XInternAtom(pDisplay, "QUERY_CLOSE", False);
   aDESTROY_NOTIFY   = XInternAtom(pDisplay, "DESTROY_NOTIFY", False);
   aDLG_FOCUS        = XInternAtom(pDisplay, "DLG_FOCUS", False);
   aSET_FOCUS        = XInternAtom(pDisplay, "SET_FOCUS", False);
@@ -959,6 +991,7 @@ int WBInitDisplay(Display *pDisplay)
      aMENU_UI_COMMAND  == None ||
      aRESIZE_NOTIFY    == None ||
      aCONTROL_NOTIFY   == None ||
+     aQUERY_CLOSE      == None ||
      aDESTROY_NOTIFY   == None ||
      aDLG_FOCUS        == None ||
      aSET_FOCUS        == None ||
@@ -1132,6 +1165,8 @@ destroy_without_wm:
       // pike that I shouldn't be querying info or trying to destroy it TWICE.
     }
 
+//    WB_ERROR_PRINT("TEMPORARY:  %s - call to XDestroyWindow for %u (%08xH)\n", __FUNCTION__, (int)wID, (int)wID);
+
     BEGIN_XCALL_DEBUG_WRAPPER
     XDestroyWindow(pDisp, wID); // do this anyway (since it's still mapped and not destroyed)
     END_XCALL_DEBUG_WRAPPER
@@ -1243,6 +1278,8 @@ destroy_without_wm:
 
     pEntry->iWindowState = WB_WINDOW_DESTROYED; // so that there is no recursion problem or attempts to use the window
 
+//    WB_ERROR_PRINT("TEMPORARY:  %s - call to XDestroyWindow for %u (%08xH)\n", __FUNCTION__, (int)wID, (int)wID);
+
     BEGIN_XCALL_DEBUG_WRAPPER
     XDestroyWindow(pDisp, wID); // do this anyway (since it's still mapped and not destroyed)
     END_XCALL_DEBUG_WRAPPER
@@ -1287,7 +1324,9 @@ int i1;
     }
 
     if(!pDisp)
+    {
       pDisp = pDefaultDisplay;
+    }
 
     if(WB_IS_WINDOW_MAPPED(sWBHashEntries[i1]))
     {
@@ -1319,7 +1358,6 @@ int i1;
   }
 
   BEGIN_XCALL_DEBUG_WRAPPER
-//  XFlush(pDefaultDisplay);
   XSync(pDefaultDisplay, FALSE);  // try sync'ing first to avoid certain errors
   XCloseDisplay(pDefaultDisplay); // display is to be destroyed now
   END_XCALL_DEBUG_WRAPPER
@@ -2234,10 +2272,10 @@ void WBDestroyWindow(Window wID)
     // window and its children
 
     BEGIN_XCALL_DEBUG_WRAPPER
-//    XFlush(pDisplay);
     XSync(pDisplay, 0);
     END_XCALL_DEBUG_WRAPPER
 
+// NOTE:  I used to dispatch remaining events, but this might dispatch EXPOSE and I don't want that
 //    while(XCheckWindowEvent(pDisplay, wID, EVENT_ALL_MASK, &event))
 //    {
 //      WBWindowDispatch(wID, &event);
@@ -2271,13 +2309,20 @@ void WBDestroyWindow(Window wID)
 ////        WBAllowErrorOutput();
 //      }
     }
+    else if(!WB_IS_WINDOW_BEING_DESTROYED(*pEntry) && !WB_IS_WINDOW_DESTROYED(*pEntry))
+    {
+      WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Window,
+                     "WBDestroyWindow - wID %d (%08xH), destroying 'unmapped' window\n",
+                     (int)wID, (int)wID);
+
+      __InternalDestroyWindow(pDisplay, wID, pEntry); // may mark it 'DESTROYING' so recursion won't happen (see above)
+    }
+    // NOTE:  the above 'if' may preclude this next one from EVAR happening
     else if(!WB_TO_DELETE_WINDOW_ENTRY(*pEntry)) // has not called 'WBUnregisterWindowCallback'
     {
       WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Window,
                      "WBDestroyWindow - wID %d (%08xH), Marking 'unmapped' window 'destroyed'\n",
                      (int)wID, (int)wID);
-
-      WB_ERROR_PRINT("INFO: %s only marking window %d 'destroyed'\n", __FUNCTION__, (int)wID);
 
       pEntry->iWindowState = WB_WINDOW_DESTROYED;  // initially, do this
     }
@@ -2437,7 +2482,9 @@ _WINDOW_ENTRY_ *pRval = NULL;
       }
 
       if(sWBHashEntries[i1].wID == WINDOW_ENTRY_UNUSED)
+      {
         i2 = i1;  // keep track of the 1st unused entry in the chain
+      }
 
       i1++;
       i1 &= WINDOW_ENTRY_ARRAY_MAX;
@@ -2614,7 +2661,7 @@ static struct timeval tvLastTime = {0,0};
 
   if(tvNow.tv_sec == tvLastTime.tv_sec)
   {
-    return;  // so I don't do this too often
+    return;  // so I don't do this too often - only once per second
   }
 
   tvLastTime.tv_sec = tvNow.tv_sec;
@@ -2622,6 +2669,9 @@ static struct timeval tvLastTime = {0,0};
   tvNow.tv_sec -= WB_WINDOW_DELETE_TIMEOUT;
 
   // for each remaining window in my list, destroy it
+  // TODO:  a more intelligent way to do this.  Currently it loops 2048 times
+  //        and this is NOT efficient.  however, at 1Ghz, 2048 loops should easily
+  //        be less than 1 msec (maybe 10 to 20 cycles per loop on average).
   for(i1=WINDOW_ENTRY_ARRAY_MAX - 1; i1 >= 0; i1--)
   {
     Window wID = sWBHashEntries[i1].wID;
@@ -2635,9 +2685,14 @@ static struct timeval tvLastTime = {0,0};
        sWBHashEntries[i1].tvLastActivity.tv_sec < tvNow.tv_sec) // aged enough?
     {
       WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Window,
-                     "%s - destroying entry %d for window %d (%08xH)\n",
+                     "%s - destroying entry %d for window %u (%08xH)\n",
                      __FUNCTION__, i1,
                      (int)sWBHashEntries[i1].wID, (int)sWBHashEntries[i1].wID);
+
+
+//      WB_ERROR_PRINT("TEMPORARY:  %s - delete window entry %d for window %u (%08xH)\n",
+//                     __FUNCTION__, i1,
+//                     (int)sWBHashEntries[i1].wID, (int)sWBHashEntries[i1].wID);
 
       __WindowEntryRestoreDefaultResources(i1);  // make sure no resources are allocated
       __WindowEntryDestructor(i1); // finalizes destruction and marks it 'unused'
@@ -2900,12 +2955,16 @@ _WINDOW_ENTRY_ *pEntry = __AddOrLocateEntry(wID);
     int bNewEntry = 0;
 
     if(!pEntry->pCallback)
+    {
       bNewEntry = 1;
+    }
 
     pEntry->pCallback = pCallback;
 
     if(bNewEntry)
+    {
       WBRestoreDefaultCursor(wID);  // assign the default cursor if this is a new entry
+    }
   }
 }
 
@@ -2943,8 +3002,10 @@ void WBUnregisterWindowCallback(Window wID)
   }
 
   // free resources, mark the 'last activity' time, and
-  // mark this entry as "to be destroyed" but do not actually change
-  // the callback address (TODO:  change name of function?)
+  // mark this entry as "to be destroyed"
+  
+  // NOTE:  used to NOT actually change the callback address (TODO:  change name of function?)
+  //        but in this case I'm going to NULL it.  I don't want window callbacks being called
 
   if(i1 >= 0 && sWBHashEntries[i1].wID == wID)  // guarantees I have the right one
   {
@@ -2966,6 +3027,9 @@ void WBUnregisterWindowCallback(Window wID)
 
       sWBHashEntries[i1].iWindowState = WB_WINDOW_DELETE;
     }
+
+    sWBHashEntries[i1].pCallback = NULL; // no more callback function.  'DestroyNotify' may still happen.
+    // for 'DestroyNotify' events following this, WBDispatch will deal with that.
   }
 
 }
@@ -4649,7 +4713,7 @@ int WBWindowDispatch(Window wID, XEvent *pEvent)
       pEntry->wParent = pEvent->xreparent.parent;
     }
 
-    if(pEntry->pCallback)
+    if(pEntry->pCallback) // CAN be NULL, especially if there are stale events waiting to be sent
     {
       iRval = pEntry->pCallback(wID, pEvent);
 
@@ -4685,13 +4749,17 @@ int WBWindowDispatch(Window wID, XEvent *pEvent)
     {
       if(pEvent->xdestroywindow.window == wID)
       {
-        // I am being destroyed and I have no callback
-        WB_ERROR_PRINT("WARNING:  %s - DestroyNotify for wID %d (%s) and NO CALLBACK\n",
-                       __FUNCTION__, (int)wID, pEntry->szClassName);
+        // 'pEntry' is still valid, but SHOULD be marked 'to be destroyed'
+        if(!WB_IS_WINDOW_DESTROYED(*pEntry)) // already destroyed?  no need to say anything
+        {
+          // I am being destroyed and I have no callback
+          WB_ERROR_PRINT("INFO:  %s - DestroyNotify for wID %d (%s) and NO CALLBACK (this is sometimes expected)\n",
+                         __FUNCTION__, (int)wID, pEntry->szClassName);
+        }
       }
       else
       {
-        WB_ERROR_PRINT("%s - UNEXPECTED - DestroyNotify for %d and message is for %d (no callback)\n",
+        WB_ERROR_PRINT("ERROR:  %s - (UNEXPECTED) DestroyNotify for %d and message is for %d (no callback)\n",
                        __FUNCTION__, (int)pEvent->xdestroywindow.window, (int)wID);
       }
     }
@@ -4708,6 +4776,8 @@ int WBWindowDispatch(Window wID, XEvent *pEvent)
       END_XCALL_DEBUG_WRAPPER
     }
 
+    // handle any DestroyNotify events at this point.  A parent window may send these to child windows, even
+    // after the window is actually destroyed and its callback NULL'd
 
     if(pEvent->type == DestroyNotify &&
        pEvent->xdestroywindow.window == wID) // I am being destroyed
@@ -4740,7 +4810,8 @@ int WBWindowDispatch(Window wID, XEvent *pEvent)
         pEntry->iWindowState = WB_WINDOW_DESTROYED;  // to flag "I am destroying it now"
 //        WB_ERROR_PRINT(">>TEMPORARY - %s - marking window %d (%s) destroyed and unregistering callback\n", __FUNCTION__, (int)wID, pEntry->szClassName);
 
-        WBUnregisterWindowCallback(wID);
+        WBUnregisterWindowCallback(wID); // NOTE:  this assigns 'wIDApplication' to None if this was the application window
+
         return iRval;
       }
       else
@@ -4885,14 +4956,66 @@ int WBDefault(Window wID, XEvent *pEvent)
     {
       if(pEvent->xclient.data.l[0] == aWM_DELETE_WINDOW)
       {
+        // If this is managed by the WM, I'll get this message in response to a request
+        // to close the window.  This includes clicking the 'x' button in the title bar
+
+        XClientMessageEvent evt;
+
         WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Window | DebugSubSystem_Event,
                        "%s - WM_DELETE_WINDOW for %d (%08xH)\n",
                        __FUNCTION__, (int)wID, (int)wID);
 
-        // default action is to destroy the window
-        BEGIN_XCALL_DEBUG_WRAPPER
-        XDestroyWindow(pDisplay, wID);  // todo:  wrap this in ???
-        END_XCALL_DEBUG_WRAPPER
+        WB_ERROR_PRINT("TEMPORARY:  %s - WM_PROTOCOLS WM_DELETE_WINDOW, requests call to XDestroyWindow for %u (%08xH)\n", __FUNCTION__, (int)wID, (int)wID);
+
+        // the default action is to FIRST query the window to see if it's ok to destroy it.  if it is,
+        // the window should THEN safely destroy all of its child windows, etc. before returning, so that
+        // I don't end up with a pile of X11 errors.
+
+        bzero(&evt, sizeof(evt));
+        evt.type = ClientMessage;
+        evt.display = pDisplay;
+        evt.window = wID;
+        evt.message_type = aQUERY_CLOSE; // QUERY_CLOSE request
+        evt.format = 32;
+        evt.data.l[0] = 1; // tell it to destroy contents if ok to close
+
+        i1 = WBWindowDispatch(evt.window, (XEvent *)&evt);
+
+        if(i1 <= 0) // ok to close the window (or there was an error, so close anyway)
+        {
+          if(i1 < 0)
+          {
+            WB_ERROR_PRINT("ERROR:  %s - QUERY_CLOSE returns %d, destroying window %u (%08xH) anyway\n",
+                           __FUNCTION__, i1, (int)wID, (int)wID);
+          }
+          else
+          {
+            WB_ERROR_PRINT("INFO:  %s - QUERY_CLOSE returns %d, ok to destroy window %u (%08xH)\n",
+                           __FUNCTION__, i1, (int)wID, (int)wID);
+          }
+
+          if(wID == wIDApplication) // if it's the "application window", set the quit flag
+          {
+//            WB_ERROR_PRINT("TEMPORARY:  %s - setting 'quit' flag\n", __FUNCTION__);
+
+            bQuitFlag = TRUE; // application window destroyed, application must exit
+          }
+
+          // window destruction means delete remaining events, then unregister the callback
+          __WBDelWindowEvents(pEntry->pDisplay, wID);
+
+          pEntry->iWindowState = WB_WINDOW_DESTROYED;  // to flag "I am destroying it now"
+
+          WBUnregisterWindowCallback(wID); // make sure this happens - FYI it assigns matching wIDApplication to 'None'
+
+//        WBDestroyWindow(wID); // destroy the window  (DO NOT CALL THIS, the application will stay running if it's the main frame)
+
+          // default action is to destroy the window *NOW*
+          BEGIN_XCALL_DEBUG_WRAPPER
+          XDestroyWindow(pDisplay, wID);  // todo:  wrap this in ???
+          END_XCALL_DEBUG_WRAPPER
+        }
+
         return 1;  // "handled"
       }
     }
@@ -4993,6 +5116,7 @@ int WBDefault(Window wID, XEvent *pEvent)
 
       // Look for any other occurences of this menu attached to any other window
       // TODO: make this more efficient, eh?
+      // TODO:  see if I even need this.  I've not been sharing WBMenu resources at all...
 
       for(i1=0; i1 <= WINDOW_ENTRY_ARRAY_MAX; i1++)
       {
@@ -6848,8 +6972,11 @@ void WBRemoveMenuWindow(Window wID, Window wIDMenu)
     for(i1=0; i1 <= WINDOW_ENTRY_ARRAY_MAX; i1++)
     {
       if(sWBHashEntries[i1].wIDMenu == wIDMenu)
+      {
         sWBHashEntries[i1].wIDMenu = 0;
+      }
     }
+
     return;
   }
 
@@ -6857,7 +6984,9 @@ void WBRemoveMenuWindow(Window wID, Window wIDMenu)
   if(pEntry)
   {
     if(pEntry->wIDMenu == wIDMenu)
+    {
       pEntry->wIDMenu = 0;
+    }
   }
   else
   {

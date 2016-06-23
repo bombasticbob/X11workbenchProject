@@ -56,6 +56,7 @@
 #include "window_helper.h"
 #include "font_helper.h"
 #include "child_frame.h"
+#include "draw_text.h"
 
 
 static WBChildFrame *pChildFrames = NULL;  // pointer to linked list of 'Child Frame' windows
@@ -80,15 +81,16 @@ int iRval = -1;
     return -1;
   }
 
+  // zero out entire structure beforehand
+  bzero(pChildFrame, sizeof(*pChildFrame));
+
+
   // FIRST, attach the child frame to my list o' child frames, making sure
   // that it is not already there [if it is assume this was called twice]
   // while I'm at it, zero out the structure BEFORE I assign 'pNext'
 
   if(!pChildFrames)
   {
-    // zero out entire structure beforehand
-    bzero(pChildFrame, sizeof(*pChildFrame));
-
     pChildFrames = pChildFrame;
     pChildFrame->pNext = NULL; // make sure
   }
@@ -130,7 +132,7 @@ int iRval = -1;
 
   if((WBFrameWindow_NO_TABS & pOwner->iFlags)) // window has NO tabs
   {
-    if(FWGetNumContWindows(pOwner)) // error *OR* > 0, doesn't matter
+    if(FWGetNumContWindows(pOwner)) // error *OR* > 0, doesn't matter, can ONLY have one tab in the frame
     {
       FWDestroyChildFrame(pChildFrame); // this unhooks everything (alloc'd things are zero'd by bzero)
 
@@ -141,6 +143,7 @@ int iRval = -1;
 
   // NEXT, set up all of the various 'things' in the structure that are simple assignments
   pChildFrame->ulTag = CHILD_FRAME_TAG;
+  pChildFrame->destructor = NULL; // make sure
 
   if(!pFont)
   {
@@ -151,6 +154,47 @@ int iRval = -1;
     pChildFrame->pFont = WBCopyFont(pFont);
   }
 
+  if(szFocusMenu)
+  {
+    pChildFrame->pszMenuResource = WBCopyString(szFocusMenu);
+
+    if(!pChildFrame->pszMenuResource)
+    {
+      FWDestroyChildFrame(pChildFrame); // this unhooks everything (alloc'd things are zero'd by bzero)
+      return -5; // not enough memory
+    }
+  }
+  else
+  {
+    pChildFrame->pszMenuResource = NULL;
+  }
+
+  if(pHandlerArray)
+  {
+    const WBFWMenuHandler *pH;
+    int i1;
+
+    // count the number of entries in the menu handler
+    for(i1=0, pH = pHandlerArray; pH->lMenuID || pH->callback || pH->UIcallback; i1++, pH++)
+    {
+      // NOTHING inside the loop.  just count.
+    }
+
+    // allocate space and make a copy
+
+    pChildFrame->pMenuHandler = (WBFWMenuHandler *)malloc(sizeof(WBFWMenuHandler) * (i1 + 2));
+
+    if(pChildFrame->pMenuHandler)
+    {
+      memcpy(pChildFrame->pMenuHandler, pHandlerArray,
+             sizeof(WBFWMenuHandler) * (i1 + 1));
+    }
+    else
+    {
+      FWDestroyChildFrame(pChildFrame); // this unhooks everything (alloc'd things are zero'd by bzero)
+      return -5; // not enough memory
+    }
+  }
 
   // Next, I need to create the window via 'WBCreateWindow()'
 
@@ -163,7 +207,7 @@ int iRval = -1;
 
   pChildFrame->wID = WBCreateWindow(pDisplay, pOwner->wID, FWChildFrameEvent, "ChildFrame",
                                     pOwner->iClientX, pOwner->iClientY,
-                                    pOwner->iClientWidth - 2, pOwner->iClientHeight - 2, // border is 1 pixel
+                                    pOwner->iClientWidth - 2, pOwner->iClientHeight - 2, // border is 1 pixel, so subtract 2
                                     1, InputOutput,
                                     CWBorderPixel | CWBackPixel | CWColormap | CWBitGravity,
                                     &xswa);
@@ -182,7 +226,8 @@ int iRval = -1;
   // create the default graphics context using the frame's color info
   WBCreateWindowDefaultGC(pChildFrame->wID, FWGetDefaultFG().pixel, FWGetDefaultBG().pixel);
 
-  // now allow specific kinds of input messages
+  // now allow specific kinds of input messages.  I won't need 'structure notify' as they won't work
+  // anyway.  those end up going to the frame window, and it passes them (as needed) to me.
   XSelectInput(pDisplay, pChildFrame->wID,
                WB_STANDARD_INPUT_MASK | WB_MOUSE_INPUT_MASK | WB_KEYBOARD_INPUT_MASK);
 
@@ -194,7 +239,7 @@ int iRval = -1;
 
   if(iRval < 0) // error? (returns negative on error, otherwise the tab index)
   {
-    FWDestroyChildFrame(pChildFrame); // this frees up all of the resources
+    FWDestroyChildFrame(pChildFrame); // this frees up all of the resources (but does not free the mem block)
   }
 
   // TODO:  other things
@@ -205,6 +250,7 @@ int iRval = -1;
 void FWDestroyChildFrame(WBChildFrame *pChildFrame)
 {
 WBChildFrame *pC, *pC2;
+Window wID;
 
 
   if(!pChildFrame)
@@ -212,9 +258,63 @@ WBChildFrame *pC, *pC2;
     return;
   }
 
-  // FIRST, unlink this object from the child frame list
+  wID = pChildFrame->wID; // make a copy of it
 
-  if(pChildFrames) // just in case
+  // FIRST, tell the owner to remove me from the list
+
+  if(pChildFrame->pOwner)
+  {
+    FWRemoveContainedWindow(pChildFrame->pOwner, pChildFrame);
+
+    if(pChildFrame->pOwner != NULL)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - owner pointer was nut 'NULL'd out\n", __FUNCTION__);
+    }
+
+    pChildFrame->pOwner = NULL;
+  }
+
+  // NOW, free up any resources that were malloc'd - they must also be free'd
+
+  if(pChildFrame->szDisplayName)
+  {
+    free(pChildFrame->szDisplayName);
+    pChildFrame->szDisplayName = NULL;
+  }
+
+  if(pChildFrame->pFont)
+  {
+    XFreeFont(WBGetDefaultDisplay(), pChildFrame->pFont);
+    pChildFrame->pFont = NULL;
+  }
+
+  if(pChildFrame->pMenuHandler)
+  {
+    free(pChildFrame->pMenuHandler);
+    pChildFrame->pMenuHandler = NULL;
+  }
+
+  if(pChildFrame->pszMenuResource)
+  {
+    free(pChildFrame->pszMenuResource);
+    pChildFrame->pszMenuResource = NULL;
+  }
+
+  // And, NOW, destroy the window itself [if it's valid]
+  //
+  // NOTE:  to prevent recursion problems, a 'DestroyNotify' would mark the window ID 'None'
+  //        before calling this function.  this will happen within my OWN proc, if the superclass doesn't do it
+
+  if(pChildFrame->wID != None) // if there's a chance of recursion, I detect it here
+  {
+    WBDestroyWindow(pChildFrame->wID);
+    pChildFrame->wID = None; // make sure
+  }
+
+  // FINALLY, unlink this object from the child frame list.  Do it by walking the list, looking for
+  // this entry in the list.  If I find it, I unlink it [otherwise, the 'pNext' link might be *stale*]
+
+  if(pChildFrames) // just in case, walk the list - do not rely on possibly stale pointers
   {
     pC2 = NULL;
     pC = pChildFrames;
@@ -242,51 +342,151 @@ WBChildFrame *pC, *pC2;
     }
   }
 
-  // next, tell the owner to remove me from the list
+  pChildFrame->pNext = NULL; // make sure it's not a pointer someplace that can cause problems
 
-  if(pChildFrame->pOwner)
+  // if the 'superclass' destructor was specified, call it NOW.
+  
+  if(pChildFrame->destructor)
   {
-    FWRemoveContainedWindow(pChildFrame->pOwner, pChildFrame);
+    // at this point, we ALWAYS destroy the callback function.
+    // "it is assumed" that I won't be needing 'DestroyNotify' to
+    // trigger any destruction.  That happens *AFTER* the window was
+    // destroyed, and happens asynchronously, typically before the
+    // frame window was destroyed.
+
+    // so, to make sure that I don't get an event callback that references
+    // the window object after it's free'd, I need to remove the callback.
+
+    if(wID != None)
+    {
+      WBUnregisterWindowCallback(wID); // no more event handling
+      WBSetWindowData(wID, 0, (void *)NULL); // window data is no longer pointing here
+    }
+
+    // and THEN, it's safe to call the destructor on the original object.
+    pChildFrame->destructor(pChildFrame); // this should auto-delete as well
+  }
+  else
+  {
+    // TODO:  should I perform a 'Destroy Notify' callback of my own?
+
+    // NOTE:  NOT calling 'WBunregisterWindowCallback()' so 'Destroy Notify' does its job.  hopefully.
   }
 
+  // NOTE:  I have to leave the tag alone at this point, to validate that it's
+  //        a 'Child Frame' structure.  But everything else needs to be zero'd out
+  //        (I used to use 'bzero' but I'm just commenting it here, for reference)
+  //        so... make sure everything that's free'd gets ZERO'd as well.  this is
+  //        because a 'DestroyNotify' handler that frees up the memory (and destroys
+  //        any 'superclass') will probably call this function again, and it might
+  //        happen asynchronously.  In fact, it probably WILL happen asynchronously.
 
-  // FINALLY, free the window
-  WBDestroyWindow(pChildFrame->wID);
+  //  bzero(pChildFrame, sizeof(*pChildFrame)); // zero it out (as a matter of course)
 
-  // and any resources that were malloc'd must also be free'd
+  // note that I do *NOT* free the WBChildFrame HERE - this simply releases all resources for it.
+  // If there is NO DESTRUCTOR, the 'Destroy Notify' handler needs to do that, or at least SOMETHING.
+  // *NOT* handling this properly can result in 'use after free' problems.
+}
+
+void FWSetChildFrameMenu(WBChildFrame *pChildFrame, const char *szFocusMenu)
+{
+  if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
+  {
+    return;
+  }
+
+  if(pChildFrame->pszMenuResource)
+  {
+    free(pChildFrame->pszMenuResource);
+  }
+
+  if(szFocusMenu)
+  {
+    pChildFrame->pszMenuResource = WBCopyString(szFocusMenu);
+  }
+  else
+  {
+    pChildFrame->pszMenuResource = NULL;
+  }
+
+}
+
+void FWSetChildFrameMenuHandlers(WBChildFrame *pChildFrame, const WBFWMenuHandler *pHandlerArray)
+{
+  if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
+  {
+    return;
+  }
+
+  if(pChildFrame->pMenuHandler)
+  {
+    free(pChildFrame->pMenuHandler);
+  }
+
+  if(pHandlerArray)
+  {
+    const WBFWMenuHandler *pH;
+    int i1;
+
+    // count the number of entries in the menu handler
+    for(i1=0, pH = pHandlerArray; pH->lMenuID || pH->callback || pH->UIcallback; i1++, pH++)
+    {
+      // NOTHING inside the loop.  just count.
+    }
+
+    // allocate space and make a copy
+
+    pChildFrame->pMenuHandler = (WBFWMenuHandler *)malloc(sizeof(WBFWMenuHandler) * (i1 + 2));
+
+    if(pChildFrame->pMenuHandler)
+    {
+      memcpy(pChildFrame->pMenuHandler, pHandlerArray,
+             sizeof(WBFWMenuHandler) * (i1 + 1));
+    }
+  }
+  else
+  {
+    pChildFrame->pMenuHandler = NULL;
+  }
+}
+
+void FWSetChildFrameDisplayName(WBChildFrame *pChildFrame, const char *szDisplayName)
+{
+  if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
+  {
+    return;
+  }
 
   if(pChildFrame->szDisplayName)
   {
     free(pChildFrame->szDisplayName);
   }
 
-  if(pChildFrame->pFont)
+  if(!szDisplayName)
   {
-    XFreeFont(WBGetDefaultDisplay(), pChildFrame->pFont);
+    return;
   }
 
-  bzero(pChildFrame, sizeof(*pChildFrame)); // zero it out [so I don't re-free things if I call something twice]
-
-}
-
-void FWSetChildFrameMenu(WBChildFrame *pChildFrame, const char *szFocusMenu)
-{
-}
-
-void FWSetChildFrameMenuHandlers(WBChildFrame *pChildFrame, const WBFWMenuHandler *pHandlerArray)
-{
-}
-
-void FWSetChildFrameDisplayName(WBChildFrame *pChildFrame, const char *szDisplayName)
-{
+  pChildFrame->szDisplayName = WBCopyString(szDisplayName);
 }
 
 void FWSetChildFrameImageAtom(WBChildFrame *pChildFrame, Atom aImage)
 {
+  if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
+  {
+    return;
+  }
+
+  pChildFrame->aImageAtom = aImage;
 }
 
 void FWSetChildFrameExtent(WBChildFrame *pChildFrame, int iXExtent, int iYExtent)
 {
+  if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
+  {
+    return;
+  }
+
   // NOTE:  see (and maybe call) FWChildFrameRecalcLayout, below
 }
 
@@ -298,10 +498,11 @@ Display *pDisplay;
 int iL, iT, iW, iH;
 
 
-  if(!pChildFrame) // TODO:  properly validate this (anal retentive if DEBUG build)
+  if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
   {
     return;
   }
+
 
   pDisplay = WBGetWindowDisplay(pChildFrame->wID);
   pOwner = pChildFrame->pOwner;
@@ -362,19 +563,64 @@ int iL, iT, iW, iH;
 }
 
 
+int FWChildFrameQueryClose(WBChildFrame *pChildFrame)
+{
+Display *pDisplay;
+XClientMessageEvent evt;
+
+
+  if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
+  {
+    return -1; // an error
+  }
+
+  if(!pChildFrame->pUserCallback)
+  {
+    return 0; // return 'ok to close' when there's no 'user callback' function to query
+  }
+
+  pDisplay = WBGetWindowDisplay(pChildFrame->wID);
+
+  bzero(&evt, sizeof(evt));
+  evt.type = ClientMessage;
+
+  evt.display = pDisplay;
+  evt.window = pChildFrame->wID;
+  evt.message_type = aQUERY_CLOSE;
+  evt.format = 32;  // always
+
+  return pChildFrame->pUserCallback(evt.window, (XEvent *)&evt);
+}
+
+
 // DEFAULT WINDOW EVENT HANDLER FOR CHILD FRAME
 
 int FWChildFrameEvent(Window wID, XEvent *pEvent)
 {
 int iRval = 0;
 WBChildFrame *pC;
+WBFrameWindow *pFW;
+#ifndef NO_DEBUG
+char tbuf[32]; // for keyboard input
+int nChar = sizeof(tbuf);
+#endif // NO_DEBUG
+
 
   pC = FWGetChildFrameStruct(wID);
 
   if(!pC)
   {
+#ifndef NO_DEBUG
+    WB_ERROR_PRINT("ERROR:  %s - no child frame structure, window data is %p\n", __FUNCTION__, WBGetWindowData(wID, 0));
+
+    WBDebugDumpEvent(pEvent);
+#endif // NO_DEBUG
+
     return 0;
   }
+
+  pFW = pC->pOwner; // make sure I know my owning frame window
+
 
   // TODO:  messages I handle myself, before any user callbacks
   //        (and perhaps messages that I don't pass to the callback at all)
@@ -384,11 +630,102 @@ WBChildFrame *pC;
     iRval = pC->pUserCallback(wID, pEvent);
   }  
 
+  // regardless, for a 'DestroyNotify, assign wID to 'None' in the ChildFrame class
+
   if(!iRval)
   {
     // TODO:  default handling of messages NOT handled by user callback
 
+    switch(pEvent->type)
+    {
+      case KeyPress:
+        {
+#ifndef NO_DEBUG
+          int iACS = 0;
+          int iKey = WBKeyEventProcessKey((XKeyEvent *)pEvent, tbuf, &nChar, &iACS);
+
+          WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame | DebugSubSystem_Keyboard,
+                         "%s KEY PRESS for KEY %d KEYCODE %d MASK=%d (%xH)\n",
+                           __FUNCTION__, iKey, ((XKeyEvent *)pEvent)->keycode,
+                           ((XKeyEvent *)pEvent)->state, ((XKeyEvent *)pEvent)->state);
+#endif // NO_DEBUG
+
+          // check for menu and hotkey activation.
+//          if(nChar > 0) // only for "real" characters (i.e. not just the ALT key)
+          if(pFW)
+          {
+            WBMenuBarWindow *pMenuBar = MBGetMenuBarWindowStruct(WBGetMenuWindow(pFW->wID));
+
+            if(pMenuBar)  // menu bar exists?
+            {
+              WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Menu | DebugSubSystem_Frame | DebugSubSystem_Keyboard,
+                             "%s call to MBMenuProcessHotKey for menu window %d (%08xH)\n",
+                             __FUNCTION__, (int)pMenuBar->wSelf, (int)pMenuBar->wSelf);
+
+              iRval = MBMenuProcessHotKey(pMenuBar->pMenu, (XKeyEvent *)pEvent);
+            }
+          }
+        }
+        break;
+
+      case KeyRelease:
+        {
+          // KeyRelease
+#ifndef NO_DEBUG
+          int iACS = 0, iKey = WBKeyEventProcessKey((XKeyEvent *)pEvent, tbuf, &nChar, &iACS);
+
+          if(nChar > 0)
+          {
+            WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame | DebugSubSystem_Keyboard,
+                           "%s KEY RELEASE for KEY %d KEYCODE %d  MASK=%d (%xH)\n",
+                           __FUNCTION__, iKey, ((XKeyEvent *)pEvent)->keycode,
+                           ((XKeyEvent *)pEvent)->state, ((XKeyEvent *)pEvent)->state);
+
+          }
+#endif // NO_DEBUG
+
+        }
+
+        break;
+    }
   }
+
+
+  if(pEvent->type == DestroyNotify &&
+     pEvent->xdestroywindow.window == wID)
+  {
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
+                   "%s - DestroyNotify\n", __FUNCTION__);
+
+    if(!iRval)
+    {
+      WB_ERROR_PRINT("TEMPORARY:  %s - DestroyNotify *NOT* handled by superclass\n", __FUNCTION__);
+    }
+
+    pC = FWGetChildFrameStruct(wID); // re-get the structure (it may have been deleted, probably SHOULD have been)
+
+    if(pC && pC->wID != None) // haven't called FWDestroyChildFrame yet?
+    {
+      // mark window ID 'None', then call FWDestroyChildFrame from here
+      // by design it's safe to do that...
+
+      pC->wID = None; // since window already 'destroyed' - I'm getting the notification after all
+
+      // set the window callback to NULL - this disconnects me from the message processor also
+      // as well as freeing up everything
+
+      FWDestroyChildFrame(pC); // make sure it's destroyed, unlinked, etc. (pointer may not be valid now)
+
+      WB_ERROR_PRINT("TEMPORARY:  %s - DestroyNotify handled by Child Window base class\n", __FUNCTION__);
+    }
+
+    WBUnregisterWindowCallback(wID); // prevents any more messages from being dispatched to this function
+
+    WB_DEBUG_PRINT(DebugLevel_ERROR/*DebugLevel_Verbose | DebugSubSystem_Event | DebugSubSystem_Frame*/,
+                   "%s - child frame window destroyed\n", __FUNCTION__);
+    return 1;
+  }
+
 
   return iRval;
 }

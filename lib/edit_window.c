@@ -57,6 +57,8 @@
 
 
 int FWEditWindowEvent(Window wID, XEvent *pEvent);
+static void InternalEditWindowDestructor(WBChildFrame *pC);
+static void InternalEditWindowDestroy(WBEditWindow *pEditWindow);
 
 static XColor clrFG, clrBG, clrAFG, clrABG;
 static int iInitColorFlag = 0;
@@ -139,20 +141,30 @@ WBEditWindow *pRval;
     return NULL;
   }                    
 
-  // TODO:  any other initialization
+  // assign my 'destructor', which will be called by FWDestroyChildFrame
+  // THIS must be done LAST, since 'FWInitChildFrame' might call FWDestroyChildFrame on error
+  // and I don't want to call the 'destructor' yet.
+  pRval->childframe.destructor = InternalEditWindowDestructor;
+
+
+  // TODO:  any other initialization belongs HERE.  if error, call FWDestroyChildFrame() and return
+  //        a NULL immediately (since that would destroy the child frame AND the Edit Window stuff)
+
 
   return pRval;
 }
 
-void WBDestroyEditWindow(WBEditWindow *pEditWindow)
+// this function destroys any allocated objects in the WBEditWindow, but doesn't free the pointer
+static void InternalEditWindowDestroy(WBEditWindow *pEditWindow)
 {
-  FWDestroyChildFrame(&(pEditWindow->childframe));
+  // these next 'things' are private to this particular 'class'
 
   if(pEditWindow->szFileName)
   {
     free(pEditWindow->szFileName);
     pEditWindow->szFileName = NULL;
   }
+
   if(pEditWindow->pTextObjects)
   {
     // TODO:  destroy them individually
@@ -160,8 +172,42 @@ void WBDestroyEditWindow(WBEditWindow *pEditWindow)
     free(pEditWindow->pTextObjects);
     pEditWindow->pTextObjects = NULL;
   }
+}
 
-  free(pEditWindow); // TODO:  put this in a 'garbage collector' instead?
+static void InternalEditWindowDestructor(WBChildFrame *pC)
+{
+  WBEditWindow *pEW = (WBEditWindow *)pC;
+
+//  WB_ERROR_PRINT("TEMPORARY:  %s - destroying edit window %p\n", __FUNCTION__, pEW);
+
+  InternalEditWindowDestroy(pEW);
+  
+  bzero(pEW, sizeof(*pEW)); // in case anything else 'stale' is there
+
+  free(pEW);  
+
+//  WB_ERROR_PRINT("TEMPORARY:  %s - destroyed edit window %p\n", __FUNCTION__, pEW);
+}
+
+void WBDestroyEditWindow(WBEditWindow *pEditWindow)
+{
+Window wID;
+
+  if(pEditWindow->childframe.pUserCallback == FWEditWindowEvent)
+  {
+    pEditWindow->childframe.pUserCallback = NULL;  // prevents any kind of recursion from messages (unlikely)
+  }
+
+  if(pEditWindow->childframe.destructor == NULL)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - destructor is NULL - pointer will not be free'd\n");    
+
+    InternalEditWindowDestroy(pEditWindow); // perform the necessary destruction *ANYWAY* but don't free the pointer
+
+    // TODO:  assign the destructor to NULL and call it directly after calling FWDestroyChildFrame() ?
+  }
+
+  FWDestroyChildFrame(&(pEditWindow->childframe)); // destroy window, free up all resources, call destructor (if not NULL)
 }
 
 WBEditWindow *WBEditWindowFromWindowID(Window wID)
@@ -178,11 +224,15 @@ Display *pDisplay = WBGetWindowDisplay(wID);
 
 
   pE = WBEditWindowFromWindowID(wID);
+  if(!pE)
+  {
+    return 0;
+  }
 
   switch(pEvent->type)
   {
     case Expose:
-      WB_ERROR_PRINT("TEMPORARY:  %s - expose event\n", __FUNCTION__);
+//      WB_ERROR_PRINT("TEMPORARY:  %s - expose event\n", __FUNCTION__);
       geom.x = pEvent->xexpose.x;
       geom.y = pEvent->xexpose.y;
       geom.width = pEvent->xexpose.width;
@@ -198,6 +248,21 @@ Display *pDisplay = WBGetWindowDisplay(wID);
       WBEndPaint(wID, gc);
       
       return 1; // "handled"
+
+    case DestroyNotify:
+      // if I'm destroying ME, then I must free up the structure.
+      // if this callback is being called, assume NOT recursive.
+
+      if(pEvent->xdestroywindow.window == wID)
+      {
+        pE->childframe.wID = None; // assign 'none' as the window ID, since I already destroyed it.  don't re-destroy it.
+
+        WBDestroyEditWindow(pE);  // this should fix everything else.
+        
+        return 1; // handled
+      }
+
+      break;
   }
   
   return 0; // for now, NONE are handled

@@ -871,7 +871,7 @@ unsigned char aAnswers[256] =
 }
 
 void WBDraw3DBorderTab(Display *pDisplay, Drawable dw, GC gc, WB_GEOM *pgeomOutline,
-                       int bFocus, unsigned long lFGColor, unsigned long lBGColor,
+                       int fFocus, unsigned long lFGColor, unsigned long lBGColor,
                        unsigned long lBorderColor1, unsigned long lBorderColor2,
                        unsigned long lHighlightColor,
                        XFontStruct *pFont, XFontStruct *pBoldFont,
@@ -879,10 +879,24 @@ void WBDraw3DBorderTab(Display *pDisplay, Drawable dw, GC gc, WB_GEOM *pgeomOutl
 {
 XPoint xpt[13];
 XColor clrAvg, clrTemp;
+int iFontHeight, bFocus;
 int i1, i2, iR, iG, iB, iY, iU, iV, iYBG;
 Region rgnClip;
 GC gc2;
 WB_RECT rctTemp;
+
+
+  if(!pFont)
+  {
+    pFont = WBGetDefaultFont();
+  }
+
+  if(!pBoldFont)
+  {
+    pBoldFont = WBGetDefaultFont();
+  }
+
+  iFontHeight = pFont->ascent + pFont->descent;
 
 
   // begin by creating a region that consists of my 'rounded rect' polygon
@@ -946,6 +960,11 @@ WB_RECT rctTemp;
 
   // select the clip region
   XSetRegion(pDisplay, gc2, rgnClip);
+
+  // set 'bFocus' to indicate if I have focus.  'fFocus' also indicates 'x' button state
+  // 0 or < -1 is "I do not have focus".  -1 or > 0 is "I have focus".  negative is 'x button clicked'
+
+  bFocus = fFocus > 0 || fFocus == -1;
 
   if(bFocus)
   {
@@ -1132,18 +1151,57 @@ WB_RECT rctTemp;
   XSetForeground(pDisplay, gc2, lFGColor);
 
   // for now just do centered text
-  DTDrawSingleLineText(pFont ? pFont : WBGetDefaultFont(),
-                       szText, pDisplay, gc, dw, 0, 0, &rctTemp,
+  DTDrawSingleLineText(pFont, szText, pDisplay, gc2, dw, 0, 0, &rctTemp,
                        DTAlignment_HCENTER | DTAlignment_VCENTER);
 
 
+  // NOW, I need to draw the 'x' for the close button.  Fist, I calculate its rect
+
+  rctTemp.top = pgeomOutline->y + 2;                         // top plus 2 pixels
+  rctTemp.bottom = rctTemp.top + iFontHeight;                // height is font height
+  rctTemp.right = pgeomOutline->x + pgeomOutline->width - 6; // right is 6 pixels from right edge
+  rctTemp.left = rctTemp.right - iFontHeight + 2;            // left is 2 pixels + font height from right
+
+  if(fFocus < 0) // clicking 'x' ?
+  {
+    XSetForeground(pDisplay, gc2, lHighlightColor);
+    XSetBackground(pDisplay, gc2, lHighlightColor);
+  }
+  else
+  {
+    XSetForeground(pDisplay, gc2, lBGColor);
+    XSetBackground(pDisplay, gc2, lBGColor);
+  }
+
+  // fill in with selected colors
+
+  XFillRectangle(pDisplay, dw, gc2, rctTemp.left, rctTemp.top, rctTemp.right - rctTemp.left, rctTemp.bottom - rctTemp.top);
+
+  if(fFocus < 0) // clicking 'x' ?
+  {
+    XSetForeground(pDisplay, gc2, lBGColor);
+  }
+  else
+  {
+    XSetForeground(pDisplay, gc2, lHighlightColor);
+  }
+
+  // now draw the '+' using a BOLD font
+
+  rctTemp.left -=2;
+  rctTemp.right += 2;
+  rctTemp.top -= 2;
+  rctTemp.bottom += 2; // big enough to 'center' properly
+
+  DTDrawSingleLineText(pBoldFont, "x", pDisplay, gc2, dw, 0, 0, &rctTemp,
+                       DTAlignment_HCENTER | DTAlignment_VCENTER);
 
 
   XFreeGC(pDisplay, gc2);
   XDestroyRegion(rgnClip);
 
 
-  WB_ERROR_PRINT("TEMPORARY:  %s - only partially implemented\n", __FUNCTION__);
+//  WB_ERROR_PRINT("TEMPORARY:  %s - only partially implemented\n", __FUNCTION__);
 }
 
 

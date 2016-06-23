@@ -251,9 +251,6 @@ typedef struct __WB_FW_MENU_HANDLER__
     int iClientWidth;                    // The current width of the frame window's client area
     int iClientHeight;                   // The current height of the frame window's client area
 
-    int iFirstTab;                       // The first visible tab index (0 if none)
-    int iTabWidth;                       // The width of each tab (in pixels)
-    int iNumTabs;                        // The total number of visible tabs
   } WBFrameWindow;
 
   * \endcode
@@ -270,9 +267,6 @@ typedef struct __WB_FRAME_WINDOW__
   int iClientWidth;                    ///< The current width of the frame window's client area
   int iClientHeight;                   ///< The current height of the frame window's client area
 
-  int iFirstTab;                       ///< The first visible tab index (0 if none)
-  int iTabWidth;                       ///< The width of each tab (in pixels)
-  int iNumTabs;                        ///< The total number of visible tabs
 } WBFrameWindow;
 
 
@@ -335,7 +329,7 @@ enum WBStatusTabInfo_FLAGS
   typedef struct __WBChildFrame__
   {
     unsigned int ulTag;               // tag indicating I'm a 'Child Frame' window
-    Window wID;                       // window identifier for the 'Child Frame' window
+    Window wID;                       // window identifier for the 'Child Frame' window.  may contain 'None' while being destroyed
     WBFrameWindow *pOwner;            // a pointer to the WBFrameWindow owner
     XFontStruct *pFont;               // default font for the window
 
@@ -359,7 +353,11 @@ enum WBStatusTabInfo_FLAGS
     char *szDisplayName;              // display name shown in tab and title bar.  You should not alter this member directly.
     Atom aImageAtom;                  // 'image' atom for display in tabs.  default is 'None'.  You should not alter this member directly.
 
+    char *pszMenuResource;            ///< malloc'd resource string for this child frame's menu (NULL = 'use default')
+    WBFWMenuHandler *pMenuHandler;    ///< malloc'd menu handler for this child frame's menu (NULL = 'use default')
+
     WBWinEvent pUserCallback;         // message callback function pointer (can be NULL)
+    void (*destructor)(struct __WBChildFrame__ *);  // pointer to a destructor.  if not NULL, will be called by FWDestroyChildFrame()
 
     struct __WBChildFrame__ *pNext;   // 'Next Object' pointer in an internally stored linked list
   } WBChildFrame;
@@ -374,7 +372,7 @@ enum WBStatusTabInfo_FLAGS
 typedef struct __WBChildFrame__
 {
   unsigned int ulTag;               ///< tag indicating I'm a 'Child Frame' window
-  Window wID;                       ///< window identifier for the 'Child Frame' window
+  Window wID;                       ///< window identifier for the 'Child Frame' window.  may contain 'None' while being destroyed
   WBFrameWindow *pOwner;            ///< a pointer to the WBFrameWindow owner
   XFontStruct *pFont;               ///< default font for the window
 
@@ -398,7 +396,11 @@ typedef struct __WBChildFrame__
   char *szDisplayName;              ///< display name shown in tab and title bar.  You should not alter this member directly.
   Atom aImageAtom;                  ///< 'image' atom for display in tabs.  default is 'None'.  You should not alter this member directly.
 
+  char *pszMenuResource;            ///< resource string for this child frame's menu (NULL = 'use default')
+  WBFWMenuHandler *pMenuHandler;    ///< menu handler for this child frame's menu (NULL = 'use default')
+
   WBWinEvent pUserCallback;         ///< message callback function pointer (can be NULL)
+  void (*destructor)(struct __WBChildFrame__ *);  ///< pointer to a 'superclass' destructor.  If not NULL, will be called by FWDestroyChildFrame()
 
   struct __WBChildFrame__ *pNext;   ///< 'Next Object' pointer in an internally stored linked list
 } WBChildFrame;
@@ -429,12 +431,7 @@ enum WBChildFrame_FLAGS
      /* this declares the atoms 'const' outside of frame_window.c, and does NOT declare them in clipboard_helper.c */
      /* These atoms are GLOBAL variables, assigned by the DEFAULT Display, and may not work for other threads.     */
 
-extern const Atom aNEW_TAB;      // command sent by Client Message to create a new tab (also ctrl+N)
-extern const Atom aNEXT_TAB;     // command sent by Client Message to switch to the next tab (also ctrl+alt+pgdn)
-extern const Atom aPREV_TAB;     // command sent by Client Message to switch to the previous tab (also ctrl+alt+pgup)
-extern const Atom aSET_TAB;      // command sent by Client Message to switch to the specified tab
-extern const Atom aCLOSE_TAB;    // command sent by Client Message to close the specified tab
-extern const Atom aREORDER_TAB;  // command sent by Client Message to re-order the specified tab (activate with mouse-drag)
+extern const Atom aTAB_MESSAGE;  // command sent by Client Message related to tabs
 
 #endif // !defined(_FRAME_WINDOW_C_) && !defined(_CLIPBOARD_HELPER_C)
 
@@ -659,6 +656,39 @@ void FWSetFocusWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pCont);
   * Header File:  frame_window.h
 **/
 void FWSetFocusWindowIndex(WBFrameWindow *pFrameWindow, int iIndex);
+
+/** \ingroup frame_window
+  * \brief Sets the focus to a specific contained window using its tab order index
+  *
+  * \param pFrameWindow A pointer to a WBFrameWindow structure for the frame window
+  * \param pCont A pointer to a WBChildFrame structure for the contained window.  Use NULL for the current focus window
+  * \returns The tab order index of 'pCont', or a negative value on error.
+  *
+  * Header File:  frame_window.h
+**/
+int FWGetChildFrameIndex(WBFrameWindow *pFrameWindow, WBChildFrame *pCont);
+
+/** \ingroup frame_window
+  * \brief Sets the specific contained window to a particular index in the tab order
+  *
+  * \param pFrameWindow A pointer to a WBFrameWindow structure for the frame window
+  * \param pCont A pointer to a WBChildFrame structure for the contained window.  Use NULL for the current focus window
+  * \param iIndex
+  * \parblock
+  * The new 'tab order' index to assign to the 'contained' window, or a constant indicating how
+  * to adjust the index
+  *
+  * A value of 0 to n assigns THAT tab index.  Positive values greater than the total number of tabs moves it to the end.\n
+  * A value of -1 moves the tab 1 to the left\n
+  * A value of -2 moves the tab 1 to the right\n
+  *
+  * Use a value of '0' to move the tab to the beginning.
+  * \endparblock
+  * \returns void
+  *
+  * Header File:  frame_window.h
+**/
+void FWMoveChildFrameTabIndex(WBFrameWindow *pFrameWindow, WBChildFrame *pCont, int iIndex);
 
 /** \ingroup frame_window
   * \brief Sets the 'status' text for a Frame Window with a status bar, forcing a re-paint

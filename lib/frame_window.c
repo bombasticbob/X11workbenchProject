@@ -69,6 +69,7 @@
 #include "child_frame.h"
 #include "conf_help.h"
 #include "draw_text.h"
+#include "dialog_window.h"
 
 
 #define TAB_BAR_HEIGHT           24 /* for now */
@@ -82,14 +83,20 @@
 #define FRAME_WINDOW_MIN_WIDTH  (100 + 12 * TAB_BAR_TAB_WIDTH)             /* re-sizable window absolute minimum width */
 #define FRAME_WINDOW_MIN_HEIGHT (100 + TAB_BAR_HEIGHT + STATUS_BAR_HEIGHT) /* re-sizable window absolute minimum height */
 
+#define NEW_TAB_MESSAGE     1
+#define NEXT_TAB_MESSAGE    2
+#define PREV_TAB_MESSAGE    3
+#define SET_TAB_MESSAGE     4
+#define CLOSE_TAB_MESSAGE   5
+#define REORDER_TAB_MESSAGE 6
 
 
 typedef struct __FRAME_WINDOW__
 {
   WBFrameWindow wbFW;
 
-  WBFWMenuHandler *pMenuHandler;     // pointer to the current menu handler structure array (internally allocated)
-  WBFWMenuHandler *pDefMenuHandler;  // pointer to default menu handler (assigned by 'FWSetMenuHandlers()')
+  WBFWMenuHandler *pMenuHandler;     // pointer to the current menu handler structure array.  don't 'free' this (it's a cache)
+  WBFWMenuHandler *pDefMenuHandler;  // pointer to  (internally allocated) default menu handler (assigned by 'FWSetMenuHandlers()')
 
   int nChildFrames;                  // total number of child frames
   int nMaxChildFrames;               // max number of child frames within the current array
@@ -101,6 +108,7 @@ typedef struct __FRAME_WINDOW__
   int nFocusTab;                     // which tab has the focus?  0 if no tabs
   int nLastTab;                      // last tab to have focus; -1 when no tabs visible
   int nLeftTab, nRightTab;           // left and right tab indices, same order as in ppChildFrames (0 if no tabs)
+  int nCloseTab;                     // a flag that indicates I'm closing a tab (UI mostly, triggers event on mouse-up)
 
   char *szTitle;                     // title bar string (malloc'd)
   char *szStatus;                    // status bar string (malloc'd)
@@ -170,12 +178,7 @@ static int iInitColorFlag = 0;
   * \hideinitializer
   * @{
 **/
-Atom aNEW_TAB = None;      ///< command sent by Client Message to create a new tab (also ctrl+N)
-Atom aNEXT_TAB = None;     ///< command sent by Client Message to switch to the next tab (also ctrl+alt+pgdn)
-Atom aPREV_TAB = None;     ///< command sent by Client Message to switch to the previous tab (also ctrl+alt+pgup)
-Atom aSET_TAB = None;      ///< command sent by Client Message to switch to the specified tab
-Atom aCLOSE_TAB = None;    ///< command sent by Client Message to close the specified tab
-Atom aREORDER_TAB = None;  ///< command sent by Client Message to re-order the specified tab (activate with mouse-drag)
+Atom aTAB_MESSAGE = None;      ///< command sent by Client Message related to 'tab' operations
 /**
   * @}
 **/
@@ -184,31 +187,49 @@ Atom aREORDER_TAB = None;  ///< command sent by Client Message to re-order the s
 
 static void __internal_destroy_frame_window(FRAME_WINDOW *pTemp)
 {
-  int i1;
+int i1;
+Window wIDMenu;
+WBMenuBarWindow *pMB;
+
 
   if(pTemp->ppChildFrames)
   {
-    for(i1=0; i1 < pTemp->nChildFrames && i1 < pTemp->nMaxChildFrames; i1++)
+    for(i1=pTemp->nChildFrames - 1; i1 >= 0; i1--)
     {
       WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Frame,
                      "%s - Destroy contents %d\n",
                      __FUNCTION__, i1 + 1);
 
-      if(pTemp->ppChildFrames[i1])
-      {
-        // validate the pointer
-#ifndef NO_DEBUG /* warning off for release build */
-#warning this is potentially unsafe code...
-#endif // !NO_DEBUG
+      WBChildFrame *pC = pTemp->ppChildFrames[i1];
 
-        WBDestroyWindow(pTemp->ppChildFrames[i1]->wID); // TODO:  improve this
+      if(pC)
+      {
+        pC->pOwner = NULL; // so it doesn't try to remove itself
+
+        pTemp->ppChildFrames[i1] = NULL; // so I don't try to do this again
+        FWDestroyChildFrame(pC); // should validate 'pC' before destroying
       }
     }
 
     free(pTemp->ppChildFrames);
+
     pTemp->ppChildFrames = NULL;
     pTemp->nChildFrames = 0; // by convention
     pTemp->nMaxChildFrames = 0; // this too
+  }
+
+  // destroy the menu bar window and menu
+  wIDMenu = WBGetMenuWindow(pTemp->wbFW.wID);
+
+  if(wIDMenu != None)
+  {
+    WBRemoveMenuWindow(pTemp->wbFW.wID, wIDMenu); // this should destroy it if no references
+
+    pMB = MBGetMenuBarWindowStruct(wIDMenu);
+    if(pMB)
+    {
+      MBDestroyMenuBarWindow(pMB);
+    }
   }
 
   if(pTemp->szTitle)
@@ -227,6 +248,12 @@ static void __internal_destroy_frame_window(FRAME_WINDOW *pTemp)
   {
     free(pTemp->pStatusBarTabs);
     pTemp->pStatusBarTabs = NULL;
+  }
+
+  if(pTemp->pDefMenuHandler)
+  {
+    free(pTemp->pDefMenuHandler);
+    pTemp->pDefMenuHandler = NULL;
   }
 
   if(pTemp->pDefaultMenuResource)
@@ -259,26 +286,12 @@ static void InternalCheckFWAtoms(void)
 {
 Display *pDisplay = WBGetDefaultDisplay();
 
-  if(aNEW_TAB      == None || // TODO:  use '&&' instad of '||' ?  only check ONE of them?  use a 'one time' flag?
-     aNEXT_TAB     == None ||
-     aPREV_TAB     == None ||
-     aSET_TAB      == None ||
-     aCLOSE_TAB    == None ||
-     aREORDER_TAB  == None)
-  {
-    aNEW_TAB          = XInternAtom(pDisplay, "FW_NEW_TAB", False);
-    aNEXT_TAB         = XInternAtom(pDisplay, "FW_NEXT_TAB", False);
-    aPREV_TAB         = XInternAtom(pDisplay, "FW_PREV_TAB", False);
-    aSET_TAB          = XInternAtom(pDisplay, "FW_SET_TAB", False);
-    aCLOSE_TAB        = XInternAtom(pDisplay, "FW_CLOSE_TAB", False);
-    aREORDER_TAB      = XInternAtom(pDisplay, "FW_REORDER_TAB", False);
 
-    if(aNEW_TAB      == None ||
-       aNEXT_TAB     == None ||
-       aPREV_TAB     == None ||
-       aSET_TAB      == None ||
-       aCLOSE_TAB    == None ||
-       aREORDER_TAB  == None)
+  if(aTAB_MESSAGE == None)
+  {
+    aTAB_MESSAGE = XInternAtom(pDisplay, "FW_TAB_MESSAGE", False);
+
+    if(aTAB_MESSAGE == None)
     {
       WB_ERROR_PRINT("ERROR:  %s - unable to initialize atom(s)\n", __FUNCTION__);
     }
@@ -436,9 +449,10 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
   pNew->nStatusBarTabs = 0; // DEFAULT_STATUS_BAR_TAB;
   pNew->pStatusBarTabs = NULL;
 
-  pNew->nAvgCharWidth = -1; // mostly for status bar, marks that it needs to be re-calc'd
+  pNew->nAvgCharWidth = -1;         // mostly for status bar, marks that it needs to be re-calc'd
   pNew->bTabBarRectAntiRecurse = 0; // must do this too (anti-recurse flag for tab bar)
-  pNew->nTabBarButtonFlags = 0;  // must do this as well (tab bar button bit flags)
+  pNew->nTabBarButtonFlags = 0;     // must do this as well (tab bar button bit flags)
+  pNew->nCloseTab = -1;             // mark that I'm NOT closing a tab (make sure
 
   // do the default status now
 
@@ -587,6 +601,9 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
 
   if(iFlags & WBFrameWindow_APP_WINDOW)
   {
+    WB_ERROR_PRINT("TEMPORARAY:  %s - setting %u (%08xH) as application window\n",
+                   __FUNCTION__, (int)pNew->wbFW.wID, (int)pNew->wbFW.wID);
+    
     WBSetApplicationWindow(pNew->wbFW.wID);
   }
 
@@ -632,14 +649,20 @@ void FWDestroyFrameWindow2(WBFrameWindow *pFrameWindow)
   if(pTemp)
   {
     if(pPrev)
+    {
       pPrev->pNext = pTemp->pNext;  // unhook
+    }
     else if(pFrames == pTemp)
+    {
       pFrames = pTemp->pNext;
+    }
   }
 
 
   if(wID > 0)
+  {
     WBDestroyWindow(wID);  // this will free the structure
+  }
   else
   {
     // I must destroy malloc'd entries and contained windows in lieu of 'FWDefaultCallback'
@@ -691,11 +714,16 @@ FRAME_WINDOW *pFrameWindow;
     return;
   }
 
-  if(pFrameWindow->pMenuHandler)
+  if(pFrameWindow->pDefMenuHandler)
   {
-    free(pFrameWindow->pMenuHandler);
+    if(pFrameWindow->pMenuHandler == pFrameWindow->pDefMenuHandler)
+    {
+      pFrameWindow->pMenuHandler = NULL; // don't re-use pointer
+    }
 
-    pFrameWindow->pMenuHandler = NULL;
+    free(pFrameWindow->pDefMenuHandler);
+
+    pFrameWindow->pDefMenuHandler = NULL;
   }
 
   if(!pHandlerArray)
@@ -706,565 +734,24 @@ FRAME_WINDOW *pFrameWindow;
   // count the number of entries
   for(i1=0, pH = pHandlerArray; pH->lMenuID || pH->callback || pH->UIcallback; i1++, pH++)
   {
-    // NOTHING inside the loop
+    // NOTHING inside the loop.  just count.
   }
 
   // allocate space and make a copy
 
-  pFrameWindow->pMenuHandler = (WBFWMenuHandler *)malloc(sizeof(WBFWMenuHandler) * (i1 + 2));
+  pFrameWindow->pDefMenuHandler = (WBFWMenuHandler *)malloc(sizeof(WBFWMenuHandler) * (i1 + 2));
 
-  if(pFrameWindow->pMenuHandler)
+  if(pFrameWindow->pDefMenuHandler)
   {
-    memcpy(pFrameWindow->pMenuHandler, pHandlerArray,
+    memcpy(pFrameWindow->pDefMenuHandler, pHandlerArray,
            sizeof(WBFWMenuHandler) * (i1 + 1));
   }
+
+  if(!pFrameWindow->pMenuHandler)
+  {
+    pFrameWindow->pMenuHandler = pFrameWindow->pDefMenuHandler; // re-assigned
+  }
 }
-
-int FWDefaultCallback(Window wID, XEvent *pEvent)
-{
-  FRAME_WINDOW *pFrameWindow;
-  Window wIDMenu;
-  int iRval = 0;
-#ifndef NO_DEBUG
-  char tbuf[32]; // for keyboard input
-  int nChar = sizeof(tbuf);
-#endif // NO_DEBUG
-
-
-  pFrameWindow = (FRAME_WINDOW *)FWGetFrameWindowStruct(wID);
-
-  if(!pFrameWindow)
-  {
-    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
-
-    return 0;
-  }
-
-  wIDMenu = WBGetMenuWindow(wID);
-
-  // TODO:  message re-direction to children BEFORE 'pFWCallback'
-
-  if(wIDMenu)
-  {
-    switch(pEvent->type)
-    {
-      case ButtonPress:
-      case ButtonRelease:
-        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
-                         "%s - BUTTON PRESS/RELEASE\n", __FUNCTION__);
-
-        // check tab bar first since I might be grabbing the mouse
-        if(WBPointInRect(pEvent->xbutton.x, pEvent->xbutton.y, pFrameWindow->rctTabBar) ||
-           (pFrameWindow->nTabBarButtonFlags & tab_bar_button_GRAB))
-        {
-          return Internal_Tab_Bar_Event(pFrameWindow, pEvent);
-        }
-
-        if(WBPointInWindow(pEvent->xbutton.window, pEvent->xbutton.x, pEvent->xbutton.y, wIDMenu))
-        {
-          return WBWindowDispatch(wIDMenu, pEvent);  // menu window should handle THESE mousie events
-        }
-
-        break;
-
-      case MotionNotify:
-        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
-                         "%s - MOTION NOTIFY\n", __FUNCTION__);
-
-        // check tab bar first since I might be grabbing the mouse
-        if(WBPointInRect(pEvent->xbutton.x, pEvent->xbutton.y, pFrameWindow->rctTabBar) ||
-           (pFrameWindow->nTabBarButtonFlags & tab_bar_button_GRAB))
-        {
-          return Internal_Tab_Bar_Event(pFrameWindow, pEvent);
-        }
-
-        if(WBPointInWindow(pEvent->xmotion.window, pEvent->xmotion.x, pEvent->xmotion.y, wIDMenu))
-        {
-          return(WBWindowDispatch(wIDMenu, pEvent));  // menu window should handle mousie events
-        }
-
-        break;
-
-      case ConfigureNotify:  // window size/position change
-        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
-                       "%s - CONFIGURE NOTIFY\n", __FUNCTION__);
-
-        // allow message to process first, and post a message to myself
-        // to re-evaluate the layout.  This is to avoid having a window that's
-        // not "changed" yet trying to update its size info when size info is
-        // not yet accurate.
-        //
-        // ALSO - I can get this on a window MOVE without a resize...
-
-        {
-          Display *pDisplay;
-          XClientMessageEvent evt;
-
-          pDisplay = WBGetWindowDisplay(wID);
-
-          bzero(&evt, sizeof(evt));
-          evt.type = ClientMessage;
-
-          evt.display = pDisplay;
-          evt.window = wID;
-          evt.message_type = aRESIZE_NOTIFY;
-          evt.format = 32;  // always
-          evt.data.l[0] = pEvent->xconfigure.x;
-          evt.data.l[1] = pEvent->xconfigure.y;
-          evt.data.l[2] = pEvent->xconfigure.x + pEvent->xconfigure.width; // right
-          evt.data.l[3] = pEvent->xconfigure.y + pEvent->xconfigure.height; // bottom
-          evt.data.l[4] = pEvent->xconfigure.border_width; // RESERVED (for now, just do it)
-
-          WBPostEvent(wID, (XEvent *)&evt); // NOTE:  if too slow, post 'priority' instead
-        }  
-        
-        break;
-
-
-      case ClientMessage:  // menus, etc. (they generate the 'ClientMessage')
-
-#ifndef NO_DEBUG
-        {
-          char *p1 = XGetAtomName(WBGetWindowDisplay(wID), pEvent->xclient.message_type);
-
-          WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
-                         "%s - CLIENT MESSAGE:  %s\n", __FUNCTION__, p1);
-
-          if(p1)
-          {
-            XFree(p1);
-          }
-        }
-#endif // NO_DEBUG
-
-        if(pEvent->xclient.message_type == aSET_FOCUS)
-        {
-          // set focus to window in data.l[0], or "default" if it's 'None'
-
-          if(pEvent->xclient.data.l[0] == None)
-          {
-            // do I have a 'focus' child frame?
-            WBChildFrame *pFocus = FWGetFocusWindow(&(pFrameWindow->wbFW));
-
-            if(pFocus)
-            {
-              WBSetInputFocus(pFocus->wID);
-            }
-            else
-            {
-              WBSetInputFocus(wID); // set input focus to myself
-            }
-          }
-          else
-          {
-            WBSetInputFocus((Window)pEvent->xclient.data.l[0]);
-          }
-        }
-        else if(pEvent->xclient.message_type == aRESIZE_NOTIFY)
-        {
-          FWRecalcLayout(wID);
-
-          return 1; // handled (TODO:  send to user-defined callback as well?)
-        }
-        else if(pEvent->xclient.message_type == aMENU_COMMAND)
-        {
-          //////////////////////////////////////////////////////////////////////////
-          //                                _                     _ _             //
-          //   _ __ ___   ___ _ __  _   _  | |__   __ _ _ __   __| | | ___ _ __   //
-          //  | '_ ` _ \ / _ \ '_ \| | | | | '_ \ / _` | '_ \ / _` | |/ _ \ '__|  //
-          //  | | | | | |  __/ | | | |_| | | | | | (_| | | | | (_| | |  __/ |     //
-          //  |_| |_| |_|\___|_| |_|\__,_| |_| |_|\__,_|_| |_|\__,_|_|\___|_|     //
-          //                                                                      //
-          //////////////////////////////////////////////////////////////////////////
-
-
-          // check the container window that has the current focus, and THEN
-          // check the frame window for an appropriate handler
-
-          WBChildFrame *pFocus = FWGetFocusWindow(&(pFrameWindow->wbFW));
-
-          if(pFocus) // if a tab has a focus, use that window's event handler first
-          {
-            int iRet = WBWindowDispatch(pFocus->wID, pEvent);
-
-            if(iRet) // non-zero return
-            {
-              return iRet; // the handler MUST return non-zero if the message should NOT be processed by the frame!
-            }
-          }
-
-          if(pFrameWindow->pMenuHandler)
-          {
-            // search for the matching menu or ID - anything above 0x10000 is assumed to be a pointer
-            const WBFWMenuHandler *pHandler = pFrameWindow->pMenuHandler;
-
-            while(pHandler->lMenuID) // zero marks the end
-            {
-              long lID = pHandler->lMenuID;
-
-              if(pHandler->lMenuID >= 0x10000L)
-              {
-                lID = XInternAtom(WBGetDefaultDisplay(), (const char *)lID, False);
-
-                if(!lID)
-                {
-                  continue;
-                }
-              }
-
-              if(pEvent->xclient.data.l[0] == lID)
-              {
-                if(pHandler->callback)
-                {
-                  if(pHandler->callback(&(pEvent->xclient)))
-                  {
-                    return 1;
-                  }
-                }
-
-                return 0; // NOT handled or handler returned zero
-              }
-
-              pHandler++;
-            }
-          }
-        }
-        else if(pEvent->xclient.message_type == aMENU_UI_COMMAND)
-        {
-          //////////////////////////////////////////////////////////////////////////////////////
-          //                                _   _ ___   _                     _ _             //
-          //   _ __ ___   ___ _ __  _   _  | | | |_ _| | |__   __ _ _ __   __| | | ___ _ __   //
-          //  | '_ ` _ \ / _ \ '_ \| | | | | | | || |  | '_ \ / _` | '_ \ / _` | |/ _ \ '__|  //
-          //  | | | | | |  __/ | | | |_| | | |_| || |  | | | | (_| | | | | (_| | |  __/ |     //
-          //  |_| |_| |_|\___|_| |_|\__,_|  \___/|___| |_| |_|\__,_|_| |_|\__,_|_|\___|_|     //
-          //                                                                                  //
-          //////////////////////////////////////////////////////////////////////////////////////
-
-          // check 'contained' window for an appropriate UI handler before passing
-          // it off to the frame window's handler
-
-          WBChildFrame *pFocus = FWGetFocusWindow(&(pFrameWindow->wbFW));
-          if(pFocus)
-          {
-            int iRet = WBWindowDispatch(pFocus->wID, pEvent);
-            if(iRet >= 0)
-            {
-              return iRet;
-            }
-
-            // TODO:  determine if a '-1' value really SHOULD grey out the menu choice anyway or
-            //        if I should return some OTHER value to differentiate 'grey' from 'no handler'
-          }
-
-          if(pFrameWindow->pMenuHandler)
-          {
-            const WBFWMenuHandler *pHandler = pFrameWindow->pMenuHandler;
-
-            while(pHandler->lMenuID) // zero marks the end
-            {
-              long lID = pHandler->lMenuID;
-
-              if(pHandler->lMenuID >= 0x10000L)
-              {
-                lID = XInternAtom(WBGetDefaultDisplay(), (const char *)lID, False);
-
-                if(!lID)
-                {
-                  continue;
-                }
-              }
-
-              if(pEvent->xclient.data.l[0] == lID) // a message handler exists
-              {
-                if(pHandler->UIcallback)
-                {
-                  WBMenu *pMenu;
-                  WBMenuItem *pItem;
-
-                  // important detail - the 'data.l' array is assumed to have 32-bit values in it,
-                  // regardless of how its definition and 64/32-bitness affects the actual data storage.
-                  // In effect, only the lower 32-bits is valid.  Hence, I must combine two 32-bit values
-                  // together in order to make a 64-bit pointer.  For consistency I always use 2 values
-                  // per pointer to pass the information via the message structure.  otherwise it gets
-                  // complicated and I really don't like complicated.  it causes mistakes, errors, crashes...
-
-#if !defined(__SIZEOF_POINTER__) // TODO find a better way to deal with pointer size
-#define __SIZEOF_POINTER__ 0
-#endif
-#if __SIZEOF_POINTER__ == 4 /* to avoid warnings in 32-bit linux */
-                  pMenu = (WBMenu *)pEvent->xclient.data.l[1];
-                  pItem = (WBMenuItem *)pEvent->xclient.data.l[3];
-#else // assume 64-bit pointers here, and if they truncate, should NOT get any warnings... well that's the idea
-                  pMenu = (WBMenu *)((unsigned long long)pEvent->xclient.data.l[1] | ((unsigned long long)pEvent->xclient.data.l[2] << 32));
-                  pItem = (WBMenuItem *)((unsigned long long)pEvent->xclient.data.l[3] | ((unsigned long long)pEvent->xclient.data.l[4] << 32));
-#endif
-                  // TODO:  validate pointers, otherwise a posted message might crash me (like a vulnerability)
-
-#ifndef NO_DEBUG /* warning off for release build */
-#warning this code potentially has a vulnerability in it
-#endif // !NO_DEBUG
-
-                  // if(!WBIsValidMenu(pMenu) || !WBIsValidMenuItem(pItem)) { do not do it }
-
-                  return pHandler->UIcallback(pMenu, pItem);
-                }
-
-                return 0; // NO UI handler so return '0' [aka 'normal']
-              }
-
-              pHandler++;
-            }
-          }
-
-          return -1; // if there's no handler and no UI handler, always return 'disabled'
-        }
-#ifndef NO_DEBUG
-        else
-        {
-          char *p1 = XGetAtomName(WBGetWindowDisplay(wID), pEvent->xclient.message_type);
-
-          WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
-                         "%s - Client message %s not handled by frame window\n",
-                          __FUNCTION__, p1);
-
-          if(p1)
-          {
-            XFree(p1);
-          }
-        }
-#endif // NO_DEBUG
-
-        break;
-
-      default:
-        break;
-    }
-  }
-
-  // TAB BAR (but with no menu)
-
-  if(!(WBFrameWindow_NO_TABS & pFrameWindow->wbFW.iFlags)) // I have a tab bar
-  {
-    if(pEvent->type == ButtonPress ||
-       pEvent->type == ButtonRelease ||
-       pEvent->type == MotionNotify)
-    {
-      if(WBPointInRect(pEvent->xbutton.x, pEvent->xbutton.y, pFrameWindow->rctTabBar) ||
-                       (pFrameWindow->nTabBarButtonFlags & tab_bar_button_GRAB)) // grabbing mouse means I get the event
-      {
-        return Internal_Tab_Bar_Event(pFrameWindow, pEvent);
-      }
-    }
-    else if(pEvent->type == Expose)
-    {
-      InternalPaintTabBar(pFrameWindow, &(pEvent->xexpose));  // this will 'validate' the tab bar area, preventing re-paint
-    }
-    else if(pEvent->type == ClientMessage && // tab-related client messages
-            (pEvent->xclient.message_type == aNEW_TAB ||
-             pEvent->xclient.message_type == aPREV_TAB ||
-             pEvent->xclient.message_type == aNEXT_TAB ||
-             pEvent->xclient.message_type == aSET_TAB))
-    {
-//      WB_ERROR_PRINT("TODO:  %s - handle ClientMessage for the tab bar\n", __FUNCTION__);
-//      WBDebugDumpEvent(pEvent);
-      if(pEvent->xclient.message_type == aNEW_TAB)
-      {
-        // TODO:  post a WM_FILE_NEW menu command to the owner
-      }
-      else if(pEvent->xclient.message_type == aPREV_TAB)
-      {
-        if(pFrameWindow->nFocusTab > 0)
-        {
-          FWSetFocusWindowIndex(&(pFrameWindow->wbFW), pFrameWindow->nFocusTab - 1);
-        }
-      }
-      else if(pEvent->xclient.message_type == aNEXT_TAB)
-      {
-        if((pFrameWindow->nFocusTab + 1) < pFrameWindow->nChildFrames)
-        {
-          FWSetFocusWindowIndex(&(pFrameWindow->wbFW), pFrameWindow->nFocusTab + 1);
-        }
-      }
-      else if(pEvent->xclient.message_type == aSET_TAB)
-      {
-        if((int)pEvent->xclient.data.l[0] >= 0 &&
-           (int)pEvent->xclient.data.l[0] < pFrameWindow->nChildFrames)
-        {
-          FWSetFocusWindowIndex(&(pFrameWindow->wbFW), (int)pEvent->xclient.data.l[0]);
-        }
-      }
-
-      return 1; // handled
-    }
-  }
-
-
-  // expose event for status bar - painting the status bar and tab bar.
-
-  if(pEvent->type == Expose &&
-     (WBFrameWindow_STATUS_BAR & pFrameWindow->wbFW.iFlags))
-  {
-    InternalPaintStatusBar(pFrameWindow, &(pEvent->xexpose));  // this will 'validate' the status bar area, preventing re-paint
-  }
-
-
-  // user callback function
-
-  if(pFrameWindow->pFWCallback)
-  {
-    // for most messages, if I handle it here, I don't do further processing
-
-    iRval = (pFrameWindow->pFWCallback)(wID, pEvent);
-
-    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_Event | DebugSubSystem_Frame,
-                   "%s - %s event and user callback returns %d\n", __FUNCTION__, WBEventName(pEvent->type), iRval);
-
-    if(iRval)
-    {
-      // check message types that I do *NOT* want to 'bail out' for, as well as those
-      // that I _MUST_ bail out for.
-
-      switch(pEvent->type)
-      {
-        case DestroyNotify: // must process after user callback
-          WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
-                         "%s DestroyNotify and user callback returned a non-zero value\n", __FUNCTION__);
-
-          // CONTINUE PROCESSING - after the user's callback handles DestroyNotify I must handle
-          //                       it here also (at the very end)
-
-          break;
-
-        case Expose: // no further processing needed, special debug notification
-          WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
-                         "%s Expose event and user callback returns %d\n", __FUNCTION__, iRval);
-          return iRval;  // 'expose' event already handled
-
-
-        default: // all other messages, no further processing needed
-          WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
-                         "%s - %s event and user callback returns %d\n", __FUNCTION__, WBEventName(pEvent->type), iRval);
-          return iRval;
-      }
-    }
-    else
-    {
-      // TODO:  deal with specific events NOT handled by the user callback
-    }
-  }
-
-
-  // At this point iRval _COULD_  be non-zero (example, DestroyNotify)
-  // so don't do any handling for those messages.  For everything else,
-  // a return value of ZERO means "not handled", so handle them.
-
-  if(!iRval)
-  {
-    switch(pEvent->type)
-    {
-      case KeyPress:
-        {
-#ifndef NO_DEBUG
-          int iACS = 0;
-          int iKey = WBKeyEventProcessKey((XKeyEvent *)pEvent, tbuf, &nChar, &iACS);
-
-          WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame | DebugSubSystem_Keyboard,
-                         "%s KEY PRESS for KEY %d KEYCODE %d MASK=%d (%xH)\n",
-                           __FUNCTION__, iKey, ((XKeyEvent *)pEvent)->keycode,
-                           ((XKeyEvent *)pEvent)->state, ((XKeyEvent *)pEvent)->state);
-#endif // NO_DEBUG
-
-          // check for menu and hotkey activation.
-//          if(nChar > 0) // only for "real" characters (i.e. not just the ALT key)
-          {
-            WBMenuBarWindow *pMenuBar = MBGetMenuBarWindowStruct(WBGetMenuWindow(wID));
-
-            if(pMenuBar)  // menu bar exists?
-            {
-              WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Menu | DebugSubSystem_Frame | DebugSubSystem_Keyboard,
-                             "%s call to MBMenuProcessHotKey for menu window %d (%08xH)\n",
-                             __FUNCTION__, (int)pMenuBar->wSelf, (int)pMenuBar->wSelf);
-
-              iRval = MBMenuProcessHotKey(pMenuBar->pMenu, (XKeyEvent *)pEvent);
-            }
-          }
-        }
-        break;
-
-      case KeyRelease:
-        {
-          // KeyRelease
-#ifndef NO_DEBUG
-          int iACS = 0, iKey = WBKeyEventProcessKey((XKeyEvent *)pEvent, tbuf, &nChar, &iACS);
-
-          if(nChar > 0)
-          {
-            WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame | DebugSubSystem_Keyboard,
-                           "%s KEY RELEASE for KEY %d KEYCODE %d  MASK=%d (%xH)\n",
-                           __FUNCTION__, iKey, ((XKeyEvent *)pEvent)->keycode,
-                           ((XKeyEvent *)pEvent)->state, ((XKeyEvent *)pEvent)->state);
-
-          }
-#endif // NO_DEBUG
-
-        }
-
-        break;
-
-
-
-      case SelectionRequest:
-      case SelectionClear:
-      case SelectionNotify:
-
-        return 0; // NOT handled (default handler might want to handle them, but not me)
-
-//        return FWDoSelectionEvents(&(pFrameWindow->wbFW), wID, wIDMenu, pEvent);  <-- no longer needed
-    }
-  }
-
-
-  // TODO:   message re-direction to children AFTER 'pFWCallback'
-
-
-
-  // ----------------------------------------
-  // DESTROY DESTROY DESTROY DESTROY DESTROY
-  //
-  //   special handling for 'DestroyNotify'
-  //
-  // DESTROY DESTROY DESTROY DESTROY DESTROY
-  // ----------------------------------------
-
-
-  if(pEvent->type == DestroyNotify &&
-     pEvent->xdestroywindow.window == wID)
-  {
-//    int boolQuitFlag = (pFrameWindow->wbFW.iFlags & WBFrameWindow_APP_WINDOW) != 0;
-
-    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
-                   "%s - DestroyNotify\n", __FUNCTION__);
-
-    WBSetWindowData(wID, 0, NULL);
-
-    __internal_destroy_frame_window(pFrameWindow);
-
-    free(pFrameWindow);
-
-//    if(boolQuitFlag)
-//      bQuitFlag = TRUE;  // set the global 'quit' flag if I'm an application top-level window
-
-    WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_Event | DebugSubSystem_Frame,
-                   "%s - frame window destroyed\n", __FUNCTION__);
-    return 1;
-  }
-
-  WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Event | DebugSubSystem_Frame,
-                 "%s - frame window callback returns %d\n", __FUNCTION__, iRval);
-
-  return iRval;  // return back the 'handled' status
-}
-
 
 
 static void InternalCalcStatusBarRect(FRAME_WINDOW *pFrameWindow, WB_RECT *pRect)
@@ -1682,7 +1169,8 @@ const FRAME_WINDOW *pFrameWindow;
     iIndex = pFrameWindow->nFocusTab;
   }
 
-  if(iIndex < 0 || !pFrameWindow->ppChildFrames || iIndex >= pFrameWindow->nChildFrames)
+  if(iIndex < 0 || // still test for this in case 'nFocusTab' is negative (but unlikely)
+     !pFrameWindow->ppChildFrames || iIndex >= pFrameWindow->nChildFrames)
   {
     return NULL;
   }
@@ -1712,8 +1200,11 @@ int iRval;
     pFrameWindow->ppChildFrames = (WBChildFrame **)malloc(pFrameWindow->nMaxChildFrames * sizeof(WBChildFrame *));
     if(!pFrameWindow->ppChildFrames)
     {
+      pFrameWindow->nMaxChildFrames = 0;
+
 no_memory:
       WB_ERROR_PRINT("ERROR:  %s - not enough memory\n", __FUNCTION__);
+
       return -1;
     }
 
@@ -1729,8 +1220,9 @@ no_memory:
       goto no_memory;
     }
 
-    pFrameWindow->nMaxChildFrames += 128;
     pFrameWindow->ppChildFrames = (WBChildFrame **)pTemp; // re-assign new pointer    
+
+    pFrameWindow->nMaxChildFrames += 128;
   }
 
   // ADD NEW CHILD FRAME TO THE END [TODO insert just past current focus window instead?]
@@ -1739,7 +1231,10 @@ no_memory:
   (pFrameWindow->nChildFrames)++;
   pFrameWindow->ppChildFrames[iRval] = pNew;
 
-  WB_ERROR_PRINT("TEMPORARY:  %s - adding tab %d\n", __FUNCTION__, iRval);
+  pNew->pOwner = &(pFrameWindow->wbFW); // set THIS frame as the owner in the contained tab
+
+  WB_ERROR_PRINT("TEMPORARY:  %s - adding tab %d window %u (%08xH)\n",
+                 __FUNCTION__, iRval, (int)pNew->wID, (int)pNew->wID);
 
   FWSetFocusWindowIndex(pFW, iRval); // set focus to it
 
@@ -1769,7 +1264,15 @@ int iIndex, i2;
   {
     if(pFrameWindow->ppChildFrames[iIndex] == pCont)
     {
-      WB_ERROR_PRINT("TEMPORARY:  %s - removing tab %d\n", __FUNCTION__, iIndex);
+#ifndef NO_DEBUG
+      if(pCont->pOwner != &(pFrameWindow->wbFW))
+      {
+        WB_ERROR_PRINT("ERROR:  %s - tab's owner %p does not match this frame window (%p)!\n",
+                       __FUNCTION__, (void *)pCont->pOwner, (void *)&(pFrameWindow->wbFW));
+      }
+#endif // NO_DEBUG
+
+      pCont->pOwner = NULL; // for now, always do this
 
       for(i2=iIndex + 1; i2 < pFrameWindow->nChildFrames; i2++)
       {
@@ -1781,16 +1284,60 @@ int iIndex, i2;
 
       if(pFrameWindow->nFocusTab >= pFrameWindow->nChildFrames)
       {
-        pFrameWindow->nFocusTab--;
+        pFrameWindow->nFocusTab = pFrameWindow->nChildFrames - 1; // focus to last tab if I deleted the last tab
+      }
+      else if(pFrameWindow->nFocusTab > iIndex) // was the tab in focus to the right of the one I'm removing?
+      {
+        // decrement the tab index, since I deleted something to the left of it.
+        pFrameWindow->nFocusTab--; // result won't be negative, because of '>' in 'if'
       }
 
       // invalidate the tab bar rectangle first, before I continue
       WBInvalidateRect(pFW->wID, &(pFrameWindow->rctLastTabBarRect), 0);
 
-      FWRecalcLayout(pFW->wID); // recalculate layout (this also updates the frame window and whatnot)
+      if(pFrameWindow->nChildFrames <= 0)
+      {
+        // switch focus menu to 'default'.  there are NO tabs left.
 
-      // docs say "does not destroy the window".  it only gets removed, that's all
+        Window wMB = WBGetMenuWindow(pFrameWindow->wbFW.wID);
 
+        if(wMB != None)
+        {
+          WBMenuBarWindow *pMBW = MBGetMenuBarWindowStruct(wMB);
+
+          if(pMBW)
+          {
+            MBSetMenuBarMenuResource(pMBW, pFrameWindow->pDefaultMenuResource);
+          }
+        }
+
+        pFrameWindow->nChildFrames = 0; // make sure
+
+        FWRecalcLayout(pFW->wID); // recalculate layout (this also updates the frame window and whatnot)
+        WBInvalidateRect(pFW->wID, NULL, 1); // update everything NOW.  it's 'empty'
+      }
+      else if(iIndex == pFrameWindow->nFocusTab) // is it the focus window? (not always)
+      {
+        // focus window changes, so make sure everything is informed
+
+        if(iIndex < pFrameWindow->nChildFrames)
+        {
+          FWSetFocusWindowIndex(pFW, iIndex); // note:  I just deleted 'iIndex', but the *NEW* 'iIndex' has the focus now
+        }
+        else
+        {
+          // in this case, I'm deleting the last window in the bunch, so set focus to the last one
+          FWSetFocusWindowIndex(pFW, pFrameWindow->nChildFrames - 1);
+        }
+      }
+      else
+      {
+        // if I'm displaying a different window in the tab, just re-calc the layout
+
+        FWRecalcLayout(pFW->wID); // recalculate layout (this also updates the frame window and whatnot)
+        FWSetFocusWindowIndex(pFW, pFrameWindow->nFocusTab); // re-assign focus to same, fixes certain problems
+      }
+      
       return;
     }
   }
@@ -1833,11 +1380,13 @@ FRAME_WINDOW *pFrameWindow;
 WBChildFrame *pC;
 int i1;
 Display *pDisplay = WBGetWindowDisplay(pFW->wID);
+Window wMB;
+WBMenuBarWindow *pMBW;
 
 
   pFrameWindow = InternalGet_FRAME_WINDOW(pFW);
 
-  if(!pFrameWindow || iIndex < 0)
+  if(!pFrameWindow)
   {
     WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
 
@@ -1846,12 +1395,22 @@ Display *pDisplay = WBGetWindowDisplay(pFW->wID);
 
   // locate the contained window from my list.  then set as 'focus tab'
 
-  if(!pFrameWindow->ppChildFrames || iIndex >= pFrameWindow->nChildFrames)
+  if(!pFrameWindow->ppChildFrames || !pFrameWindow->nChildFrames)
   {
     return; // no child windows in list, or index is greater than the maximum
   }
 
+  if(iIndex >= pFrameWindow->nChildFrames)
+  {
+    iIndex = pFrameWindow->nChildFrames - 1; // a simple fix
+  }
+  else if(iIndex < 0)
+  {
+    iIndex = 0;
+  }
+
   pFrameWindow->nFocusTab = iIndex; // set focus to THIS one
+  pFrameWindow->nCloseTab = -1;     // mark that I'm NOT closing a tab (make sure)
 
   // go through the list and hide all of the others NOT the focus window
   for(i1=0; i1 < pFrameWindow->nChildFrames; i1++)
@@ -1862,8 +1421,11 @@ Display *pDisplay = WBGetWindowDisplay(pFW->wID);
     }
 
     pC = pFrameWindow->ppChildFrames[i1];
-    if(WBIsMapped(pDisplay, pC->wID))
+
+//    if(WBIsMapped(pDisplay, pC->wID))
     {
+//      WB_ERROR_PRINT("TEMPORARY:  %s - unmapping %u (%08xH)\n", __FUNCTION__, (unsigned int)pC->wID, (unsigned int)pC->wID);
+
       WBUnmapWindow(pDisplay, pC->wID); // unmap it (make it invisible)
     }
   }
@@ -1876,15 +1438,194 @@ Display *pDisplay = WBGetWindowDisplay(pFW->wID);
 
   pC = pFrameWindow->ppChildFrames[iIndex];
 
-//  if(!WBIsMapped(pDisplay, pC->wID))  determine why this is NOT working
+  WBMapWindow(pDisplay, pC->wID);     // make sure it's mapped (probably isn't)
+
+  // NOW, switch to the menu associated with the current frame
+  wMB = WBGetMenuWindow(pFrameWindow->wbFW.wID);
+
+  if(wMB != None)
   {
-    WBMapWindow(pDisplay, pC->wID);     // make sure it's mapped
+    pMBW = MBGetMenuBarWindowStruct(wMB);
+
+    if(pMBW)
+    {
+      if(pC->pszMenuResource)
+      {
+        MBSetMenuBarMenuResource(pMBW, pC->pszMenuResource);
+      }
+      else
+      {
+        MBSetMenuBarMenuResource(pMBW, pFrameWindow->pDefaultMenuResource);
+      }
+    }
   }
 
   WBUpdateWindow(pFW->wID);  // update these windows now
   WBUpdateWindow(pC->wID);
 }
 
+
+int FWGetChildFrameIndex(WBFrameWindow *pFW, WBChildFrame *pCont)
+{
+FRAME_WINDOW *pFrameWindow;
+int iIndex;
+
+  pFrameWindow = InternalGet_FRAME_WINDOW(pFW);
+
+  if(!pFrameWindow)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
+
+    return -1;
+  }
+
+  // locate the contained window from my list.  then set as 'focus tab'
+
+  if(!pFrameWindow->ppChildFrames || !pFrameWindow->nChildFrames)
+  {
+    return -1; // no child windows in list
+  }
+
+  if(!pCont)
+  {
+    return pFrameWindow->nFocusTab; // return focus tab index
+  }
+
+  for(iIndex=0; iIndex < pFrameWindow->nChildFrames; iIndex++)
+  {
+    if(pFrameWindow->ppChildFrames[iIndex] == pCont)
+    {
+      return iIndex;
+    }
+  }
+
+  return -1;
+}
+
+void FWMoveChildFrameTabIndex(WBFrameWindow *pFW, WBChildFrame *pCont, int iIndex)
+{
+FRAME_WINDOW *pFrameWindow;
+int iI, i1;
+WBChildFrame *pC = NULL;
+
+
+  pFrameWindow = InternalGet_FRAME_WINDOW(pFW);
+
+  if(!pFrameWindow)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
+
+    return;
+  }
+
+  // locate the contained window from my list.  then set as 'focus tab'
+
+  if(!pFrameWindow->ppChildFrames || !pFrameWindow->nChildFrames)
+  {
+    return; // no child windows in list
+  }
+
+  iI = FWGetChildFrameIndex(pFW, pCont);
+
+  if(iI < 0)
+  {
+    return; // for now...
+  }
+
+  if(iIndex == -1) // previous
+  {
+    iIndex = iI - 1;
+
+    if(iIndex < 0)
+    {
+      iIndex = 0;
+    }
+
+    WB_ERROR_PRINT("TEMPORARY:  %s - move prev %d\n", __FUNCTION__, iIndex);
+  }
+  else if(iIndex == -2)
+  {
+    iIndex = iI + 1;
+
+    WB_ERROR_PRINT("TEMPORARY:  %s - move next %d\n", __FUNCTION__, iIndex);
+  }
+
+  if(iIndex >= pFrameWindow->nChildFrames)
+  {
+    iIndex = pFrameWindow->nChildFrames - 1;
+  }
+
+  // move 'iI' to 'iIndex', sliding everything else around
+
+  if(iI > iIndex)
+  {
+    pC = pFrameWindow->ppChildFrames[iI];
+
+    for(i1=iI; i1 > iIndex; i1--) // move 1 to the right from iIndex through iI - 1
+    {
+      pFrameWindow->ppChildFrames[i1] = pFrameWindow->ppChildFrames[i1 - 1];
+    }
+
+    pFrameWindow->ppChildFrames[iIndex] = pC;
+
+    if(pFrameWindow->nFocusTab == iI)
+    {
+      pFrameWindow->nFocusTab = iIndex;
+    }
+    else if(pFrameWindow->nFocusTab >= iIndex && pFrameWindow->nFocusTab < iI)
+    {
+      pFrameWindow->nFocusTab ++; // increment it (since I moved things to the right)
+
+      if(pFrameWindow->nFocusTab >= pFrameWindow->nChildFrames)
+      {
+        pFrameWindow->nFocusTab = pFrameWindow->nChildFrames - 1; // just in case
+      }
+    }
+  }
+  else if(iI < iIndex)
+  {
+    pC = pFrameWindow->ppChildFrames[iI];
+
+    for(i1=iI; i1 < iIndex; i1++) // move 1 to the left from iI + 1 through iIndex
+    {
+      pFrameWindow->ppChildFrames[i1] = pFrameWindow->ppChildFrames[i1 + 1];
+    }
+
+    pFrameWindow->ppChildFrames[iIndex] = pC;
+
+    if(pFrameWindow->nFocusTab == iI)
+    {
+      pFrameWindow->nFocusTab = iIndex;
+    }
+    else if(pFrameWindow->nFocusTab > iI && pFrameWindow->nFocusTab <= iIndex)
+    {
+      pFrameWindow->nFocusTab --; // decrement it (since I moved things to the left)
+
+      if(pFrameWindow->nFocusTab < 0)
+      {
+        pFrameWindow->nFocusTab = 0; // just in case
+      }
+    }
+  }
+
+  WBInvalidateRect(pFW->wID, &(pFrameWindow->rctLastTabBarRect), 0);
+
+  FWRecalcLayout(pFW->wID); // recalculate layout (this also updates the frame window and whatnot)
+
+  WBUpdateWindow(pFW->wID);  // update these windows now
+
+  if(pFrameWindow->nFocusTab >= 0 && pFrameWindow->nFocusTab < pFrameWindow->nChildFrames)
+  {
+    // make sure I re-paint the focus window
+
+    pC = pFrameWindow->ppChildFrames[pFrameWindow->nFocusTab];
+  
+    if(pC)
+    {  
+      WBUpdateWindow(pC->wID);
+    }
+  }
+}
 
 void FWSetStatusText(WBFrameWindow *pFW, const char *szText)
 {
@@ -1965,6 +1706,21 @@ FRAME_WINDOW *pFrameWindow;
 
   WBInvalidateRect(pFrameWindow->wbFW.wID, &rct, 0); // and, finally, invalidate the status bar but don't re-paint yet
 }
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                    //
+//   _____                     _     _   _                    _  _  _                 //
+//  | ____|__   __ ___  _ __  | |_  | | | |  __ _  _ __    __| || |(_) _ __    __ _   //
+//  |  _|  \ \ / // _ \| '_ \ | __| | |_| | / _` || '_ \  / _` || || || '_ \  / _` |  //
+//  | |___  \ V /|  __/| | | || |_  |  _  || (_| || | | || (_| || || || | | || (_| |  //
+//  |_____|  \_/  \___||_| |_| \__| |_| |_| \__,_||_| |_| \__,_||_||_||_| |_| \__, |  //
+//                                                                            |___/   //
+//                                                                                    //
+////////////////////////////////////////////////////////////////////////////////////////
+
 
 static void Internal_CalcTabRect(FRAME_WINDOW *pFrameWindow, int iIndex, WB_RECT *prctTab)
 {
@@ -2084,29 +1840,27 @@ int i1;
           XFontStruct *pFont = WBGetDefaultFont();
           
           // did I click on the 'x' button in the upper right corner?
-          // form a square equal to half the height (wide
-          rctTemp.right -= 2; // 2 from the right edge
-          rctTemp.left = rctTemp.right - (pFont->ascent + pFont->descent) / 2; // approximate font width
-          rctTemp.top += 2 + pFont->ascent / 2; // 2 pixels plus half of the ascent down
-          rctTemp.bottom = rctTemp.top + pFont->ascent / 2 + pFont->descent / 2; // bottom is 'rest of font'
+          // form a ~square that represents the button using font height.  See 
+          rctTemp.right -= 6;                                                // 6 from the right edge
+          rctTemp.left = rctTemp.right - pFont->ascent + pFont->descent + 2; // font width + 2 from right
+          rctTemp.top += 2;                                                  // 2 pixels from top
+          rctTemp.bottom = rctTemp.top + pFont->ascent + pFont->descent;     // height is font height
 
-// TODO:  do I really want to post/send message or should i wait until mouse release?  In the
-//        case of tab delete, I might query for "are you sure" like if the file has not been saved
-
-          bzero(&evt, sizeof(evt));
-          evt.type = ClientMessage;
-
-          evt.display = pDisplay;
-          evt.window = pFrameWindow->wbFW.wID;
+          // TODO:  do I really want to post/send message or should i wait until mouse release?  In the
+          //        case of tab delete, I might query for "are you sure" like if the file has not been saved
 
           if(WBPointInRect(pEvent->xbutton.x, pEvent->xbutton.y, rctTemp))
           {
             // clicking on the 'x' button to close the tab
 
-            evt.message_type = aCLOSE_TAB;
+            pFrameWindow->nCloseTab = i1;  // the tab I'm closing (notify on mouse up)
+
+            WBInvalidateRect(pFrameWindow->wbFW.wID, &(pFrameWindow->rctLastTabBarRect), 1);
           }
           else
           {
+            pFrameWindow->nCloseTab = -1;  // NOT closing a tab (make sure)
+
             // set focus to tab (do it on button press)
 
             if(i1 == pFrameWindow->nFocusTab)
@@ -2114,18 +1868,27 @@ int i1;
               return 1;  // do nothing (already there)
             }
 
-            evt.message_type = aSET_TAB;
+            bzero(&evt, sizeof(evt));
+            evt.type = ClientMessage;
+
+            evt.display = pDisplay;
+            evt.window = pFrameWindow->wbFW.wID;
+            evt.message_type = aTAB_MESSAGE;
+
+            evt.data.l[0] = SET_TAB_MESSAGE;
+            evt.data.l[1] = i1; // the tab index
+            evt.format = 32;  // always
+
+            WBPostEvent(pFrameWindow->wbFW.wID, (XEvent *)&evt); // this will re-paint
           }
-
-          evt.data.l[0] = i1; // the tab index
-          evt.format = 32;  // always
-
-          WBPostEvent(pFrameWindow->wbFW.wID, (XEvent *)&evt); // this will re-paint
 
           return 1;
         }
       }
     }
+
+    // if I get here, I'll do this to make sure the UI is consistent
+    pFrameWindow->nCloseTab = -1;  // NOT closing a tab (make sure)
     
     return 1; // for now assume "I handled it" since the mousie was grabbed
   }
@@ -2133,7 +1896,9 @@ int i1;
   {
     if(!(pFrameWindow->nTabBarButtonFlags & tab_bar_button_GRAB)) // mouse grabbed?
     {
+      pFrameWindow->nCloseTab = -1;                                   // NOT closing a tab
       pFrameWindow->nTabBarButtonFlags &= ~tab_bar_button_BUTTONMASK; // turn off button mask if not grabbed
+
       return 0; // "not handled"
     }
 
@@ -2143,7 +1908,8 @@ int i1;
 
     pFrameWindow->nTabBarButtonFlags &= ~tab_bar_button_GRAB;
 
-    if(!(pFrameWindow->nTabBarButtonFlags & tab_bar_button_BUTTONMASK)) // clicked on a tab, did we?
+    if(pFrameWindow->nCloseTab < 0 &&  // NOT closing a tab (make sure)
+       !(pFrameWindow->nTabBarButtonFlags & tab_bar_button_BUTTONMASK)) // clicked on a tab, did we?
     {
       // if I'm releasing on a tab, and I dragged it, change the tab order according to the tab
       // that I'm sitting on at the moment...
@@ -2162,12 +1928,22 @@ int i1;
 
       evt.display = pDisplay;
       evt.window = pFrameWindow->wbFW.wID;
+      evt.message_type = aTAB_MESSAGE;
 
-      if(pFrameWindow->nTabBarButtonFlags & tab_bar_button_NEXT)
+      if(pFrameWindow->nCloseTab >= 0) // I'm closing a tab?
+      {
+        evt.data.l[0] = CLOSE_TAB_MESSAGE;
+        evt.data.l[1] = pFrameWindow->nCloseTab;
+
+        WB_ERROR_PRINT("TEMPORARY:  %s - close tab %d\n", __FUNCTION__, pFrameWindow->nCloseTab);
+
+        pFrameWindow->nCloseTab = -1; // NOT closing a tab now (make sure) (also fixes the UI)
+      }
+      else if(pFrameWindow->nTabBarButtonFlags & tab_bar_button_NEXT)
       {
         if(pFrameWindow->nRightTab < (pFrameWindow->nChildFrames - 1))
         {
-          evt.message_type = aNEXT_TAB;
+          evt.data.l[0] = NEXT_TAB_MESSAGE;
         }
         else
         {
@@ -2178,7 +1954,7 @@ int i1;
       {
         if(pFrameWindow->nLeftTab > 0)
         {
-          evt.message_type = aPREV_TAB;
+          evt.data.l[0] = PREV_TAB_MESSAGE;
         }
         else
         {
@@ -2187,7 +1963,7 @@ int i1;
       }
       else if(pFrameWindow->nTabBarButtonFlags & tab_bar_button_NEW)
       {
-        evt.message_type = aNEW_TAB;
+        evt.data.l[0] = NEW_TAB_MESSAGE;
       }
 
       evt.format = 32;  // always
@@ -2198,6 +1974,7 @@ no_message:
 
       pFrameWindow->nTabBarButtonFlags &= ~tab_bar_button_BUTTONMASK;
 
+      // all-important, mark tab bar rectangle 'to be re-painted' and update it
       WBInvalidateRect(pFrameWindow->wbFW.wID, &(pFrameWindow->rctLastTabBarRect), 1);
     }
 
@@ -2500,6 +2277,11 @@ XFontStruct *fontBold = NULL;
       WBChildFrame *pC;
       int i1;
 
+//      if(pFrameWindow->nCloseTab >= 0)
+//      {
+//        WB_ERROR_PRINT("TEMPORARY:  %s - nCloseTab is %d\n", __FUNCTION__, pFrameWindow->nCloseTab);
+//      }
+
       for(i1=pFrameWindow->nRightTab; i1 >= pFrameWindow->nLeftTab; i1--)
       {
         if(i1 != pFrameWindow->nFocusTab)
@@ -2520,7 +2302,9 @@ XFontStruct *fontBold = NULL;
           g2.x -= rct0.left; // translate to 'drawable' coordinates
           g2.y -= rct0.top;
 
-          WBDraw3DBorderTab(pDisplay, dw, gc, &g2, 0, clrFG.pixel, clrBG.pixel,
+          WBDraw3DBorderTab(pDisplay, dw, gc, &g2,
+                            pFrameWindow->nCloseTab == i1 ? -2 : 0,  // -2 if I'm deleting the tab (no focus)
+                            clrFG.pixel, clrBG.pixel,
                             clrBD2.pixel, clrBD3.pixel, clrABG.pixel,
                             WBGetDefaultFont(), fontBold,
                             pC->aImageAtom, pC->szDisplayName);
@@ -2539,7 +2323,9 @@ XFontStruct *fontBold = NULL;
           g2.x -= rct0.left; // translate to 'drawable' coordinates
           g2.y -= rct0.top;
 
-          WBDraw3DBorderTab(pDisplay, dw, gc, &g2, 1, clrFG.pixel, clrBG.pixel,
+          WBDraw3DBorderTab(pDisplay, dw, gc, &g2,
+                            pFrameWindow->nCloseTab == i1 ? -1 : 1,  // -1 if I'm deleting the tab, positive otherwise
+                            clrFG.pixel, clrBG.pixel,
                             clrBD2.pixel, clrBD3.pixel, clrABG.pixel,
                             WBGetDefaultFont(), fontBold,
                             pC->aImageAtom, pC->szDisplayName);
@@ -2980,6 +2766,683 @@ error_return2:
   }
 
   return 0; // ok!
+}
+
+
+int FWDefaultCallback(Window wID, XEvent *pEvent)
+{
+  FRAME_WINDOW *pFrameWindow;
+  Window wIDMenu;
+  int iRval = 0;
+#ifndef NO_DEBUG
+  char tbuf[32]; // for keyboard input
+  int nChar = sizeof(tbuf);
+#endif // NO_DEBUG
+
+
+  if(pEvent->type == DestroyNotify)
+  {
+    if(pEvent->xdestroywindow.window != wID)
+    {
+      XEvent evt;
+
+//      WB_ERROR_PRINT("TEMPORARY:  %s - DestroyNotify on window %d (%08xH), window %d (%08xH)\n",
+//                     __FUNCTION__,
+//                     (int)pEvent->xdestroywindow.window, (int)pEvent->xdestroywindow.window,
+//                     (int)wID, (int)wID);
+
+      memcpy(&evt, pEvent, sizeof(evt));
+
+      evt.xany.window = pEvent->xdestroywindow.window;
+
+      WBDispatch(&evt); // sends a copy directly to the child window, saying "you are destroyed"
+      // it should be harmless to do this.  It appears that when a window accepts 'sub-structure notify'
+      // types of events, the owned windows don't get the Destroy Notify events.
+    }
+  }
+
+  pFrameWindow = (FRAME_WINDOW *)FWGetFrameWindowStruct(wID);
+
+  if(!pFrameWindow)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
+
+    return 0;
+  }
+
+  wIDMenu = WBGetMenuWindow(wID);
+
+  // TODO:  message re-direction to children BEFORE 'pFWCallback'
+
+  if(wIDMenu)
+  {
+    switch(pEvent->type)
+    {
+      case ButtonPress:
+      case ButtonRelease:
+        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
+                         "%s - BUTTON PRESS/RELEASE\n", __FUNCTION__);
+
+        // check tab bar first since I might be grabbing the mouse
+        if(WBPointInRect(pEvent->xbutton.x, pEvent->xbutton.y, pFrameWindow->rctTabBar) ||
+           (pFrameWindow->nTabBarButtonFlags & tab_bar_button_GRAB))
+        {
+          return Internal_Tab_Bar_Event(pFrameWindow, pEvent);
+        }
+
+        if(WBPointInWindow(pEvent->xbutton.window, pEvent->xbutton.x, pEvent->xbutton.y, wIDMenu))
+        {
+          return WBWindowDispatch(wIDMenu, pEvent);  // menu window should handle THESE mousie events
+        }
+
+        break;
+
+      case MotionNotify:
+        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
+                         "%s - MOTION NOTIFY\n", __FUNCTION__);
+
+        // check tab bar first since I might be grabbing the mouse
+        if(WBPointInRect(pEvent->xbutton.x, pEvent->xbutton.y, pFrameWindow->rctTabBar) ||
+           (pFrameWindow->nTabBarButtonFlags & tab_bar_button_GRAB))
+        {
+          return Internal_Tab_Bar_Event(pFrameWindow, pEvent);
+        }
+
+        if(WBPointInWindow(pEvent->xmotion.window, pEvent->xmotion.x, pEvent->xmotion.y, wIDMenu))
+        {
+          return(WBWindowDispatch(wIDMenu, pEvent));  // menu window should handle mousie events
+        }
+
+        break;
+
+      case ConfigureNotify:  // window size/position change
+        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
+                       "%s - CONFIGURE NOTIFY\n", __FUNCTION__);
+
+        // allow message to process first, and post a message to myself
+        // to re-evaluate the layout.  This is to avoid having a window that's
+        // not "changed" yet trying to update its size info when size info is
+        // not yet accurate.
+        //
+        // ALSO - I can get this on a window MOVE without a resize...
+
+        {
+          Display *pDisplay;
+          XClientMessageEvent evt;
+
+          pDisplay = WBGetWindowDisplay(wID);
+
+          bzero(&evt, sizeof(evt));
+          evt.type = ClientMessage;
+
+          evt.display = pDisplay;
+          evt.window = wID;
+          evt.message_type = aRESIZE_NOTIFY;
+          evt.format = 32;  // always
+          evt.data.l[0] = pEvent->xconfigure.x;
+          evt.data.l[1] = pEvent->xconfigure.y;
+          evt.data.l[2] = pEvent->xconfigure.x + pEvent->xconfigure.width; // right
+          evt.data.l[3] = pEvent->xconfigure.y + pEvent->xconfigure.height; // bottom
+          evt.data.l[4] = pEvent->xconfigure.border_width; // RESERVED (for now, just do it)
+
+          WBPostEvent(wID, (XEvent *)&evt); // NOTE:  if too slow, post 'priority' instead
+        }  
+        
+        break;
+
+
+      case ClientMessage:  // menus, etc. (they generate the 'ClientMessage')
+
+#ifndef NO_DEBUG
+        {
+          char *p1 = XGetAtomName(WBGetWindowDisplay(wID), pEvent->xclient.message_type);
+
+          WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
+                         "%s - CLIENT MESSAGE:  %s\n", __FUNCTION__, p1);
+
+          if(p1)
+          {
+            XFree(p1);
+          }
+        }
+#endif // NO_DEBUG
+
+        if(pEvent->xclient.message_type == aSET_FOCUS)
+        {
+          // set focus to window in data.l[0], or "default" if it's 'None'
+
+          if(pEvent->xclient.data.l[0] == None)
+          {
+            // do I have a 'focus' child frame?
+            WBChildFrame *pFocus = FWGetFocusWindow(&(pFrameWindow->wbFW));
+
+            if(pFocus)
+            {
+              WBSetInputFocus(pFocus->wID);
+            }
+            else
+            {
+              WBSetInputFocus(wID); // set input focus to myself
+            }
+          }
+          else
+          {
+            WBSetInputFocus((Window)pEvent->xclient.data.l[0]);
+          }
+        }
+        else if(pEvent->xclient.message_type == aRESIZE_NOTIFY)
+        {
+          FWRecalcLayout(wID);
+
+          return 1; // handled (TODO:  send to user-defined callback as well?)
+        }
+        else if(pEvent->xclient.message_type == aMENU_COMMAND)
+        {
+          //////////////////////////////////////////////////////////////////////////
+          //                                _                     _ _             //
+          //   _ __ ___   ___ _ __  _   _  | |__   __ _ _ __   __| | | ___ _ __   //
+          //  | '_ ` _ \ / _ \ '_ \| | | | | '_ \ / _` | '_ \ / _` | |/ _ \ '__|  //
+          //  | | | | | |  __/ | | | |_| | | | | | (_| | | | | (_| | |  __/ |     //
+          //  |_| |_| |_|\___|_| |_|\__,_| |_| |_|\__,_|_| |_|\__,_|_|\___|_|     //
+          //                                                                      //
+          //////////////////////////////////////////////////////////////////////////
+
+
+          // check the container window that has the current focus, and THEN
+          // check the frame window for an appropriate handler
+
+          WBChildFrame *pFocus = FWGetFocusWindow(&(pFrameWindow->wbFW));
+
+          if(pFocus) // if a tab has a focus, use that window's event handler first
+          {
+            int iRet = WBWindowDispatch(pFocus->wID, pEvent);
+
+            if(iRet) // non-zero return
+            {
+              return iRet; // the handler MUST return non-zero if the message should NOT be processed by the frame!
+            }
+          }
+
+          if(pFrameWindow->pMenuHandler)
+          {
+            // search for the matching menu or ID - anything above 0x10000 is assumed to be a pointer
+            const WBFWMenuHandler *pHandler = pFrameWindow->pMenuHandler;
+
+            while(pHandler->lMenuID) // zero marks the end
+            {
+              long lID = pHandler->lMenuID;
+
+              if(pHandler->lMenuID >= 0x10000L)
+              {
+                lID = XInternAtom(WBGetDefaultDisplay(), (const char *)lID, False);
+
+                if(!lID)
+                {
+                  continue;
+                }
+              }
+
+              if(pEvent->xclient.data.l[0] == lID)
+              {
+                if(pHandler->callback)
+                {
+                  if(pHandler->callback(&(pEvent->xclient)))
+                  {
+                    return 1;
+                  }
+                }
+
+                return 0; // NOT handled or handler returned zero
+              }
+
+              pHandler++;
+            }
+          }
+        }
+        else if(pEvent->xclient.message_type == aMENU_UI_COMMAND)
+        {
+          //////////////////////////////////////////////////////////////////////////////////////
+          //                                _   _ ___   _                     _ _             //
+          //   _ __ ___   ___ _ __  _   _  | | | |_ _| | |__   __ _ _ __   __| | | ___ _ __   //
+          //  | '_ ` _ \ / _ \ '_ \| | | | | | | || |  | '_ \ / _` | '_ \ / _` | |/ _ \ '__|  //
+          //  | | | | | |  __/ | | | |_| | | |_| || |  | | | | (_| | | | | (_| | |  __/ |     //
+          //  |_| |_| |_|\___|_| |_|\__,_|  \___/|___| |_| |_|\__,_|_| |_|\__,_|_|\___|_|     //
+          //                                                                                  //
+          //////////////////////////////////////////////////////////////////////////////////////
+
+          // check 'contained' window for an appropriate UI handler before passing
+          // it off to the frame window's handler
+
+          WBChildFrame *pFocus = FWGetFocusWindow(&(pFrameWindow->wbFW));
+          if(pFocus)
+          {
+            int iRet = WBWindowDispatch(pFocus->wID, pEvent);
+            if(iRet >= 0)
+            {
+              return iRet;
+            }
+
+            // TODO:  determine if a '-1' value really SHOULD grey out the menu choice anyway or
+            //        if I should return some OTHER value to differentiate 'grey' from 'no handler'
+          }
+
+          if(pFrameWindow->pMenuHandler)
+          {
+            const WBFWMenuHandler *pHandler = pFrameWindow->pMenuHandler;
+
+            while(pHandler->lMenuID) // zero marks the end
+            {
+              long lID = pHandler->lMenuID;
+
+              if(pHandler->lMenuID >= 0x10000L)
+              {
+                lID = XInternAtom(WBGetDefaultDisplay(), (const char *)lID, False);
+
+                if(!lID)
+                {
+                  continue;
+                }
+              }
+
+              if(pEvent->xclient.data.l[0] == lID) // a message handler exists
+              {
+                if(pHandler->UIcallback)
+                {
+                  WBMenu *pMenu;
+                  WBMenuItem *pItem;
+
+                  // important detail - the 'data.l' array is assumed to have 32-bit values in it,
+                  // regardless of how its definition and 64/32-bitness affects the actual data storage.
+                  // In effect, only the lower 32-bits is valid.  Hence, I must combine two 32-bit values
+                  // together in order to make a 64-bit pointer.  For consistency I always use 2 values
+                  // per pointer to pass the information via the message structure.  otherwise it gets
+                  // complicated and I really don't like complicated.  it causes mistakes, errors, crashes...
+
+#if !defined(__SIZEOF_POINTER__) // TODO find a better way to deal with pointer size
+#define __SIZEOF_POINTER__ 0
+#endif
+#if __SIZEOF_POINTER__ == 4 /* to avoid warnings in 32-bit linux */
+                  pMenu = (WBMenu *)pEvent->xclient.data.l[1];
+                  pItem = (WBMenuItem *)pEvent->xclient.data.l[3];
+#else // assume 64-bit pointers here, and if they truncate, should NOT get any warnings... well that's the idea
+                  pMenu = (WBMenu *)((unsigned long long)pEvent->xclient.data.l[1] | ((unsigned long long)pEvent->xclient.data.l[2] << 32));
+                  pItem = (WBMenuItem *)((unsigned long long)pEvent->xclient.data.l[3] | ((unsigned long long)pEvent->xclient.data.l[4] << 32));
+#endif
+                  // TODO:  validate pointers, otherwise a posted message might crash me (like a vulnerability)
+
+#ifndef NO_DEBUG /* warning off for release build */
+#warning this code potentially has a vulnerability in it - 'pMenu' and 'pItem' could be bad pointers
+#endif // !NO_DEBUG
+
+                  // if(!WBIsValidMenu(pMenu) || !WBIsValidMenuItem(pItem)) { do not do it }
+
+                  return pHandler->UIcallback(pMenu, pItem);
+                }
+
+                return 0; // NO UI handler so return '0' [aka 'normal']
+              }
+
+              pHandler++;
+            }
+          }
+
+          return -1; // if there's no handler and no UI handler, always return 'disabled'
+        }
+#ifndef NO_DEBUG
+        else
+        {
+          char *p1 = XGetAtomName(WBGetWindowDisplay(wID), pEvent->xclient.message_type);
+
+          WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
+                         "%s - Client message %s not handled by frame window\n",
+                          __FUNCTION__, p1);
+
+          if(p1)
+          {
+            XFree(p1);
+          }
+        }
+#endif // NO_DEBUG
+
+        break;
+
+      default:
+        break;
+    }
+  }
+
+  // TAB BAR (but with no menu)
+
+  if(!(WBFrameWindow_NO_TABS & pFrameWindow->wbFW.iFlags)) // I have a tab bar
+  {
+    if(pEvent->type == ButtonPress ||
+       pEvent->type == ButtonRelease ||
+       pEvent->type == MotionNotify)
+    {
+      if(WBPointInRect(pEvent->xbutton.x, pEvent->xbutton.y, pFrameWindow->rctTabBar) ||
+                       (pFrameWindow->nTabBarButtonFlags & tab_bar_button_GRAB)) // grabbing mouse means I get the event
+      {
+        return Internal_Tab_Bar_Event(pFrameWindow, pEvent);
+      }
+    }
+    else if(pEvent->type == Expose)
+    {
+      InternalPaintTabBar(pFrameWindow, &(pEvent->xexpose));  // this will 'validate' the tab bar area, preventing re-paint
+    }
+    else if(pEvent->type == ClientMessage && // tab-related client messages
+            pEvent->xclient.message_type == aTAB_MESSAGE)
+    {
+//      WB_ERROR_PRINT("TODO:  %s - handle ClientMessage for the tab bar\n", __FUNCTION__);
+//      WBDebugDumpEvent(pEvent);
+      if(pEvent->xclient.data.l[0] == NEW_TAB_MESSAGE)
+      {
+        Display *pDisplay;
+        XClientMessageEvent evt;
+
+        pDisplay = WBGetWindowDisplay(wID);
+
+        // post a WM_COMMAND ClientMessage event, for 'IDM_FILE_NEW'
+        // TODO:  do I want to pre-define things like this in the header?
+
+        bzero(&evt, sizeof(evt));
+        evt.type = ClientMessage;
+
+        evt.display = pDisplay;
+        evt.window = wID;
+        evt.message_type = aMENU_COMMAND;
+        evt.format = 32;  // always
+        evt.data.l[0] = XInternAtom(pDisplay, "IDM_FILE_NEW", 0);
+
+        WBPostEvent(wID, (XEvent *)&evt);
+      }
+      else if(pEvent->xclient.data.l[0] == PREV_TAB_MESSAGE)
+      {
+        if(pFrameWindow->nFocusTab > 0)
+        {
+          FWSetFocusWindowIndex(&(pFrameWindow->wbFW), pFrameWindow->nFocusTab - 1);
+        }
+      }
+      else if(pEvent->xclient.data.l[0] == NEXT_TAB_MESSAGE)
+      {
+        if((pFrameWindow->nFocusTab + 1) < pFrameWindow->nChildFrames)
+        {
+          FWSetFocusWindowIndex(&(pFrameWindow->wbFW), pFrameWindow->nFocusTab + 1);
+        }
+      }
+      else if(pEvent->xclient.data.l[0] == SET_TAB_MESSAGE)
+      {
+        if((int)pEvent->xclient.data.l[1] >= 0 &&
+           (int)pEvent->xclient.data.l[1] < pFrameWindow->nChildFrames)
+        {
+          FWSetFocusWindowIndex(&(pFrameWindow->wbFW), (int)pEvent->xclient.data.l[1]);
+        }
+      }
+      else if(pEvent->xclient.data.l[0] == CLOSE_TAB_MESSAGE)
+      {
+        if((int)pEvent->xclient.data.l[1] >= 0 &&
+           (int)pEvent->xclient.data.l[1] < pFrameWindow->nChildFrames)
+        {
+          WBChildFrame *pC = pFrameWindow->ppChildFrames[pEvent->xclient.data.l[1]];
+
+          FWRemoveContainedWindow(&(pFrameWindow->wbFW), pC); // remove from frame
+          FWDestroyChildFrame(pC); // destroys 'child frame' (and superclass, if it assigned a destructor)
+        }
+      }
+
+      return 1; // handled
+    }
+  }
+
+
+  // expose event for status bar - painting the status bar and tab bar.
+
+  if(pEvent->type == Expose &&
+     (WBFrameWindow_STATUS_BAR & pFrameWindow->wbFW.iFlags))
+  {
+    InternalPaintStatusBar(pFrameWindow, &(pEvent->xexpose));  // this will 'validate' the status bar area, preventing re-paint
+  }
+
+
+  // user callback function
+
+  if(pFrameWindow->pFWCallback)
+  {
+    // for most messages, if I handle it here, I don't do further processing
+
+    iRval = (pFrameWindow->pFWCallback)(wID, pEvent);
+
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_Event | DebugSubSystem_Frame,
+                   "%s - %s event and user callback returns %d\n", __FUNCTION__, WBEventName(pEvent->type), iRval);
+
+    if(iRval)
+    {
+      // check message types that I do *NOT* want to 'bail out' for, as well as those
+      // that I _MUST_ bail out for.
+
+      switch(pEvent->type)
+      {
+        case DestroyNotify: // must process after user callback
+          WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
+                         "%s DestroyNotify and user callback returned a non-zero value\n", __FUNCTION__);
+
+          // CONTINUE PROCESSING - after the user's callback handles DestroyNotify I must handle
+          //                       it here also (at the very end)
+
+          break;
+
+        case Expose: // no further processing needed, special debug notification
+          WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
+                         "%s Expose event and user callback returns %d\n", __FUNCTION__, iRval);
+          return iRval;  // 'expose' event already handled
+
+
+        default: // all other messages, no further processing needed
+          WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
+                         "%s - %s event and user callback returns %d\n", __FUNCTION__, WBEventName(pEvent->type), iRval);
+          return iRval;
+      }
+    }
+    else
+    {
+      // TODO:  deal with specific events NOT handled by the user callback
+
+      if(pEvent->type == ClientMessage &&
+         pEvent->xclient.message_type == aQUERY_CLOSE)
+      {
+        int i1;
+        Display *pDisplay = WBGetWindowDisplay(wID);
+
+        // note that 'Query Close' would have been processed already with an "ok to close" result
+        // SO, check contained windows, and then destroy everything except the window itself
+        if(pFrameWindow->ppChildFrames && pFrameWindow->nChildFrames > 0)
+        {
+          for(i1=0; i1 < pFrameWindow->nChildFrames; i1++)
+          {
+            XClientMessageEvent evt;
+
+            bzero(&evt, sizeof(evt));
+            evt.type = ClientMessage;
+            evt.display = pDisplay;
+            evt.window = pFrameWindow->ppChildFrames[i1]->wID;
+            evt.message_type = aQUERY_CLOSE; // QUERY_CLOSE request
+            evt.format = 32;
+            evt.data.l[0] = 0; // "do not close yourself yet"
+            
+            if((int)WBWindowDispatch(evt.window, (XEvent *)&evt) > 0) // TODO:  handle errors
+            {
+              WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Event | DebugSubSystem_Frame,
+                             "%s - QUERY CLOSE returning 1 (child refuses to close)\n", __FUNCTION__);
+
+              return 1; // "not ok" to close
+            }
+          }
+        }
+
+//        DLGMessageBox(MessageBox_OK | MessageBox_MiddleFinger, wID, "OK to close", "Checknig if ok to close");
+
+        if(pEvent->xclient.data.l[0]) // meaning "delete your private data if it's ok to close, destroy imminent"
+        {
+          // children say "go for it" - so now I do it to myself
+
+          if(pFrameWindow->ppChildFrames && pFrameWindow->nChildFrames > 0)
+          {
+            for(i1=pFrameWindow->nChildFrames - 1; i1 >= 0; i1--)
+            {
+              WB_ERROR_PRINT("TEMPORARY:  %s - destroying child frame %d\n", __FUNCTION__, i1);
+
+              WBChildFrame *pC = pFrameWindow->ppChildFrames[i1];
+              pC->pOwner = NULL; // so it doesn't try to remove itself
+
+              pFrameWindow->ppChildFrames[i1] = NULL; // so I don't try to do this again
+              FWDestroyChildFrame(pC);
+            }
+
+            pFrameWindow->nChildFrames = 0;
+          }
+
+          // to help deal with the destruction, tell the registered window proc that
+          // I am destroying the window by sending a 'DestroyNotify' to it.
+
+          if(pFrameWindow->pFWCallback)
+          {
+            XDestroyWindowEvent evt;
+
+            bzero(&evt, sizeof(evt));
+            evt.type = DestroyNotify;
+            evt.display = pDisplay;
+            evt.event = evt.window = pFrameWindow->wbFW.wID;
+
+            pFrameWindow->pFWCallback(evt.event, (XEvent *)&evt);
+          }
+
+          WB_ERROR_PRINT("TEMPORARY:  %s - destroying internal data, etc.\n", __FUNCTION__);
+
+          WBSetWindowData(wID, 0, NULL);
+
+          __internal_destroy_frame_window(pFrameWindow); // this destroys the children
+          free(pFrameWindow);
+
+          // NOTE:  caller must unregister the callback, etc.
+        }
+
+        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
+                       "%s - QUERY CLOSE returning zero\n", __FUNCTION__);
+
+        return 0; // OK to close
+      }
+    }
+  }
+
+
+  // At this point iRval _COULD_  be non-zero (example, DestroyNotify)
+  // so don't do any handling for those messages.  For everything else,
+  // a return value of ZERO means "not handled", so handle them.
+
+  if(!iRval)
+  {
+    switch(pEvent->type)
+    {
+      case KeyPress:
+        {
+#ifndef NO_DEBUG
+          int iACS = 0;
+          int iKey = WBKeyEventProcessKey((XKeyEvent *)pEvent, tbuf, &nChar, &iACS);
+
+          WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame | DebugSubSystem_Keyboard,
+                         "%s KEY PRESS for KEY %d KEYCODE %d MASK=%d (%xH)\n",
+                           __FUNCTION__, iKey, ((XKeyEvent *)pEvent)->keycode,
+                           ((XKeyEvent *)pEvent)->state, ((XKeyEvent *)pEvent)->state);
+#endif // NO_DEBUG
+
+          // check for menu and hotkey activation.
+//          if(nChar > 0) // only for "real" characters (i.e. not just the ALT key)
+          {
+            WBMenuBarWindow *pMenuBar = MBGetMenuBarWindowStruct(WBGetMenuWindow(wID));
+
+            if(pMenuBar)  // menu bar exists?
+            {
+              WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Menu | DebugSubSystem_Frame | DebugSubSystem_Keyboard,
+                             "%s call to MBMenuProcessHotKey for menu window %d (%08xH)\n",
+                             __FUNCTION__, (int)pMenuBar->wSelf, (int)pMenuBar->wSelf);
+
+              iRval = MBMenuProcessHotKey(pMenuBar->pMenu, (XKeyEvent *)pEvent);
+            }
+          }
+        }
+        break;
+
+      case KeyRelease:
+        {
+          // KeyRelease
+#ifndef NO_DEBUG
+          int iACS = 0, iKey = WBKeyEventProcessKey((XKeyEvent *)pEvent, tbuf, &nChar, &iACS);
+
+          if(nChar > 0)
+          {
+            WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame | DebugSubSystem_Keyboard,
+                           "%s KEY RELEASE for KEY %d KEYCODE %d  MASK=%d (%xH)\n",
+                           __FUNCTION__, iKey, ((XKeyEvent *)pEvent)->keycode,
+                           ((XKeyEvent *)pEvent)->state, ((XKeyEvent *)pEvent)->state);
+
+          }
+#endif // NO_DEBUG
+
+        }
+
+        break;
+
+
+
+      case SelectionRequest:
+      case SelectionClear:
+      case SelectionNotify:
+
+        return 0; // NOT handled (default handler might want to handle them, but not me)
+
+//        return FWDoSelectionEvents(&(pFrameWindow->wbFW), wID, wIDMenu, pEvent);  <-- no longer needed
+    }
+  }
+
+
+  // TODO:   message re-direction to children AFTER 'pFWCallback'
+
+
+
+  // ----------------------------------------
+  // DESTROY DESTROY DESTROY DESTROY DESTROY
+  //
+  //   special handling for 'DestroyNotify'
+  //
+  // DESTROY DESTROY DESTROY DESTROY DESTROY
+  // ----------------------------------------
+
+
+  if(pEvent->type == DestroyNotify &&
+     pEvent->xdestroywindow.window == wID)
+  {
+//    int boolQuitFlag = (pFrameWindow->wbFW.iFlags & WBFrameWindow_APP_WINDOW) != 0;
+
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
+                   "%s - DestroyNotify\n", __FUNCTION__);
+
+    WBSetWindowData(wID, 0, NULL);
+
+    __internal_destroy_frame_window(pFrameWindow);
+
+    free(pFrameWindow);
+
+//    if(boolQuitFlag)
+//      bQuitFlag = TRUE;  // set the global 'quit' flag if I'm an application top-level window
+
+    WB_DEBUG_PRINT(DebugLevel_ERROR/*DebugLevel_Verbose | DebugSubSystem_Event | DebugSubSystem_Frame*/,
+                   "%s - frame window destroyed\n", __FUNCTION__);
+    return 1;
+  }
+
+  WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Event | DebugSubSystem_Frame,
+                 "%s - frame window callback returns %d\n", __FUNCTION__, iRval);
+
+  return iRval;  // return back the 'handled' status
 }
 
 

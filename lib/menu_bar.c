@@ -427,14 +427,53 @@ void MBReCalcMenuBarWindow(WBMenuBarWindow *pMenuBar /*, int iX, int iY, int *pi
 
 void MBDestroyMenuBarWindow(WBMenuBarWindow *pMenuBar)
 {
-  if(!pMenuBar)
+  if(!pMenuBar || pMenuBar->ulTag != MENU_WINDOW_TAG)
+  {
     return;
+  }
 
   // TODO:  any special notifications??
+
+  if(pMenuBar->pMenu)
+  {
+    MBDestroyMenu(pMenuBar->pMenu); // TODO:  make this do reference counting?
+    pMenuBar->pMenu = NULL; // by convention, do this
+  }
 
   WBDestroyWindow(pMenuBar->wSelf);
   free(pMenuBar);
 }
+
+void MBSetMenuBarMenuResource(WBMenuBarWindow *pMenuBar, const char *pszResource)
+{
+WBMenu *pMenu;
+
+  if(!pMenuBar || pMenuBar->ulTag != MENU_WINDOW_TAG)
+  {
+    return;
+  }
+
+  pMenu = MBCreateMenu(-1, 0, pszResource, WBMENU_RESERVE_DEFAULT);
+
+  if(!pMenu)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - unable to create menu\n", __FUNCTION__);
+    return;
+  }
+
+  if(pMenuBar->pMenu)
+  {
+    MBDestroyMenu(pMenuBar->pMenu);
+  }
+
+  pMenuBar->pMenu = pMenu;
+  
+  pMenuBar->iSelected = -1;
+  pMenuBar->iPrevSel = -1;
+
+  MBReCalcMenuBarWindow(pMenuBar);
+}
+
 
 // this next callback is assigned via WBRegisterMenuCallback
 int MBMenuParentEvent(Window wIDMenu, XEvent *pEvent)
