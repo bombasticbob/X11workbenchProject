@@ -341,7 +341,7 @@ WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDBar, Window wIDOwner, WBMen
   xswa.bit_gravity = CenterGravity;
   xswa.override_redirect = True;  // so window manager won't mess with it
 
-  pRval = (WBMenuPopupWindow *)malloc(sizeof(*pRval));
+  pRval = (WBMenuPopupWindow *)WBAlloc(sizeof(*pRval));
 
   if(!pRval)
   {
@@ -379,7 +379,7 @@ WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDBar, Window wIDOwner, WBMen
   {
     WB_WARN_PRINT("%s - WARNING:  unable to create window for popup menu\n", __FUNCTION__);
 
-    free(pRval);
+    WBFree(pRval);
     return NULL;
   }
 
@@ -502,7 +502,7 @@ static void MBMenuPopupHandleMenuItem(Display *pDisplay, Window wID, WBMenuPopup
 
     WBPostPriorityEvent(wID, (XEvent *)&evt);
   }
-  else
+  else // regular menu item.  do a 'menu command'
   {
     XClientMessageEvent evt;
 
@@ -514,6 +514,7 @@ static void MBMenuPopupHandleMenuItem(Display *pDisplay, Window wID, WBMenuPopup
     evt.message_type = aMENU_COMMAND;
     evt.format = 32;  // always
     evt.data.l[0] = pItem->iAction;  // menu command message ID
+#warning potentially dangerous code.  this should be re-written to NOT use a 'pMenu' pointer in an event
     evt.data.l[1] = (long)pMenu;     // pointer to menu object
     evt.data.l[2] = wID;             // window ID of menu bar
 
@@ -545,6 +546,8 @@ static int MBMenuPopupHandleMenuItemUI(Display *pDisplay, WBMenuPopupWindow *pSe
 
   evt.data.l[0] = pItem->iAction;  // menu command message ID (needed to identify menu)
 
+#warning potentially dangerous code.  this should be re-written to NOT use a 'pMenu' or 'pItem' pointer in an event
+
 #if !defined(__SIZEOF_POINTER__) // TODO find a better way
 #define __SIZEOF_POINTER_ 0
 #endif
@@ -559,6 +562,10 @@ static int MBMenuPopupHandleMenuItemUI(Display *pDisplay, WBMenuPopupWindow *pSe
   evt.data.l[3] = (long)((unsigned long long)pItem & 0xffffffffL);
   evt.data.l[4] = (long)(((unsigned long long)pItem >> 32) & 0xffffffffL);
 #endif
+
+  ////////////////////////////////////////////////////////////////////
+  // TODO:  handle things differently for a DYNAMIC menu UI handler?
+  ////////////////////////////////////////////////////////////////////
 
   return WBWindowDispatch(pSelf->wOwner, (XEvent *)&evt); // 'send event'
 }
@@ -654,7 +661,7 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
     if(pItem->iPosition < 0)
       pItem->iPosition = iVPos;  // also needed for mousie/clickie
 
-    if(pItem->iAction == -1) // separator
+    if(pItem->iAction == WBMENU_SEPARATOR) // separator
     {
       xpt[0].x=xwa.border_width + 1;
       xpt[0].y=pItem->iPosition + SEPARATOR_POS - 1;
@@ -670,6 +677,14 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
       iVPos += SEPARATOR_HEIGHT;
       XSetForeground(pDisplay, gc, clrMenuFG.pixel);
       continue;
+    }
+    else if(pItem->iAction & WBMENU_DYNAMIC_HIGH_BIT)
+    {
+      ////////////////////////////////    
+      // TODO:  HANDLE DYNAMIC MENU
+      ////////////////////////////////    
+
+      WB_ERROR_PRINT("TODO:  %s - handle dynamic menu\n", __FUNCTION__);
     }
 
     iUIState = MBMenuPopupHandleMenuItemUI(pDisplay, pSelf, pMenu, pItem);
@@ -864,13 +879,13 @@ WB_GEOM geom;
 
       iHPos = 1; // XTextWidth(pFont, "  ", 2);  // width of 2 spaces
 
-      // if somethign is selected it will NOT be the same one I'm trying
+      // if something is selected it will NOT be the same one I'm trying
       // to select now, so invalidate it so that it's re-painted
       if(pSelf->iSelected >= 0 && pSelf->iSelected < pMenu->nItems)
       {
         WBMenuItem *pItem0 = pMenu->ppItems[pSelf->iSelected];
 
-        if(pItem0)
+        if(pItem0) // the old selected item
         {
           geom.x = iHPos;
           geom.y = pItem0->iPosition - 1; // actual practice suggests going outside the box a bit
@@ -883,6 +898,7 @@ WB_GEOM geom;
 
       pSelf->iSelected = i1;  // indicate the item that's NOW selected
 
+      // rectangle for new selected item
       geom.x = iHPos;
       geom.y = pItem->iPosition - 1; // actual practice suggests going outside the box a bit
       geom.width = pSelf->iWidth + 1; //pItem->iTextWidth;
@@ -946,7 +962,7 @@ static int MBMenuPopupEvent(Window wID, XEvent *pEvent)
 
         WBSetWindowData(pSelf->wSelf, 0, 0);  // clear the 'back pointer' now
 
-        free(pSelf);  // on destroy I always do this (no owned objects so it's easy)
+        WBFree(pSelf);  // on destroy I always do this (no owned objects so it's easy)
 
         return 1;  // processed
       }

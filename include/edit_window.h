@@ -6,7 +6,7 @@
 //        \___| \__,_||_| \__|_____\_/\_/  |_||_| |_| \__,_| \___/  \_/\_/(_)_| |_|     //
 //                           |_____|                                                    //
 //                                                                                      //
-//                     a window into which you can type text                            //
+//                  a window into which you can type (and edit) text                    //
 //                                                                                      //
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -65,6 +65,12 @@
 */
 
 
+/** \ingroup child_frame
+  * \brief TAG for the WBEditWindow structure
+**/
+#define EDIT_WINDOW_TAG (*((const unsigned int * const)"FWEW"))
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -115,13 +121,12 @@ extern "C" {
   * \ingroup edit_window
   * \brief Structure that defines an Edit Window
   *
-  * The WBFWMenuHandler structure is designed to be initialized via macros, so
-  * that a set of callback functions can then be easily used to handle menu events.
-  * If no menu handler is present for a menu item, or if the menu UI handler is
-  * NOT NULL and returns a non-zero value, the menu item will be disabled and
-  * displayed accordingly.  It will not be possible to use its hotkey nor select it.
-  * Otherwise, the menu will be displayed normally and be selectable, and its hotkey
-  * will be able to activate it.
+  * The WBEditWindow structure defines an 'Edit Window' that is a 'superclass' of
+  * a Child Frame window.  The first element MUST be the 'WBChildFrame'.  Elements
+  * that follow it are specific to the Edit Window.
+  *
+  * This uses a TEXT_OBJECT structure to store the actual text data, and to manage the
+  * UI functionality.
   *
   * \code
 
@@ -129,12 +134,13 @@ extern "C" {
   {
     WBChildFrame childframe;          // elements common to a 'child frame' (derived object)
 
+    unsigned int ulTag;               // 'Tag' identifying this structure as a WBEditWindow
+
     char *szFileName;                 // malloc'd name of file associated with this edit window (NULL if none)
 
-    int nTextObjects;                 // Total number of items in aTextObjects
-    int nMaxTextObjects;              // Max number of items in aTextObjects
+    WBWinEvent pUserCallback;         // user callback function to receive notifications and unhandled messages
 
-    TEXT_OBJECT *pTextObjects;        // pointer to the 'TEXT_OBJECT' array
+    TEXT_OBJECT xTextObject;          // the 'TEXT_OBJECT' member, that does MOST of the work
 
   } WBEditWindow;
 
@@ -144,20 +150,28 @@ extern "C" {
   * to 'WBChildFrame *', or by using the 'WBChildWindowFromWindowID()' function.
   *
   * \sa \ref TEXT_OBJECT
-*/
+**/
 typedef struct __WBEditWindow__
 {
   WBChildFrame childframe;          ///< elements common to a 'child frame' (derived object)
 
+  unsigned int ulTag;               ///< 'Tag' identifying this structure as a WBEditWindow
+
   char *szFileName;                 ///< malloc'd name of file associated with this edit window (NULL if none)
 
-  int nTextObjects;                 ///< Total number of items in aTextObjects
-  int nMaxTextObjects;              ///< Max number of items in aTextObjects
+  WBWinEvent pUserCallback;         ///< user callback function to receive notifications and unhandled messages
 
-  TEXT_OBJECT *pTextObjects;        ///< pointer to the 'TEXT_OBJECT' array
+  TEXT_OBJECT xTextObject;          ///< the 'TEXT_OBJECT' member, that does MOST of the work
 
 } WBEditWindow;
 
+
+// external atoms associated with edit windows, documented elsewhere
+
+#ifndef _EDIT_WINDOW_C_IMPLEMENTED_
+extern Atom aEW_HOVER_NOTIFY;
+extern Atom aEW_EDIT_CHANGE;
+#endif // _EDIT_WINDOW_C_IMPLEMENTED_
 
 /** \ingroup edit_window
   * \brief Create an Edit Window
@@ -172,7 +186,9 @@ typedef struct __WBEditWindow__
   * This function allows you to create an Edit Window that is a regular child of a frame window or
   * dialog box, as a 'single document' handler.  To create a window that uses the maximum available
   * space within the client area of the parent, specify '-1' for iTop, iLeft, iWidth, and iHeight.
-*/
+  *
+  * Header File:  edit_window.h
+**/
 WBEditWindow *WBCreateEditWindow(WBFrameWindow *pOwner, XFontStruct *pFont,
                                  const char *szFocusMenu, const WBFWMenuHandler *pHandlerArray,
                                  int fFlags);
@@ -183,7 +199,11 @@ WBEditWindow *WBCreateEditWindow(WBFrameWindow *pOwner, XFontStruct *pFont,
   *
   * \param pEditWindow A pointer to the WBEditWindow structure for the edit window
   * \returns void
-*/
+  *
+  * Call this function on any pointer returned by WBCreateEditWindow to destroy it and free its resources.
+  *
+  * Header File:  edit_window.h
+**/
 void WBDestroyEditWindow(WBEditWindow *pEditWindow);
 
 
@@ -194,8 +214,95 @@ void WBDestroyEditWindow(WBEditWindow *pEditWindow);
   * \returns A pointer to the associated WBEditWindow structure (if it is a WBEditWindow), or NULL on error
   *
   * Use this function to safely obtain the correct WBEditWindow structure for a given Window ID.
-*/
+  *
+  * Header File:  edit_window.h
+**/
 WBEditWindow *WBEditWindowFromWindowID(Window wID);
+
+
+/** \ingroup edit_window
+  * \brief Open an existing file and read its contents into the Edit Window, storing the file name for later reference
+  *
+  * \param pEditWindow A pointer to the WBEditWindow structure
+  * \param pszFileName A (const) pointer to a character string containing the file name.  PATH rules will be used to locate the actual file.
+  * \returns A value of zero if successful, non-zero on error.
+  *
+  * Use this function to read a file into the Edit Window, replacing any existing contents.
+  *
+  * Header File:  edit_window.h
+**/
+int WBEditWindowLoadFile(WBEditWindow *pEditWindow, const char *pszFileName);
+
+
+/** \ingroup edit_window
+  * \brief Save the contents from the Edit Window to a file, overwriting the file if it already exists
+  *
+  * \param pEditWindow A pointer to the WBEditWindow structure
+  * \param pszFileName A (const) pointer to a character string containing the file name.  PATH rules will be used to locate the actual file.  A value of NULL uses the stored file name.
+  * \returns A value of zero if successful, non-zero on error.
+  *
+  * Use this function to write the contents of an Edit Window to a file, overwriting any existing file of the same name.
+  *
+  * Header File:  edit_window.h
+**/
+int WBEditWindowSaveFile(WBEditWindow *pEditWindow, const char *pszFileName);
+
+
+/** \ingroup edit_window
+  * \brief Clear the contents in the Edit Window, and NULL the stored file name
+  *
+  * \param pEditWindow A pointer to the WBEditWindow structure
+  *
+  * Use this function to clear an Edit Window, setting the file name to NULL
+  *
+  * Header File:  edit_window.h
+**/
+void WBEditWindowClear(WBEditWindow *pEditWindow);
+
+
+/** \ingroup edit_window
+  * \brief Check for valid WBEditWindow pointer
+  *
+  * \param pEditWindow A pointer to a WBEditWindow structure
+  * \returns non-zero if valid, zero if NOT valid
+  *
+  * Header File:  edit_window.h
+**/
+static __inline int WBIsValidEditWindow(WBEditWindow *pEditWindow)
+{
+  if(!pEditWindow ||                                     // invalid pointer (TODO:  check range?)
+     pEditWindow->childframe.ulTag != CHILD_FRAME_TAG || // child frame tag not valid
+     pEditWindow->ulTag != EDIT_WINDOW_TAG)              // edit window tag not valid
+  {
+    return 0; // NOT valid.
+  }
+
+  return 1;
+}
+
+
+// CALLBACK REGISTRATION
+
+
+/** \ingroup edit_window
+  * \brief Clear the contents in the Edit Window, and NULL the stored file name
+  *
+  * \param pEditWindow A pointer to the WBEditWindow structure
+  * \param pUserCallback A pointer to the callback function that handles messages (Return 0 for default handling, != 0 if handled).  Can be NULL.
+  *
+  * Use this function to specify a user callback for an Edit Window. By using this function to specify the callback,
+  * you ensure that proper 'Edit Window' event handling will still occur.
+  *
+  * As with other callback functions that use WBWinEvent as their data type, you nee to return a value of zero
+  * to indicate 'perform default handling', non-zero if you handle the event and do NOT want 'default' handling.
+  *
+  * Edit Windows can generate a number of custom Client Message events that are specific to Edit Windows.
+  *
+  * Header File:  edit_window.h
+**/
+void WBEditWindowRegisterCallback(WBEditWindow *pEditWindow, WBWinEvent pUserCallback);
+
+
 
 
 #ifdef __cplusplus

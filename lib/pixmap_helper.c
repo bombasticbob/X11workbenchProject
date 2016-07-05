@@ -77,7 +77,7 @@
 
 
 
-#ifdef NODEBUG
+#ifdef NO_DEBUG
 #define DEBUG_DUMP_XPM_ATTRIBUTES(X) 
 #define DEBUG_DUMP_COLORMAP(X)
 #else
@@ -85,7 +85,7 @@ static void DebugDumpXpmAttributes(const char *szFunction, int nLine, XPM_ATTRIB
 static void DebugDumpColormap(const XStandardColormap *pMap);
 #define DEBUG_DUMP_XPM_ATTRIBUTES(X) DebugDumpXpmAttributes(__FUNCTION__, __LINE__, X)
 #define DEBUG_DUMP_COLORMAP(X) DebugDumpColormap(X)
-#endif // NODEBUG
+#endif // NO_DEBUG
 
 
 #define MINIMUM_ATOM_RESOURCE_LIST_SIZE 256
@@ -830,7 +830,7 @@ int i1;
   if(!pAtomResourceList)
   {
     pAtomResourceList = (INTERNAL_ATOM_RESOURCE_LIST *)
-      malloc(MINIMUM_ATOM_RESOURCE_LIST_SIZE * sizeof(*pAtomResourceList));
+                        WBAlloc(MINIMUM_ATOM_RESOURCE_LIST_SIZE * sizeof(*pAtomResourceList));
 
     if(!pAtomResourceList)
     {
@@ -855,7 +855,7 @@ int i1;
   {
     int iNewSize = MINIMUM_ATOM_RESOURCE_LIST_SIZE / 2 + nAtomResourceListMax;
 
-    void *pTemp = realloc(pAtomResourceList, iNewSize);
+    void *pTemp = WBReAlloc(pAtomResourceList, iNewSize);
     if(!pTemp)
     {
       WB_ERROR_PRINT("%s - not enough memoory for atom resource list re-alloc\n", __FUNCTION__);
@@ -909,13 +909,15 @@ int i1, i2;
          && i2 < sizeof(szPreDefinedIconResources)/sizeof(szPreDefinedIconResources[0]);
         i1++, i2++)
     {
-      Atom aTemp = XInternAtom(WBGetDefaultDisplay(), szPreDefinedIconResources[i2], True); // create or lookup
+      Atom aTemp = WBGetAtom(WBGetDefaultDisplay(), szPreDefinedIconResources[i2]);
 
       if(aTemp != None)
       {
         RegisterIconResource(aTemp, GetPreDefinedIconResource(i1));
       }
     }
+
+    iHasBeenRegistered = 1;
   }
 
   for(i1=0; i1 < nAtomResourceList; i1++)
@@ -987,9 +989,9 @@ Pixmap PXM_LoadPixmap(char *ppXPM[], XPM_ATTRIBUTES *pAttr, Pixmap *pMask /* = N
 {
 Pixmap pixRval = None, pixRval2 = None;
 XPM_ATTRIBUTES xattr;
-//#ifndef NODEBUG
+//#ifndef NO_DEBUG
 //WB_UINT64 ullTime = WBGetTimeIndex();
-//#endif // NODEBUG
+//#endif // NO_DEBUG
 
 
   if(!ppXPM)
@@ -1011,10 +1013,14 @@ XPM_ATTRIBUTES xattr;
 
 //  WB_ERROR_PRINT("TEMPORARY:  %s line %d  delta tick %lld\n", __FUNCTION__, __LINE__, (WBGetTimeIndex() - ullTime));
 
+#ifdef X11WORKBENCH_TOOLKIT_HAVE_XPM
   BEGIN_XCALL_DEBUG_WRAPPER
+#endif // X11WORKBENCH_TOOLKIT_HAVE_XPM
   XPM_CREATE_PIXMAP_FROM_DATA(WBGetDefaultDisplay(), WBGetHiddenHelperWindow(),
                               ppXPM, &pixRval, &pixRval2, &xattr);
+#ifdef X11WORKBENCH_TOOLKIT_HAVE_XPM
   END_XCALL_DEBUG_WRAPPER
+#endif // X11WORKBENCH_TOOLKIT_HAVE_XPM
 
 //  WB_ERROR_PRINT("TEMPORARY:  %s line %d  delta tick %lld\n", __FUNCTION__, __LINE__, (WBGetTimeIndex() - ullTime));
 
@@ -1178,7 +1184,7 @@ void PXM_OnExit(void)
 {
   if(pAtomResourceList)
   {
-    free(pAtomResourceList);
+    WBFree(pAtomResourceList);
     pAtomResourceList = NULL;
   }
 
@@ -1191,7 +1197,7 @@ void PXM_OnExit(void)
 
 
 
-#ifndef NODEBUG
+#ifndef NO_DEBUG
 static void DebugDumpXpmAttributes(const char *szFunction, int nLine, XPM_ATTRIBUTES *pAttr)
 {
   WBDebugPrint("%s line %d XPM_ATTRIBUTES contain:\n", szFunction, nLine);
@@ -1249,5 +1255,5 @@ static void DebugDumpColormap(const XStandardColormap *pMap)
 }
 
 
-#endif // !NODEBUG
+#endif // !NO_DEBUG
 

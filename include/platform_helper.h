@@ -99,50 +99,92 @@
 
 
 /** \ingroup platform
+  * \hideinitializer
   * \brief INVALID HANDLE VALUE equivalent
   *
-  * This definition generically refers to an INVALID HANDLE
+  * This definition generically refers to an INVALID HANDLE, more specifically a FILE or SOCKET handle on POSIX systems
 **/
 #define INVALID_HANDLE_VALUE ((int)-1)
 
-// jump optimization macros - gcc only
-#define WB_UNLIKELY(x) (__builtin_expect (!!(x), 0))
-#define WB_LIKELY(x) (__builtin_expect (!!(x), 1))
-
-//#ifdef _LONGLONG /* TODO test for _LONGLONG in configure script */
 
 /** \ingroup platform
-  * \brief Platform abstract 64-bit integer
-  *
-  * This definition identifies the data type for a 64-bit integer
+  * @{
 **/
-#define WB_INT64 long long
 
-/** \ingroup platform
-  * \brief Platform abstract unsigned 64-bit integer
+//--------------------------------------
+// branch optimization macros - gcc only
+//--------------------------------------
+
+#define WB_UNLIKELY(x) (__builtin_expect (!!(x), 0)) /**< optimization for code branching when condition is 'unlikely'.  use within conditionals **/
+#define WB_LIKELY(x) (__builtin_expect (!!(x), 1))   /**< optimization for code branching when condition is 'likely'.  use within conditionals **/
+
+/** \brief The minimum 'internal' Atom value used by the toolkit
   *
-  * This definition identifies the data type for an unsigned 64-bit integer
+  * This is the minimum 'internal' Atom value that is used by the toolkit.  Atoms that are allocated via XInternAtom()
+  * will have a value that is LESS than WB_INTERNAL_ATOM_MIN_VAL, and anything allocated via WBGetAtom() will have
+  * a value that is GREATER THAN OR EQUAL to WB_INTERNAL_ATOM_MIN_VAL.
+  *
+  * Use of this constant to determine 'internal' from 'X11' Atoms is based on the source code for the Xorg X11 server,
+  * which uses the function 'MakeAtom()' (in 'dix/atom.c') to allocate new atoms.  These values are assigned SEQUENTIALLY,
+  * beginning with 'XA_LAST_PREDEFINED+1' and continuing from there.  A value of this magnitude allows for about 1 billion
+  * Atom allocations before 'hitting the limit'.  (having that many atoms would negatively impact the X windows system)
+  *
+  * In the future, it is possible that an Atom *MAY* have a randomly assigned value, or a value assigned that clashes
+  * with this definition.  In such a case, a major re-write might be needed to correct for it.
+  *
+  * NOTE:  This value must NOT include any of the bits 'Or'd with an Atom within a menu, such as 'WBMENU_POPUP_HIGH_BIT'
+  * or 'WBMENU_DYNAMIC_HIGH_BIT'.  Otherwise, THAT architecture would need to be modified as well.
+  *
 **/
-#define WB_UINT64 unsigned long long
+#define WB_INTERNAL_ATOM_MIN_VAL 0x3f000000L         /**< the minimum 'internal' Atom value used by the toolkit **/
 
-//#else // !defined _LONGLONG, unlikely
-//typedef struct __WB_INT64__ { unsigned long l1, l2; } WB_INT64;
-//typedef struct __WB_UINT64__ { unsigned long l1, l2; } WB_UINT64;
-//#endif // _LONGLONG
+/**
+  * @}
+**/
 
 /** \ingroup platform
   * \brief Platform abstract 32-bit integer
   *
   * This definition identifies the data type for a 32-bit integer
 **/
-#define WB_INT32 int
+typedef int WB_INT32;
 
 /** \ingroup platform
   * \brief Platform abstract unsigned 32-bit integer
   *
   * This definition identifies the data type for an unsigned 32-bit integer
 **/
-#define WB_UINT32 unsigned int
+typedef unsigned int WB_UINT32;
+
+
+#if defined(HAVE_LONGLONG) || defined(__DOXYGEN__) /* 'configure' tests for 'long long' datatype valid in configure script */
+
+/** \ingroup platform
+  * \brief defined whenever the 'WB_UINT64' data type is a 'built in' data type
+**/
+#define HAS_WB_UINT64_BUILTIN
+
+
+/** \ingroup platform
+  * \brief Platform abstract 64-bit integer
+  *
+  * This definition identifies the data type for a 64-bit integer
+**/
+typedef long long WB_INT64;
+
+/** \ingroup platform
+  * \brief Platform abstract unsigned 64-bit integer
+  *
+  * This definition identifies the data type for an unsigned 64-bit integer
+**/
+typedef unsigned long long WB_UINT64;
+
+#else // !defined HAVE_LONGLONG, unlikely (this part won't show up in doxygen either)
+
+typedef struct __WB_INT64__ { WB_UINT32 dw2; WB_INT32 dw1; } WB_INT64;    // note 'dw1' is a signed value
+typedef struct __WB_UINT64__ { WB_UINT32 dw2; WB_UINT32 dw1; } WB_UINT64;
+
+#endif // _LONGLONG
 
 
 #define WB_C99_INITIALIZERS /* allow C99-style initializers */
@@ -180,7 +222,7 @@ typedef pthread_key_t   WB_THREAD_KEY;
   *
   * This 'typedef' refers to a CONDITION, a triggerable synchronization resource
 **/
-typedef unsigned int WB_COND; // defined as 'unsigned int' because of pthread_cond problems under Linux
+typedef WB_UINT32 WB_COND; // defined as 'WB_UINT32' because of pthread_cond problems under Linux
 //typedef pthread_cond_t  WB_COND;
 
 /** \ingroup platform
@@ -228,10 +270,10 @@ typedef pthread_mutex_t WB_MUTEX;
 #define __inline__ inline /* this assumes 'inline' is supported (MSC should support this) */
 #endif // __inline__
 
-#define WB_INT64 __int64
-#define WB_UINT64 unsigned __int64
-#define WB_INT32 int
-#define WB_UINT32 unsigned int
+typedef __int64 WB_INT64;
+typedef unsigned __int64 WB_UINT64;
+typedef int WB_INT32;
+typedef unsigned int WB_UINT32;
 
 // assume MS Windows Win32 API
 typedef HMODULE WB_MODULE ;     /* module handle */
@@ -256,6 +298,254 @@ typedef HANDLE WB_MUTEX;        // equivalent to a mutex handle
 #define __PACKED__
 
 #endif // __GNUC__
+
+
+// put standard '#define's and typedefs here, the ones that apply to EVERYBODY
+
+/** \ingroup platform
+  * @{
+**/
+#define WB_SECURE_HASH_TIMEOUT 60000 /**< 'secure hash' maximum lifetime, in milliseconds **/
+
+typedef char * WB_PSTR;         ///< pointer to char string - a convenience typedef
+typedef const char * WB_PCSTR;  ///< pointer to const char string - a convenience typedef
+/**
+  * @}
+**/
+
+
+// memory allocation (with debug support)
+
+/** \ingroup sub_alloc
+  * \brief High performance memory sub-allocator 'allocate'
+  *
+  * \param nSize The length of memory being requested
+  * \returns A pointer to the allocated buffer, always aligned on a 'pointer size' boundary.  Do NOT overrun the buffer!
+  *
+  * Header File:  platform_helper.h
+**/
+void *WBAlloc(int nSize);
+
+/** \ingroup sub_alloc
+  * \brief High performance memory sub-allocator 'free'
+  *
+  * \param pBuf A pointer to the previously sub-allocated memory
+  * \returns void
+  *
+  * Header File:  platform_helper.h
+**/
+void WBFree(void *pBuf);
+
+/** \ingroup sub_alloc
+  * \brief High performance memory sub-allocator, similar to 'malloc_usable_size'
+  *
+  * \param pBuf A pointer to the previously sub-allocated memory
+  * \returns The usable size of the allocated memory.
+  *
+  * Use this function to determine how big a memory block REALLY is, particularly if
+  * 'malloc_usable_size' is supported.  The sub-allocators use power-of-two allocation
+  * sizes in order to minimize the need to re-allocate blocks of memory.  The assumption
+  * is that memory re-allocation is likely.  To minimize the need to flip pointers around
+  * all of the time, and copy blocks of memory from one place to another via re-allocation,
+  * you can use this function to determine how much memory is REALLY available in the
+  * memory block.  (this function is used internally within WBReAlloc(), and is generally 'advisory'
+  * when used for other purposes).
+  *
+  * Header File:  platform_helper.h
+**/
+int WBAllocUsableSize(void *pBuf);
+
+/** \ingroup sub_alloc
+  * \brief High performance memory sub-allocator 're-allocate'
+  *
+  * \param pBuf A pointer to the previously sub-allocated memory
+  * \param nNewSize The desired 'new' size of the memory block
+  * \return A pointer to the new allocated memory block, or NULL on error.  If the return value is NOT NULL, the previous pointer becomes invalid.
+  *
+  * Header File:  platform_helper.h
+**/
+void * WBReAlloc(void *pBuf, int nNewSize);
+
+/** \ingroup sub_alloc
+  * \brief High performance memory sub-allocator 'trash masher' - call periodically to minimize wasted memory
+  *
+  * Sub-allocation sometimes leaves 'holes' in memory.  This function is intended to minimize that, by freeing
+  * up blocks of allocated memory that are no longer in use.  It is not the same as 'garbage collection', but
+  * it may have the same basic effect.  Call this function within the main message loop in the main thread.
+  *
+  * Header File:  platform_helper.h
+**/
+void WBSubAllocTrashMasher(void);
+
+
+// BASIC STRING UTILITIES
+
+// simple but helpful string utilities
+
+/** \ingroup text
+  * \brief A simple utility that returns a WBAlloc() copy of a 0-byte terminated string
+  *
+  * \param pSrc A pointer to the original ASCII string (0-byte terminated)
+  * \return a 'WBAlloc() copy of the string (0-byte terminated)
+  *
+  * This function creates a 'WBAlloc() copy of szStr, up to the 0-byte.  The returned string
+  * ALWAYS ends in a zero byte.  The caller must deallocate the returned pointer using 'WBFree()'.\n
+  * The function returns NULL on error.
+  *
+  * Header File:  platform_helper.h
+**/
+char *WBCopyString(const char *pSrc);
+
+/** \ingroup text
+  * \brief A simple utility that returns a WBAlloc() copy of a string up to a maximum length (can also be 0-byte terminated)
+  *
+  * \param pSrc A pointer to the original ASCII string (can be 0-byte terminated)
+  * \param nMaxChars The maximum number of characters to be copied, or until a 0-byte is found
+  * \return a 'WBAlloc() copy of the string (0-byte terminated)
+  *
+  * This function creates a 'WBAlloc() copy of pStr, up to 'nMaxChars' or until a 0-byte is
+  * found, whichever happens first.  The returned string ALWAYS ends in a zero byte.
+  * The caller must deallocate the returned pointer using 'WBFree()'.\n
+  * The function returns NULL on error.
+  *
+  * Header File:  platform_helper.h
+**/
+char *WBCopyStringN(const char *pSrc, unsigned int nMaxChars);
+
+/** \ingroup text
+  * \brief A simple utility that concatenates a string onto the end of a 0-byte terminated WBAlloc() string
+  *
+  * \param ppDest A pointer to a pointer to a WBAlloc() string containing the first portion of the concatenated result (also the return value)
+  * \param pSrc A pointer to a character string to concatenate onto the end of the first string
+  *
+  * This function concatenates two strings together.  The first parameter must point to the character pointer variable
+  * that points to the first string to be concatenated.  This must either be a WBAlloc() pointer or NULL, and the string
+  * itself must be 0-byte terminated.  The second parameter points to a 0-byte terminated string, which does not
+  * have to be a WBAlloc() string.  The function will overwrite the first pointer with WBAlloc() copy of the result
+  * of concatenating the two strings.\n
+  * On error, the function does NOT modify ppDest and aborts the concatenate operation.
+  *
+  * Header File:  platform_helper.h
+**/
+void WBCatString(char **ppDest, const char *pSrc);
+
+/** \ingroup text
+  * \brief A simple utility that concatenates a string onto the end of a 0-byte terminated WBAlloc() string up to a maximum length (can also be 0-byte terminated)
+  *
+  * \param ppDest A pointer to a pointer to a WBAlloc() string containing the first portion of the concatenated result (also the return value)
+  * \param pSrc A pointer to a character string to concatenate onto the end of the first string (can be 0-byte terminated)
+  * \param nMaxChars The maximum number of characters to be concatenated, or until a 0-byte is found in pSrc
+  *
+  * This function concatenates two strings together.  The first parameter must point to the character pointer variable
+  * that points to the first string to be concatenated.  This must either be a WBAlloc() pointer or NULL, and the string
+  * itself must be 0-byte terminated.  The second parameter points to a POSSIBLY 0-byte terminated string, which does not
+  * have to be a WBAlloc() string.  The function will overwrite the first pointer with WBAlloc() copy of the result
+  * of concatenating the two strings.  The string 'pSrc' will be concatenated up to 'nMaxChars' or until a 0-byte is
+  * found, whichever happens first.\n
+  * On error, the function does NOT modify pszStr1 and aborts the concatenate operation.
+  *
+  * Header File:  platform_helper.h
+**/
+void WBCatStringN(char **ppDest, const char *pSrc, unsigned int nMaxChars);
+
+/** \ingroup text
+  * \brief De-Quote a string 'in place', that is modifying the original string by removing quotes
+  *
+  * \param pszStr A pointer to a (0-byte terminated) ASCII string that may contain quotes.  Quotes are removed 'in place'
+  *
+  * Often you need to be able to remove quote characters from a string in a standardized manner.  This
+  * function handles just about every standard quoting method available, including the use of double-quotes
+  * to indicate a quote within a quoted string, the use of single or double quotes, etc.
+  *
+  * Header File:  platform_helper.h
+**/
+void WBDeQuoteString(char *pszStr);      // de-quote a string in place
+
+/** \ingroup text
+  * \brief Determine how many 'lines' are in a block of text by counting 'linefeed' characters
+  *
+  * \param pSrc A const pointer to an ASCII or UTF8 string (may end in zero byte)
+  * \param nMaxChars The maximum number of characters in the buffer
+  * \returns The total number of lines (including blank lines)
+  *
+  * Use this function to determine how many lines are in the block of text.  A line is considered to be
+  * a string of 1 or more characters, ending in a zero byte [or end of text as determined by 'nMaxChars'],
+  * or one of the following sequences:  \<CRLF\>, \<LF\>, \<CR\>, or \<LFCR\>
+  *
+  * Header File:  platform_helper.h
+**/
+int WBStringLineCount(const char *pSrc, unsigned int nMaxChars);
+
+/** \ingroup text
+  * \brief Locate the next line in a block of text, returning its pointer (and updating remaining length)
+  *
+  * \param pSrc A const pointer to an ASCII or UTF8 string (may end in a zero byte)
+  * \param pnMaxChars A pointer to an integer containing maximum number of characters in the buffer
+  * \returns A pointer to the next line, the character just following a \<CRLF\>, \<LF\>, \<CR\>, or \<LFCR\> sequence.
+  *
+  * Use this function to find the 'next line' in a block of text.  It will also update the number of characters remaining
+  * in the buffer, and store the result in '*pnMaxChars'.  If 'pnMaxChars' is NULL, the string buffer is assumed to
+  * terminate with a zero-byte.
+  *
+  * Header File:  platform_helper.h
+**/
+const char *WBStringNextLine(const char *pSrc, unsigned int *pnMaxChars);
+
+
+#if 0
+
+// THIS IS ALL RESERVED FOR FUTURE USE
+// MAY NOT BE NEEDED IF I USE _Xmbtowc _Xwctomb and _Xwctomb
+// X11 defines them as mblen(), mbtowc(), and wctomb()
+// The alternative is to do something similar on WIN32, once that is implemented in the toolkit
+// with '#ifdef blocks all around it
+
+/** \ingroup text
+  * \brief Check for and report if multi-byte string
+  *
+  * \param pszStr A pointer to a (0-byte terminated) UTF-8 string that may have multi-byte characters
+  * \return A positive value indicating the length of the UTF-16 string if it were converted, zero if
+  *         there are no multi-byte characters, or < 0 if the string is malformed or cannot be converted
+  *
+  * multi-byte character strings may require special handling to conver to/from unicode before they
+  * can be handled by X11.  Further, you may need to use a '16' version of an X11 API to manage the
+  * double-byte characters.  Even more complex, you might actually have to convert the entire string
+  * to/from unicode in an RFC-COMPLIANT AND SECURE MANNER before you can go off and try to render it.
+  * This function scans a UTF-8 string and returns the length as a UTF-16 string if it contains ANY
+  * multi-byte characters _AND_ can be properly converted.  It returns 0 if it's pure ASCII, and
+  * a value of -1 if it cannot be properly converted, and -2 if it is simply 'malformed'.
+  *
+  * Header File:  platform_helper.h
+**/
+int WBIsMultiByte(const char *pszStr);
+
+
+/** \ingroup text
+  * \brief Convert UTF-8 string to UTF-16 string
+  *
+  * \param pszStr A pointer to a (0-byte terminated) UTF-8 string that may have multi-byte characters
+  * \return A 'WBAlloc() pointer to an array of XChar2b structures containing the UTF-16
+  *
+  * Use this function to create a UTF-16 string from a UTF-8 string for use with the '16' X11 API
+  * text-related functions
+  *
+  * Header File:  platform_helper.h
+**/
+XChar2b * WBConvertMultiByteTo16(const char *pszStr);
+
+/** \ingroup text
+  * \brief Convert UTF-16 string to UTF-8 string
+  *
+  * \param pszStr A pointer to a (0-word terminated) UTF-16 string
+  * \return A 'WBAlloc() pointer to a UTF-8 string that may have multi-byte characters
+  *
+  * Use this function to create a UTF-8 string from a UTF-16 string.
+  *
+  * Header File:  platform_helper.h
+**/
+char *WBConvertMultiByteFrom16(const XChar2b *pwzStr);
+#endif // 0
+
 
 
 
@@ -520,11 +810,9 @@ void my_qsort_r(void *base, int nmemb, int size, void *thunk,
 
 #endif
 
-
 // *******************************************
-// FILE/APPLICATION SEARCH PATH AND TEMP FILES
+// STARTUP AND SHUTDOWN (must-call functions)
 // *******************************************
-
 
 /** \ingroup startup
   * \brief Resource initialization on startup
@@ -548,17 +836,175 @@ void WBPlatformOnInit(void);
 **/
 void WBPlatformOnExit(void);
 
+
+
+// *********************************
+// INTERNAL memory/security helpers
+// *********************************
+
+/** \ingroup platform
+  * \brief Create/obtain a 32-bit 'secure' hash for a pointer
+  *
+  * \param pPointer A pointer to memory that remains valid after the call
+  * \returns An allocated 'hash' to the pointer.  The hash should be free'd after use.
+  *
+  * This function will create a 'secure' hash for a pointer.  The hash can be used asynchronously
+  * for up to WB_SECURE_HASH_TIMEOUT milliseconds, after which it the reference automatically be free'd.
+  * In this way, an asynchronous message can contain references to pointers that are difficult to
+  * 'fake' if another application were to attempt to inject Events into the queue.
+  *
+  * NOTE:  automatically freeing the reference does NOT free the pointer.  Failure to handle these
+  *        correctly can result in memory leaks, but THAT is preferable to security vulnerabilities
+  *
+  * If the same pointer is used more than once in a call to this function, and the hash is still 'valid',
+  * the same hash will be returned as before, but with a higher (internal) reference count.  The timeout
+  * threshold will be reset using the current request time.  This makes it 'thread safe'.
+  *
+  * Passing a pointer asynchronously via a hash, particularly across thread boundaries, SHOULD implement
+  * its own method of reference counting to avoid re-using a pointer after the memory has been free'd.  If
+  * you do not queue the message, this becomes less important.  In any case, care needs to be taken to
+  * avoid using a pointer after it has been free'd.
+  *
+  * Header File:  platform_helper.h
+**/
+WB_UINT32 WBCreatePointerHash(void *pPointer);
+
+/** \ingroup platform
+  * \brief Destroy a 32-bit 'secure' hash for a pointer
+  *
+  * \param uiHash The 'hash' value created by WBCreatePointerHash()
+  *
+  * This function will destroy a 'secure' hash for a pointer that was created by WBCreatePointerHash()
+  *
+  * NOTE:  destroying the hash reference does NOT free the pointer.  Failure to handle these
+  *        correctly can result in memory leaks, but that is preferable to security vulnerabilities
+  *
+  * You should call this function immediately, once you have completed using the 'secure' pointer hash.
+  *
+  * Header File:  platform_helper.h
+**/
+void WBDestroyPointerHash(WB_UINT32 uiHash);
+
+/** \ingroup platform
+  * \brief Obtain a pointer from a 32-bit 'secure' pointer hash value
+  *
+  * \param uiHash The 'hash' value created by WBCreatePointerHash()
+  * \returns An allocated 'hash' to the pointer, or NULL if not valid.  The hash should be destroyed immediately after use.
+  *
+  * This function will create a 'secure' hash for a pointer.  The hash can be used asynchronously
+  * for up to WB_SECURE_HASH_TIMEOUT milliseconds, after which it the reference automatically be free'd.
+  * In this way, an asynchronous message can contain references to pointers that are difficult to
+  * 'fake' if another application were to attempt to inject Events into the queue.
+  *
+  * NOTE:  automatically freeing the reference does NOT free the pointer.  Failure to handle these
+  *        correctly can result in memory leaks, but that is preferable to security vulnerabilities
+  *
+  * Header File:  platform_helper.h
+**/
+void * WBGetPointerFromHash(WB_UINT32 uiHash);
+
+
+
+//-----------------------------------------
+// ATOM HELPERS (internally-defined atoms)
+//-----------------------------------------
+
+
+/** \ingroup platform
+  * \brief Lookup and/or allocate an internal Atom for a named string (lookups include X11 atoms)
+  *
+  * \param pDisplay The display to search for a matching X11 Atom
+  * \param szAtomName The text 'Atom name' to search (and optionally create) for an Atom
+  * \returns An Atom representing the specified szAtomName.  For values less than WB_INTERNAL_ATOM_MIN_VAL, it will be an X11 Atom.  Otherwise, the value will be 'internal only'
+  * 
+  * This function will lookup and/or allocate an internal Atom based on the specified Atom name.  If the Atom
+  * name exists as an X11 Atom, or already exists as an internal atom, the function will return that value.
+  * Otherwise, this function will return an allocated Atom with a value >= WB_INTERNAL_ATOM_MIN_VAL.
+  *
+  * NOTE:  If an X11 Atom with a matching name exists, along with an 'internal' definition, the internal
+  * definition will be returned.  This is to prevent problems with a 'race condition' on an atom name.
+  *
+  * If you need a globally defined atom with the matching name, use 'XInternAtom' instead.  Internally defined
+  * atoms must never be used with other applications, window properties, or the window manager.
+  *
+  * The X11 workbench toolkit makes use of Atoms for menu and dialog box events.  To prevent flooding the X11 server with
+  * a lot of unnecessary proprietary Atom names, this function lets X11 workbench continue to use the Atom paradigm
+  * while simultaneously keeping its own separate, private list of Atoms.
+  *
+  * Header File:  platform_helper.h
+**/
+Atom WBGetAtom(Display *pDisplay, const char *szAtomName);
+
+/** \ingroup platform
+  * \brief Lookup (but do not allocate) an internal (or X11) Atom for a named string
+  *
+  * \param pDisplay The display to search for a matching X11 Atom
+  * \param szAtomName The text 'Atom name' to search for an Atom
+  * \returns An Atom representing the specified szAtomName.  For values less than WB_INTERNAL_ATOM_MIN_VAL, it will be an X11 Atom.  Otherwise, the value will be 'internal only'
+  *
+  * If an atom is not found, this function will return 'None'.  It does not allocate a new atom.
+  * 
+  * This function will lookup an internal (or X11) Atom based on the specified Atom name.  If the Atom
+  * name exists as an X11 Atom, or already exists as an internal atom, the function will return that value.
+  * Otherwise, this function will return 'None'.
+  *
+  * An internal atom will have a value >= WB_INTERNAL_ATOM_MIN_VAL
+  *
+  * NOTE:  If an X11 Atom with a matching name exists, along with an 'internal' definition, the internal
+  * definition will be returned.  This is to prevent problems with a 'race condition' on an atom name.
+  *
+  * If you need a globally defined atom with the matching name, use 'XInternAtom' instead.  Internally defined
+  * atoms must never be used with other applications, window properties, or the window manager.
+  *
+  * The X11 workbench toolkit makes use of Atoms for menu and dialog box events.  To prevent flooding the X11 server with
+  * a lot of unnecessary proprietary Atom names, this function lets X11 workbench continue to use the Atom paradigm
+  * while simultaneously keeping its own separate, private list of Atoms.
+  *
+  * Header File:  platform_helper.h
+**/
+Atom WBLookupAtom(Display *pDisplay, const char *szAtomName);
+
+/** \ingroup platform
+  * \brief Lookup and/or allocate an internal Atom for a named string
+  *
+  * \param pDisplay The display to search for a matching X11 Atom
+  * \param aAtom The Atom to return the text for
+  * \returns An allocated pointer containing the 'Atom name' text string.  This pointer will need to be free'd using WBFree() (it is created via 'WBCopyString()')
+  * 
+  * This function returns the Atom name (as an allocated character string) associate with the specified Atom,
+  * whether the Atom is an X11 Atom or an internal 'X11 workbench toolkit' Atom.
+  *
+  * The X11 workbench toolkit makes use of Atoms for menu and dialog box events.  To prevent flooding the X11 server with
+  * a lot of unnecessary proprietary Atom names, this function lets X11 workbench continue to use the Atom paradigm
+  * while simultaneously keeping its own separate, private list of Atoms.  This function is intended to be compatible
+  * with the X11 function 'XGetAtomName()' to simplify the implementation of the application's code.
+  *
+  * A non-NULL return value must be free'd using 'WBFree()' rather than 'XFree()' (as it would have been with 'XGetAtomName()').
+  * This is primarily for future cross-platform compatibility.
+  *
+  * Header File:  platform_helper.h
+**/
+char * WBGetAtomName(Display *pDisplay, Atom aAtom);
+
+
+
+
+// *******************************************
+// FILE/APPLICATION SEARCH PATH AND TEMP FILES
+// *******************************************
+
+
 /** \ingroup platform
   * \brief Run an application asynchronously
   *
   * \param szFileName A const pointer to a character string containing a file or path name
-  * \returns A 'malloc'd pointer to a character string containing the ACTUAL path to the file
+  * \returns A 'WBAlloc() pointer to a character string containing the ACTUAL path to the file
   *
   * This function locates a file using the PATH environment variable and the value of 'szFileName'
   * by testing the file (or directory name) using 'stat'.  When the file (or directory) is located,
-  * this function returns the path name as a 'malloc'd string.  If the file (or directory) cannot
+  * this function returns the path name as a 'WBAlloc() string.  If the file (or directory) cannot
   * be located, the function returns NULL.\n
-  * The caller must 'free()' any non-NULL pointer returned by this function.
+  * The caller must 'WBFree()' any non-NULL pointer returned by this function.
   *
   * Header File:  platform_helper.h
 **/
@@ -568,13 +1014,13 @@ char * WBSearchPath(const char *szFileName);
   * \brief Get the name for a new, unique temporary file, creating the file in the process, and save its name for later deletion
   *
   * \param szExt A const pointer to a string containing the file's extension (without the '.'), or NULL if no extension is desired.
-  * \returns A 'malloc'd pointer to a character string containing fully qualified path to the file
+  * \returns A 'WBAlloc() pointer to a character string containing fully qualified path to the file
   *
   * This function obtains a unique temporary file name and then creates the file with a zero length,
-  * returning the name of the file in a malloc'd character string.  On error, it returns NULL.\n
+  * returning the name of the file in a WBAlloc() character string.  On error, it returns NULL.\n
   * The actual location of the temporary file depends upon platform-specific parameters, such as
   * environment variables and system settings.\n
-  * The caller must 'free()' any non-NULL pointer returned by this function.\n
+  * The caller must 'WBFree()' any non-NULL pointer returned by this function.\n
   * This function preserves the name of the file in a list of temporary files that need to be deleted once the
   * application has terminated.  This way an external application can keep the file open indefinitely, or even
   * re-read the file, without negative effects.  The 'WBPlatformOnExit()' function will delete all temporary files
@@ -589,13 +1035,13 @@ char * WBTempFile(const char *szExt);
   * \brief Get the name for a new, unique temporary file, creating the file in the process
   *
   * \param szExt A const pointer to a string containing the file's extension (without the '.'), or NULL if no extension is desired.
-  * \returns A 'malloc'd pointer to a character string containing fully qualified path to the file
+  * \returns A 'WBAlloc() pointer to a character string containing fully qualified path to the file
   *
   * This function obtains a unique temporary file name and then creates the file with a zero length,
-  * returning the name of the file in a malloc'd character string.  On error, it returns NULL.\n
+  * returning the name of the file in a WBAlloc() character string.  On error, it returns NULL.\n
   * The actual location of the temporary file depends upon platform-specific parameters, such as
   * environment variables and system settings.\n
-  * The caller must 'free()' any non-NULL pointer returned by this function.
+  * The caller must 'WBFree()' any non-NULL pointer returned by this function.
   *
   * Header File:  platform_helper.h
 **/
@@ -645,7 +1091,7 @@ WB_PROCESS_ID WBRunAsync(const char *szAppName, ...);
   * \brief Run an application synchronously, returning 'stdout' output in a character buffer.
   *
   * \param szAppName A const pointer to a character string containing the path to the application
-  * \returns A malloc'd pointer to a buffer containing the 'stdout' output from the application.
+  * \returns A WBAlloc() pointer to a buffer containing the 'stdout' output from the application.
   *
   * Use this function to run an external process and capture its output.  This function will ignore the
   * error return code from the program, so if this information is necessary, you should write a different
@@ -654,7 +1100,7 @@ WB_PROCESS_ID WBRunAsync(const char *szAppName, ...);
   * Each additional parameter passed to this function is a parameter that is to be passed to the program.
   * The final parameter in the list must be NULL, so any call to this function will need to have at
   * least 2 parameters.
-  * On error this function returns a NULL value.  Any non-NULL value must be 'free'd by the caller.
+  * On error this function returns a NULL value.  Any non-NULL value must be 'free'd by the caller using WBFree().
   *
   * Header File:  platform_helper.h
 **/
@@ -665,7 +1111,7 @@ char * WBRunResult(const char *szAppName, ...);
   *
   * \param szStdInBuf A const pointer to 0-byte terminated string/buffer containing the input for piped data.
   * \param szAppName A const pointer to a character string containing the path to the application
-  * \returns A malloc'd pointer to a buffer containing the 'stdout' output from the application.
+  * \returns A WBAlloc() pointer to a buffer containing the 'stdout' output from the application.
   *
   * Use this function to run an external process, providing a buffer that contains data to be sent to the
   * applications 'stdin', and in the process, capture its output.  This function will ignore the
@@ -675,7 +1121,7 @@ char * WBRunResult(const char *szAppName, ...);
   * Each additional parameter passed to this function is a parameter that is to be passed to the program.
   * The final parameter in the list must be NULL, so any call to this function will need to have at
   * least 2 parameters.
-  * On error this function returns a NULL value.  Any non-NULL value must be 'free'd by the caller.\n
+  * On error this function returns a NULL value.  Any non-NULL value must be 'free'd by the caller using WBFree().\n
   *
   * To create piped output, pass the result of the previous 'WBRunResult' or 'WBRunResultPipe' as the
   * 'szStdInBuf' parameter to a subsequent 'WBRunResultPipe' call.
@@ -1071,7 +1517,7 @@ int WBCondWaitMutex(WB_COND *pCond, WB_MUTEX *pMtx, int nTimeout);
   *
   * Header File:  platform_helper.h
 **/
-unsigned int WBInterlockedDecrement(volatile unsigned int *pValue);
+WB_UINT32 WBInterlockedDecrement(volatile WB_UINT32 *pValue);
 
 
 /** \ingroup threads
@@ -1086,7 +1532,7 @@ unsigned int WBInterlockedDecrement(volatile unsigned int *pValue);
   *
   * Header File:  platform_helper.h
 **/
-unsigned int WBInterlockedIncrement(volatile unsigned int *pValue);
+WB_UINT32 WBInterlockedIncrement(volatile WB_UINT32 *pValue);
 
 
 /** \ingroup threads
@@ -1103,7 +1549,7 @@ unsigned int WBInterlockedIncrement(volatile unsigned int *pValue);
   *
   * Header File:  platform_helper.h
 **/
-unsigned int WBInterlockedExchange(volatile unsigned int *pValue, unsigned int nNewVal);
+WB_UINT32 WBInterlockedExchange(volatile WB_UINT32 *pValue, WB_UINT32 nNewVal);
 
 
 /** \ingroup threads
@@ -1119,7 +1565,7 @@ unsigned int WBInterlockedExchange(volatile unsigned int *pValue, unsigned int n
   *
   * Header File:  platform_helper.h
 **/
-unsigned int WBInterlockedRead(volatile unsigned int *pValue);
+WB_UINT32 WBInterlockedRead(volatile WB_UINT32 *pValue);
 
 
 
@@ -1166,7 +1612,7 @@ int WBPrintPostScriptFile(const char *szPrinterName, const char *szFileName);
 /** \ingroup printer
   * \brief Get a list of printer names
   *
-  * \returns a 'malloc'd pointer to a list of zero-byte terminated strings containing the printer names, ending with 2 zero-bytes
+  * \returns a 'WBAlloc() pointer to a list of zero-byte terminated strings containing the printer names, ending with 2 zero-bytes
   *
   * Use this function to get a list of printer names that can be used with WBPrintPostScriptFile().
   * On POSIX systems, it will be information from '/usr/local/etc/printcap' or '/etc/printcap'.

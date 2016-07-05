@@ -107,12 +107,15 @@ WBMenu *MBCreateMenu(int iID, int iPopup, const char *pszResource, int iReserveS
   unsigned char *pEnd;
   const char *p1, *p2;
 
-  pRval = (WBMenu *)malloc(sizeof(WBMenu) + iReserveSpace);  // for now just do this
+  pRval = (WBMenu *)WBAlloc(sizeof(WBMenu) + iReserveSpace);  // for now just do this
 
   if(!pRval)
+  {
     return NULL;
+  }
 
   bzero(pRval, sizeof(WBMenu) + iReserveSpace);  // make sure
+  pRval->uiTag = WBMENU_TAG;
 
   pEnd = (unsigned char *)(pRval + 1);
 
@@ -185,59 +188,156 @@ void MBDestroyMenu(WBMenu *pMenu)
 {
 int i1;
 
-  if(pMenu)
+  if(!MBIsMenuValid(pMenu))
   {
-    if(pMenu->ppItems) // part of 'pMenu' memory block
-    {
-      for(i1=0; i1 < pMenu->nItems; i1++)
-      {
-        MBDestroyMenuItem(pMenu->ppItems[i1]);
-      }
-    }
-
-    if(pMenu->ppPopups) // part of 'pMenu' memory block
-    {
-      for(i1=0; i1 < pMenu->nPopups; i1++)
-      {
-        MBDestroyMenu(pMenu->ppPopups[i1]);
-      }
-    }
-
-    free(pMenu);
+    WB_ERROR_PRINT("ERROR:  %s - invalid menu pointer %p\n", __FUNCTION__, pMenu);
+    return;
   }
+
+  if(pMenu->ppItems) // part of 'pMenu' memory block
+  {
+    for(i1=0; i1 < pMenu->nItems; i1++)
+    {
+      MBDestroyMenuItem(pMenu->ppItems[i1]);
+    }
+  }
+
+  if(pMenu->ppPopups) // part of 'pMenu' memory block
+  {
+    for(i1=0; i1 < pMenu->nPopups; i1++)
+    {
+      MBDestroyMenu(pMenu->ppPopups[i1]);
+    }
+  }
+
+  WBFree(pMenu);
+}
+
+int MBIsMenuValid(const WBMenu *pMenu)
+{
+  // first check to see that the menu pointer is valid memory
+
+  if(!pMenu)
+  {
+    return 0;
+  }
+
+  // For now, we MUST assume that a WBMenu was allocated using MBCreateMenu()
+  // or else this next part will not work properly
+
+  if(WBAllocUsableSize(pMenu) < sizeof(WBMenu))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - invalid WBMenu pointer %p\n", __FUNCTION__, pMenu);
+    return 0;
+  }
+
+  // for now, just validate the tag
+
+  return pMenu->uiTag == WBMENU_TAG;
+}
+
+int MBIsMenuItemValid(const WBMenuItem *pMenuItem)
+{
+  // first check to see that the menu pointer is valid memory
+
+  if(!pMenuItem)
+  {
+    return 0;
+  }
+
+  // For now, we MUST assume that a WBMenuItem was allocated using MBCreateMenuItem()
+  // or else this next part will not work properly
+
+  if(WBAllocUsableSize(pMenuItem) < sizeof(WBMenuItem))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - invalid WBMenuItem pointer %p\n", __FUNCTION__, pMenuItem);
+    return 0;
+  }
+
+  // for now, just validate the tag
+
+  return pMenuItem->uiTag == WBMENUITEM_TAG;
 }
 
 void MBDestroyMenuItem(WBMenuItem *pMenuItem)
 {
-  if(pMenuItem)
+  if(!MBIsMenuItemValid(pMenuItem))
   {
-    free(pMenuItem);
+    WB_ERROR_PRINT("ERROR:  %s - invalid menu item pointer %p\n", __FUNCTION__, pMenuItem);
+    return;
   }
+
+  WBFree(pMenuItem);
 }
 
 int MBAddMenuItem(WBMenu *pMenu, const WBMenuItem *pItem, int iPos)
 {
-  return(-1);
+  if(!MBIsMenuValid(pMenu))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - invalid menu pointer %p\n", __FUNCTION__, pMenu);
+    return -1;
+  }
+
+  if(!MBIsMenuItemValid(pItem))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - invalid menu item pointer %p\n", __FUNCTION__, pItem);
+    return -1;
+  }
+
+  return -1;
 }
 
 void MBRemoveMenuItem(WBMenu *pMenu, int iPos)
 {
+  if(!MBIsMenuValid(pMenu))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - invalid menu pointer %p\n", __FUNCTION__, pMenu);
+    return;
+  }
 
 }
 
 int MBAddPopupMenu(WBMenu *pMenu, const WBMenu *pPopupMenu)
 {
-  return(-1);
+  if(!MBIsMenuValid(pMenu))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - invalid menu pointer %p\n", __FUNCTION__, pMenu);
+    return -1;
+  }
+
+  if(!MBIsMenuValid(pPopupMenu))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - invalid menu pointer %p\n", __FUNCTION__, pPopupMenu);
+    return -1;
+  }
+
+  // TODO:  implement this
+
+  return -1;
 }
 
 WBMenu *MBFindPopupMenu(WBMenu *pMenu, int idPopup)
 {
+  if(!MBIsMenuValid(pMenu))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - invalid menu pointer %p\n", __FUNCTION__, pMenu);
+    return NULL;
+  }
+
+  // TODO:  implement this
+
   return NULL;
 }
 
 void MBRemovePopupMenu(WBMenu *pMenu, int idPopup)
 {
+  if(!MBIsMenuValid(pMenu))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - invalid menu pointer %p\n", __FUNCTION__, pMenu);
+    return;
+  }
 
+  // TODO:  implement this
 }
 
 WBMenu *MBCopyMenu(const WBMenu *pMenu, int iReserveSpace)
@@ -245,6 +345,13 @@ WBMenu *MBCopyMenu(const WBMenu *pMenu, int iReserveSpace)
   // TODO:  make a copy of the main structure, the individual WBMenuItem structures,
   //        and recursively copy the 'popup' WBMenu structures
 
+  if(!MBIsMenuValid(pMenu))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - invalid menu pointer %p\n", __FUNCTION__, pMenu);
+    return NULL;
+  }
+
+  // TODO:  implement this
 
   return NULL;
 }
@@ -272,32 +379,42 @@ static void InternalLocateMenuInResource(const char *pszResource, int *piID,
 
     p3 = p2;
     while(p3 < p1 && *p3 != '\n' && *p3 != '\t')
+    {
       p3++;
+    }
 
     if(*p3 == '\t')  // line contains a tab
+    {
       continue;
+    }
 
     bzero(tbuf, sizeof(tbuf));
     memcpy(tbuf, p2, (sizeof(tbuf) - 1) < (p1 - p2) ? sizeof(tbuf) - 1 : (p1 - p2));
+
     p4 = tbuf + strlen(tbuf);
+
     while(p4 > tbuf && *(p4 - 1) <= ' ')
+    {
       *(--p4) = 0;  // trim trailing white space
+    }
 
     i1 = atoi(tbuf);
 
     if(i1 <= 0)
+    {
       continue;
+    }
 
     if(*piID == -1)
     {
-//      fprintf(stderr, "Looking for first menu item, found %d\n", i1);
-
       *piID = i1;  // keep track of what I actually found
       break;
     }
 
     if(*piID == i1) // a match
+    {
       break;
+    }
   }
 
   *ppStart = p1;  // this will be the beginning of the next line after the ID
@@ -317,39 +434,49 @@ static void InternalLocateMenuInResource(const char *pszResource, int *piID,
 
     p3 = p2;
     while(p3 < p1 && *p3 != '\n' && *p3 != '\t')
+    {
       p3++;
+    }
 
     if(*p3 == '\t')  // line contains a tab
+    {
       continue;
+    }
 
     bzero(tbuf, sizeof(tbuf));
     memcpy(tbuf, p2, (sizeof(tbuf) - 1) < (p1 - p2) ? sizeof(tbuf) - 1 : (p1 - p2));
+
     p4 = tbuf + strlen(tbuf);
+
     while(p4 > tbuf && *(p4 - 1) <= ' ')
+    {
       *(--p4) = 0;  // trim trailing white space
+    }
 
     i1 = atoi(tbuf);
 
     if(i1 <= 0)
+    {
       continue;
+    }
 
     p1 = p2;  // point back at the beginning of the line
     p2 = *ppStart;  // start of section
 
     while(p1 > p2 && *(p1 - 1) != '\n')
+    {
       p1--;  // find newline prior to where I'm at right now
+    }
 
     break;  // and that's it - p1 points to end of section
   }
 
   *ppEnd = p1;
-//  fprintf(stderr, "found section for ID %d\n%-.*s\n\n", *piID, (int)(*ppEnd - *ppStart), *ppStart);
 
 }
 
 static int InternalPopulateMenuFromResource(WBMenu *pMenu, int iID, const char *pszResource)
 {
-//char tbuf[16];  // big enough for a number
 const char *p1, *p2; //, *p3;
 int i1;
 
@@ -359,7 +486,9 @@ int i1;
 
   InternalLocateMenuInResource(pszResource, &iID, &p1, &p2);
   if(p1 == p2)  // not found
+  {
     return 0;
+  }
 
   // parse out the menu resource and build my structure
   // (assume it's empty when I begin)
@@ -370,15 +499,21 @@ int i1;
 
     pItem = MBCreateMenuItem(&p1);
     if(!pItem)
+    {
       continue;
+    }
 
     pMenu->ppItems[(pMenu->nItems)++] = pItem;
 
     if(pMenu->nItems >= pMenu->nMaxItems)
+    {
       break;
+    }
 
     while(p1 < p2 && *p1 <= ' ' && *p1 != '\t')
+    {
       p1++;  // skip any blank lines and leading white space I might find, excluding tabs
+    }
   }
 
   // Finally, create menus for all of the popups and populate my structure with pointers to them.
@@ -386,9 +521,13 @@ int i1;
   for(i1=0; i1 < pMenu->nItems; i1++)
   {
     if(!pMenu->ppItems[i1] || // just in case
-       pMenu->ppItems[i1]->iAction == -1)
+       pMenu->ppItems[i1]->iAction == WBMENU_SEPARATOR)
     {
       // separator (so I don't try and create a popup for it)
+    }
+    else if(pMenu->ppItems[i1]->iAction & WBMENU_DYNAMIC_HIGH_BIT)
+    {
+      // dynamic menu entry - no popups created, and menu display is created 'on the fly'
     }
     else if(pMenu->ppItems[i1]->iAction & WBMENU_POPUP_HIGH_BIT)
     {
@@ -401,8 +540,11 @@ int i1;
       if(pPopup)
       {
         pMenu->ppPopups[(pMenu->nPopups)++] = pPopup;
+
         if(pMenu->nPopups >= pMenu->nMaxPopups)
+        {
           break;
+        }
       }
       else
       {
@@ -421,59 +563,59 @@ int i1;
 
 static int TranslateHotKeyText(const char *szText) // translate key or return UTF-8 char
 {
-    if((szText[0] == 'F' || szText[0] == 'f') &&
-       szText[1] >= '1' && szText[1] <= '9')
+  if((szText[0] == 'F' || szText[0] == 'f') &&
+     szText[1] >= '1' && szText[1] <= '9')
+  {
+    int iF = szText[1] - '0';
+    if(szText[2] >= '0' && szText[2] <= '9')
     {
-      int iF = szText[1] - '0';
-      if(szText[2] >= '0' && szText[2] <= '9')
-      {
-        iF = iF * 10 + (szText[2] - '0');
-      }
-      // function keys iF=1 through 35 are supported.  Anything else is a bug/feature
-      return (XK_F1 + iF - 1);
+      iF = iF * 10 + (szText[2] - '0');
     }
-    else if(!strncasecmp(szText, "home", 4))
-    {
-      return XK_Home;
-    }
-    else if(!strncasecmp(szText, "end", 3))
-    {
-      return XK_End;
-    }
-    else if(!strncasecmp(szText, "left", 4))
-    {
-      return XK_Left;
-    }
-    else if(!strncasecmp(szText, "right", 5))
-    {
-      return XK_Right;
-    }
-    else if(!strncasecmp(szText, "up", 2))
-    {
-      return XK_Up;
-    }
-    else if(!strncasecmp(szText, "down", 4))
-    {
-      return XK_Down;
-    }
-    else if(!strncasecmp(szText, "pgup", 4) || !strncasecmp(szText, "prior", 5))
-    {
-      return XK_Page_Up;
-    }
-    else if(!strncasecmp(szText, "pgdown", 6) || !strncasecmp(szText, "next", 4))
-    {
-      return XK_Page_Down;
-    }
-    else if(!strncasecmp(szText, "del", 3))
-    {
-      return XK_Delete;
-    }
-    else if(!strncasecmp(szText, "ins", 3))
-    {
-      return XK_Insert;
-    }
+    // function keys iF=1 through 35 are supported.  Anything else is a bug/feature
+    return (XK_F1 + iF - 1);
+  }
+  else if(!strncasecmp(szText, "home", 4))
+  {
+    return XK_Home;
+  }
+  else if(!strncasecmp(szText, "end", 3))
+  {
+    return XK_End;
+  }
+  else if(!strncasecmp(szText, "left", 4))
+  {
+    return XK_Left;
+  }
+  else if(!strncasecmp(szText, "right", 5))
+  {
+    return XK_Right;
+  }
+  else if(!strncasecmp(szText, "up", 2))
+  {
+    return XK_Up;
+  }
+  else if(!strncasecmp(szText, "down", 4))
+  {
+    return XK_Down;
+  }
+  else if(!strncasecmp(szText, "pgup", 4) || !strncasecmp(szText, "prior", 5))
+  {
+    return XK_Page_Up;
+  }
+  else if(!strncasecmp(szText, "pgdown", 6) || !strncasecmp(szText, "next", 4))
+  {
+    return XK_Page_Down;
+  }
+  else if(!strncasecmp(szText, "del", 3))
+  {
+    return XK_Delete;
+  }
+  else if(!strncasecmp(szText, "ins", 3))
+  {
+    return XK_Insert;
+  }
 
-    return *szText;  // for now (later do UTF-8 translation)
+  return *szText;  // for now (later do UTF-8 translation)
 }
 
 static int ProcessHotKeyText(const char *szText)
@@ -534,37 +676,52 @@ WBMenuItem *pRval = NULL;
   while(p1 < p2)
   {
     NEXT_COL(p1, p3, p2);  // menu text
-//    fprintf(stderr, "   COLUMN:  %-.*s\n", (int)(p1 - p3), p3);
+
     if(p1 > p3)
+    {
       i1 += (p1 - p3) + 2;
+    }
 
     if(p1 >= p2)
+    {
       break;
+    }
 
-    NEXT_COL(p1, p3, p2);  // message ID, 'popup', or 'separator'
-//    fprintf(stderr, "   COLUMN:  %-.*s\n", (int)(p1 - p3), p3);
+    NEXT_COL(p1, p3, p2);  // message ID, 'popup', or 'separator', or 'dynamic'
+
     if(p1 >= p2)
+    {
       break;
+    }
 
     NEXT_COL(p1, p3, p2);  // toolhelp text
-//    fprintf(stderr, "   COLUMN:  %-.*s\n", (int)(p1 - p3), p3);
+
     if(p1 > p3)
+    {
       i1 += (p1 - p3) + 2;
+    }
 
     if(p1 >= p2)
+    {
       break;
+    }
 
     NEXT_COL(p1, p3, p2);  // reserved text
-//    fprintf(stderr, "   COLUMN:  %-.*s\n", (int)(p1 - p3), p3);
+
     if(p1 > p3)
+    {
       i1 += (p1 - p3) + 2;
+    }
   }
 
-  pRval = (WBMenuItem *)malloc(sizeof(WBMenuItem) + i1);
+  pRval = (WBMenuItem *)WBAlloc(sizeof(WBMenuItem) + i1);
   if(!pRval)
+  {
     return NULL;  // bummer (no memory)
+  }
 
   bzero(pRval, sizeof(WBMenuItem) + i1);  // make sure
+  pRval->uiTag = WBMENUITEM_TAG;
 
   pRval->iMenuItemText = -1; // "none"
   pRval->iUnderscore = -1;   // "none"
@@ -601,6 +758,7 @@ WBMenuItem *pRval = NULL;
         memcpy(p4, p3, p1 - p3);
         p4 += (p1 - p3);
       }
+
       *(p4++) = 0;
 
       while(*p5 && *p5 != '_')
@@ -618,9 +776,11 @@ WBMenuItem *pRval = NULL;
     }
 
     if(p1 >= p2) // checking that I parsed past the end of the string
+    {
       break;
+    }
 
-    NEXT_COL(p1, p3, p2);  // message ID, 'popup', or 'separator'
+    NEXT_COL(p1, p3, p2);  // message ID, 'popup', or 'separator', or 'dynamic'
 
     if(p1 > p3) // parse similar to the menu text, store offsets and other info
     {
@@ -630,11 +790,17 @@ WBMenuItem *pRval = NULL;
       // trim any trailing white space (like line feeds, tabs, ???)
       i1 = strlen(tbuf);
       while(i1 > 0 && tbuf[i1 - 1] <= ' ')
+      {
         tbuf[--i1] = 0;
+      }
 
       if(!strcasecmp(tbuf, "separator"))
       {
-        pRval->iAction = -1;
+        pRval->iAction = WBMENU_SEPARATOR;
+      }
+      else if(!strcasecmp(tbuf, "dynamic"))
+      {
+        pRval->iAction = WBMENU_DYNAMIC_HIGH_BIT;
       }
       else if(!strcasecmp(tbuf, "popup"))
       {
@@ -642,16 +808,16 @@ WBMenuItem *pRval = NULL;
       }
       else
       {
-//        fprintf(stderr, "  MENU MESSAGE ID: %s\n", tbuf);
         i1 = atoi(tbuf);
+
         if(i1 > 0)
         {
           pRval->iAction = i1;
         }
         else
         {
-          // assume it's an atom, and get its value as an integer
-          pRval->iAction = (int)XInternAtom(WBGetDefaultDisplay(), tbuf, False);
+          // assume it's an atom, and get its value as an integer (or allocate if not there)
+          pRval->iAction = (int)WBGetAtom(WBGetDefaultDisplay(), tbuf);
 
           if(pRval->iAction == (int)None)
           {
@@ -662,20 +828,32 @@ WBMenuItem *pRval = NULL;
     }
 
     if(p1 >= p2)
+    {
       break;
+    }
 
-    NEXT_COL(p1, p3, p2);  // toolhelp text or popup menu ID
+    NEXT_COL(p1, p3, p2);  // toolhelp text or popup menu ID, or menu ID for 'dynamic'
     if(p1 > p3)
     {
-      if(pRval->iAction == WBMENU_POPUP_HIGH_BIT)
+      if(pRval->iAction == WBMENU_POPUP_HIGH_BIT ||
+         pRval->iAction == WBMENU_DYNAMIC_HIGH_BIT)
       {
         bzero(tbuf, sizeof(tbuf));
         memcpy(tbuf, p3, (p1 - p3) > (sizeof(tbuf) - 1) ? sizeof(tbuf) - 1 : p1 - p3);
-        while(tbuf[0] && tbuf[strlen(tbuf) - 1] <= ' ')
-          tbuf[strlen(tbuf) - 1] = 0;  // right trim
 
-//        fprintf(stderr, "   POPUP ID %s\n", tbuf);
-        pRval->iAction |= atoi(tbuf);
+        while(tbuf[0] && tbuf[strlen(tbuf) - 1] <= ' ')
+        {
+          tbuf[strlen(tbuf) - 1] = 0;  // right trim
+        }
+
+        if(pRval->iAction == WBMENU_POPUP_HIGH_BIT)
+        {
+          pRval->iAction |= atoi(tbuf);
+        }
+        else // dynamic menu action
+        {
+          pRval->iAction |= (int)WBGetAtom(WBGetDefaultDisplay(), tbuf);
+        }
       }
       else
       {
@@ -702,32 +880,46 @@ WBMenuItem *pRval = NULL;
     }
 
     if(p1 >= p2)
+    {
       break;
+    }
 
     NEXT_COL(p1, p3, p2);  // hotkey (non-popup) or toolhelp text (popup)
     if(p1 > p3)
     {
-      if(pRval->iAction == WBMENU_POPUP_HIGH_BIT)
+      if(pRval->iAction & WBMENU_POPUP_HIGH_BIT)
       {
         pRval->iTooltipText = (p4 - pRval->data);
+
         if(p1 > p3 && *(p1 - 1) == '\t')
         {
           memcpy(p4, p3, (p1 - p3) - 1);
+
           p4[p1 - p3 - 1] = 0;  // terminate string
         }
         else
         {
           if(p1 > p3)
+          {
             memcpy(p4, p3, p1 - p3);
+          }
+
           p4[p1 - p3] = 0;  // terminate string
         }
 
         // next, trim the string as much as I can
         i1=strlen(p4);
+
         while(i1 > 0 && p4[i1 - 1] <= ' ')
+        {
           p4[--i1] = 0;
+        }
 
         p4 += i1 + 1;
+      }
+      else if(pRval->iAction & ~(WBMENU_POPUP_MASK)) // only for "other than 'regular' menu items"
+      {
+        // TODO: any special thing for these, dynamics, etc.
       }
       else
       {
@@ -741,14 +933,20 @@ WBMenuItem *pRval = NULL;
         else
         {
           if(p1 > p3)
+          {
             memcpy(p4, p3, p1 - p3);
+          }
+
           p4[p1 - p3] = 0;  // terminate string
         }
 
         // next, trim the string as much as I can
         i1=strlen(p4);
+
         while(i1 > 0 && p4[i1 - 1] <= ' ')
+        {
           p4[--i1] = 0;
+        }
 
         if(*p4)
         {
@@ -764,7 +962,9 @@ WBMenuItem *pRval = NULL;
     }
 
     if(p1 >= p2)
+    {
       break;
+    }
 
     NEXT_COL(p1, p3, p2);  // reserved text
 
@@ -778,71 +978,100 @@ WBMenuItem *pRval = NULL;
       else
       {
         if(p1 > p3)
+        {
           memcpy(p4, p3, p1 - p3);
+        }
+
         p4[p1 - p3] = 0;  // terminate string
       }
 
       // next, trim the string as much as I can
       i1=strlen(p4);
+
       while(i1 > 0 && p4[i1 - 1] <= ' ')
+      {
         p4[--i1] = 0;
+      }
 
       p4 += i1 + 1;
     }
   }
 
 #ifndef NO_DEBUG
-  if((WBGetDebugLevel() & DebugLevel_MASK) >= DebugLevel_Chatty)
+  if((WBGetDebugLevel() & DebugLevel_MASK) >= DebugLevel_Chatty ||
+     (WBGetDebugLevel() & DebugSubSystem_Menu))
   {
-    if(pRval->iAction == -1)
+    if(pRval->iAction == WBMENU_SEPARATOR)
     {
-      WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_Menu,
-                     "  MENU ITEM SEPARATOR\n");
+      WBDebugPrint("  MENU ITEM SEPARATOR\n");
+    }
+    else if(pRval->iAction & WBMENU_DYNAMIC_HIGH_BIT)
+    {
+      p4 = WBGetAtomName(WBGetDefaultDisplay(), pRval->iAction & WBMENU_POPUP_MASK);
+      WBDebugPrint("  DYNAMIC MENU ITEM %d \"%s\"\n",
+                   pRval->iAction & WBMENU_POPUP_MASK, p1);
+      if(p4)
+      {
+        WBFree(p4);
+        p4 = NULL;
+      }
     }
     else if(pRval->iAction & WBMENU_POPUP_HIGH_BIT)
     {
+      p4 = WBGetAtomName(WBGetDefaultDisplay(), pRval->iAction & WBMENU_POPUP_MASK);
+
       if(pRval->iHotKey == -1)
       {
-        WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_Menu,
-                       "  POPUP MENU \"%s\" %d   \"%s\" %-.2s\n",
-                       pRval->data + pRval->iMenuItemText,
-                       pRval->iAction & WBMENU_POPUP_MASK,
-                       pRval->iTooltipText >= 0 ? pRval->data + pRval->iTooltipText : "",
-                       pRval->iUnderscore >= 0 ? pRval->data + pRval->iUnderscore : "");
+        WBDebugPrint("  POPUP MENU \"%s\" %d \"%s\"   \"%s\" %-.2s\n",
+                     pRval->data + pRval->iMenuItemText,
+                     pRval->iAction & WBMENU_POPUP_MASK, p4,
+                     pRval->iTooltipText >= 0 ? pRval->data + pRval->iTooltipText : "",
+                     pRval->iUnderscore >= 0 ? pRval->data + pRval->iUnderscore : "");
       }
       else
       {
-        WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_Menu,
-                       "  POPUP MENU \"%s\" %d   \"%s\" \"%s\"(%xH) %-.2s\n",
-                       pRval->data + pRval->iMenuItemText,
-                       pRval->iAction & WBMENU_POPUP_MASK,
-                       pRval->iTooltipText >= 0 ? pRval->data + pRval->iTooltipText : "",
-                       pRval->iHotKey >= 0 ? pRval->data + pRval->iHotKey : "",
-                       pRval->nHotKey,
-                       pRval->iUnderscore >= 0 ? pRval->data + pRval->iUnderscore : "");
+        WBDebugPrint("  POPUP MENU \"%s\" %d \"%s\"  \"%s\" \"%s\"(%xH) %-.2s\n",
+                     pRval->data + pRval->iMenuItemText,
+                     pRval->iAction & WBMENU_POPUP_MASK, p4,
+                     pRval->iTooltipText >= 0 ? pRval->data + pRval->iTooltipText : "",
+                     pRval->iHotKey >= 0 ? pRval->data + pRval->iHotKey : "",
+                     pRval->nHotKey,
+                     pRval->iUnderscore >= 0 ? pRval->data + pRval->iUnderscore : "");
+      }
+
+      if(p4)
+      {
+        WBFree(p4);
+        p4 = NULL;
       }
     }
     else
     {
+      p4 = WBGetAtomName(WBGetDefaultDisplay(), pRval->iAction & WBMENU_POPUP_MASK);
+
       if(pRval->iHotKey == -1)
       {
-        WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_Menu,
-                       "  MENU ITEM \"%s\" %d   \"%s\" %-.2s\n",
-                       pRval->data + pRval->iMenuItemText,
-                       pRval->iAction & WBMENU_POPUP_MASK,
-                       pRval->iTooltipText >= 0 ? pRval->data + pRval->iTooltipText : "",
-                       pRval->iUnderscore >= 0 ? pRval->data + pRval->iUnderscore : "");
+        WBDebugPrint("  MENU ITEM \"%s\" %d \"%s\"   \"%s\" %-.2s\n",
+                     pRval->data + pRval->iMenuItemText,
+                     pRval->iAction & WBMENU_POPUP_MASK, p4,
+                     pRval->iTooltipText >= 0 ? pRval->data + pRval->iTooltipText : "",
+                     pRval->iUnderscore >= 0 ? pRval->data + pRval->iUnderscore : "");
       }
       else
       {
-        WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_Menu,
-                       "  MENU ITEM \"%s\" %d   \"%s\" \"%s\"(%xH) %-.2s\n",
-                       pRval->data + pRval->iMenuItemText,
-                       pRval->iAction,
-                       pRval->iTooltipText >= 0 ? pRval->data + pRval->iTooltipText : "",
-                       pRval->iHotKey >= 0 ? pRval->data + pRval->iHotKey : "",
-                       pRval->nHotKey,
-                       pRval->iUnderscore >= 0 ? pRval->data + pRval->iUnderscore : "");
+        WBDebugPrint("  MENU ITEM \"%s\" %d \"%s\"  \"%s\" \"%s\"(%xH) %-.2s\n",
+                     pRval->data + pRval->iMenuItemText,
+                     pRval->iAction & WBMENU_POPUP_MASK, p4,
+                     pRval->iTooltipText >= 0 ? pRval->data + pRval->iTooltipText : "",
+                     pRval->iHotKey >= 0 ? pRval->data + pRval->iHotKey : "",
+                     pRval->nHotKey,
+                     pRval->iUnderscore >= 0 ? pRval->data + pRval->iUnderscore : "");
+      }
+
+      if(p4)
+      {
+        WBFree(p4);
+        p4 = NULL;
       }
     }
   }
@@ -884,6 +1113,7 @@ XClientMessageEvent evt;
       evt.window = pMB->wSelf;
       evt.message_type = aMENU_ACTIVATE;
       evt.format = 32;
+#warning this is potentially dangerous code.  find another way to pass a pointer, if I even need it
       evt.data.l[0] = (long)pItem;
       evt.data.l[1] = iIndex; // index for menu item
 
@@ -915,6 +1145,7 @@ XClientMessageEvent evt;
       evt.window = pMP->wSelf;
       evt.message_type = aMENU_ACTIVATE;
       evt.format = 32;
+#warning this is potentially dangerous code.  find another way to pass a pointer, if I even need it
       evt.data.l[0] = (long)pItem;
       evt.data.l[1] = iIndex; // index for menu item
 
@@ -991,10 +1222,17 @@ static WBMenuItem * __HotKeySearch(WBMenu *pMenu, int iHotKey, int *piIndex)
 int MBMenuProcessHotKey(WBMenu *pMenu, XKeyEvent *pEvent)
 {
 int iACS = 0, iKey, i1, iIsPopup, nChar;
-//int iRval = 0;
 char tbuf[64];
 int iHotKey0;
 WBMenuItem *pItem;
+
+
+  if(!MBIsMenuValid(pMenu))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - invalid menu pointer %p\n", __FUNCTION__, pMenu);
+    return 0;
+  }
+
 
   // check for hotkey and process (called by KeyEvent processing for frame, etc.)
 
@@ -1049,7 +1287,7 @@ WBMenuItem *pItem;
   iIsPopup = pMenu->iMenuID & WBMENU_POPUP_HIGH_BIT; // popup menus will accept keystrokes without modifiers
 
 
-  if(!iIsPopup && !(iACS & WB_KEYEVENT_ALT)) // NOT alt and not a popup
+  if(!iIsPopup && !(iACS & WB_KEYEVENT_ALT)) // NOT alt and not a popup (main menu ONLY uses 'alt' keys)
   {
     WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Event | DebugSubSystem_Menu | DebugSubSystem_Keyboard,
                    "%s - Key %d (%xH) ACS=%xH not valid for non-popup menu\n", __FUNCTION__, iKey, iKey, iACS);
@@ -1066,10 +1304,15 @@ WBMenuItem *pItem;
     }
   }
 
+  /////////////////////////////////////////////////////////////////////
   // TODO:  soft-match of XK_KP_* vs XK_* for numbers, cursors, etc.
+  /////////////////////////////////////////////////////////////////////
 
   // step 1:  check for top-level menu accelerators (underscores on menu names)
-  if(!iIsPopup || !iACS) // not valid for 'underscore' processing
+  //          for either the current 'top level' menu, or the visible popup menu
+
+  if(!iIsPopup || // i.e. it's a MAIN menu (so I always do an ALT+'underscore char' hotkey)
+     !iACS)       // no ctrl/alt/shift - i'm typing in stuff after displaying a popup, so does char match underscore char?
   {
     WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Menu | DebugSubSystem_Keyboard,
                    "%s - menu has %d items\n", __FUNCTION__, pMenu->nItems);
@@ -1078,36 +1321,44 @@ WBMenuItem *pItem;
     {
       pItem = pMenu->ppItems[i1];
 
-      if(pItem->iAction == WBMENU_SEPARATOR  // separator
-         || pItem->iUnderscore < 0)          // no underscore
+      if(pItem->iAction == WBMENU_SEPARATOR)  // separator{
       {
-//        WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Menu | DebugSubSystem_Keyboard,
-//                       "%s - skipping entry %d, %d %d\n", __FUNCTION__,
-//                       pItem->iAction, pItem->iUnderscore);
+        continue;
+      }
+      else if(pItem->iAction & WBMENU_DYNAMIC_HIGH_BIT)
+      {
+        // dynamic menu items are created on-the-fly
+
+        ////////////////////////////////////////////////
+        // TODO:  hotkey search of dynamic menu
+        ////////////////////////////////////////////////
+
+        WB_ERROR_PRINT("TODO:  %s - dynamic menu hotkey search not implemented\n", __FUNCTION__);
+
+        // it would PROBABLY be a good idea to cache the latest hotkeys, instead of re-building
+        // the dynamic menu every! stinking! time!, or else have the UI handler do the hotkey search
+        // (the alternative, and simpler way, would be to NOT allow hotkeys in dynamic menus, but
+        //  force the application to handle them on its own instead... i.e. pass the burden BACK)
+
+        continue;
+      }
+      else if(pItem->iUnderscore < 0)          // no underscore
+      {
         continue;
       }
 
       if(toupper(pItem->data[pItem->iUnderscore + 1])
          == iKey) // it's a match?
       {
+       
         __PostMenuActivateEvent(pMenu, pItem, i1, iIsPopup);
 
         return 1;
       }
-//      else
-//      {
-//        WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Menu | DebugSubSystem_Keyboard,
-//                       "%s - comparing '%c' to '%c' for %s\n",
-//                       __FUNCTION__, (char)iKey, toupper(pItem->data[pItem->iUnderscore + 1]),
-//                       &(pItem->data[pItem->iMenuItemText]));
-//      }
+
+      // TODO:  XK_KP_* matches to XK_* for numbers, etc.
     }
   }
-//  else
-//  {
-//    WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Event | DebugSubSystem_Menu | DebugSubSystem_Keyboard,
-//                   "%s - Key %d (%xH) ACS=%xH not valid for underscore check\n", __FUNCTION__, iKey, iKey, iACS);
-//  }
 
 
   // next search for hotkeys defined as part of the menu by first building
@@ -1142,6 +1393,9 @@ WBMenuItem *pItem;
   {
     return 0;  // not handled (done this way for optimization)
   }
+
+  // at this point the hotkey has been identified, so take action on it
+  // and then return a '1' value indicating that I 'handled' the notification
 
   if(pItem->iAction & WBMENU_POPUP_HIGH_BIT)
   {
@@ -1191,6 +1445,7 @@ WBMenuItem *pItem;
     evt.message_type = aMENU_COMMAND;
     evt.format = 32;  // always
     evt.data.l[0] = pItem->iAction;  // menu command message ID
+#warning this is potentially unsafe code - consider a BETTER way of passing a 'pMenu' pointer
     evt.data.l[1] = (long)pMenu;     // pointer to menu object
     evt.data.l[2] = wIDBar;          // window ID of menu bar
 
@@ -1201,6 +1456,8 @@ WBMenuItem *pItem;
                   (int)aMENU_COMMAND, (int)pItem->iAction,
                   pMenu, (int)wIDBar);
   }
+
+  // return "that I handled the thing" to caller
 
   return 1;
 }

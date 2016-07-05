@@ -458,15 +458,7 @@ void WBDrawDownArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect,
   * \param wID the Drawable, typically the Window ID for the target window
   * \param gc The GC (graphics context) to use
   * \param pgeomOutline A WB_GEOM that identifies the rectangular border of the tab to draw
-  * \param fFocus
-  * \parblock
-  * A flag value that indicates whether or not this tab has the 'focus', and whether or not the 'x' is being 'pressed'.
-  *
-  * A value of 0 indicates 'no focus'.  A positive value is 'focus'.  A negative value is 'pressing the "x" button'.
-  * More specifically, -1 indicates 'focus', and any other negative value indicates 'no focus' while pressing the 'x'.
-  *
-  * This is necessary to properly implement UI feedback for the tab.  Clicking 'x' implies getting the focus.
-  * \endparblock
+  * \param fFocus A flag value that indicates whether or not this tab has the 'focus', and whether or not the 'x' is being 'pressed'.\n\n A value of 0 indicates 'no focus'.  A positive value is 'focus'.\n\n A negative value generally indicates 'pressing the "x" button'.  Specifically, a -1 indicates 'focus', and any other negative value indicates 'no focus' while pressing the 'x'.  This is necessary to properly implement UI feedback for the tab.  Clicking 'x' does not imply getting the focus.\n
   * \param lFGColor The current 'foreground' 'Pixel' color for text and borders
   * \param lBGColor The current 'background' 'Pixel' color for areas outside of the tab
   * \param lBorderColor1 The upper, left 'Pixel' color to use when drawing the tab

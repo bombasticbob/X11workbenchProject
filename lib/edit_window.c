@@ -6,7 +6,7 @@
 //        \___| \__,_||_| \__|_____\_/\_/  |_||_| |_| \__,_| \___/  \_/\_/(_)\___|      //
 //                           |_____|                                                    //
 //                                                                                      //
-//                     a window into which you can type text                            //
+//                  a window into which you can type (and edit) text                    //
 //                                                                                      //
 //////////////////////////////////////////////////////////////////////////////////////////
 
@@ -44,34 +44,171 @@
 
 ******************************************************************************/
 
-
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <memory.h>
 #include <string.h>
 #include <strings.h>
 
+#define _EDIT_WINDOW_C_IMPLEMENTED_
+
 #include "window_helper.h"
 #include "edit_window.h"
 #include "conf_help.h"
+#include "draw_text.h"
+
+
+#if 1 // assign to 0 to disable this trace-style debugging
+#define CALLBACK_TRACKER WBDebugPrint("TEMPORARY:  %s - callback tracker\n", __FUNCTION__);
+#else //
+#define CALLBACK_TRACKER { }
+#endif // 0,1
+
+#define  EDIT_WINDOW_LINE_SPACING 4  /* 4 spaces between each line */
 
 
 int FWEditWindowEvent(Window wID, XEvent *pEvent);
 static void InternalEditWindowDestructor(WBChildFrame *pC);
 static void InternalEditWindowDestroy(WBEditWindow *pEditWindow);
 
+// UI callbacks for WBChildFrameUI
+
+static void internal_do_char(WBChildFrame *, XClientMessageEvent *);   // handler for regular WM_CHAR Client Messages (WBChildFrame *, typed-in characters)
+static void internal_scancode(WBChildFrame *, XClientMessageEvent *);  // handler for 'other scan code' WM_CHAR Client Messages (WBChildFrame *, typed-in characters)
+static void internal_bkspace(WBChildFrame *, int iACS);                // 'backspace' delete character (WBChildFrame *, backspace equivalent).  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+static void internal_del(WBChildFrame *, int iACS);                    // 'delete' char under cursor (WBChildFrame *, delete equivalent).  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+static void internal_tab(WBChildFrame *, int iACS);                    // 'tab' char, or tab navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+static void internal_enter(WBChildFrame *, int iACS);                  // 'enter' char, or 'enter' for navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+static void internal_uparrow(WBChildFrame *, int iACS);                // 'up' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+static void internal_downarrow(WBChildFrame *, int iACS);              // 'down' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+static void internal_leftarrow(WBChildFrame *, int iACS);              // 'left' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+static void internal_rightarrow(WBChildFrame *, int iACS);             // 'right' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+static void internal_home(WBChildFrame *, int iACS);                   // 'home' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+static void internal_end(WBChildFrame *, int iACS);                    // 'end' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+static void internal_pgup(WBChildFrame *, int iACS);                   // 'page up' navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+static void internal_pgdown(WBChildFrame *, int iACS);                 // 'page down' navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+static void internal_pgleft(WBChildFrame *, int iACS);                 // 'page left' navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+static void internal_pgright(WBChildFrame *, int iACS);                // 'page right' navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+static void internal_help(WBChildFrame *, int iACS);                   // 'help' context (WBChildFrame *, F1).  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+static void internal_hover_notify(WBChildFrame *, int x, int y);       // 'mouse hover' notification (WBChildFrame *, x and y are pixel coords with respect to upper left corner)
+static void internal_hover_cancel(WBChildFrame *);                     // 'mouse hover' cancel notification (WBChildFrame *, cancel any 'hover' action)
+static int internal_is_ins_mode(WBChildFrame *);                       // returns non-zero if in 'insert' mode, 0 for 'overwrite'
+static void internal_toggle_ins_mode(WBChildFrame *);                  // toggles insert mode on/off (WBChildFrame *, press 'INS' key)
+static void internal_copy_to_cb(WBChildFrame *);                       // copy selection to clipboard
+static void internal_paste_from_cb(WBChildFrame *);                    // paste from clipboard
+static void internal_cut_to_cb(WBChildFrame *);                        // delete selection, copying to clipboard first
+static void internal_delete_sel(WBChildFrame *);                       // delete selection only
+static void internal_select_all(WBChildFrame *);                       // select all
+static void internal_select_none(WBChildFrame *);                      // select none
+static void internal_save(WBChildFrame *, const char *szFileName);     // save to specified file name (WBChildFrame *, NULL to keep same file name)
+static WB_PCSTR internal_get_file_name(WBChildFrame *);                // get (const) pointer to file name string
+static void internal_mouse_click(WBChildFrame *, int iX, int iY,
+                                 int iButtonMask, int iACS);           // 'mouse click' notification.  \sa aWM_POINTER
+static void internal_mouse_dblclick(WBChildFrame *, int iX, int iY,
+                                    int iButtonMask, int iACS);        // 'mouse double click' notification.  \sa aWM_POINTER
+static void internal_mouse_drag(WBChildFrame *, int iX, int iY,
+                                int iButtonMask, int iACS);            // 'mouse drag' (begin) notification.  \sa aWM_POINTER
+static void internal_mouse_drop(WBChildFrame *, int iX, int iY,
+                                int iButtonMask, int iACS);            // 'mouse drop' (drag end) notification.  \sa aWM_POINTER
+static void internal_mouse_move(WBChildFrame *, int iX, int iY);       // 'mouse motion' notification.  \sa aWM_POINTER
+static void internal_mouse_scrollup(WBChildFrame *, int iX, int iY,
+                                    int iButtonMask, int iACS);        // 'mouse scroll up' notification.  \sa aWM_POINTER
+static void internal_mouse_scrolldown(WBChildFrame *, int iX, int iY,
+                                      int iButtonMask, int iACS);      // 'mouse scroll down' notification.  \sa aWM_POINTER
+static void internal_mouse_cancel(WBChildFrame *);                     // 'mouse cancel' notification (cancel 'drag', etc.).  \sa aWM_POINTER
+static void internal_get_row_col(WBChildFrame *pC, int *piR, int *piC);// get row/col (etc.)
+static int internal_has_selection(WBChildFrame *pC);                   // returns non-zero value if there is a selection
+static void internal_undo(WBChildFrame *);                             // perform an undo
+static void internal_redo(WBChildFrame *);                             // perform a re-do
+static int internal_can_undo(WBChildFrame *);                          // returns non-zero value if 'can undo'
+static int internal_can_redo(WBChildFrame *);                          // returns non-zero value if 'can redo'
+
+
+static void internal_update_status_text(WBEditWindow *); // called whenever status text should change
+static void internal_new_cursor_pos(WBEditWindow *); // called whenever cursor position changes.
+
+
 static XColor clrFG, clrBG, clrAFG, clrABG;
 static int iInitColorFlag = 0;
+
+
+static WBChildFrameUI internal_CFUI = 
+{
+  CHILD_FRAME_UI_TAG,
+  internal_do_char,         internal_scancode,     internal_bkspace,        internal_del,
+  internal_tab,             internal_enter,        internal_uparrow,        internal_downarrow,
+  internal_leftarrow,       internal_rightarrow,   internal_home,           internal_end,
+  internal_pgup,            internal_pgdown,       internal_pgleft,         internal_pgright,
+  internal_help,            internal_hover_notify, internal_hover_cancel,   internal_is_ins_mode,
+  internal_toggle_ins_mode, internal_copy_to_cb,   internal_paste_from_cb,  internal_cut_to_cb,
+  internal_delete_sel,      internal_select_all,   internal_select_none,    internal_save,
+  internal_get_file_name,   internal_mouse_click,  internal_mouse_dblclick, internal_mouse_drag,
+  internal_mouse_drop,      internal_mouse_move,   internal_mouse_scrollup, internal_mouse_scrolldown,
+  internal_mouse_cancel,    internal_get_row_col,  internal_has_selection,  internal_undo,
+  internal_redo,            internal_can_undo,     internal_can_redo
+};
+
+
+
+/** \ingroup edit_window
+  * \hideinitializer
+  * \brief Hover notification to user-callback, sent via ClientMessage event
+  *
+  * EW_HOVER_NOTIFY message format (relative to XEvent.xclient)\n
+  * type == ClientMessage\n
+  * message_type == aEW_HOVER_NOTIFY\n
+  * format == 32 (always)\n
+  * data.l[0] A value of 1 to indicate 'hover notify', zero to indicate 'hover cancel'\n
+  * data.l[1] The current row (0-based) (hover notify only)\n
+  * data.l[2] The current column (0-based) (hover notify only)\n
+  *
+  * The Edit Window sends this event directly to the callback specified by WBEditWindowRegisterCallback()
+  * whenever the Edit Window receives a hover notification.  If no user callback is specified (i.e. it is NULL)
+  * no such event will be generated the window itself.
+**/
+Atom aEW_HOVER_NOTIFY=None;
+
+/** \ingroup edit_window
+  * \hideinitializer
+  * \brief 'Edit Change' notification to user-callback, sent via ClientMessage event
+  *
+  * EW_EDIT_CHANGE message format (relative to XEvent.xclient)\n
+  * type == ClientMessage\n
+  * message_type == aEW_EDIT_CHANGE\n
+  * format == 32 (always)\n
+  * data.l[0] A value of 1 to indicate text added or deleted, 2 for a 're-do', or 0 for an un-do operation\n"
+  * data.l[1] The current row (0-based) (hover notify only)\n
+  * data.l[2] The current column (0-based) (hover notify only)\n
+  *
+  * The Edit Window sends this event directly to the callback specified by WBEditWindowRegisterCallback()
+  * whenever the Edit Window text has been modified due to UI interaction.  If no user callback is specified (i.e. it is NULL)
+  * no such event will be generated the window itself.
+**/
+Atom aEW_EDIT_CHANGE=None;
+
+
+
 
 #define LOAD_COLOR0(X,Y) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) > 0) {  }
 #define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
 
-static void InternalCheckEWColors(void)
+static void InternalCheckEWColorsAndAtoms(void)
 {
   Colormap colormap;
 
   // *Frame.background, *Frame.foreground, *WmFrame.background, *WmFrame.foreground,
   // *Form.background, *Form.foreground, *background, *foreground
+
+  if(aEW_EDIT_CHANGE == None)
+  {
+    aEW_EDIT_CHANGE = WBGetAtom(WBGetDefaultDisplay(), "EW_EDIT_CHANGE");
+  }
+
+  if(aEW_HOVER_NOTIFY == None)
+  {
+    aEW_HOVER_NOTIFY = WBGetAtom(WBGetDefaultDisplay(), "EW_HOVER_NOTIFY");
+  }
 
   if(!iInitColorFlag)
   {
@@ -113,9 +250,9 @@ WBEditWindow *WBCreateEditWindow(WBFrameWindow *pOwner, XFontStruct *pFont,
 WBEditWindow *pRval;
 
 
-  InternalCheckEWColors();
+  InternalCheckEWColorsAndAtoms();
 
-  pRval = (WBEditWindow *)malloc(sizeof(*pRval));
+  pRval = (WBEditWindow *)WBAlloc(sizeof(*pRval));
 
   if(!pRval)
   {
@@ -125,21 +262,40 @@ WBEditWindow *pRval;
 
   bzero(pRval, sizeof(*pRval));
 
+  pRval->ulTag = EDIT_WINDOW_TAG;
   pRval->szFileName = NULL;  // explicitly do this, though the bzero would've
-  pRval->nTextObjects = 0;
-  pRval->nMaxTextObjects = 0;
-  pRval->pTextObjects = NULL;
+  pRval->pUserCallback = NULL; // explicitly do this, too
+
+  if(!pFont)
+  {
+    pFont = WBGetDefaultFont();
+  }
+
+  WBInitializeInPlaceTextObject(&(pRval->xTextObject), None);
+
+//  pRval->xTextObject.vtable->set_col(&(pRval->xTextObject), 0);
+//  pRval->xTextObject.vtable->set_row(&(pRval->xTextObject), 0);
 
 
-  if(0 > FWInitChildFrame(&(pRval->childframe), pOwner, pFont, szFocusMenu, pHandlerArray,
+  // create the actual window.
+
+  if(0 > FWInitChildFrame(&(pRval->childframe), pOwner, pFont, // NOTE:  a copy of pFont will be in 'childframe.pFont'
+                          szFocusMenu, pHandlerArray,
                           FWEditWindowEvent, fFlags))
   {
     WB_ERROR_PRINT("ERROR:  %s - unable to initialize child frame\n", __FUNCTION__);
 
-    free(pRval);
+    WBFree(pRval);
 
     return NULL;
   }                    
+
+  pRval->xTextObject.wIDOwner = pRval->childframe.wID; // TODO:  make assigning this an API function?
+
+
+  // assign my 'UI' vtable pointer, which will be (intelligently) called by the 'Child Frame' event handler
+  // this standardizes the various UI methods and makes coding a complex UI quite a bit easier
+  pRval->childframe.pUI = &internal_CFUI; // UI function vtable
 
   // assign my 'destructor', which will be called by FWDestroyChildFrame
   // THIS must be done LAST, since 'FWInitChildFrame' might call FWDestroyChildFrame on error
@@ -151,6 +307,12 @@ WBEditWindow *pRval;
   //        a NULL immediately (since that would destroy the child frame AND the Edit Window stuff)
 
 
+  internal_update_status_text(pRval); // update status text now.
+
+  CreateTimer(WBGetWindowDisplay(pRval->childframe.wID), pRval->childframe.wID,
+              333333, 1, 1);      // TODO:  use #define for timer ID and period (1/3 second for now))
+  // NOTE:  when I unregister the window callback, the timer will be deleted automatically
+
   return pRval;
 }
 
@@ -161,17 +323,13 @@ static void InternalEditWindowDestroy(WBEditWindow *pEditWindow)
 
   if(pEditWindow->szFileName)
   {
-    free(pEditWindow->szFileName);
+    WBFree(pEditWindow->szFileName);
     pEditWindow->szFileName = NULL;
   }
 
-  if(pEditWindow->pTextObjects)
-  {
-    // TODO:  destroy them individually
+  WBDestroyInPlaceTextObject(&(pEditWindow->xTextObject));
 
-    free(pEditWindow->pTextObjects);
-    pEditWindow->pTextObjects = NULL;
-  }
+  pEditWindow->ulTag = 0; // not valid any more
 }
 
 static void InternalEditWindowDestructor(WBChildFrame *pC)
@@ -184,14 +342,27 @@ static void InternalEditWindowDestructor(WBChildFrame *pC)
   
   bzero(pEW, sizeof(*pEW)); // in case anything else 'stale' is there
 
-  free(pEW);  
+  WBFree(pEW);  
 
 //  WB_ERROR_PRINT("TEMPORARY:  %s - destroyed edit window %p\n", __FUNCTION__, pEW);
 }
 
 void WBDestroyEditWindow(WBEditWindow *pEditWindow)
 {
-Window wID;
+  if(!WBIsValidEditWindow(pEditWindow))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - invalid Edit Window pointer %p\n", __FUNCTION__, pEditWindow);
+    return;
+  }  
+
+  if(pEditWindow->pUserCallback)
+  {
+    // TODO:  Send an aDESTROY_NOTIFY ClientMessage 'destroy' notification (once I document it)
+
+    // TODO:  send a 'DestroyNotify' event instead???
+
+    pEditWindow->pUserCallback = NULL;
+  }
 
   if(pEditWindow->childframe.pUserCallback == FWEditWindowEvent)
   {
@@ -200,27 +371,123 @@ Window wID;
 
   if(pEditWindow->childframe.destructor == NULL)
   {
-    WB_ERROR_PRINT("ERROR:  %s - destructor is NULL - pointer will not be free'd\n");    
+    WB_ERROR_PRINT("ERROR:  %s - destructor is NULL - pointer will not be free'd\n", __FUNCTION__);
 
     InternalEditWindowDestroy(pEditWindow); // perform the necessary destruction *ANYWAY* but don't free the pointer
 
-    // TODO:  assign the destructor to NULL and call it directly after calling FWDestroyChildFrame() ?
+    // TODO:  ALWAYS assign the destructor to NULL, and THEN call it directly after calling FWDestroyChildFrame() ?
   }
+
+  if(pEditWindow->childframe.wID != None)
+  {
+    DeleteTimer(WBGetWindowDisplay(pEditWindow->childframe.wID),
+                pEditWindow->childframe.wID, 1); // the preferred method, when practical, is to delete it explicitly
+  }
+
+  // the last step destroys the child frame, which will destroy the Edit Window as well
 
   FWDestroyChildFrame(&(pEditWindow->childframe)); // destroy window, free up all resources, call destructor (if not NULL)
 }
 
 WBEditWindow *WBEditWindowFromWindowID(Window wID)
 {
-  return (WBEditWindow *)FWGetChildFrameStruct(wID); // for now; later, use a tag to verify
+WBEditWindow *pRval = (WBEditWindow *)FWGetChildFrameStruct(wID);
+
+
+  if(pRval && !WBIsValidEditWindow(pRval))
+  {
+    pRval = NULL;
+  }
+
+  return pRval;
 }
+
+
+int WBEditWindowLoadFile(WBEditWindow *pEditWindow, const char *pszFileName)
+{
+  if(!pEditWindow || !WBIsValidEditWindow(pEditWindow)
+     || !pszFileName || !*pszFileName)
+  {
+    return -1;
+  }
+
+  // TODO:  implement 'load file'.  handle unicode files.  UTF-16 files begin with 0xff, 0xfe
+  //        UTF-8 files are assumed to be the same as ASCII (with no prefix).
+
+
+
+  return -1; // error
+}
+
+int WBEditWindowSaveFile(WBEditWindow *pEditWindow, const char *pszFileName)
+{
+  if(!pEditWindow || !WBIsValidEditWindow(pEditWindow))
+  {
+    return -1;
+  }
+
+  if(!pszFileName || !*pszFileName)
+  {
+    pszFileName = pEditWindow->szFileName;
+  }
+
+  if(!pszFileName || !*pszFileName)
+  {
+    return -1; // error (no file name)
+  }
+
+
+  // TODO:  implement 'file save'
+
+
+  return -1; // error
+}
+
+void WBEditWindowClear(WBEditWindow *pEditWindow)
+{
+  if(!pEditWindow || !WBIsValidEditWindow(pEditWindow))
+  {
+    return;
+  }
+
+  WBDestroyInPlaceTextObject(&(pEditWindow->xTextObject));
+  WBInitializeInPlaceTextObject(&(pEditWindow->xTextObject), pEditWindow->childframe.wID);
+
+  FWChildFrameRecalcLayout(&(pEditWindow->childframe));
+}
+
+void WBEditWindowRegisterCallback(WBEditWindow *pEditWindow, WBWinEvent pUserCallback)
+{
+  if(!pEditWindow || !WBIsValidEditWindow(pEditWindow))
+  {
+    return;
+  }
+
+  pEditWindow->pUserCallback = pUserCallback;
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////////
+//                                                                               //
+//   _____                     _     _   _                    _  _               //
+//  | ____|__   __ ___  _ __  | |_  | | | |  __ _  _ __    __| || |  ___  _ __   //
+//  |  _|  \ \ / // _ \| '_ \ | __| | |_| | / _` || '_ \  / _` || | / _ \| '__|  //
+//  | |___  \ V /|  __/| | | || |_  |  _  || (_| || | | || (_| || ||  __/| |     //
+//  |_____|  \_/  \___||_| |_| \__| |_| |_| \__,_||_| |_| \__,_||_| \___||_|     //
+//                                                                               //
+//                                                                               //
+///////////////////////////////////////////////////////////////////////////////////
+
+
 
 int FWEditWindowEvent(Window wID, XEvent *pEvent)
 {
 WBEditWindow *pE;
 GC gc;
-WB_GEOM geom;
+WB_GEOM geom, geom2;
 Display *pDisplay = WBGetWindowDisplay(wID);
+XFontSet xFontSet;
 
 
   pE = WBEditWindowFromWindowID(wID);
@@ -243,9 +510,28 @@ Display *pDisplay = WBGetWindowDisplay(wID);
 
       XSetForeground(pDisplay, gc, clrBG.pixel);
       XSetBackground(pDisplay, gc, clrBG.pixel);
-      XFillRectangle(pDisplay, wID, gc, geom.x, geom.y, geom.width - 2, geom.height - 2);
 
+      WBGetWindowGeom(wID, &geom2);
+
+      geom2.x ++;       // 1-pixel border
+      geom2.y ++;
+      geom2.width -= 2; // 1 pixel border on BOTH sides
+      geom2.height -= 2;
+
+      XFillRectangle(pDisplay, wID, gc, geom.x, geom.y, geom.width, geom.height);
+
+      xFontSet = WBFontSetFromFont(pDisplay, pE->childframe.pFont);
+
+      pE->xTextObject.vtable->do_expose(&(pE->xTextObject), pDisplay, wID, gc,
+                                        &geom, // the GEOM to 'paint to'
+                                        &geom2, // the GEOM bordering the window's viewport (NULL for ALL)
+                                        xFontSet);
       WBEndPaint(wID, gc);
+
+      if(xFontSet)
+      {
+        XFreeFontSet(pDisplay, xFontSet);
+      }
       
       return 1; // "handled"
 
@@ -263,8 +549,1084 @@ Display *pDisplay = WBGetWindowDisplay(wID);
       }
 
       break;
+
+    case ClientMessage:
+      if(pEvent->xclient.message_type == aRESIZE_NOTIFY)
+      {
+        // TODO:  process re-calculation of the extents, etc.
+
+
+        FWSetChildFrameScrollInfo(&(pE->childframe),
+                                  pE->xTextObject.vtable->get_row(&(pE->xTextObject)),
+                                  pE->xTextObject.vtable->get_rows(&(pE->xTextObject)),
+                                  pE->xTextObject.vtable->get_col(&(pE->xTextObject)),
+                                  pE->xTextObject.vtable->get_cols(&(pE->xTextObject)),
+                                  pE->childframe.pFont->ascent + pE->childframe.pFont->ascent + EDIT_WINDOW_LINE_SPACING,
+                                  WBFontAvgCharWidth(pDisplay, pE->childframe.pFont));
+      }
+      else if(pEvent->xclient.message_type == aWM_TIMER)
+      {
+        // only when this tab is visible do I call the callback.
+
+        if(pE->childframe.pOwner && // just in case
+           FWGetChildFrameIndex(pE->childframe.pOwner, NULL)                // focus window's tab index
+            == FWGetChildFrameIndex(pE->childframe.pOwner, &(pE->childframe))) // THIS window's tab index
+        {
+//          WB_ERROR_PRINT("TEMPORARY:  %s - timer\n", __FUNCTION__);
+
+          pE->xTextObject.vtable->cursor_blink(&(pE->xTextObject), 1);
+        }
+      }
+      else if(pEvent->xclient.message_type == aQUERY_CLOSE)
+      {
+        if(pE->pUserCallback)
+        {
+          int iRval = pE->pUserCallback(wID, pEvent);  // allow the user callback to determine when to close
+
+          if(iRval)
+          {
+            return iRval;
+          }
+        }
+
+        return 0; // for now, just return 'ok to close' whether I've saved or not
+      }
   }
   
-  return 0; // for now, NONE are handled
+  return 0; // "not handled"
 }
+
+
+
+//////////////////////////////////////////////////////////////////////////////
+//                                                                          //
+//         _   _  ___    ____        _  _  _                   _            //
+//        | | | ||_ _|  / ___| __ _ | || || |__    __ _   ___ | | __        //
+//        | | | | | |  | |    / _` || || || '_ \  / _` | / __|| |/ /        //
+//        | |_| | | |  | |___| (_| || || || |_) || (_| || (__ |   <         //
+//         \___/ |___|  \____|\__,_||_||_||_.__/  \__,_| \___||_|\_\        //
+//                                                                          //
+//                                                                          //
+//////////////////////////////////////////////////////////////////////////////
+
+
+static void internal_update_status_text(WBEditWindow *pE) // called whenever cursor position changes.
+{
+WBChildFrame *pC = &(pE->childframe);
+int iR, iC;
+char tbuf[1024];
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  internal_get_row_col(pC, &iR, &iC);
+
+  if(pC->szStatusText)
+  {
+    WBFree(pC->szStatusText);
+    pC->szStatusText = NULL;
+  }
+
+  snprintf(tbuf, sizeof(tbuf), "Row,Col: %d,%d\tlines: %d  width: %d\t%s\t",
+          iR,
+          iC,
+          pE->xTextObject.vtable->get_rows(&(pE->xTextObject)),
+          pE->xTextObject.vtable->get_cols(&(pE->xTextObject)),
+          (const char *)(pE->xTextObject.vtable->get_insmode(&(pE->xTextObject)) ? "INS" : "OVR"));
+
+  pC->szStatusText = WBCopyString(tbuf);
+
+  if(!pC->szStatusText)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - not enough memory to display status\n", __FUNCTION__);      
+  }
+
+  FWChildFrameStatusChanged(pC);
+}
+
+static void internal_new_cursor_pos(WBEditWindow *pE) // called whenever cursor position changes.
+{
+  CALLBACK_TRACKER;
+
+  if(WBIsValidEditWindow(pE))
+  {
+    internal_update_status_text(pE);
+
+    // see if the row exceeds the viewport, and if that's the case, scroll it.
+
+
+
+    // TODO:  other things, like messing with the display area, re-calc layout, re-paint, etc.
+    //        check to see if top/bottom rows changed, invalidate old line, validate new line, see if
+    //        horizontal scrolling entire window or just the cursor, etc. etc. etc.
+  }
+}
+
+static void internal_notify_change(WBChildFrame *pC, int bUndo)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  if(pE->pUserCallback)
+  {
+    XClientMessageEvent evt;
+
+    bzero(&evt, sizeof(evt));
+
+    evt.type=ClientMessage;
+    evt.display=WBGetWindowDisplay(pC->wID);
+    evt.window=pC->wID;
+    evt.message_type=aEW_EDIT_CHANGE;
+    evt.format=32;
+
+    evt.data.l[0] = bUndo;
+    evt.data.l[1] = pE->xTextObject.vtable->get_row(&(pE->xTextObject));
+    evt.data.l[2] = pE->xTextObject.vtable->get_col(&(pE->xTextObject));
+
+    pE->pUserCallback(pC->wID, (XEvent *)&evt);
+  }
+}
+
+static void internal_do_char(WBChildFrame *pC, XClientMessageEvent *pEvent)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+int iKey, iACS, nChar;
+char *pBuf;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  // TODO:  determine whether or not the character is printable
+
+  iKey = pEvent->data.l[0];            // result from WBKeyEventProcessKey()
+  iACS = pEvent->data.l[1];
+  nChar = pEvent->data.l[2];
+  pBuf = (char *)&(pEvent->data.l[3]);
+
+  if(iACS)
+  {
+    // TODO:  handle non-printing chars
+
+    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+    WB_ERROR_PRINT("TEMPORARY:  %s - beep\n", __FUNCTION__);
+  }
+  else if(pE->xTextObject.vtable->has_select(&(pE->xTextObject)))
+  {
+//    WB_ERROR_PRINT("TEMPORARY:  %s - set text to \"%.*s\"\n", __FUNCTION__, nChar, pBuf);
+    pE->xTextObject.vtable->set_text(&(pE->xTextObject), pBuf, nChar);
+    internal_notify_change(pC, 0);
+  }
+  else
+  {
+//    WB_ERROR_PRINT("TEMPORARY:  %s - inserting \"%.*s\"\n", __FUNCTION__, nChar, pBuf);
+    pE->xTextObject.vtable->ins_chars(&(pE->xTextObject), pBuf, nChar);
+    internal_notify_change(pC, 0);
+  }
+
+  {
+    char *p1 = pE->xTextObject.vtable->get_text(&(pE->xTextObject));
+
+    WB_ERROR_PRINT("TEMPORARY:  %s - new text \"%s\"\n", __FUNCTION__, p1);
+
+    if(p1)
+    {
+      WBFree(p1);
+    }
+  }
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
+}
+
+static void internal_scancode(WBChildFrame *pC, XClientMessageEvent *pEvent)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  // TODO:  handle things I might want, like 'indent' which might be ctrl+[ or ctrl+], or maybe
+  //        ctrl+tab or ctrl+shift+tab
+
+
+  XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+}
+
+static void internal_bkspace(WBChildFrame *pC, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  if(iACS) // not handling ctrl, shift, or alt with backspace.  yet.
+  {
+    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+  }
+  else
+  {
+  }
+
+}
+
+static void internal_del(WBChildFrame *pC, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  // shift+del does 'cut' behavior
+
+  if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift+del
+  {
+    if(!pE->xTextObject.vtable->has_select(&(pE->xTextObject)))
+    {
+      // no selection, can't "cut"
+      XBell(WBGetWindowDisplay(pC->wID), -100);
+    }
+    else
+    {
+      // copy selection to the clipboard, then delete - same as internal_cut_to_cb()
+
+      char *p1 = pE->xTextObject.vtable->get_text(&(pE->xTextObject));
+      if(p1)
+      {
+        WBSetClipboardData(WBGetWindowDisplay(pC->wID), aUTF8_STRING, 8, p1, strlen(p1) + 1);
+
+        WBFree(p1);
+
+        pE->xTextObject.vtable->del_select(&(pE->xTextObject));
+        internal_notify_change(pC, 0);
+      }
+    }
+  }
+  else if(pE->xTextObject.vtable->has_select(&(pE->xTextObject)))
+  {
+    pE->xTextObject.vtable->del_select(&(pE->xTextObject));
+    internal_notify_change(pC, 0);
+  }
+  else
+  {
+    pE->xTextObject.vtable->del_chars(&(pE->xTextObject), 1);
+    internal_notify_change(pC, 0);
+  }
+
+}
+
+static void internal_tab(WBChildFrame *pC, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+}
+
+static void internal_enter(WBChildFrame *pC, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+}
+
+static void internal_uparrow(WBChildFrame *pC, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+}
+
+static void internal_downarrow(WBChildFrame *pC, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+}
+
+static void internal_leftarrow(WBChildFrame *pC, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+}
+
+static void internal_rightarrow(WBChildFrame *pC, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+}
+
+static void internal_home(WBChildFrame *pC, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+}
+
+static void internal_end(WBChildFrame *pC, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+}
+
+static void internal_pgup(WBChildFrame *pC, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+}
+
+static void internal_pgdown(WBChildFrame *pC, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+}
+
+static void internal_pgleft(WBChildFrame *pC, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+}
+
+static void internal_pgright(WBChildFrame *pC, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+}
+
+static void internal_help(WBChildFrame *pC, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+}
+
+static void internal_hover_notify(WBChildFrame *pC, int x, int y)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+}
+
+static void internal_hover_cancel(WBChildFrame *pC)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+}
+
+static int internal_is_ins_mode(WBChildFrame *pC)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return -1;
+  }
+
+  return pE->xTextObject.vtable->get_insmode(&(pE->xTextObject));
+}
+
+static void internal_toggle_ins_mode(WBChildFrame *pC)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+int iInsMode;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  iInsMode = pE->xTextObject.vtable->get_insmode(&(pE->xTextObject));
+  pE->xTextObject.vtable->set_insmode(&(pE->xTextObject), !iInsMode);
+
+  internal_update_status_text(pE);
+}
+
+static void internal_copy_to_cb(WBChildFrame *pC)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+char *p1;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  // copy selection to the clipboard
+
+  if(pE->xTextObject.vtable->has_select(&(pE->xTextObject)))
+  {
+    p1 = pE->xTextObject.vtable->get_text(&(pE->xTextObject));
+
+    if(p1)
+    {
+      WBSetClipboardData(WBGetWindowDisplay(pC->wID), aUTF8_STRING, 8, p1, strlen(p1) + 1);
+
+      WBFree(p1);
+    }
+  }
+  else
+  {
+    // no selection, can't "copy"
+
+    XBell(WBGetWindowDisplay(pC->wID), -100);
+  }
+}
+
+static void internal_paste_from_cb(WBChildFrame *pC)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+Atom aType = aUTF8_STRING;
+int iFormat = 8;
+unsigned long nData = 0;
+char *p1;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  // copy selection to the clipboard, then delete - same as internal_cut_to_cb()
+
+  p1 = (char *)WBGetClipboardData(WBGetWindowDisplay(pC->wID), &aType, &iFormat, &nData);
+  if(!p1) // try regular string, not UTF8
+  {
+    aType = aSTRING;
+    p1 = (char *)WBGetClipboardData(WBGetWindowDisplay(pC->wID), &aType, &iFormat, &nData);
+  }
+
+  if(p1 && nData > 0)
+  {
+    if(!p1[nData - 1])
+    {
+      nData--;
+    }
+  }
+
+
+  if(p1)
+  {
+    // TODO:  convert to correct format (ASCII)
+    if(iFormat != 8) // 16-bit unicode is assumed now
+    {
+      if(iFormat == 8 * sizeof(wchar_t))
+      {
+        char *pNew = WBAlloc(sizeof(wchar_t) * (nData + 2));
+        if(pNew)
+        {
+          bzero(pNew, sizeof(wchar_t) * (nData + 2));
+          wcstombs(pNew, (const wchar_t *)p1, sizeof(wchar_t) * (nData + 2));
+        }
+
+        WBFree(p1);
+        p1 = pNew;
+      }
+      else
+      {
+        XBell(WBGetWindowDisplay(pC->wID), -100);
+        WB_ERROR_PRINT("TEMPORARY - %s - clipboard format %d, can't 'PASTE'\n", __FUNCTION__, iFormat);
+        
+        WBFree(p1);
+        p1 = NULL; // by convention - also, checked in next section
+      }
+    }
+
+    if(p1)
+    {
+      if(pE->xTextObject.vtable->has_select(&(pE->xTextObject)))
+      {
+        pE->xTextObject.vtable->replace_select(&(pE->xTextObject), p1, nData);
+        internal_notify_change(pC, 0);
+      }
+      else
+      {
+        pE->xTextObject.vtable->ins_chars(&(pE->xTextObject), p1, nData);
+        internal_notify_change(pC, 0);
+      }
+
+      WBFree(p1);
+      p1 = NULL; // by convention
+    }
+  }
+
+}
+
+static void internal_cut_to_cb(WBChildFrame *pC)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  if(!pE->xTextObject.vtable->has_select(&(pE->xTextObject)))
+  {
+    // no selection, can't "cut"
+    XBell(WBGetWindowDisplay(pC->wID), -100);
+  }
+  else
+  {
+    // copy selection to the clipboard, then delete - same as internal_cut_to_cb()
+
+    char *p1 = pE->xTextObject.vtable->get_text(&(pE->xTextObject));
+    if(p1)
+    {
+      WBSetClipboardData(WBGetWindowDisplay(pC->wID), aUTF8_STRING, 8, p1, strlen(p1) + 1);
+
+      WBFree(p1);
+
+      pE->xTextObject.vtable->del_select(&(pE->xTextObject));
+      internal_notify_change(pC, 0);
+    }
+  }
+
+}
+
+static void internal_delete_sel(WBChildFrame *pC)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  if(!pE->xTextObject.vtable->has_select(&(pE->xTextObject)))
+  {
+    // no selection, can't "cut"
+    XBell(WBGetWindowDisplay(pC->wID), -100);
+  }
+  else
+  {
+    pE->xTextObject.vtable->del_select(&(pE->xTextObject));
+    internal_notify_change(pC, 0);
+  }
+}
+
+static void internal_select_all(WBChildFrame *pC)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+WB_RECT rct;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  rct.left = rct.top = 0;
+  rct.right = pE->xTextObject.vtable->get_cols(&(pE->xTextObject));
+  rct.bottom = pE->xTextObject.vtable->get_rows(&(pE->xTextObject));
+
+  pE->xTextObject.vtable->set_select(&(pE->xTextObject), &rct); // select 'all'
+}
+
+static void internal_select_none(WBChildFrame *pC)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  pE->xTextObject.vtable->set_select(&(pE->xTextObject), NULL);
+}
+
+static void internal_save(WBChildFrame *pC, const char *szFileName)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  WBEditWindowSaveFile(pE, szFileName);
+}
+
+static WB_PCSTR internal_get_file_name(WBChildFrame *pC)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return NULL;
+  }
+
+  return pE->szFileName;
+}
+
+static void internal_mouse_click(WBChildFrame *pC, int iX, int iY, int iButtonMask, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  pE->xTextObject.vtable->mouse_click(&(pE->xTextObject), iX, iY, iButtonMask, iACS);
+}
+
+static void internal_mouse_dblclick(WBChildFrame *pC, int iX, int iY, int iButtonMask, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+}
+
+static void internal_mouse_drag(WBChildFrame *pC, int iX, int iY, int iButtonMask, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  pE->xTextObject.vtable->begin_mouse_drag(&(pE->xTextObject));
+}
+
+static void internal_mouse_drop(WBChildFrame *pC, int iX, int iY, int iButtonMask, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  pE->xTextObject.vtable->end_mouse_drag(&(pE->xTextObject));
+}
+
+static void internal_mouse_move(WBChildFrame *pC, int iX, int iY)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  pE->xTextObject.vtable->mouse_click(&(pE->xTextObject), iX, iY, 0, 0); // report mouse motion
+}
+
+static void internal_mouse_scrollup(WBChildFrame *pC, int iX, int iY, int iButtonMask, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+}
+
+static void internal_mouse_scrolldown(WBChildFrame *pC, int iX, int iY, int iButtonMask, int iACS)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+}
+
+static void internal_mouse_cancel(WBChildFrame *pC)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+}
+
+static void internal_get_row_col(WBChildFrame *pC, int *piR, int *piC)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  if(piC)
+  {
+    *piC = pE->xTextObject.vtable->get_col(&(pE->xTextObject));
+  }
+  
+  if(piR)
+  {
+    *piR = pE->xTextObject.vtable->get_row(&(pE->xTextObject));
+  }
+}
+
+static int internal_has_selection(WBChildFrame *pC)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return 0;
+  }
+
+  return 0; // no current selection
+}
+
+static void internal_undo(WBChildFrame *pC)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  // perform an un-do operation
+}
+
+static void internal_redo(WBChildFrame *pC)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  // perform a re-do operation
+}
+
+static int internal_can_undo(WBChildFrame *pC)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return 0;
+  }
+
+  return 0; // can't un-do
+}
+
+static int internal_can_redo(WBChildFrame *pC)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return 0;
+  }
+
+  return 0; // can't re-do
+}
+
+
 

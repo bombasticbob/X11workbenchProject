@@ -65,15 +65,6 @@
 #include "text_object.h"
 
 
-#ifdef HAVE_MALLOC_USABLE_SIZE
-#ifdef __FreeBSD__
-#include <malloc_np.h>
-#else
-#include <malloc.h>
-#endif // __FreeBSD__
-#endif // HAVE_MALLOC_USABLE_SIZE
-
-
 // UTF-8 HANDLING
 // X11 has XFree86 extensions with 'Xutf8' versions of a lot of things
 // which is only applicable with the following
@@ -301,168 +292,6 @@ static __inline__ const char * __internal_get_line_ending_text(enum _LineFeed_ i
 
 
 
-// ********************
-// MEMORY SUB-ALLOCATOR
-// ********************
-
-// NOTES TO SELF (design notes)
-// a) allocate Xk blocks of memory for suballocator blocks of a specific size
-// b) the first 'page' of the memory block is an array of indices (double-link list)
-// c) the remainder of the block is an ordered set of memory blocks of a fixed size
-// d) as more blocks are added, they are added to a linked list associated with the size
-// e) blocks "more than Xk" will be malloc'd and added to the 'malloc' list.
-// f) malloc'd blocks will have a double-link list and a header with extra info
-// This way an allocated address will auto-indicate which memory block it belongs to
-
-static const char szWBAllocTag[]="WB_M";
-#define WB_ALLOC_TAG (*((const unsigned int *)szWBAllocTag))
-
-struct __malloc_header__
-{
-  struct __malloc_header__ *pPrev, *pNext;
-  unsigned int iTag;   // see WB_ALLOC_TAG
-  unsigned int cbSize; // size used for last malloc/realloc
-};
-
-//static struct __malloc_header__ *pMallocList = NULL, *pMallocListEnd = NULL;
-// TODO:  when I go to implement this, uncomment the above line
-
-// TODO:  sync object for pMallocList etc.
-
-void *WBAlloc(int nSize)
-{
-unsigned char *pRval;
-struct __malloc_header__ *pMH;
-unsigned int nAllocSize, nNewSize, nLimit;
-
-
-  if(nSize <= 0)
-  {
-    return NULL;
-  }
-
-  // TODO:  implement allocation of smaller memory blocks as 'power of 2' blocks.
-  //
-
-  nAllocSize = nSize + sizeof(*pMH);
-  // nAllocSize will be converted to the next higher power of 2
-
-  nLimit = nAllocSize + (nAllocSize >> 1);
-  for(nNewSize=64; nNewSize < nLimit; nNewSize <<= 1) { } // NOTE:  64 bytes is the smallest allocation unit
-
-//  if(nNewSize < 4096) TODO:  internally sub-allocated blocks
-//  {
-//    TODO:  maintain lists of pre-allocated blocks of memory, allocating new memory as needed
-//           (this memory will need to be re-used intelligently so trash mashing can work properly
-//  }
-
-  pRval = (unsigned char *)malloc(nNewSize); // for now
-
-  if(pRval)
-  {
-    pMH = (struct __malloc_header__ *)pRval;
-
-    pRval += sizeof(*pMH);
-
-    pMH->pPrev = NULL;
-    pMH->pNext = NULL;
-    pMH->iTag = WB_ALLOC_TAG;
-    pMH->cbSize = nNewSize - sizeof(*pMH); // nSize; // TODO:  actual allocated size via malloc_usable_size
-  }
-
-  return pRval;
-}
-
-void WBFree(void *pBuf)
-{
-struct __malloc_header__ *pMH;
-
-  if(!pBuf)
-  {
-    return;
-  }
-
-  // validate pointer
-  // TODO:  check against linked list of 'allocated' blocks first
-
-  pMH = ((struct __malloc_header__ *)pBuf) - 1;
-
-  if(pMH->iTag == WB_ALLOC_TAG)
-  {
-    free(pMH);
-  }
-  else
-  {
-    WB_ERROR_PRINT("ERROR - %s NOT freeing memory %p\n", __FUNCTION__, pBuf);
-  }
-}
-
-void * WBReAlloc(void *pBuf, int nNewSize)
-{
-struct __malloc_header__ *pMH;
-unsigned char *pRval = NULL;
-unsigned int nAllocSize, nNewNewSize, nLimit;
-
-
-  if(!pBuf || nNewSize <= 0)
-  {
-    return NULL;
-  }
-
-  // validate pointer
-  // TODO:  check against linked list of 'allocated' blocks first
-
-  pMH = ((struct __malloc_header__ *)pBuf) - 1;
-
-  if(pMH->iTag == WB_ALLOC_TAG)
-  {
-    // the whole point of this is to minimize the actual need to re-allocate the
-    // memory block by maintaining a LARGER block than is actually needed when
-    // allocated or re-allocated.  Gradually increasing size is pretty much assumed.
-
-    if(pMH->cbSize >= nNewSize)
-    {
-      return pBuf; // no change (same pointer) since it's large enough already
-    }
-
-    // TODO:  implement re-allocation of smaller memory blocks as 'power of 2' blocks.
-    //
-
-    nAllocSize = nNewSize + sizeof(*pMH);
-    // nAllocSize will be converted to the next higher power of 2
-
-    nLimit = nAllocSize + (nAllocSize >> 1);
-    for(nNewNewSize=64; nNewNewSize < nLimit; nNewNewSize <<= 1) { } // NOTE:  64 bytes is the smallest allocation unit
-
-//    if(nNewSize < 4096) TODO:  internally sub-allocated blocks
-//    {
-//      TODO:  maintain lists of pre-allocated blocks of memory, allocating new memory as needed
-//             (this memory will need to be re-used intelligently so trash mashing can work properly
-//    }
-
-    pRval = realloc(pMH, nNewNewSize);
-    if(pRval)
-    {
-      pMH = (struct __malloc_header__ *)pRval;
-      pRval += sizeof(*pMH);
-
-      pMH->cbSize = nNewNewSize - sizeof(*pMH);
-    }
-  }
-  else
-  {
-    WB_ERROR_PRINT("ERROR - %s NOT re-allocating memory %p\n", __FUNCTION__, pBuf);
-  }
-
-  return pRval; // realloc(pBuf, nNewSize); // for now
-}
-
-void WBSubAllocTrashMasher(void)
-{
-  // do nothing (for now)
-  // later, walk memory list to see if any blocks are completely unused, and free them.
-}
-
 
 // ***********
 // TEXT BUFFER
@@ -489,7 +318,7 @@ int cbLen;
   }
 
   cbLen = sizeof(*pRval) + nLines * sizeof(pRval->aLines[0]);
-  pRval = malloc(cbLen);
+  pRval = WBAlloc(cbLen);
 
   if(!pRval)
   {
@@ -600,7 +429,7 @@ int nNew;
     nNew += DEFAULT_TEXT_BUFFER_LINES;
     nNew -= (nNew % (DEFAULT_TEXT_BUFFER_LINES / 2));
 
-    pBuf = realloc(pBuf, sizeof(*pBuf) + nNew * sizeof(pBuf->aLines[0]));
+    pBuf = WBReAlloc(pBuf, sizeof(*pBuf) + nNew * sizeof(pBuf->aLines[0]));
 
     if(!pBuf)
     {
@@ -634,7 +463,7 @@ int i1;
     }
   }
 
-  free(pBuf);
+  WBFree(pBuf);
 }
 
 void WBTextBufferLineChange(TEXT_BUFFER *pBuf, unsigned long nLine, int nNewLen)
@@ -908,15 +737,17 @@ TEXT_OBJECT *WBTextObjectConstructor(unsigned long cbStructSize, const char *szT
 {
 TEXT_OBJECT *pRval;
 
-  pRval = (TEXT_OBJECT *)malloc(sizeof(*pRval));
+  pRval = (TEXT_OBJECT *)WBAlloc(sizeof(*pRval));
 
   if(pRval)
   {
-    pRval->vtable = &WBDefaultTextObjectVTable;
-    pRval->ulTag = TEXT_OBJECT_TAG;
-    pRval->vtable->init(pRval);
+//    pRval->vtable = &WBDefaultTextObjectVTable;
+//    pRval->ulTag = TEXT_OBJECT_TAG;
+//    pRval->vtable->init(pRval);
+//
+//    pRval->wIDOwner = wIDOwner;
 
-    pRval->wIDOwner = wIDOwner;
+    WBInitializeInPlaceTextObject(pRval, wIDOwner);
 
     pRval->pText = WBAllocTextBuffer(szText, cbLen);
   }
@@ -930,8 +761,27 @@ void WBTextObjectDestructor(TEXT_OBJECT *pObj)
   {
     pObj->vtable->destroy(pObj);
 
-    free(pObj);
+    WBFree(pObj);
   }
+}
+
+int WBTextObjectCalculateLineHeight(int iAscent, int iDescent)  // consistently calculate line height from font ascent/descent
+{
+int iFontHeight;
+
+  iFontHeight = iAscent + iDescent;
+  
+  // adjust font height to include line spacing (I'll use this to position the lines)
+  if(iDescent > MIN_LINE_SPACING / 2)
+  {
+    iFontHeight += iDescent / 2; // line spacing is 1/2 of descent, or MIN_LINE_SPACING
+  }
+  else
+  {
+    iFontHeight += MIN_LINE_SPACING;
+  }
+
+  return iFontHeight;
 }
 
 
@@ -1263,7 +1113,7 @@ int iOldSel, cbLen;
 
 // ---------------------------------------------------------------------------
 // __internal_get_selected_text - arbitrary text retrieval (internal only)
-//                                returns malloc'd string pointer
+//                                returns WBAlloc'd string pointer
 //
 // iRow is the starting row position
 // iCol is the starting column position
@@ -1380,7 +1230,7 @@ int iIsBoxMode, iIsLineMode;
       cbLF = strlen(szLineFeed);
     }
 
-    pRval = malloc(cb1); // allocate the buffer
+    pRval = WBAlloc(cb1); // allocate the buffer
 
     if(pRval)
     {
@@ -1566,7 +1416,7 @@ TEXT_BUFFER *pBuf;
     return;
   }
 
-  pBuf = (TEXT_BUFFER *)(pThis->pText);
+  pBuf = (TEXT_BUFFER *)(pThis->pText); // might be NULL, must check before use
 
   if(iEndRow < 0)
   {
@@ -1634,15 +1484,7 @@ TEXT_BUFFER *pBuf;
       pRect->left = pThis->rctWinView.left;
       pRect->right = INT_MAX; //pThis->rctWinView.right;
 
-      // adjust font height to include line spacing (I'll use this to position the lines)
-      if(pThis->iDesc > MIN_LINE_SPACING / 2)
-      {
-        iFontHeight += pThis->iDesc / 2; // line spacing is 1/2 of descent, or MIN_LINE_SPACING
-      }
-      else
-      {
-        iFontHeight += MIN_LINE_SPACING;
-      }
+      iFontHeight = WBTextObjectCalculateLineHeight(pThis->iAsc, pThis->iDesc); // height PLUS inter-line spacing
 
       pRect->top = pThis->rctWinView.top
                  + iFontHeight * (iStartRow - pThis->rctView.top);
@@ -1721,21 +1563,24 @@ static void __internal_destroy(struct _text_object_ *pThis)
     pThis->pRedo = NULL;
   }
 }
+
 static void __internal_init(struct _text_object_ *pThis)
 {
+  pThis->ulTag = TEXT_OBJECT_TAG;
   pThis->wIDOwner = None;
-  memset(&pThis->rctSel, 0, sizeof(pThis->rctSel));
-  memset(&pThis->rctHighLight, 0, sizeof(pThis->rctHighLight));
+
+  bzero(&pThis->rctSel, sizeof(pThis->rctSel));
+  bzero(&pThis->rctHighLight, sizeof(pThis->rctHighLight));
 
   pThis->iFileType = 0;   // plain text
-  pThis->iLineFeed = 0;   // '\n'
+  pThis->iLineFeed = LineFeed_DEFAULT;
   pThis->iInsMode = 1;    // insert
   pThis->iSelMode = 0;    // normal
   pThis->iScrollMode = 0; // normal
   pThis->iRow = 0;
   pThis->iCol = 0;
   pThis->iPos = 0; // reserved
-  memset(&pThis->rctView, 0, sizeof(pThis->rctView));
+  bzero(&pThis->rctView, sizeof(pThis->rctView));
   pThis->pText = NULL;
   pThis->pUndo = NULL;
   pThis->pRedo = NULL;
@@ -2307,7 +2152,7 @@ WB_RECT rctSel;
 
     if(pTemp)
     {
-      free(pTemp);
+      WBFree(pTemp);
     }
 
     // once the selection has been deleted, select 'nothing' and re-paint all
@@ -2701,18 +2546,19 @@ WB_RECT rctInvalid;
       if(iMultiLine)
       {
         iMultiLine = 0;
-        p2 = p1;
+        p2 = p1; // either end of string, or the position of the newline
       }
+
       p1 = pChar;
 
       // insert at 'iCol'
 
       if(!pBuf) // no buffer, so add text now
       {
-        pThis->pText = WBAllocTextBuffer(p1, p2 - p1);
+        pBuf = pThis->pText = WBAllocTextBuffer(p1, p2 - p1);
 
         pThis->iRow = 0; // always
-        pThis->iCol = p2 - p1; // effectively, like pressing 'end'
+        pThis->iCol = p2 - p1; // effectively, like pressing 'end' after inserting
 
         __internal_add_undo(pThis, UNDO_INSERT, pThis->iSelMode,
                             pThis->iRow, 0, &(pThis->rctSel), NULL, 0, // old col was 0, always
@@ -2726,30 +2572,33 @@ WB_RECT rctInvalid;
           pThis->iRow = 0; // force it
         }
 
-        if(pBuf->nEntries <= 0)
+        if(pBuf->nEntries <= 0 || !pBuf->aLines[0])
         {
-          pBuf->nEntries = 1;
-          pL = pBuf->aLines[0] = WBAlloc(pThis->iCol + p2 - p1 + 2);
-          if(pL)
+          if(pBuf->nEntries <= 0)
           {
-            iLen = strlen(pL);
+            pBuf->nEntries = 1; // single-line, always this, but not verifying for now
           }
-        }
-        else if(!pBuf->aLines[0])
-        {
+
           pL = pBuf->aLines[0] = WBAlloc(pThis->iCol + p2 - p1 + 2);
+
           if(pL)
           {
-            iLen = strlen(pL);
+            if(pThis->iCol > 0)
+            {
+              memset(pL, ' ', pThis->iCol);
+            }
+
+            iLen = pThis->iCol;
           }
         }
         else
         {
           pTemp = pBuf->aLines[0];
-          i1 = iLen = strlen(pTemp);
+          i1 = iLen = strlen(pTemp); // the actual length
+
           if(iLen < pThis->iCol)
           {
-            i1 = pThis->iCol;
+            i1 = pThis->iCol; // the alloc length
           }
 
           if(pThis->iInsMode == InsertMode_OVERWRITE)
@@ -2770,20 +2619,29 @@ WB_RECT rctInvalid;
           {
             pBuf->aLines[0] = pL;
           }
+          else
+          {
+            WB_ERROR_PRINT("ERROR:  %s - not enough memory\n", __FUNCTION__);
+          }
         }
 
         if(pL)
         {
           if(iLen < pThis->iCol)
           {
-            memset(pL + iLen, ' ', pThis->iCol - iLen); // pad with space
+            memset(pL + iLen, ' ', pThis->iCol - iLen); // pad with spaces
+
             pL[pThis->iCol + p2 - p1] = 0;              // I need a terminating zero byte
           }
           else if(iLen > pThis->iCol &&                    // insert 'in the middle'
                   pThis->iInsMode != InsertMode_OVERWRITE) // NOT overwriting
           {
             // make room for text
-            memmove(pL + pThis->iCol + (p2 - p1), pL + pThis->iCol, iLen - pThis->iCol + 1);
+            if(WB_LIKELY((iLen - pThis->iCol + 1) > 0)) // probably always true
+            {
+              memmove(pL + pThis->iCol + (p2 - p1), pL + pThis->iCol, iLen - pThis->iCol + 1);
+                // note that this includes teh zero byte.
+            }
           }
           else if((p2 - p1) + pThis->iCol >= iLen)
           {
@@ -2809,6 +2667,159 @@ WB_RECT rctInvalid;
     {
 
       // TODO: auto-vscroll while inserting text, make sure cursor position is visible
+
+      // insert at 'iCol'
+
+      if(!pBuf) // no buffer, so add text now
+      {
+        p1 = pChar;
+        p2 = pChar + nChar;
+
+        pBuf = pThis->pText = WBAllocTextBuffer(pChar, nChar);
+
+        pThis->iRow = 0; // always
+        pThis->iCol = nChar; // effectively, like pressing 'end' after inserting
+
+        __internal_add_undo(pThis, UNDO_INSERT, pThis->iSelMode,
+                            pThis->iRow, 0, &(pThis->rctSel), NULL, 0, // old col was 0, always
+                            pThis->iRow, pThis->iCol, NULL,            // new col already assigned
+                            pChar, nChar); // the new text
+      }
+      else // add to existing buffer
+      {
+        // NOW, parse into 'lines' and add text as needed
+        const char *p3 = pChar + nChar; // p3 is 'end of text' marker now
+        p2 = pChar;               // also marks 'end of line' for insertion
+
+//POOBAH convert all this shit to use line buffers as proper MBCS entries, with row/col being non-linear to char length
+//POOBAH that means an API that gets you an MBCS char based on col, gets the lenth of the string in cols, handles hard/soft tabs,
+//POOBAH and lets you insert/overwrite a string, automatically re-allocating the buffer, and things like that.
+        
+        while(p2 < p3)
+        {
+          int nTabs = 0;
+          p1 = p2; // new 'start of line' pointer (for insertion)
+
+          while(p2 < p3 && *p2 != '\n' && *p2 != '\r')
+          {
+            if(*p2 == '\t') // hard tab insertion?
+            {
+              nTabs++; // count them (for now); this is for allocation purposes
+
+              // NOTE:  if hard tabs are supported, I will be storing the white space
+              //        as a special character
+            }
+
+            p2++;
+          }
+
+          // p2 now points just past the end of the 'line' I am inserting, and points to
+          // either a '\r' or a '\n' (which will be inserted)
+
+          // there are 3 scenarious:
+          // a) inserting a line feed (no text)
+          // b) inserting text without a line feed
+          // c) inserting text WITH a line feed (or more than one line feed)
+          //
+          // and the insert condition:  insert OR overwrite
+          // a) if overwrite exceeds the length of the line, it appends to the same line.
+          // b) if overwrite 'overwrites' with a line feed, it acts like 'insert' at that point (gedit does this too)
+          // c) if insert or overwrite adds a line feed, a new line is created with the remaining text from the line
+          //    and subsequent lines are moved down by 1 to make space for it
+
+          // I'll deal with 'inserting text' first, then the line feed separately
+        
+          if(pBuf->nEntries <= 0 || !pBuf->aLines[0])
+          {
+            if(pBuf->nEntries <= 0)
+            {
+              pBuf->nEntries = 1; // single-line, always this, but not verifying for now
+            }
+
+            pL = pBuf->aLines[0] = WBAlloc(pThis->iCol + p2 - p1 + 2);
+
+            if(pL)
+            {
+              if(pThis->iCol > 0)
+              {
+                memset(pL, ' ', pThis->iCol);
+              }
+
+              iLen = pThis->iCol;
+            }
+          }
+          else
+          {
+            pTemp = pBuf->aLines[0];
+            i1 = iLen = strlen(pTemp); // the actual length
+
+            if(iLen < pThis->iCol)
+            {
+              i1 = pThis->iCol; // the alloc length
+            }
+
+            if(pThis->iInsMode == InsertMode_OVERWRITE)
+            {
+              if(i1 < pThis->iCol + p2 - p1)
+              {
+                i1 = pThis->iCol + p2 - p1; // extent of the text I'm adding when I overwrite
+              }
+            }
+            else
+            {
+              i1 += p2 - p1;
+            }
+
+            pL = WBReAlloc(pTemp, i1 + 2);
+
+            if(pL)
+            {
+              pBuf->aLines[0] = pL;
+            }
+            else
+            {
+              WB_ERROR_PRINT("ERROR:  %s - not enough memory\n", __FUNCTION__);
+            }
+          }
+
+          if(pL)
+          {
+            if(iLen < pThis->iCol)
+            {
+              memset(pL + iLen, ' ', pThis->iCol - iLen); // pad with spaces
+
+              pL[pThis->iCol + p2 - p1] = 0;              // I need a terminating zero byte
+            }
+            else if(iLen > pThis->iCol &&                    // insert 'in the middle'
+                    pThis->iInsMode != InsertMode_OVERWRITE) // NOT overwriting
+            {
+              // make room for text
+              if(WB_LIKELY((iLen - pThis->iCol + 1) > 0)) // probably always true
+              {
+                memmove(pL + pThis->iCol + (p2 - p1), pL + pThis->iCol, iLen - pThis->iCol + 1);
+                  // note that this includes teh zero byte.
+              }
+            }
+            else if((p2 - p1) + pThis->iCol >= iLen)
+            {
+              pL[pThis->iCol + p2 - p1] = 0; // I need a terminating zero byte
+            }
+
+            __internal_add_undo(pThis, UNDO_INSERT, pThis->iSelMode,
+                                pThis->iRow, pThis->iCol, &(pThis->rctSel),
+                                (pThis->iInsMode == InsertMode_OVERWRITE && pThis->iCol < iLen ?
+                                 pL + pThis->iCol : NULL), // for overwrite, it's the original text
+                                (pThis->iInsMode == InsertMode_OVERWRITE && pThis->iCol < iLen ?
+                                 p2 - p1 : 0),  // length of old text for overwrite
+                                pThis->iRow, pThis->iCol + (p2 - p1), NULL,
+                                p1, p2 - p1); // the new text
+
+            memcpy(pL + pThis->iCol, p1, p2 - p1); // insert the data
+
+            pThis->iCol += p2 - p1; // always advance the cursor to this point (overwrite OR insert)
+          }
+        }
+      }
 
       __internal_invalidate_rect(pThis, NULL, 1); // so invalidate everything
     }
@@ -2950,14 +2961,7 @@ WB_RECT rctSel;
       }
       else
       {
-        if(pThis->iDesc > MIN_LINE_SPACING / 2)
-        {
-          iFontHeight += pThis->iDesc / 2; // line spacing is 1/2 of descent, or MIN_LINE_SPACING
-        }
-        else
-        {
-          iFontHeight += MIN_LINE_SPACING;
-        }
+        iFontHeight = WBTextObjectCalculateLineHeight(pThis->iAsc, pThis->iDesc);
 
         iRow = pThis->rctView.top
              + (iMouseYDelta + iFontHeight / 4 - pThis->rctWinView.top) / iFontHeight;
@@ -3154,10 +3158,13 @@ int iPageHeight;
     }
     else // re-calculate cursor metrics
     {
-      pThis->iCursorY += (pThis->iAsc + pThis->iDesc
-                          + pThis->iDesc > MIN_LINE_SPACING * 2 ?
-                            pThis->iDesc / 2 : MIN_LINE_SPACING)
-                       * (pThis->iRow - iOldRow);
+      pThis->iCursorY += WBTextObjectCalculateLineHeight(pThis->iAsc, pThis->iDesc)
+                       * (pThis->iRow - iOldRow); // will effectively subtract
+
+//                        (pThis->iAsc + pThis->iDesc
+//                         + pThis->iDesc > MIN_LINE_SPACING * 2 ?
+//                           pThis->iDesc / 2 : MIN_LINE_SPACING)
+//                       * (pThis->iRow - iOldRow);
 
       __internal_invalidate_cursor(pThis, 1); // invalidate the NEW cursor rectangle
     }
@@ -3248,10 +3255,13 @@ int iPageHeight;
     }
     else // re-calculate cursor metrics
     {
-      pThis->iCursorY += (pThis->iAsc + pThis->iDesc
-                          + pThis->iDesc > MIN_LINE_SPACING * 2 ?
-                            pThis->iDesc / 2 : MIN_LINE_SPACING)
+      pThis->iCursorY += WBTextObjectCalculateLineHeight(pThis->iAsc, pThis->iDesc)
                        * (pThis->iRow - iOldRow);
+
+//                        (pThis->iAsc + pThis->iDesc
+//                         + pThis->iDesc > MIN_LINE_SPACING * 2 ?
+//                           pThis->iDesc / 2 : MIN_LINE_SPACING)
+//                       * (pThis->iRow - iOldRow);
 
       __internal_invalidate_cursor(pThis, 1); // invalidate the NEW cursor rectangle
     }
@@ -3337,7 +3347,7 @@ TEXT_BUFFER *pBuf;
       }
       else // re-calculate cursor metrics
       {
-        pThis->iCursorX += (pThis->iCol - iOldCol) * pThis->iFontWidth;
+        pThis->iCursorX += (pThis->iCol - iOldCol) * pThis->iFontWidth; // will effectively subtract
 
         __internal_invalidate_cursor(pThis, 1); // invalidate the NEW cursor rectangle
       }
@@ -4061,14 +4071,7 @@ GC gc2 = None;
 
       // adjust font height to include line spacing (I'll use this to position the lines)
 
-      if(iDesc > MIN_LINE_SPACING / 2)
-      {
-        iFontHeight += iDesc / 2; // line spacing is 1/2 of descent, or MIN_LINE_SPACING
-      }
-      else
-      {
-        iFontHeight += MIN_LINE_SPACING;
-      }
+      iFontHeight = WBTextObjectCalculateLineHeight(pThis->iAsc, pThis->iDesc);
 
       iWindowHeightInLines = geomV.height / iFontHeight; // window height (in lines)
       if(!iWindowHeightInLines)

@@ -90,14 +90,17 @@ XFontStruct *pRval;
 
   if(XGetFontProperty(pOldFont, XA_FONT, &lName))
   {
-    char *pName = XGetAtomName(WBGetDefaultDisplay(), (Atom)lName);
+    char *pName = WBGetAtomName(WBGetDefaultDisplay(), (Atom)lName);
+
     if(pName)
     {
       WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Font,
                      "%s(%s)\n", __FUNCTION__, pName);
 
       pRval = XLoadQueryFont(WBGetDefaultDisplay(), pName);
-      XFree(pName);
+
+      WBFree(pName);
+
       return pRval;
     }
     else
@@ -178,7 +181,7 @@ char *p1, /* *p2,*/ *p3;
     return NULL;  // should never happen
   }
 
-  pRval = malloc(sizeof(WB_FONT_INFO) + strlen(szFontName));
+  pRval = WBAlloc(sizeof(WB_FONT_INFO) + strlen(szFontName));
   // -foundry-family-weight-slant-sWidth-adstyle-pixelsize-pointsize-resX-resY-spacing-avgwidth-registry-encoding
 
   if(!pRval)
@@ -381,9 +384,14 @@ static int InternalFontMatch2(const char *p1, const char *p2)
   }
 
   if(pfi1)
-    free(pfi1);
+  {
+    WBFree(pfi1);
+  }
+
   if(pfi2)
-    free(pfi2);
+  {
+    WBFree(pfi2);
+  }
 
   return iRval;
 }
@@ -444,7 +452,7 @@ char temp[1024];
 // TEMPORARY - for debugginG purposes (remove ASAP)
 //    void *pTemp = WBParseFontName(ppNames[i1]);
 //    if(pTemp)
-//      free(pTemp);
+//      WBFree(pTemp);
 
     WBDebugPrint("  %s\n", ppNames[i1]);
 
@@ -460,12 +468,12 @@ char temp[1024];
       for(i2=0; i2 < pFSInfo[i1].n_properties && pFSInfo[i1].properties; i2++)
       {
         XFontProp *pProp = pFSInfo[i1].properties + i2;
-        char *pName = XGetAtomName(WBGetDefaultDisplay(),pProp->name);
+        char *pName = WBGetAtomName(WBGetDefaultDisplay(),pProp->name);
 
         if(pName)
         {
-          strcpy(temp, pName);
-          XFree(pName);
+          strncpy(temp, pName, sizeof(temp));
+          WBFree(pName);
         }
         else
         {
@@ -999,11 +1007,11 @@ int iRval = 0;
 
   if(XGetFontProperty((XFontStruct *)pFont, XA_FONT, &lName))
   {
-    pName = XGetAtomName(pDisplay ? pDisplay : WBGetDefaultDisplay(), (Atom)lName);
+    pName = WBGetAtomName(pDisplay ? pDisplay : WBGetDefaultDisplay(), (Atom)lName);
 
     if(!pName && pDisplay)
     {
-      pName = XGetAtomName(WBGetDefaultDisplay(), (Atom)lName);
+      pName = WBGetAtomName(WBGetDefaultDisplay(), (Atom)lName);
     }
   }
 
@@ -1032,7 +1040,7 @@ int iRval = 0;
       }
 
 //      WB_ERROR_PRINT("TEMPORARY:  %s - width=%d, avg=%d, rval=%d\n", __FUNCTION__, pFI->iWidth, pFI->iAvgWidth, iRval);
-      free(pFI);
+      WBFree(pFI);
 
       if(iRval)
       {
@@ -1040,7 +1048,8 @@ int iRval = 0;
       }
     }
 
-    XFree(pName);
+    WBFree(pName);
+    pName = NULL; // by convention to prevent re-use
   }
 
   iRval = XTextWidth((XFontStruct *)pFont, " ", 1); // return the width of the 'space' character as a last resort
@@ -1070,11 +1079,11 @@ XFontStruct *pRval;
 
   if(XGetFontProperty((XFontStruct *)pOriginal, XA_FONT, &lName))
   {
-    pName = XGetAtomName(pDisplay ? pDisplay : WBGetDefaultDisplay(), (Atom)lName);
+    pName = WBGetAtomName(pDisplay ? pDisplay : WBGetDefaultDisplay(), (Atom)lName);
 
     if(!pName && pDisplay)
     {
-      pName = XGetAtomName(WBGetDefaultDisplay(), (Atom)lName);
+      pName = WBGetAtomName(WBGetDefaultDisplay(), (Atom)lName); // desperately trying to succeed
     }
   }
 
@@ -1106,7 +1115,7 @@ XFontStruct *pRval;
       }
       else
       {
-        free(pFI);
+        WBFree(pFI);
         pFI = NULL; // flag (see below)
       }
     }
@@ -1118,7 +1127,7 @@ XFontStruct *pRval;
     }
     else
     {
-      free(pFI);
+      WBFree(pFI);
     }
   }
 
@@ -1129,7 +1138,8 @@ XFontStruct *pRval;
 
   pRval = WBLoadFont(pDisplay, pName, iFontSize, iFlags);
 
-  XFree(pName); // required
+  WBFree(pName); // required (no longer need XFree, using 'WBGetAtomName()'
+  pName = NULL; // by convention to prevent re-use
 
   if(!pRval)
   {
@@ -1174,23 +1184,27 @@ static const char szISO[]="-ISO8859-";
 
   if(XGetFontProperty((XFontStruct *)pFont, XA_FONT, &lName))
   {
-    pName = XGetAtomName(pDisplay ? pDisplay : WBGetDefaultDisplay(), (Atom)lName);
+    pName = WBGetAtomName(pDisplay ? pDisplay : WBGetDefaultDisplay(), (Atom)lName);
 
     if(!pName && pDisplay)
     {
-      pName = XGetAtomName(WBGetDefaultDisplay(), (Atom)lName);
+      pName = WBGetAtomName(WBGetDefaultDisplay(), (Atom)lName);
     }
   }
 
-  if(pName) // make a copy of 'pName' so that I can edit it
-  {
-    p1 = WBCopyString(pName);
-    XFree(pName);
-    if(p1)
-    {
-      pName = p1; // I can edit the copy
-    }
-  }
+// NOTE:  this is no longer needed.  WBGetAtomName returns an editable pointer allocated with 'WBAlloc()'
+//  if(pName) // make a copy of 'pName' so that I can edit it
+//  {
+//    p1 = WBCopyString(pName);
+//
+//    XFree(pName);
+//    pName = NULL;    
+//
+//    if(p1)
+//    {
+//      pName = p1; // I can edit the copy
+//    }
+//  }
 
   if(!pName)
   {
@@ -1247,8 +1261,8 @@ static const char szISO[]="-ISO8859-";
 //    XFree(pDef); // NO NO NO (warning)
 //  }
 
-//  XFree(pName); // I made a copy of it...
-  free(pName);
+  WBFree(pName);
+  pName = NULL; // by convention to prevent re-use
 
   if(!rVal)
   {
@@ -1310,12 +1324,23 @@ int i1;
 
   for(i1=0; i1 < pFont->n_properties; i1++)
   {
+    char *p1 = WBGetAtomName(WBGetDefaultDisplay(), pFont->properties[i1].name);
+    char *p2 = WBGetAtomName(WBGetDefaultDisplay(), (Atom)pFont->properties[i1].card32);
+
     WB_WARN_PRINT("      %5d %-20s = %ld (%08lxH) %s\n",
-                  (int)pFont->properties[i1].name,
-                  XGetAtomName(WBGetDefaultDisplay(), pFont->properties[i1].name),
+                  (int)pFont->properties[i1].name,p1,
                   pFont->properties[i1].card32,
-                  pFont->properties[i1].card32,
-                  XGetAtomName(WBGetDefaultDisplay(), (Atom)pFont->properties[i1].card32));
+                  pFont->properties[i1].card32, p2);
+
+    if(p1)
+    {
+      WBFree(p1);
+    }
+
+    if(p2)
+    {
+      WBFree(p2);
+    }
   }
 
   WB_WARN_PRINT("    ascent           = %d\n"

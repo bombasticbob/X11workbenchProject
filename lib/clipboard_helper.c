@@ -87,7 +87,7 @@ typedef struct _ClipboardTask_ // only for getting data; setting data done immed
   volatile struct _ClipboardTask_ *pNext; // singly linked list
 
   int fType;       // get (0) or set (1) [others reserved]
-  void *pData;     // 'malloc'd data when 'get' completed
+  void *pData;     // 'WBAlloc'd data when 'get' completed
   int cbLength;    // length of buffer
   Atom aSelection; // 'selection' to grab ('None' implies "CLIPBOARD" behavior)
   Atom aType;      // data type
@@ -125,7 +125,7 @@ typedef struct _ClipboardData_ // for when I own the clipboard
 
 static WB_THREAD hClipboardThread = (WB_THREAD)INVALID_HANDLE_VALUE;
 static volatile int bClipboardQuitFlag = 0;
-static volatile CLIPBOARD_TASK * volatile pCBTHead = NULL;  // malloc'd structures
+static volatile CLIPBOARD_TASK * volatile pCBTHead = NULL;  // WBAlloc'd structures
 static CLIPBOARD_DATA *pCBDHead = NULL;  // both are linked lists
 
 static WB_MUTEX xClipboardMutex;
@@ -198,7 +198,7 @@ char *pDisplayName;
       usleep(100); // wait for my thread to initialize
     }
 
-    free(pDisplayName);  // ok to free it now
+    WBFree(pDisplayName);  // ok to free it now
 
     if(bClipboardQuitFlag || !WBThreadRunning(hClipboardThread))
     {
@@ -258,12 +258,12 @@ void WBExitClipboardSystem(Display *pDisplay)
     if(pT->fType == 0 // only for 'get'
        && pT->pData)
     {
-      free(pT->pData);
+      WBFree(pT->pData);
     }
 
     WBCondFree((WB_COND *)&(pT->cond)); // assume it works (and signals anything waiting with an error)
 
-    free((void *)pT);
+    WBFree((void *)pT);
   }
 
   while(pCBDHead) // this one is more likely to have data in it
@@ -271,7 +271,7 @@ void WBExitClipboardSystem(Display *pDisplay)
     CLIPBOARD_DATA *pD = pCBDHead;
     pCBDHead = pCBDHead->pNext;
 
-    free(pD); // this one is very simple
+    WBFree(pD); // this one is very simple
   }
 
 //  pCBTHead = NULL;
@@ -329,13 +329,13 @@ CLIPBOARD_TASK *pT;
 
       if(!pT->fType && pT->pData) // it COULD happen...
       {
-        free(pT->pData);
+        WBFree(pT->pData);
         pT->pData = NULL;
       }
 
       WBCondFree((WB_COND *)&(pT->cond)); // assume it works
 
-      free((void *)pT);  // do this while locked
+      WBFree((void *)pT);  // do this while locked
     }
   }
 }
@@ -602,12 +602,12 @@ Atom aUTF8_STRING;
 #ifndef NO_DEBUG
             if(aSelection != XA_PRIMARY && aSelection != aCLIPBOARD)
             {
-              char *p1 = XGetAtomName(pDisplay, aSelection);
+              char *p1 = WBGetAtomName(pDisplay, aSelection);
               WB_ERROR_PRINT("TEMPORARY:  %s - selection = %d \"%s\"  owner = %u (%08xH)\n",
                              __FUNCTION__, (int)aSelection, p1, (int)wOwn, (int)wOwn);
               if(p1)
               {
-                XFree(p1);
+                WBFree(p1);
               }
             }
 #endif // NO_DEBUG
@@ -663,7 +663,7 @@ Atom aUTF8_STRING;
 
                 iLen = iFactor * pD->cbLength; // actual length in bytes
 
-                pT->pData = malloc(iLen + iFactor);
+                pT->pData = WBAlloc(iLen + iFactor);
 
                 if(pT->pData)
                 {
@@ -829,7 +829,7 @@ null_data_me_own:
             pCBDHead = pD->pNext;
           }
 
-          free(pD); // done with it now
+          WBFree(pD); // done with it now
         }
 
         // NOW, must create 'CLIPBOARD_DATA' struct with this stuff in it.
@@ -870,7 +870,7 @@ null_data_me_own:
             iTrueLen = pT->cbLength;
           }
 
-          pD = (CLIPBOARD_DATA *)malloc(sizeof(*pD) + 2 + iTrueLen);
+          pD = (CLIPBOARD_DATA *)WBAlloc(sizeof(*pD) + 2 + iTrueLen);
 
           if(!pD)
           {
@@ -893,12 +893,12 @@ null_data_me_own:
 
             if(pD->aSelection != None)
             {
-              char *p1 = XGetAtomName(pDisplay, pD->aSelection);
+              char *p1 = WBGetAtomName(pDisplay, pD->aSelection);
 
               XSetSelectionOwner(pDisplay, pD->aSelection, wWindow, CurrentTime);
 
 //              WB_ERROR_PRINT("TEMPORARY:  %s - owned \"%s\"\n", __FUNCTION__, p1);
-              XFree(p1);
+              WBFree(p1);
             }
             else
             {
@@ -950,18 +950,18 @@ null_data_me_own:
                   iLen = pD->cbLength;
                 }
 
-                p1 = XGetAtomName(pDisplay, pD->aSelection);
+                p1 = WBGetAtomName(pDisplay, pD->aSelection);
                 WBDebugPrint("   selection: \"%s\"\n", p1);
-                XFree(p1);
+                WBFree(p1);
 
-                p1 = XGetAtomName(pDisplay, pD->aType);
+                p1 = WBGetAtomName(pDisplay, pD->aType);
                 WBDebugPrint("   type:      \"%s\"\n", p1);
-                XFree(p1);
+                WBFree(p1);
 
                 WBDebugPrint("   format:    %d\n", pD->nFormat);
                 WBDebugPrint("   length:    %d (%d)\n", pD->cbLength, iLen);
 
-                p1 = malloc(iLen + 1);
+                p1 = WBAlloc(iLen + 1);
 
                 if(p1 && iLen)
                 {
@@ -974,7 +974,7 @@ null_data_me_own:
 
                 WBDebugPrint("----------\n%s\n----------\n", p1);
 
-                free(p1);
+                WBFree(p1);
 
                 pD = pD->pNext;
               }
@@ -1202,7 +1202,7 @@ null_data_me_own:
               pD2->pNext = pD->pNext;
             }
 
-            free(pD); // free up the memory [that's all I need to do]
+            WBFree(pD); // free up the memory [that's all I need to do]
 
             pD = pD2;  // this continues searching correctly
 
@@ -1437,7 +1437,7 @@ null_data_me_own:
                                      __FUNCTION__, nItems, pT->cbLength);
                     }
 
-                    pT->pData = malloc(iLen + 4);
+                    pT->pData = WBAlloc(iLen + 4);
 
                     if(pT->pData)
                     {
@@ -1640,13 +1640,13 @@ null_data_me_own:
     {
       if(!pT->fType && pT->pData) // it COULD happen...
       {
-        free(pT->pData);
+        WBFree(pT->pData);
         pT->pData = NULL;
       }
 
       WBCondFree((WB_COND *)&(pT->cond)); // assume it works
 
-      free((void *)pT);  // do this while locked
+      WBFree((void *)pT);  // do this while locked
     }
   }
 
@@ -1663,13 +1663,13 @@ null_data_me_own:
     {
       if(!pT->fType && pT->pData) // it COULD happen...
       {
-        free(pT->pData);
+        WBFree(pT->pData);
         pT->pData = NULL;
       }
 
       WBCondFree((WB_COND *)&(pT->cond)); // assume it works
 
-      free((void *)pT);  // do this while locked
+      WBFree((void *)pT);  // do this while locked
     }
   }
 
@@ -1688,7 +1688,7 @@ null_data_me_own:
 
       WBCondFree((WB_COND *)&(pT->cond)); // assume it works
 
-      free((void *)pT);  // do this while locked
+      WBFree((void *)pT);  // do this while locked
     }
   }
 
@@ -1725,7 +1725,7 @@ null_data_me_own:
       }
     }
 
-    free(pD); // this one is very simple
+    WBFree(pD); // this one is very simple
   }
 
   // OK no longer owning the clipboard, so now it's time to 
@@ -1807,7 +1807,7 @@ int iErr;
     return NULL;
   }
 
-  pTask = (CLIPBOARD_TASK *)malloc(sizeof(*pTask));
+  pTask = (CLIPBOARD_TASK *)WBAlloc(sizeof(*pTask));
   if(!pTask)
   {
     WB_ERROR_PRINT("%s - can't create 'CLIPBOARD_TASK' for clipboard task\n", __FUNCTION__);
@@ -1870,7 +1870,7 @@ int iErr;
 //    WB_ERROR_PRINT("TEMPORARY:  %s - completed wait\n", __FUNCTION__);
 
     pRval = pTask->pData;  // always for 'get'
-    pTask->pData = NULL;   // so I don't accidentally free it, evar [assume malloc from other thread is OK]
+    pTask->pData = NULL;   // so I don't accidentally free it, evar [assume WBAlloc from other thread is OK]
     
     if(paType)
     {
@@ -1948,13 +1948,13 @@ int iErr;
 
     if(pTask->pData) // it COULD happen...
     {
-      free(pTask->pData);
+      WBFree(pTask->pData);
       pTask->pData = NULL;
     }
 
     WBCondFree((WB_COND *)&(pTask->cond)); // assume it works
 
-    free((void *)pTask);  // do this while locked
+    WBFree((void *)pTask);  // do this while locked
   }
 
   pTask = NULL;   // so I don't try to re-use it
@@ -1974,7 +1974,7 @@ exit_point0:
 
   if(pTask)
   {
-    free((void *)pTask); // TODO:  on error, this might cause a crash... or not
+    WBFree((void *)pTask); // TODO:  on error, this might cause a crash... or not
   }
 
   return pRval; // for now (similar to an error return)
@@ -1992,7 +1992,7 @@ volatile CLIPBOARD_TASK *pT, *pTask;
     return -1;
   }
 
-  pTask = (CLIPBOARD_TASK *)malloc(sizeof(*pTask));
+  pTask = (CLIPBOARD_TASK *)WBAlloc(sizeof(*pTask));
   if(!pTask)
   {
     WB_ERROR_PRINT("%s - can't create 'CLIPBOARD_TASK' for clipboard task\n", __FUNCTION__);
@@ -2079,7 +2079,7 @@ volatile CLIPBOARD_TASK *pT, *pTask;
   {
     WBCondFree((WB_COND *)&(pTask->cond)); // assume it works
 
-    free((void *)pTask);  // do this while locked
+    WBFree((void *)pTask);  // do this while locked
   }
 
   pTask = NULL;   // so I don't try to re-use it
@@ -2097,7 +2097,7 @@ exit_point0:
 
   if(pTask)
   {
-    free((void *)pTask); // TODO:  on error, this might cause a crash... or not
+    WBFree((void *)pTask); // TODO:  on error, this might cause a crash... or not
   }
 
   return iRval;

@@ -159,6 +159,7 @@ int iStartupMinMax = 0; // main window open min/max/normal flag
   * data.l[0] Menu command message ID (aka 'action')\n
   * data.l[1] (truncated) pointer to the WBMenu object (cast to 'long', truncated to 32 bits)\n
   * data.l[2] Window ID of the menu bar\n
+  *
 **/
 Atom aMENU_COMMAND=None;
 
@@ -177,7 +178,24 @@ Atom aMENU_COMMAND=None;
   * data.l[4] high 32-bits of WBMenuItem object pointer\n
   *
   * A Frame Window returns '0' to indicate that the menu should be displayed normally (same as 'not handled')\n
-  * Other return values alter the display of the menu.  Currently -1 (disable) is the only supported value.\n
+  * Other return values alter the display of the menu.
+  *
+  *  For a popup menu:
+  *    -1 :  disables the menu
+  *     0 :  enables the menu (default behavior if no handler present)
+  *
+  *  For a dynamic menu: (preliminary) - popup menu items only (not found in top-level menus)
+  *    -1 : disabled the menu
+  *     0 : 'not handled' or 'error' (no dynamic menu will be added or displayed)
+  *    \>0 : a 'secure internal pointer hash' representing an actual pointer value (preliminary, RESERVED)
+  *         this pointer will be to a WBAlloc'd block of memory describing the menu items (as text).  It will
+  *         be necessary for the caller to interpret this text to create the dynamic memory items.
+  *         PRELIMINARY:  the text will be 'menu text\\tAtom Name' - no hotkeys, no tooltip text.  The menu
+  *                       text can include underscores which will only work when the popup is available
+  *
+  * TODO:  change this to be 'less dangerous' with respect to getting invalid pointers jammed into the queue.  It
+  * is theoretically possible for a different application to post Client Message events using faked values.
+  *
 **/
 Atom aMENU_UI_COMMAND=None;
 
@@ -672,19 +690,29 @@ XStandardColormap cmapDefault; // a copy of teh XStandardColormap for the Colorm
 #define EVENT_ARRAY_MASK 0x1fff /* 'and' this for modular math */
 
 /** \ingroup wcore
-  * \internal
-  * \brief Core (internal) structure for storing and dispatching events
+  * \struct __EVENT_ENTRY__
+  * \copydoc EVENT_ENTRY
 **/
-
+/** \ingroup wcore
+  * \typedef EVENT_ENTRY
+  * \brief Core (internal) structure for storing and dispatching events
+  *
+**/
 typedef struct __EVENT_ENTRY__
 {
-  Display *pDisplay;
-  int iNext;
-  Window wID;
-  XEvent xEvt;
-  // alignment padding to make it exactly 256 bytes in length to support variable length data payloads
-  char padding[256 - sizeof(Display *) - sizeof(Window) - sizeof(int) - sizeof(XEvent)];
-//  char padding[256];  // temporary
+  Display *pDisplay; ///< the Display pointer for the event
+  int iNext;         ///< index for 'next' in a linked list
+  Window wID;        ///< the window for which the event is queued
+  XEvent xEvt;       ///< the event I'm queueing
+
+  /** \brief alignment padding to make the struct exactly 256 bytes in length
+    *
+    * Make the structure 256 bytes in length in order to support variable length data payloads (in addition to the event stuff)
+    *
+    * TODO:  this may not be necessary
+  **/
+  char padding[256 - sizeof(Display *) - sizeof(Window) - sizeof(int) - sizeof(XEvent)]; 
+
 } EVENT_ENTRY;
 
 static EVENT_ENTRY axWBEvt[EVENT_ARRAY_SIZE];
@@ -698,37 +726,43 @@ static int (* pAppEventCallback)(XEvent *pEvent) = NULL;
 
 #define TIMER_ARRAY_SIZE  512
 
+/** \struct __TIMER_ENTRY__
+  * \ingroup wcore
+  * \copydoc TIMER_ENTRY
+**/
 /** \ingroup wcore
-  * \internal
+  * \typedef TIMER_ENTRY
   * \brief Core (internal) structure for managing timers
 **/
-
 typedef struct __TIMER_ENTRY__
 {
-  struct __TIMER_ENTRY__ *pNext; // linked lists for performance
-  WB_UINT64 lTimeIndex;          // time index for which this timer next expires
-  unsigned long lTimeInterval;   // interval (or zero for one-shot timer)
+  struct __TIMER_ENTRY__ *pNext; ///< linked lists for performance
+  WB_UINT64 lTimeIndex;          ///< time index for which this timer next expires
+  unsigned long lTimeInterval;   ///< interval (or zero for one-shot timer)
 
-  Display *pDisplay;             // display associated with timer
-  Window wID;                    // window to receive timer event
-  long lID;                      // timer identifier
+  Display *pDisplay;             ///< display associated with timer
+  Window wID;                    ///< window to receive timer event
+  long lID;                      ///< timer identifier
 } TIMER_ENTRY;
 
 static TIMER_ENTRY axWBTimer[TIMER_ARRAY_SIZE];
 static TIMER_ENTRY *pTimerEntryActive = NULL, *pTimerEntryFree = NULL;
   // pointers for two linked lists.  entries must be in either 'active' or 'free' list.
 
-/** \ingroup wcore
-  * \internal
-  * \brief Core (internal) structure for managing timers
+/** \struct __DELAYED_EVENT_ENTRY__
+  * \ingroup wcore
+  * \copydoc DELAYED_EVENT_ENTRY
 **/
-
+/** \ingroup wcore
+  * \typedef DELAYED_EVENT_ENTRY
+  * \brief Core (internal) structure for managing delayed events
+**/
 typedef struct __DELAYED_EVENT_ENTRY__
 {
-  struct __DELAYED_EVENT_ENTRY__ *pNext; // linked lists for performance
-  WB_UINT64 lTimeIndex;          // time index for which this timer next expires
+  struct __DELAYED_EVENT_ENTRY__ *pNext; ///< linked lists for performance
+  WB_UINT64 lTimeIndex;                  ///< time index for which this timer next expires
 
-  XEvent event;                  // copy of delayed event
+  XEvent event;                          ///< copy of delayed event
 } DELAYED_EVENT_ENTRY;
 
 static DELAYED_EVENT_ENTRY axWBDelayedEvent[TIMER_ARRAY_SIZE]; // same size as timers
@@ -742,14 +776,12 @@ static DELAYED_EVENT_ENTRY *pDelayedEventEntryActive = NULL, *pDelayedEventEntry
 /*                                                                    */
 /**********************************************************************/
 
-//static __inline WBWindow WBWindowFromWindow(Window wID);
-//static __inline Window WBWindowToWindow(WBWindow wID);
-#ifdef NODEBUG
+#ifdef NO_DEBUG
 static __inline__ _WINDOW_ENTRY_ *WBGetWindowEntry(Window wID);
 #else
 #define WBGetWindowEntry(X) Debug_WBGetWindowEntry(X, __FUNCTION__, __LINE__)
 static __inline__ _WINDOW_ENTRY_ *Debug_WBGetWindowEntry(Window wID, const char *szFunction, int nLine);
-#endif // NODEBUG
+#endif // NO_DEBUG
 
 static void __WBInitEvent();
 static int __WBAddEvent(Display *pDisp, Window wID, XEvent *pEvent);
@@ -938,15 +970,24 @@ int WBInitDisplay(Display *pDisplay)
   //        are not being used any more.  The docs say the following:
   //        "It will become undefined only when the last connection to the X server closes."
   //        (As such, I should minimize introducing NEW atoms, even though it's kinda necessary)
+  //
+  // To compensate, MANY of the atoms that I create will use WBGetAtom() rather than XInternAtom()
 
-  aMENU_COMMAND     = XInternAtom(pDisplay, "MENU_COMMAND", False);
-  aMENU_UI_COMMAND  = XInternAtom(pDisplay, "MENU_UI_COMMAND", False);
-  aRESIZE_NOTIFY    = XInternAtom(pDisplay, "RESIZE_NOTIFY", False);
-  aCONTROL_NOTIFY   = XInternAtom(pDisplay, "CONTROL_NOTIFY", False);
-  aQUERY_CLOSE      = XInternAtom(pDisplay, "QUERY_CLOSE", False);
-  aDESTROY_NOTIFY   = XInternAtom(pDisplay, "DESTROY_NOTIFY", False);
-  aDLG_FOCUS        = XInternAtom(pDisplay, "DLG_FOCUS", False);
-  aSET_FOCUS        = XInternAtom(pDisplay, "SET_FOCUS", False);
+  aMENU_COMMAND     = WBGetAtom(pDisplay, "MENU_COMMAND");//XInternAtom(pDisplay, "MENU_COMMAND", False);
+  aMENU_UI_COMMAND  = WBGetAtom(pDisplay, "MENU_UI_COMMAND");//XInternAtom(pDisplay, "MENU_UI_COMMAND", False);
+  aRESIZE_NOTIFY    = WBGetAtom(pDisplay, "RESIZE_NOTIFY");//XInternAtom(pDisplay, "RESIZE_NOTIFY", False);
+  aCONTROL_NOTIFY   = WBGetAtom(pDisplay, "CONTROL_NOTIFY");//XInternAtom(pDisplay, "CONTROL_NOTIFY", False);
+  aQUERY_CLOSE      = WBGetAtom(pDisplay, "QUERY_CLOSE");//XInternAtom(pDisplay, "QUERY_CLOSE", False);
+  aDESTROY_NOTIFY   = WBGetAtom(pDisplay, "DESTROY_NOTIFY");//XInternAtom(pDisplay, "DESTROY_NOTIFY", False);
+  aDLG_FOCUS        = WBGetAtom(pDisplay, "DLG_FOCUS");//XInternAtom(pDisplay, "DLG_FOCUS", False);
+  aSET_FOCUS        = WBGetAtom(pDisplay, "SET_FOCUS");//XInternAtom(pDisplay, "SET_FOCUS", False);
+
+  // additional 'window manager' messages generated internally by the toolkit
+  aWM_CHAR          = WBGetAtom(pDisplay, "WM_CHAR");//XInternAtom(pDisplay, "WM_CHAR", False);
+  aWM_TIMER         = WBGetAtom(pDisplay, "WM_TIMER");//XInternAtom(pDisplay, "WM_TIMER", False);
+  aWM_POINTER       = WBGetAtom(pDisplay, "WM_POINTER");//XInternAtom(pDisplay, "WM_POINTER", False);
+
+  // these next atoms REQUIRE the use of 'XInternAtom' since they have 'global' scope for the entire X11 system
 
   // window manager messages (see open desktop specification for window managers)
   aWM_PROTOCOLS     = XInternAtom(pDisplay, "WM_PROTOCOLS", False);
@@ -955,11 +996,6 @@ int WBInitDisplay(Display *pDisplay)
 
   // atoms used for fonts
   aAVERAGE_WIDTH    = XInternAtom(pDisplay, "AVERAGE_WIDTH", False);
-
-  // additional 'window manager' messages generated internally by the toolkit
-  aWM_CHAR          = XInternAtom(pDisplay, "WM_CHAR", False);
-  aWM_TIMER         = XInternAtom(pDisplay, "WM_TIMER", False);
-  aWM_POINTER       = XInternAtom(pDisplay, "WM_POINTER", False);
 
   // atoms for the clipboard
   aCLIPBOARD        = XInternAtom(pDisplay, "CLIPBOARD", False);
@@ -1194,7 +1230,7 @@ destroy_without_wm:
     goto destroy_without_wm;
   }
 
-  aNCW = XInternAtom(pDisp, "_NET_CLOSE_WINDOW", False);
+  aNCW = XInternAtom(pDisp, "_NET_CLOSE_WINDOW", False); /* global scope, must use XInternAtom */
 
   if(aNCW == None)
   {
@@ -1548,7 +1584,7 @@ enum
 
                 if(argvNew)
                 {
-                  free(argvNew);
+                  WBFree(argvNew);
                 }
 
                 return -1;
@@ -1581,7 +1617,7 @@ enum
 
                   if(argvNew)
                   {
-                    free(argvNew);
+                    WBFree(argvNew);
                   }
 
                   return -1;
@@ -1617,7 +1653,7 @@ enum
 
               if(argvNew)
               {
-                free(argvNew);
+                WBFree(argvNew);
               }
 
               return -1;
@@ -1634,7 +1670,7 @@ enum
 
     if(!argvNew) // need to allocate copy
     {
-      argvNew = malloc(sizeof(*argvNew) * (argc + 2));
+      argvNew = WBAlloc(sizeof(*argvNew) * (argc + 2));
       if(!argvNew)
       {
         return -1;  // not enough memory
@@ -1851,13 +1887,13 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
     Atom a1, a2;
 //    Window wParent;
 
-    a1 = XInternAtom(pEntry->pDisplay, "_NET_WM_STATE", False);
-    a2 = XInternAtom(pEntry->pDisplay, "_NET_WM_STATE_MODAL", False);
+    a1 = XInternAtom(pEntry->pDisplay, "_NET_WM_STATE", False); /* global scope, must use XInternAtom */
+    a2 = XInternAtom(pEntry->pDisplay, "_NET_WM_STATE_MODAL", False); /* global scope, must use XInternAtom */
     XChangeProperty(pEntry->pDisplay, wID, a1, XA_ATOM, 32, PropModePrepend, (unsigned char *)&a2, 1);
       // note:  Keeping existing properties, and adding my own
 
 //    // setting 'WM_TRANSIENT_FOR' allows me to use the parent window while the dialog is open - I do NOT want that!
-//    a1 = XInternAtom(pEntry->pDisplay, "WM_TRANSIENT_FOR", False);
+//    a1 = XInternAtom(pEntry->pDisplay, "WM_TRANSIENT_FOR", False); /* global scope, must use XInternAtom */
 //    wParent = WBGetParentWindow(wID);  NOTE this is not the way to do it, fix elsewhere eh?
 //    XChangeProperty(pEntry->pDisplay, wID, a1, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&wParent, 1);
   }
@@ -2403,22 +2439,22 @@ static __inline__ void InternalRestoreWindowDefaults(int iIndex)
 
 // WBGetWindowEntry - the debug version indicates what the caller's line number and function are
 
-#ifdef NODEBUG
+#ifdef NO_DEBUG
 static /*__inline__*/ _WINDOW_ENTRY_ *WBGetWindowEntry(Window wID)
 #else
 #define WBGetWindowEntry(X) Debug_WBGetWindowEntry(X, __FUNCTION__, __LINE__)
 static /*__inline__*/ _WINDOW_ENTRY_ *Debug_WBGetWindowEntry(Window wID, const char *szFunction, int nLine)
-#endif // NODEBUG
+#endif // NO_DEBUG
 {
   int i1, iStart;
 
   if(!nWBHashEntries)
   {
-#ifndef NODEBUG
+#ifndef NO_DEBUG
     WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Window,
                    "%s:%d - Window hash table empty, %d (%08xH) not found\n",
                    szFunction, nLine, (int)wID, (int)wID);
-#endif // NODEBUG
+#endif // NO_DEBUG
     return(NULL);
   }
 
@@ -2439,11 +2475,11 @@ static /*__inline__*/ _WINDOW_ENTRY_ *Debug_WBGetWindowEntry(Window wID, const c
       break;
   }
 
-#ifndef NODEBUG
+#ifndef NO_DEBUG
     WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Window,
                    "%s:%d - Window ID %d (%08xH) not found\n",
                    szFunction, nLine, (int)wID, (int)wID);
-#endif // NODEBUG
+#endif // NO_DEBUG
 
   return(NULL);
 }
@@ -2928,8 +2964,8 @@ Display *pDisplay = pEntry ? pEntry->pDisplay : pDefaultDisplay;
 Atom a1, a2;
 
 
-  a1 = XInternAtom(pDisplay, "WM_NAME", False);
-  a2 = XInternAtom(pDisplay, "WM_ICON_NAME", False);
+  a1 = XInternAtom(pDisplay, "WM_NAME", False); /* global scope, must use XInternAtom */
+  a2 = XInternAtom(pDisplay, "WM_ICON_NAME", False); /* global scope, must use XInternAtom */
 
   if(a1 != None)
   {
@@ -3120,11 +3156,11 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
   va_end(va2); // cleanup
 
   // using the # of items I count here, determine if my array size is sufficient
-  // and malloc() a bigger one if needed.  or not.
+  // and WBAlloc() a bigger one if needed.  or not.
 
   if(nItems >= sizeof(aTemp)/sizeof(aTemp[0]))
   {
-    pTemp = (Atom *)malloc((nItems + 1) * sizeof(Atom));
+    pTemp = (Atom *)WBAlloc((nItems + 1) * sizeof(Atom));
 
     if(!pTemp)
     {
@@ -3174,7 +3210,7 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
   if(pTemp != aTemp) // if I allocated the buffer
   {
-    free(pTemp);
+    WBFree(pTemp);
   }
 
 }
@@ -3270,12 +3306,16 @@ struct timeval tv;
 
   gettimeofday(&tv, NULL);
 
-#ifdef WB_UINT64
+#ifdef HAS_WB_UINT64_BUILTIN /* meaning that the WB_UINT64 data type is a 'built-in' */
+
   return (WB_UINT64)tv.tv_sec * (WB_UINT64)1000000
          + (WB_UINT64)tv.tv_usec;
+
 #else // it's a structure typedef
+
 // TODO:  convert to double, do the math, then convert to struct using floor, frac
 #error not implemented (yet)
+
 #endif // WB_UINT64
 }
 
@@ -3630,6 +3670,7 @@ static Bool __WBCheckIfEventPredicate0(Display *pDisplay, XEvent *pEvent, XPoint
 
 static int iMouseState = 0;           // artificial mouse state (global) for dbl-click and drag
 static int iMouseModShiftCtrl = 0;    // Mod/Shift/Ctrl state for last mouse state
+static int iMouseDragButtonState = 0; // mouse button bit-flags for last mouse state and auto-drag-cancel
 static WB_UINT64 tmMouse;             // timeval for most recent processed mouse event
 static Window wMouseCapture = None;
 static int iMouseX = 0, iMouseY = 0;  // RAW x,y position from mouse message
@@ -3640,7 +3681,7 @@ enum
   MouseState_NONE = 0,
   MouseState_LCLICK = 1,
   MouseState_WAS_LCLICK,
-  MouseState_LDRAG,      // implies captured
+  MouseState_LDRAG,      // 'drag' states imply mouse captured
   MouseState_RCLICK,
   MouseState_WAS_RCLICK,
   MouseState_RDRAG,
@@ -3985,6 +4026,10 @@ static unsigned long long ullLastTime = 0;
       int iButton5 = (((XButtonEvent *)pEvent)->state & Button5Mask)
                    || ((XButtonEvent *)pEvent)->button == Button5;
 
+      int iDragButtonState = (iButton1 ? 1 : 0)  // mostly for dragging, but used in other places, too
+                            | (iButton2 ? 2 : 0)
+                            | (iButton3 ? 4 : 0);
+
       int iModShiftCtrl = ((XButtonEvent *)pEvent)->state & (ShiftMask | LockMask | ControlMask | Mod1Mask
                                                              | Mod2Mask | Mod3Mask | Mod4Mask | Mod5Mask);
       int iX, iY;
@@ -4103,9 +4148,7 @@ static unsigned long long ullLastTime = 0;
                                         };
 
               evt.data.l[0] = WB_POINTER_DBLCLICK;
-              evt.data.l[1] = (iButton1 ? 1 : 0)
-                            | (iButton2 ? 2 : 0)
-                            | (iButton3 ? 4 : 0);
+              evt.data.l[1] = iDragButtonState;
               evt.data.l[2] = (iModShiftCtrl & ShiftMask ? WB_KEYEVENT_SHIFT : 0)
                             | (iModShiftCtrl & ControlMask ? WB_KEYEVENT_CTRL : 0)
                             | (iModShiftCtrl & Mod1Mask ? WB_KEYEVENT_ALT : 0);
@@ -4152,9 +4195,7 @@ static unsigned long long ullLastTime = 0;
                                       };
 
             evt.data.l[0] = WB_POINTER_CLICK;
-            evt.data.l[1] = (iButton1 ? 1 : 0)
-                          | (iButton2 ? 2 : 0)
-                          | (iButton3 ? 4 : 0)
+            evt.data.l[1] = iDragButtonState
                           | (iButton4 ? 8 : 0)
                           | (iButton5 ? 16 : 0);
             evt.data.l[2] = (iModShiftCtrl & ShiftMask ? WB_KEYEVENT_SHIFT : 0)
@@ -4207,9 +4248,7 @@ static unsigned long long ullLastTime = 0;
                 evt.data.l[0] = WB_POINTER_SCROLLDOWN;
               }
 
-              evt.data.l[1] = (iButton1 ? 1 : 0)
-                            | (iButton2 ? 2 : 0)
-                            | (iButton3 ? 4 : 0)
+              evt.data.l[1] = iDragButtonState
                             | (iButton4 ? 8 : 0)
                             | (iButton5 ? 16 : 0);
               evt.data.l[2] = (iModShiftCtrl & ShiftMask ? WB_KEYEVENT_SHIFT : 0)
@@ -4288,14 +4327,14 @@ static unsigned long long ullLastTime = 0;
                                         };
 
               evt.data.l[0] = WB_POINTER_DRAG;
-              evt.data.l[1] = (iButton1 ? 1 : 0)
-                            | (iButton2 ? 2 : 0)
-                            | (iButton3 ? 4 : 0)
+              evt.data.l[1] = iDragButtonState
                             | (iButton4 ? 8 : 0)
                             | (iButton5 ? 16 : 0);
               evt.data.l[2] = (iModShiftCtrl & ShiftMask ? WB_KEYEVENT_SHIFT : 0)
                             | (iModShiftCtrl & ControlMask ? WB_KEYEVENT_CTRL : 0)
                             | (iModShiftCtrl & Mod1Mask ? WB_KEYEVENT_ALT : 0);
+
+              iMouseDragButtonState = iDragButtonState;
 
               WBXlatCoordPoint(((XButtonEvent *)pEvent)->window, iMouseX, iMouseY,
                                ((XButtonEvent *)pEvent)->window, &iX, &iY);
@@ -4343,10 +4382,15 @@ static unsigned long long ullLastTime = 0;
           break;
 
         case MouseState_LDRAG:
+        case MouseState_RDRAG:
+        case MouseState_CDRAG:
 
-          if(pEvent->type == ButtonPress ||  // someone pressed a different mouse button
-             iMouseModShiftCtrl != iModShiftCtrl) // modifier state change
+          if(pEvent->type == ButtonPress ||                // someone pressed a different mouse button
+             iMouseDragButtonState != iDragButtonState ||  // button state has changed
+             iMouseModShiftCtrl != iModShiftCtrl)          // modifier state change
           {
+            WBMouseCancel(pDisplay, ((XButtonEvent *)pEvent)->window); // always call this
+#if 0
             XClientMessageEvent evt = {
                                         .type=ClientMessage,
                                         .serial=0,
@@ -4358,14 +4402,12 @@ static unsigned long long ullLastTime = 0;
                                       };
 
             evt.data.l[0] = WB_POINTER_CANCEL;
-            evt.data.l[1] = (iButton1 ? 1 : 0)
-                          | (iButton2 ? 2 : 0)
-                          | (iButton3 ? 4 : 0)
+            evt.data.l[1] = iMouseDragButtonState // send previous button state
                           | (iButton4 ? 8 : 0)
                           | (iButton5 ? 16 : 0);
-            evt.data.l[2] = (iModShiftCtrl & ShiftMask ? WB_KEYEVENT_SHIFT : 0)
-                          | (iModShiftCtrl & ControlMask ? WB_KEYEVENT_CTRL : 0)
-                          | (iModShiftCtrl & Mod1Mask ? WB_KEYEVENT_ALT : 0);
+            evt.data.l[2] = (iMouseModShiftCtrl & ShiftMask ? WB_KEYEVENT_SHIFT : 0) // send previous iACS
+                          | (iMouseModShiftCtrl & ControlMask ? WB_KEYEVENT_CTRL : 0)
+                          | (iMouseModShiftCtrl & Mod1Mask ? WB_KEYEVENT_ALT : 0);
 
             WBXlatCoordPoint(((XButtonEvent *)pEvent)->window, ((XButtonEvent *)pEvent)->x, ((XButtonEvent *)pEvent)->y,
                               ((XButtonEvent *)pEvent)->window, &iX, &iY);
@@ -4384,8 +4426,9 @@ static unsigned long long ullLastTime = 0;
               XUngrabPointer(pDisplay, CurrentTime);
               wMouseCapture = None;
             }
+#endif // 0
           }
-          else if(pEvent->type == MotionNotify)
+          else if(pEvent->type == MotionNotify) // mods and buttons NOT changed
           {
             // modifiers still match (see above) so no need for cancelation here
 
@@ -4404,9 +4447,7 @@ static unsigned long long ullLastTime = 0;
                                         };
 
               evt.data.l[0] = WB_POINTER_MOVE;
-              evt.data.l[1] = (iButton1 ? 1 : 0)
-                            | (iButton2 ? 2 : 0)
-                            | (iButton3 ? 4 : 0)
+              evt.data.l[1] = iDragButtonState
                             | (iButton4 ? 8 : 0)
                             | (iButton5 ? 16 : 0);
               evt.data.l[2] = (iModShiftCtrl & ShiftMask ? WB_KEYEVENT_SHIFT : 0)
@@ -4440,9 +4481,7 @@ static unsigned long long ullLastTime = 0;
                                       };
 
             evt.data.l[0] = WB_POINTER_DROP;
-            evt.data.l[1] = (iButton1 ? 1 : 0)
-                          | (iButton2 ? 2 : 0)
-                          | (iButton3 ? 4 : 0);
+            evt.data.l[1] = iDragButtonState;
             evt.data.l[2] = (iModShiftCtrl & ShiftMask ? WB_KEYEVENT_SHIFT : 0)
                           | (iModShiftCtrl & ControlMask ? WB_KEYEVENT_CTRL : 0)
                           | (iModShiftCtrl & Mod1Mask ? WB_KEYEVENT_ALT : 0);
@@ -4487,6 +4526,8 @@ static unsigned long long ullLastTime = 0;
       {
         // cancel any mouse states due to pressing a key
 
+        WBMouseCancel(pDisplay, ((XButtonEvent *)pEvent)->window);
+#if 0
         if(wMouseCapture != None)
         {
           // cancel mouse capture
@@ -4495,6 +4536,7 @@ static unsigned long long ullLastTime = 0;
         }
 
         iMouseState = MouseState_NONE; // complete
+#endif // 0
       }
     }
   }
@@ -4559,7 +4601,7 @@ XEvent evtTemp;
 
     // tell the WM to mark the desired window as "the active window"
     aTemp = XInternAtom (pEvent->xany.display ? pEvent->xany.display : pDefaultDisplay,
-                         "_NET_ACTIVE_WINDOW", False);
+                         "_NET_ACTIVE_WINDOW", False); /* global scope, must use XInternAtom */
 
     bzero(&evtTemp, sizeof(evtTemp));
 
@@ -5025,7 +5067,7 @@ int WBDefault(Window wID, XEvent *pEvent)
                       "%s - un-handled WM_TIMER for %d (%08xH)\n",
                       __FUNCTION__, (int)wID, (int)wID);
     }
-#ifndef NODEBUG    // uncomment this block to dump every event NOT handled
+#ifndef NO_DEBUG    // uncomment this block to dump every event NOT handled
     else
     {
       WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Window | DebugSubSystem_Event,
@@ -5037,7 +5079,7 @@ int WBDefault(Window wID, XEvent *pEvent)
         WBDebugDumpEvent(pEvent);
       }
     }
-#endif // NODEBUG
+#endif // NO_DEBUG
   }
   else if(pEvent->type == KeyPress ||
           pEvent->type == KeyRelease)
@@ -5136,10 +5178,10 @@ int WBDefault(Window wID, XEvent *pEvent)
     // NOTE:  selection events are handled by the Clipboard worker thread.  However, I can still (possibly)
     //        get these things sent to me.  The *POLITE* thing to do is respond to them with an error sent
     //        back to the requestor.  And so, that's what I do.  And display it in on stderr in debug code...
-#ifndef NODEBUG
-    char *p1 = pEvent->xselectionrequest.selection != None ? XGetAtomName(pDisplay, pEvent->xselectionrequest.selection) : NULL;
-    char *p2 = pEvent->xselectionrequest.target != None ? XGetAtomName(pDisplay, pEvent->xselectionrequest.target) : NULL;
-    char *p3 = pEvent->xselectionrequest.property != None ? XGetAtomName(pDisplay, pEvent->xselectionrequest.property) : NULL;
+#ifndef NO_DEBUG
+    char *p1 = pEvent->xselectionrequest.selection != None ? WBGetAtomName(pDisplay, pEvent->xselectionrequest.selection) : NULL;
+    char *p2 = pEvent->xselectionrequest.target != None ? WBGetAtomName(pDisplay, pEvent->xselectionrequest.target) : NULL;
+    char *p3 = pEvent->xselectionrequest.property != None ? WBGetAtomName(pDisplay, pEvent->xselectionrequest.property) : NULL;
 
     WB_ERROR_PRINT("TEMPORARY - %s - SelectionRequest wID=%d(%08xH) class=%s owner=%d requestor=%d selection=%s target=%s property=%s\n",
                    __FUNCTION__,
@@ -5153,17 +5195,17 @@ int WBDefault(Window wID, XEvent *pEvent)
 
     if(p1)
     {
-      XFree(p1);
+      WBFree(p1);
     }                   
     if(p2)
     {
-      XFree(p2);
+      WBFree(p2);
     }                   
     if(p3)
     {
-      XFree(p3);
+      WBFree(p3);
     }                   
-#endif // NODEBUG
+#endif // NO_DEBUG
 
     // the default rejects the request.  Send a 'SelectionNotify' to indicate the failure
     // failing to send the SelectionNotify can REALLY screw things up for the requestor
@@ -5189,8 +5231,8 @@ int WBDefault(Window wID, XEvent *pEvent)
   }
   else if(pEvent->type == SelectionClear)
   {
-#ifndef NODEBUG
-    char *p1 = XGetAtomName(pDisplay, pEvent->xselectionclear.selection);
+#ifndef NO_DEBUG
+    char *p1 = WBGetAtomName(pDisplay, pEvent->xselectionclear.selection);
 
     WB_ERROR_PRINT("TEMPORARY - %s - SelectionClear wID=%d(%08xH) class=%s window=%d selection=%s\n",
                    __FUNCTION__,
@@ -5201,18 +5243,18 @@ int WBDefault(Window wID, XEvent *pEvent)
 
     if(p1)
     {
-      XFree(p1);
+      WBFree(p1);
     }                   
-#endif // NODEBUG
+#endif // NO_DEBUG
 
     // the default rejects the request.  No need to send a 'SelectionNotify'
   }
   else if(pEvent->type == SelectionNotify)
   {
-#ifndef NODEBUG
-    char *p1 = pEvent->xselection.selection != None ? XGetAtomName(pDisplay, pEvent->xselection.selection) : NULL;
-    char *p2 = pEvent->xselection.target != None ? XGetAtomName(pDisplay, pEvent->xselection.target) : NULL;
-    char *p3 = pEvent->xselection.property != None ? XGetAtomName(pDisplay, pEvent->xselection.property) : NULL;
+#ifndef NO_DEBUG
+    char *p1 = pEvent->xselection.selection != None ? WBGetAtomName(pDisplay, pEvent->xselection.selection) : NULL;
+    char *p2 = pEvent->xselection.target != None ? WBGetAtomName(pDisplay, pEvent->xselection.target) : NULL;
+    char *p3 = pEvent->xselection.property != None ? WBGetAtomName(pDisplay, pEvent->xselection.property) : NULL;
 
     WB_ERROR_PRINT("TEMPORARY - %s - SelectionNotify wID=%d(%08xH) class=%s requestor=%d selection=%s target=%s property=%s\n",
                    __FUNCTION__,
@@ -5225,24 +5267,24 @@ int WBDefault(Window wID, XEvent *pEvent)
 
     if(p1)
     {
-      XFree(p1);
-    }                   
+      WBFree(p1);
+    }
     if(p2)
     {
-      XFree(p2);
+      WBFree(p2);
     }                   
     if(p3)
     {
-      XFree(p3);
+      WBFree(p3);
     }                   
-#endif // NODEBUG
+#endif // NO_DEBUG
   }
-//#ifndef NODEBUG    // uncomment this block to dump every event NOT handled
+//#ifndef NO_DEBUG    // uncomment this block to dump every event NOT handled
 //  else
 //  {
 //    WBDebugDumpEvent(pEvent);
 //  }
-//#endif // NODEBUG
+//#endif // NO_DEBUG
 
   return 0;  // indicate 'not handled' for now
 }
@@ -5265,6 +5307,92 @@ XEvent xevt;
     WBInternalProcessExposeEvent((XExposeEvent *)&xevt);
   }
 }
+
+
+void WBMouseCancel(Display *pDisplay, Window wID)
+{
+XClientMessageEvent evt;
+int iX, iY;
+
+
+  if((iMouseState != MouseState_LDRAG &&
+      iMouseState != MouseState_RDRAG &&
+      iMouseState != MouseState_CDRAG &&
+      iMouseState != MouseState_WAS_LCLICK &&
+      iMouseState != MouseState_WAS_RCLICK &&
+      iMouseState != MouseState_WAS_CCLICK) // expected states to do a 'Mouse Cancel' for
+     || wMouseCapture == None)
+  {
+    if(wMouseCapture != None)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - incorrect mouse state:  %d (%08xH)\n", __FUNCTION__, iMouseState, iMouseState);
+
+      XUngrabPointer(pDisplay ? pDisplay : WBGetDefaultDisplay(), CurrentTime);
+
+      wMouseCapture = None; // not captured
+    }
+    else if(iMouseState == MouseState_NONE)
+    {
+      return; // just ignore it.  no harm, no foul.  mouse not captured, state is 'None'
+    }
+    else if(iMouseState != MouseState_WAS_LCLICK &&
+            iMouseState != MouseState_WAS_RCLICK &&
+            iMouseState != MouseState_WAS_CCLICK) // the "was" states are ok here.  'mouse cancel' will not be sent, however
+    {
+      // any other mouse state is unexpected here.  spit out a message
+
+      WB_ERROR_PRINT("ERROR:  %s - mouse not captured.  mouse state:  %d (%08xH) \n", __FUNCTION__, iMouseState, iMouseState);
+    }
+
+    // TODO:  send notification for a 'WAS' state??
+
+    iMouseState = MouseState_NONE; // by convention, do this (always) on mouse cancel
+
+    return; // for now, just do this [no capture]
+  }
+
+  if(wID == None)
+  {
+    wID = wMouseCapture; // the window with the mouse capture (checked for 'None' previously)
+  }
+
+  if(!pDisplay)
+  {
+    pDisplay = WBGetWindowDisplay(wID);
+    if(!pDisplay)
+    {
+      pDisplay = WBGetDefaultDisplay(); // desperately make it work
+    }
+  }
+
+  bzero(&evt, sizeof(evt));
+  evt.type=ClientMessage;
+  evt.display=pDisplay;
+  evt.window=wID;
+  evt.message_type=aWM_POINTER;
+  evt.format=32;
+  evt.data.l[0] = WB_POINTER_CANCEL;
+
+  evt.data.l[1] = iMouseDragButtonState;
+  evt.data.l[2] = (iMouseModShiftCtrl & ShiftMask ? WB_KEYEVENT_SHIFT : 0)
+                | (iMouseModShiftCtrl & ControlMask ? WB_KEYEVENT_CTRL : 0)
+                | (iMouseModShiftCtrl & Mod1Mask ? WB_KEYEVENT_ALT : 0);
+
+  WBXlatCoordPoint(wMouseCapture, iMouseX, iMouseY, wMouseCapture, &iX, &iY);
+
+  evt.data.l[3] = iX;
+  evt.data.l[4] = iY;
+
+  WBPostPriorityEvent(wID, (XEvent *)&evt); // post the WM_POINTER 'WB_POINTER_CANCEL' event
+
+  iMouseState = MouseState_NONE; // canceled
+
+  XUngrabPointer(pDisplay, CurrentTime);
+
+  wMouseCapture = None;
+  iMouseModShiftCtrl = iMouseDragButtonState = 0;
+}
+
 
 
 int WBMapWindow(Display *pDisplay, Window wID)
@@ -5658,11 +5786,12 @@ XFontStruct *pF, *pRval;
     unsigned long lName = 0;
     if(XGetFontProperty(pF, XA_FONT, &lName))
     {
-      char *pName = XGetAtomName(WBGetDefaultDisplay(), (Atom)lName);
+      char *pName = WBGetAtomName(WBGetDefaultDisplay(), (Atom)lName);
       if(pName)
       {
         pRval = XLoadQueryFont(pDisplay, pName);
-        XFree(pName);
+
+        WBFree(pName);
       }
     }
 
@@ -8781,10 +8910,10 @@ char *p1;
 
   switch(pEvent->xany.type)
   {
-    case ClientMessage:
-      p1 = XGetAtomName(pEvent->xany.display, pEvent->xclient.message_type);
+    case ClientMessage: /* these require WBGetAtomName since the atoms may not be 'global' */
+      p1 = WBGetAtomName(pEvent->xany.display, pEvent->xclient.message_type);
       WBDebugPrint(" message_type:   %s\n", p1);
-      XFree(p1);
+      WBFree(p1);
 
       WBDebugPrint("       format:   %d\n", pEvent->xclient.format);
       WBDebugPrint("    data[0].l:   %ld (%08lxH)\n", pEvent->xclient.data.l[0], pEvent->xclient.data.l[0]);
@@ -8797,7 +8926,7 @@ char *p1;
       break;
 
 
-    case SelectionNotify:
+    case SelectionNotify: /* note THESE always use 'XGetAtomName' */
       p1 = XGetAtomName(pEvent->xany.display, pEvent->xselection.selection);
       WBDebugPrint("    selection:   %s\n", p1);
       XFree(p1);
@@ -8814,7 +8943,7 @@ char *p1;
       break;
 
 
-    case SelectionRequest:
+    case SelectionRequest: /* note THESE always use 'XGetAtomName' */
       WBDebugPrint("    Requestor:   %08xH\n", (unsigned int)pEvent->xselectionrequest.requestor);
 
       p1 = XGetAtomName(pEvent->xany.display, pEvent->xselectionrequest.selection);

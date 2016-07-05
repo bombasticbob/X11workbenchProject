@@ -72,7 +72,15 @@
 #include "platform_helper.h" // includes X11 headers as well
 #include "window_helper.h"
 #include "file_help.h"
-#include "draw_text.h"
+//#include "draw_text.h"
+
+#ifdef HAVE_MALLOC_USABLE_SIZE
+#ifdef __FreeBSD__
+#include <malloc_np.h>
+#else
+#include <malloc.h>
+#endif // __FreeBSD__
+#endif // HAVE_MALLOC_USABLE_SIZE
 
 
 static char *pTempFileList = NULL, *pTempFileListEnd = NULL;
@@ -81,48 +89,21 @@ unsigned long cbTempFileList; // size of pointer
 static volatile int fInterlockedRWLockInitFlag = 0;
 static pthread_rwlock_t xInterlockedRWLock;
 
+static void WBFreePointerHashes(void);
+static void __add_to_temp_file_list(const char *szFile);
 
-static void __add_to_temp_file_list(const char *szFile)
-{
-int i1 = strlen(szFile);
-char *pTemp;
 
-  // TODO:  thread-safe?
 
-  if(!pTempFileList)
-  {
-    cbTempFileList = PATH_MAX * 256;
-    pTempFileList = malloc(cbTempFileList);
-
-    if(!pTempFileList)
-    {
-      return;
-    }
-
-    pTempFileListEnd = pTempFileList;
-  }
-  else if((pTempFileListEnd - pTempFileList) + i1 + 2 >= cbTempFileList)
-  {
-    pTemp = realloc(pTempFileList, cbTempFileList + (128 * PATH_MAX));
-    if(!pTemp)
-    {
-      return;
-    }
-
-    cbTempFileList += 128 * PATH_MAX; // using a 'while' loop sanity checks this against i1
-
-    if((pTempFileListEnd - pTempFileList) + i1 + 2 >= cbTempFileList) // sanity check
-    {
-      return; // don't bother re-allocating, this is probably NOT sane
-    }
-  }
-
-  memcpy(pTempFileListEnd, szFile, i1);
-  pTempFileListEnd += i1;
-
-  *(pTempFileListEnd++) = 0;
-  *pTempFileListEnd = 0; // always end with 2 0-bytes, point to 2nd one
-}
+//////////////////////////////////////////////////////////////////////////////
+//                                                                          //
+//     ___         _  _        _                _   _____        _  _       //
+//    |_ _| _ __  (_)| |_     / \    _ __    __| | | ____|__  __(_)| |_     //
+//     | | | '_ \ | || __|   / _ \  | '_ \  / _` | |  _|  \ \/ /| || __|    //
+//     | | | | | || || |_   / ___ \ | | | || (_| | | |___  >  < | || |_     //
+//    |___||_| |_||_| \__| /_/   \_\|_| |_| \__,_| |_____|/_/\_\|_| \__|    //
+//                                                                          //
+//                                                                          //
+//////////////////////////////////////////////////////////////////////////////
 
 void WBPlatformOnInit(void)
 {
@@ -136,25 +117,1160 @@ void WBPlatformOnInit(void)
 
 void WBPlatformOnExit(void)
 {
-char *p1 = pTempFileList;
+char *p1;
 
-  while(p1 && *p1)
+
+  if(pTempFileList) // delete temporary file list
   {
-    unlink(p1); // delete all of the temp files, ignoring errors
-    p1 += strlen(p1) + 1;
+    for(p1 = pTempFileList; *p1; p1 += strlen(p1) + 1)
+    {
+      unlink(p1); // delete all of the temp files, ignoring errors
+    }
+
+    WBFree(pTempFileList);
   }
 
-  if(pTempFileList)
-  {
-    free(pTempFileList);
-  }
+  WBFreePointerHashes(); // delete pointer hashes
+
+  // finally, free up the RWLOCK that I created for RW-locking 'Interlocked' things
 
   if(fInterlockedRWLockInitFlag)
   {
     pthread_rwlock_destroy(&xInterlockedRWLock);
     fInterlockedRWLockInitFlag = 0; // by convention, in case I re-init [unlikely]
   }
+
 }
+
+
+//////////////////////////////////////////////////////////////////////////////
+//                                                                          //
+//                __  __     _     _      _      ___    ____                //
+//               |  \/  |   / \   | |    | |    / _ \  / ___|               //
+//               | |\/| |  / _ \  | |    | |   | | | || |                   //
+//               | |  | | / ___ \ | |___ | |___| |_| || |___                //
+//               |_|  |_|/_/   \_\|_____||_____|\___/  \____|               //
+//                                                                          //
+//                                                                          //
+//////////////////////////////////////////////////////////////////////////////
+
+// ********************
+// MEMORY SUB-ALLOCATOR
+// ********************
+
+// NOTES TO SELF (design notes)
+// a) allocate Xk blocks of memory for suballocator blocks of a specific size
+// b) the first 'page' of the memory block is an array of indices (double-link list)
+// c) the remainder of the block is an ordered set of memory blocks of a fixed size
+// d) as more blocks are added, they are added to a linked list associated with the size
+// e) blocks "more than Xk" will be malloc'd and added to the 'malloc' list.
+// f) malloc'd blocks will have a double-link list and a header with extra info
+// This way an allocated address will auto-indicate which memory block it belongs to
+
+static const char szWBAllocTag[]="WB_M";
+#define WB_ALLOC_TAG (*((const unsigned int *)szWBAllocTag)) /*< tag indicating it's a __malloc_header__ **/
+
+#define PMALLOC_FLAG (&mallocFlagMalloc) /*< when pPrev and pNext point to THIS, it's a "malloc'd" pointer **/
+
+struct __malloc_header__
+{
+  struct __malloc_header__ *pPrev, *pNext;  ///< For a 'malloc'd block, these are both PMALLOC_FLAG
+  unsigned int iTag;                        ///< see WB_ALLOC_TAG
+  unsigned int cbSize;                      ///< size used for last malloc/realloc
+};
+
+static struct __malloc_header__ mallocFlagMalloc; // pointers to THIS indicate "I am a 
+
+//static struct __malloc_header__ *pMallocList = NULL, *pMallocListEnd = NULL;
+// TODO:  when I go to implement this, uncomment the above line
+
+// TODO:  sync object for pMallocList etc.
+
+void *WBAlloc(int nSize)
+{
+unsigned char *pRval;
+struct __malloc_header__ *pMH;
+unsigned int nAllocSize, nNewSize, nLimit;
+
+
+  if(nSize <= 0)
+  {
+    return NULL;
+  }
+
+  // TODO:  implement allocation of smaller memory blocks as 'power of 2' blocks.
+  //
+
+  nAllocSize = nSize + sizeof(*pMH);
+  // nAllocSize will be converted to the next higher power of 2
+
+  nLimit = nAllocSize + (nAllocSize >> 1);
+
+  for(nNewSize=64; nNewSize < nLimit; nNewSize <<= 1)
+  { } // NOTE:  64 bytes is the smallest allocation unit
+
+//  if(nNewSize < 4096) TODO:  internally sub-allocated blocks
+//  {
+//    TODO:  maintain lists of pre-allocated blocks of memory, allocating new memory as needed
+//           (this memory will need to be re-used intelligently so trash mashing can work properly
+//  }
+
+  // for larger blocks, I use 'malloc'
+
+  pRval = (unsigned char *)malloc(nNewSize); // for now - later, use sub-allocation stuff
+
+  if(pRval)
+  {
+    pMH = (struct __malloc_header__ *)pRval;
+
+    pRval += sizeof(*pMH);
+
+    pMH->pPrev = PMALLOC_FLAG; // this indicates it was 'malloc'd
+    pMH->pNext = PMALLOC_FLAG; // this indicates it was 'malloc'd
+    pMH->iTag = WB_ALLOC_TAG;
+
+#ifdef HAVE_MALLOC_USABLE_SIZE
+    nLimit = malloc_usable_size(pRval); // the ACTUAL SIZE of the memory block
+    if(nLimit > nNewSize)
+    {
+      nNewSize = nLimit;
+    }
+#endif // HAVE_MALLOC_USABLE_SIZE
+    pMH->cbSize = nNewSize - sizeof(*pMH);
+
+  }
+
+  return pRval;
+}
+
+int WBAllocUsableSize(void *pBuf)
+{
+struct __malloc_header__ *pMH;
+
+
+  if(!pBuf)
+  {
+    return -1; // an error
+  }
+
+  // validate pointer
+  // TODO:  check against linked list of 'allocated' blocks first
+
+  pMH = ((struct __malloc_header__ *)pBuf) - 1;
+
+  if(pMH->iTag == WB_ALLOC_TAG)
+  {
+    return pMH->cbSize;
+  }
+
+  return -1; // not valid (error)
+}
+
+void WBFree(void *pBuf)
+{
+struct __malloc_header__ *pMH;
+
+  if(!pBuf)
+  {
+    return;
+  }
+
+  // validate pointer
+  // TODO:  check against linked list of 'allocated' blocks first
+
+  pMH = ((struct __malloc_header__ *)pBuf) - 1;
+
+  if(pMH->iTag == WB_ALLOC_TAG)
+  {
+    if(pMH->pPrev == PMALLOC_FLAG &&
+       pMH->pNext == PMALLOC_FLAG)
+    {
+      free(pMH);
+    }
+    else
+    {
+      WB_ERROR_PRINT("TODO:  %s unimplemented - NOT freeing memory %p\n", __FUNCTION__, pBuf);
+    }
+  }
+  else
+  {
+    WB_ERROR_PRINT("ERROR:  %s NOT freeing memory %p\n", __FUNCTION__, pBuf);
+  }
+}
+
+void * WBReAlloc(void *pBuf, int nNewSize)
+{
+struct __malloc_header__ *pMH;
+unsigned char *pRval = NULL;
+unsigned int nAllocSize, nNewNewSize, nLimit;
+
+
+  if(!pBuf || nNewSize <= 0)
+  {
+    return NULL;
+  }
+
+  // validate pointer
+  // TODO:  check against linked list of 'allocated' blocks first
+
+  pMH = ((struct __malloc_header__ *)pBuf) - 1;
+
+  if(pMH->iTag == WB_ALLOC_TAG)
+  {
+    // the whole point of this is to minimize the actual need to re-allocate the
+    // memory block by maintaining a LARGER block than is actually needed when
+    // allocated or re-allocated.  Gradually increasing size is pretty much assumed.
+
+    if(pMH->cbSize >= nNewSize)
+    {
+      return pBuf; // no change (same pointer) since it's large enough already
+    }
+
+    // TODO:  implement re-allocation of smaller memory blocks as 'power of 2' blocks.
+    //
+
+    nAllocSize = nNewSize + sizeof(*pMH);
+    // nAllocSize will be converted to the next higher power of 2
+
+    nLimit = nAllocSize + (nAllocSize >> 1);
+    for(nNewNewSize=64; nNewNewSize < nLimit; nNewNewSize <<= 1) { } // NOTE:  64 bytes is the smallest allocation unit
+
+    if(pMH->pPrev != PMALLOC_FLAG &&
+       pMH->pNext != PMALLOC_FLAG)
+    {
+      if(nNewNewSize >= 4096) // TODO:  internally sub-allocated blocks
+      {
+        // it WAS an internally sub-alloced block.  NOW it is a MALLOC block.
+
+        pRval = WBAlloc(nNewNewSize); // just allocate it with 'WBAlloc' and let 'WBAlloc' do the work
+        if(!pRval)
+        {
+          return NULL; // not enough memory
+        }
+
+        memcpy(pRval, pBuf, pMH->cbSize); // copy the old data, but not the stuff in the header.
+        WBFree(pBuf); // free 'pBuf' now that it's not needed
+
+        return pRval; // return the new pointer (old is no longer valid, new one is 'malloc'ed version).
+      }
+      else
+      {
+        //TODO:  maintain lists of pre-allocated blocks of memory, allocating new memory as needed
+        //       (this memory will need to be re-used intelligently so trash mashing can work properly
+
+        WB_ERROR_PRINT("TODO:  %s - this feature is NOT implemented.  Pointer %p NOT re-allocated\n", __FUNCTION__, pBuf);
+        return NULL;
+      }
+    }
+
+    pRval = realloc(pMH, nNewNewSize); // for now...
+    if(pRval)
+    {
+      pMH = (struct __malloc_header__ *)pRval;
+      pRval += sizeof(*pMH);
+
+#ifdef HAVE_MALLOC_USABLE_SIZE
+      nLimit = malloc_usable_size(pRval); // the ACTUAL SIZE of the memory block
+      if(nLimit > nNewSize)
+      {
+        nNewSize = nLimit;
+      }
+#endif // HAVE_MALLOC_USABLE_SIZE
+      pMH->cbSize = nNewNewSize - sizeof(*pMH);
+    }
+  }
+  else
+  {
+    WB_ERROR_PRINT("ERROR - %s NOT re-allocating memory %p\n", __FUNCTION__, pBuf);
+  }
+
+  return pRval;
+}
+
+void WBSubAllocTrashMasher(void)
+{
+  // do nothing (for now)
+  // later, walk memory list to see if any blocks are completely unused, and free them.
+  // in debug mode, maybe there's a way to validate memory blocks?
+}
+
+
+//////////////////////////////////////////////////////////////////////////////
+//                                                                          //
+//                  ____   _          _                                     //
+//                 / ___| | |_  _ __ (_) _ __    __ _  ___                  //
+//                 \___ \ | __|| '__|| || '_ \  / _` |/ __|                 //
+//                  ___) || |_ | |   | || | | || (_| |\__ \                 //
+//                 |____/  \__||_|   |_||_| |_| \__, ||___/                 //
+//                                              |___/                       //
+//                                                                          //
+//////////////////////////////////////////////////////////////////////////////
+
+
+// ************************
+// generic string utilities
+// ************************
+
+char *WBCopyString(const char *pSrc)
+{
+char *pDest;
+int iLen;
+
+  if(!pSrc || !*pSrc)
+  {
+    pDest = WBAlloc(2);
+
+    if(pDest)
+    {
+      *pDest = 0;
+    }
+  }
+  else
+  {
+    iLen = strlen(pSrc);
+
+    pDest = WBAlloc(iLen + 1);
+
+    if(pDest)
+    {
+      memcpy(pDest, pSrc, iLen);
+      pDest[iLen] = 0;
+    }
+  }
+
+  return pDest;
+}
+
+char *WBCopyStringN(const char *pSrc, unsigned int nMaxChars)
+{
+char *pDest;
+int iLen;
+const char *p1;
+
+  if(!pSrc || !*pSrc)
+  {
+    pDest = WBAlloc(2);
+
+    if(pDest)
+    {
+      *pDest = 0;
+    }
+  }
+  else
+  {
+    for(p1 = pSrc, iLen = 0; iLen < nMaxChars && *p1; p1++, iLen++)
+    { } // determine length of 'pStr' to copy
+
+    pDest = WBAlloc(iLen + 1);
+
+    if(pDest)
+    {
+      memcpy(pDest, pSrc, iLen);
+      pDest[iLen] = 0;
+    }
+  }
+
+  return pDest;
+}
+
+
+void WBCatString(char **ppDest, const char *pSrc)  // concatenate onto WBAlloc'd string
+{
+int iLen, iLen2;
+//#ifdef HAVE_MALLOC_USABLE_SIZE
+int iMaxLen;
+//#endif // HAVE_MALLOC_USABLE_SIZE
+char *p1, *p2;
+
+  if(!ppDest || !pSrc || !*pSrc)
+  {
+    return;
+  }
+
+  if(*ppDest)
+  {
+    p1 = p2 = *ppDest;
+
+//#ifdef HAVE_MALLOC_USABLE_SIZE
+    iMaxLen = WBAllocUsableSize(p1);
+
+    if(iMaxLen <= 0) // an error
+    {
+      return;
+    }
+//#endif // HAVE_MALLOC_USABLE_SIZE
+
+    while(*p2
+//#ifdef HAVE_MALLOC_USABLE_SIZE
+          && (p2 - p1) < iMaxLen
+//#endif // HAVE_MALLOC_USABLE_SIZE
+         )
+    {
+      p2++;
+    }
+
+    iLen2 = strlen(pSrc);
+    iLen = iLen2 + (p2 - p1);
+
+//#ifdef HAVE_MALLOC_USABLE_SIZE
+    if((iLen + 1) > iMaxLen)
+//#endif // HAVE_MALLOC_USABLE_SIZE
+    {
+      *ppDest = WBReAlloc(p1, iLen + 1);
+      if(!*ppDest)
+      {
+        *ppDest = p1;
+        return;  // not enough memory
+      }
+
+      p2 = (p2 - p1) + *ppDest;  // re-position end of string
+    }
+
+    memcpy(p2, pSrc, iLen2);
+    p2[iLen2] = 0;  // make sure last byte is zero
+  }
+  else
+  {
+    *ppDest = WBCopyString(pSrc);
+  }
+}
+
+void WBCatStringN(char **ppDest, const char *pSrc, unsigned int nMaxChars)
+{
+int iLen, iLen2;
+//#ifdef HAVE_MALLOC_USABLE_SIZE
+int iMaxLen;
+//#endif // HAVE_MALLOC_USABLE_SIZE
+char *p1, *p2;
+const char *p3;
+
+
+  if(!ppDest || !pSrc || !*pSrc)
+  {
+    return;
+  }
+
+  if(*ppDest)
+  {
+    p1 = p2 = *ppDest;
+
+//#ifdef HAVE_MALLOC_USABLE_SIZE
+    iMaxLen = WBAllocUsableSize(p1);
+
+    if(iMaxLen <= 0)
+    {
+      return;
+    }
+//#endif // HAVE_MALLOC_USABLE_SIZE
+
+
+    while(*p2
+//#ifdef HAVE_MALLOC_USABLE_SIZE
+          && (p2 - p1) < iMaxLen
+//#endif // HAVE_MALLOC_USABLE_SIZE
+         )
+    {
+      p2++;
+    }
+
+    for(iLen2=0, p3 = pSrc; iLen2 < nMaxChars && *p3; p3++, iLen2++)
+    { }  // determine what the length of pSrc is up to a zero byte or 'nMaxChars', whichever is first
+
+    iLen = iLen2 + (p2 - p1);
+
+//#ifdef HAVE_MALLOC_USABLE_SIZE
+    if((iLen + 1) > iMaxLen)
+//#endif // HAVE_MALLOC_USABLE_SIZE
+    {
+      *ppDest = WBReAlloc(p1, iLen + 1);
+      if(!*ppDest)
+      {
+        *ppDest = p1; // restore the old pointer value
+        return;  // not enough memory
+      }
+
+      p2 = (p2 - p1) + *ppDest;  // re-position end of string
+    }
+
+    memcpy(p2, pSrc, iLen2);
+    p2[iLen2] = 0;  // make sure last byte is zero
+  }
+  else
+  {
+    *ppDest = WBCopyStringN(pSrc, nMaxChars);
+  }
+}
+
+void WBDeQuoteString(char *pString)
+{
+char *p1, *pDest;
+
+  p1 = pDest = pString;
+
+  while(*p1)
+  {
+    if(*p1 == '"' || *p1 == '\'')
+    {
+      char c1 = *(p1++);
+
+      while(*p1 &&
+            (*p1 != c1 || p1[1] == c1))
+      {
+        if(*p1 == c1)
+        {
+          p1++;
+        }
+
+        *(pDest++) = *(p1++);
+      }
+
+      if(*p1 == c1)
+      {
+        p1++;
+      }
+    }
+    else
+    {
+      if(pDest != p1)
+      {
+        *pDest = *p1;
+      }
+
+      pDest++;
+      p1++;
+    }
+  }
+
+  *pDest = 0; // make sure
+}
+
+int WBStringLineCount(const char *pSrc, unsigned int nMaxChars)
+{
+int iRval = 1;
+const char *p1;
+
+  if(!pSrc || (!nMaxChars && !*pSrc))
+  {
+    return 0;
+  }
+
+  if(!nMaxChars)
+  {
+    nMaxChars = strlen(pSrc);
+  }
+
+  do
+  {
+    p1 = WBStringNextLine(pSrc, &nMaxChars);
+    if(p1 && nMaxChars) // another line remains
+    {
+      iRval++;
+    }
+
+    pSrc = p1;
+
+  } while(pSrc && nMaxChars);
+
+  return iRval;
+}
+
+const char *WBStringNextLine(const char *pSrc, unsigned int *pnMaxChars)
+{
+int nMaxChars;
+
+  if(!pSrc)
+  {
+    if(pnMaxChars)
+    {
+      *pnMaxChars = 0;
+    }
+
+    return NULL;
+  }
+
+  if(pnMaxChars)
+  {
+    nMaxChars = *pnMaxChars;
+  }
+  else if(!*pSrc)
+  {
+    return NULL; // end of string (no more)
+  }
+  else
+  {
+    nMaxChars = strlen(pSrc);
+  }
+
+  // TODO:  handle MBCS differently? (for now, no special handling)
+
+  while(nMaxChars > 0)
+  {
+    if(*pSrc == '\r')
+    {
+      pSrc++;
+      nMaxChars--;
+
+      if(nMaxChars > 0 && *pSrc == '\n')
+      {
+        pSrc++;
+        nMaxChars--;
+      }
+
+      break;
+    }
+    else if(*pSrc == '\n')
+    {
+      pSrc++;
+      nMaxChars--;
+
+      if(nMaxChars > 0 && *pSrc == '\r')
+      {
+        pSrc++;
+        nMaxChars--;
+      }
+
+      break;
+    }
+    else if(*pSrc == '\f' || // form feed is like a newline
+            *pSrc == '\v')   // vertical tab (similar, for now)
+    {
+      pSrc++;
+      nMaxChars--;
+
+      break;
+    }
+// TODO:  check for UTF-8 paragraph and line separators?
+//        http://www.unicodemap.org/details/0x2028/index.html  (line separator - alternate LF?)
+//        http://www.unicodemap.org/details/0x202A/index.html  (paragraph separator - alternate to CTRL+L ?)
+//
+    else if(!*pSrc) // TODO:  test for unicode?  normally we just assume UTF-8 is compatible with ASCII
+    {
+      nMaxChars = 0;
+      break;
+    }
+
+    pSrc++;
+    nMaxChars--;
+  }
+
+  if(pnMaxChars)
+  {
+    *pnMaxChars = 0;
+  }
+
+  return pSrc;
+}
+
+
+
+
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////
+//                                                                                 //
+//   ____         _         _                _   _              _                  //
+//  |  _ \  ___  (_) _ __  | |_  ___  _ __  | | | |  __ _  ___ | |__    ___  ___   //
+//  | |_) |/ _ \ | || '_ \ | __|/ _ \| '__| | |_| | / _` |/ __|| '_ \  / _ \/ __|  //
+//  |  __/| (_) || || | | || |_|  __/| |    |  _  || (_| |\__ \| | | ||  __/\__ \  //
+//  |_|    \___/ |_||_| |_| \__|\___||_|    |_| |_| \__,_||___/|_| |_| \___||___/  //
+//                                                                                 //
+//                                                                                 //
+/////////////////////////////////////////////////////////////////////////////////////
+
+typedef struct __pointer_hash__
+{
+  WB_UINT32 uiHash;
+  void *pValue;         // NULL if unused entry (making this simple)
+  WB_UINT32 dwTick; // millis count when I last created/referenced this hash
+} POINTER_HASH;
+
+static POINTER_HASH *pPointerHashes = NULL; // WBAlloc'd array
+static int nPointerHash = 0, nMaxPointerHash = 0; // for now, simple array
+
+static WB_UINT32 uiPointerHashSpinlock = 0;
+
+static void WBFreePointerHashes(void)
+{
+  if(pPointerHashes)
+  {
+    WBFree(pPointerHashes);
+    pPointerHashes = NULL;
+  }
+
+  nPointerHash = 0;
+  nMaxPointerHash = 0;
+
+  uiPointerHashSpinlock = 0;
+}
+
+WB_UINT32 WBCreatePointerHash(void *pPointer)
+{
+int i1, iFreeIndex;
+WB_UINT32 uiRval = 0;
+WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros / 1024
+
+
+  if(!pPointer)
+  {
+    return 0;
+  }
+
+  while(WBInterlockedExchange(&uiPointerHashSpinlock, 1))
+  {
+    usleep(100);
+  }
+
+  if(!pPointerHashes)
+  {
+    nMaxPointerHash = 512;   // initial size (make it a '#define' ?)
+    pPointerHashes = (POINTER_HASH *)WBAlloc(nMaxPointerHash * sizeof(*pPointerHashes));
+
+    if(!pPointerHashes)
+    {
+      goto return_point;
+    }
+
+    nPointerHash = 0;
+  }
+  else if(nPointerHash >= nMaxPointerHash)
+  {
+    void *pTemp = WBReAlloc(pPointerHashes, (nMaxPointerHash + 256) * sizeof(*pPointerHashes));
+
+    if(!pTemp)
+    {
+      goto return_point;
+    }
+
+    pPointerHashes = (POINTER_HASH *)pTemp; // new, re-alloc'd pointer
+    nMaxPointerHash += 256;
+  }
+
+  // first, check for a match, and the first 'free' index
+  for(i1=0, iFreeIndex = -1; i1 < nPointerHash; i1++)
+  {
+    if(pPointerHashes[i1].pValue == pPointer)
+    {
+      if(uiRval) // more than one?
+      {
+        WB_ERROR_PRINT("ERROR:  %s - matching 'pPointer' %p for multiple hash entries\n", __FUNCTION__, pPointer);
+      }
+      else
+      {
+        uiRval = pPointerHashes[i1].uiHash;
+        pPointerHashes[i1].dwTick = dwTick; // new timestamp
+      }
+    }
+    else if((dwTick - pPointerHashes[i1].dwTick) > WB_SECURE_HASH_TIMEOUT)
+    {
+      // too old - erase it, freeing up the location
+
+      pPointerHashes[i1].uiHash = 0;
+      pPointerHashes[i1].dwTick = 0;
+      pPointerHashes[i1].pValue = NULL; // thus marking it 'free'
+
+      if(iFreeIndex < 0) // no free index yet?  remember it
+      {
+        iFreeIndex = i1;
+      }      
+    }
+  }
+
+  if(iFreeIndex < 0) // not re-using an entry?
+  {
+    iFreeIndex = nPointerHash++; // increment total count, use last entry
+  }
+
+  pPointerHashes[iFreeIndex].dwTick = dwTick;
+  pPointerHashes[iFreeIndex].pValue = pPointer;
+
+  // see if there's a 'crash' between two identical hashes
+  // it's not likely, but it IS possible.  So test for it.
+
+  while(1) /* we assume it will bust out eventually */
+  {
+    uiRval = ((WB_UINT32)((WB_UINT64)pPointer) ^ dwTick) & 0xffffffff;
+
+    for(i1=0; i1 < nPointerHash; i1++)
+    {
+      if(!pPointerHashes[i1].pValue)
+      {
+        continue;
+      }
+
+      if(pPointerHashes[i1].uiHash == uiRval)
+      {
+        break;
+      }
+    }
+
+    if(i1 >= nPointerHash) // no matching entry found
+    {
+      break;
+    }
+    
+    dwTick -= 113; // decrement it by a prime number so I can test for it
+                   // being there again, but with a different hash value
+  }
+  
+  pPointerHashes[i1].uiHash = uiRval;
+
+
+return_point:
+
+  WBInterlockedExchange(&uiPointerHashSpinlock, 0);
+
+  return uiRval;
+}
+
+void WBDestroyPointerHash(WB_UINT32 uiHash)
+{
+int i1;
+WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros / 1024
+
+
+  while(WBInterlockedExchange(&uiPointerHashSpinlock, 1))
+  {
+    usleep(100);
+  }
+
+  for(i1=0; i1 < nPointerHash; i1++)
+  {
+    if(pPointerHashes[i1].uiHash == uiHash ||
+       (dwTick - pPointerHashes[i1].dwTick) > WB_SECURE_HASH_TIMEOUT) // check for aging while I'm at it
+    {
+      // erase it, freeing up the location
+
+      pPointerHashes[i1].uiHash = 0;
+      pPointerHashes[i1].dwTick = 0;
+      pPointerHashes[i1].pValue = NULL; // thus marking it 'free'
+    }
+  }
+
+  WBInterlockedExchange(&uiPointerHashSpinlock, 0);
+}
+
+void * WBGetPointerFromHash(WB_UINT32 uiHash)
+{
+int i1;
+void *pRval = NULL;
+
+
+  while(WBInterlockedExchange(&uiPointerHashSpinlock, 1))
+  {
+    usleep(100);
+  }
+
+  for(i1=0; i1 < nPointerHash; i1++)
+  {
+    if(!pPointerHashes[i1].pValue)
+    {
+      continue;
+    }
+
+    if(pPointerHashes[i1].uiHash == uiHash)
+    {
+      pRval = pPointerHashes[i1].pValue;
+      goto exit_point;
+    }
+  }
+
+
+exit_point:
+
+  WBInterlockedExchange(&uiPointerHashSpinlock, 0);
+
+  return pRval; // NULL if not found
+}
+
+
+
+//////////////////////////////////////////////////////////////////////////////
+//                                                                          //
+//                        _    _                                            //
+//                       / \  | |_  ___   _ __ ___   ___                    //
+//                      / _ \ | __|/ _ \ | '_ ` _ \ / __|                   //
+//                     / ___ \| |_| (_) || | | | | |\__ \                   //
+//                    /_/   \_\\__|\___/ |_| |_| |_||___/                   //
+//                                                                          //
+//                                                                          //
+//////////////////////////////////////////////////////////////////////////////
+
+//---------------------------------
+// INTERNAL ATOM 'HELPER' UTILITIES
+//---------------------------------
+
+// the X11 server maintains a global list of atoms based on unique strings.  These are
+// useful for inter-application communication, but can rapidly become inefficient when applications
+// create large numbers of unique atoms names for their own custom purposes (like the X11 workbench).
+// To combat this obvious problem, these next two functions will create application-unique atoms
+// when a global atom is not available.  Global atoms are NEVER removed.  Once there, they are there
+// until the X11 server is shut down.  For that reason, these functions are really necessary.  It should
+// help minimize the resource impact of an X11 workbench toolkit application.
+
+// For more information, see xorg-server source
+//   specifically:  Atom MakeAtom(const char *string, unsigned len, Bool makeit)
+//   this function is located in dix/atom.c .  It allocates atoms SEQUENTIALLY, beginning with XA_LAST_PREDEFINED+1
+//   because the atoms are assigned SEQUENTIALLY, it is possible to pick a "very very big number" as the minimum
+//   internal atom's starting point, i.e. WB_INTERNAL_ATOM_MIN_VAL (which is currently FF000000H) which would allow
+//   for ~16 million internally-defined atoms.
+
+static volatile WB_UINT32 lInternalAtomSpinner = 0L;
+static char **ppInternalAtoms = NULL;  // actual atom value starts with WB_INTERNAL_ATOM_MIN_VAL and is index within this array
+static char *pszAtomNames = NULL;
+static unsigned int cbAtomNames = 0, cbMaxAtomNames = 0;
+static unsigned int nInternalAtoms = 0, nMaxInternalAtoms = 0;
+
+#define INITIAL_INTERNAL_ATOM_SIZE 4096
+#define INITIAL_INTERNAL_ATOM_STRING_SIZE 262144
+
+Atom WBGetAtom(Display *pDisplay, const char *szAtomName)
+{
+Atom aRval;
+//char *p1;
+void *pTemp;
+int iLen;
+
+
+  if(!szAtomName || !*szAtomName)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - bad 'szAtomName'\n", __FUNCTION__);
+
+    return None;  // bad parameter
+  }
+
+  if(!pDisplay)
+  {
+    pDisplay = WBGetDefaultDisplay();
+  }
+
+  aRval = WBLookupAtom(pDisplay, szAtomName);
+
+  if(aRval != None)
+  {
+    return aRval;
+  }
+
+  // allocate an internal atom
+
+  aRval = None;
+
+  while(WBInterlockedExchange(&lInternalAtomSpinner, 1)) // THIS MUST BE SPIN-LOCKED
+  {
+    usleep(100); // by convention just do THIS
+  }
+
+  if(!ppInternalAtoms)
+  {
+    ppInternalAtoms = (char **)WBAlloc(INITIAL_INTERNAL_ATOM_SIZE);
+
+    if(!ppInternalAtoms)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - no memory\n", __FUNCTION__);
+
+      goto exit_point;
+    }
+
+    nMaxInternalAtoms = INITIAL_INTERNAL_ATOM_SIZE;
+    nInternalAtoms = 0; // make sure
+  }
+  else if((nInternalAtoms + 1) >= nMaxInternalAtoms)
+  {
+    pTemp = WBReAlloc(ppInternalAtoms, nMaxInternalAtoms + INITIAL_INTERNAL_ATOM_SIZE);
+    if(!pTemp)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - no memory\n", __FUNCTION__);
+
+      goto exit_point;
+    }
+
+    ppInternalAtoms = (char **)pTemp;
+    nMaxInternalAtoms += INITIAL_INTERNAL_ATOM_SIZE;
+  }
+
+  iLen = strlen(szAtomName) + 1; // include the '0' byte at the end
+
+  // now for the names buffer
+
+  if(!pszAtomNames)
+  {
+    pszAtomNames = WBAlloc(INITIAL_INTERNAL_ATOM_STRING_SIZE);
+    if(!pszAtomNames)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - no memory\n", __FUNCTION__);
+
+      goto exit_point;
+    }
+
+    cbMaxAtomNames = INITIAL_INTERNAL_ATOM_STRING_SIZE;
+    cbAtomNames = 0; // make sure
+  }
+  else if((cbAtomNames + iLen + 1) >= cbMaxAtomNames) // not enough room?
+  {
+    pTemp = WBReAlloc(pszAtomNames, cbMaxAtomNames + INITIAL_INTERNAL_ATOM_STRING_SIZE);
+    if(!pTemp)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - no memory\n", __FUNCTION__);
+
+      goto exit_point;
+    }
+
+    pszAtomNames = (char *)pTemp;
+    cbMaxAtomNames += INITIAL_INTERNAL_ATOM_STRING_SIZE;
+  }
+
+  aRval = (Atom)(nInternalAtoms + WB_INTERNAL_ATOM_MIN_VAL);
+
+  ppInternalAtoms[nInternalAtoms++] = pszAtomNames + cbAtomNames;
+
+  memcpy(pszAtomNames + cbAtomNames, szAtomName, iLen);
+
+  cbAtomNames += iLen;
+  pszAtomNames[cbAtomNames] = 0; // by convention
+
+
+exit_point:
+
+  WBInterlockedExchange(&lInternalAtomSpinner, 0);  // I'm done with it now
+
+  if(aRval == None)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - could not allocate new atom %u for %s\n", __FUNCTION__, (unsigned int)aRval, szAtomName);
+  }
+//  else
+//  {
+//    WB_ERROR_PRINT("TEMPORARY:  %s - allocating new atom %u for %s\n", __FUNCTION__, (unsigned int)aRval, szAtomName);
+//  }
+
+  return aRval;  
+//  aRval = XInternAtom(pDisplay, szAtomName, False); // temporarily, just do this
+}
+
+Atom WBLookupAtom(Display *pDisplay, const char *szAtomName)
+{
+Atom aRval;
+unsigned int i1;
+
+
+  if(!szAtomName || !*szAtomName)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - bad 'szAtomName'\n", __FUNCTION__);
+
+    return None;  // bad parameter
+  }
+
+  if(!pDisplay)
+  {
+    pDisplay = WBGetDefaultDisplay();
+  }
+
+
+  // look up internal atoms FIRST...
+
+  aRval = None;
+
+  while(WBInterlockedExchange(&lInternalAtomSpinner, 1)) // THIS MUST BE SPIN-LOCKED
+  {
+    usleep(100); // by convention just do THIS
+  }
+
+  if(ppInternalAtoms && pszAtomNames && nInternalAtoms > 0)
+  {
+    // TODO: use some kind of hashing algorithm?  for now, if the list is short enough,
+    //       this actually replicates what the X Server does with its own atoms.
+
+    for(i1=0; i1 < nInternalAtoms; i1++)
+    {
+      if(!strcmp(szAtomName, ppInternalAtoms[i1]))
+      {
+        aRval = (Atom)(i1 + WB_INTERNAL_ATOM_MIN_VAL);
+        break;
+      }
+    }  
+  }
+
+  WBInterlockedExchange(&lInternalAtomSpinner, 0);  // I'm done with it now
+
+  if(aRval != None)
+  {
+//    WB_ERROR_PRINT("TEMPORARY:  %s - found atom %u for %s\n", __FUNCTION__, (unsigned int)aRval, szAtomName);
+
+    return aRval;
+  }
+
+  aRval = XInternAtom(pDisplay, szAtomName, True);
+
+  // TODO:  anything else?
+
+  return aRval; // regardless
+}
+
+char *WBGetAtomName(Display *pDisplay, Atom aAtom)
+{
+char *pRval, *pTemp;
+unsigned int nAtom;
+
+
+  if(aAtom == None || (unsigned int)aAtom >= (unsigned int)(WB_INTERNAL_ATOM_MIN_VAL + nInternalAtoms))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - bad Atom:  %u (%08xH)\n", __FUNCTION__, (unsigned int)aAtom, (unsigned int)aAtom);
+
+    return None;  // bad parameter
+  }
+
+  if(!pDisplay)
+  {
+    pDisplay = WBGetDefaultDisplay();
+  }
+
+  if((unsigned int)aAtom < WB_INTERNAL_ATOM_MIN_VAL)
+  {
+    pTemp = XGetAtomName(pDisplay, aAtom);
+
+    if(pTemp)
+    {
+      pRval = WBCopyString(pTemp);
+      XFree(pTemp);
+
+      return pRval;
+    }
+
+    return NULL;
+  }
+
+  pRval = NULL;
+
+  while(WBInterlockedExchange(&lInternalAtomSpinner, 1)) // THIS MUST BE SPIN-LOCKED
+  {
+    usleep(100); // by convention just do THIS
+  }
+
+  if(ppInternalAtoms && pszAtomNames && nInternalAtoms > 0)
+  {
+    nAtom = (unsigned int)aAtom - WB_INTERNAL_ATOM_MIN_VAL;
+
+    if(nAtom < nInternalAtoms)
+    {
+      pRval = WBCopyString(ppInternalAtoms[nAtom]);
+    }
+  }
+
+  WBInterlockedExchange(&lInternalAtomSpinner, 0);  // I'm done with it now
+
+  if(!pRval)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - atom index %u (%u) not found, %u atoms stored\n", __FUNCTION__,
+                   (unsigned int)aAtom, (unsigned int)(aAtom - WB_INTERNAL_ATOM_MIN_VAL),
+                   nInternalAtoms);
+  }
+//  else
+//  {
+//    WB_ERROR_PRINT("TEMPORARY:  %s - found %s for Atom %u\n", __FUNCTION__, pRval, (unsigned int)aAtom);
+//  }
+
+  return pRval;
+}
+
 
 
 
@@ -202,7 +1318,7 @@ unsigned char buf[32], buf2[32];
   }
   else
   {
-    sData.pBR = malloc(sData.cbData * 2);
+    sData.pBR = WBAlloc(sData.cbData * 2);
     sData.pSW = (unsigned char *)sData.pBR + sData.cbData;
   }
 
@@ -210,7 +1326,7 @@ unsigned char buf[32], buf2[32];
 
   if(sData.cbData > sizeof(buf))
   {
-    free(sData.pBR);
+    WBFree(sData.pBR);
   }
 }
 
@@ -467,7 +1583,7 @@ char tbuf[256];
 
   colormap = WBDefaultColormap(WBGetDefaultDisplay());
 
-  pClr = malloc(nColors * sizeof(MY_XPM_COLOR));
+  pClr = WBAlloc(nColors * sizeof(MY_XPM_COLOR));
 
   // ------------------------------------------------------------------------------
   // parse the colors - 1-4 chacters, then white space, then the color as '#nnnnnn'
@@ -479,7 +1595,7 @@ char tbuf[256];
 
     if(!pX)
     {
-      free(pClr);
+      WBFree(pClr);
 
       WB_ERROR_PRINT("%s NULL pX unexpected, i1=%d\n", __FUNCTION__, i1);
       return NULL;
@@ -501,7 +1617,7 @@ char tbuf[256];
     if(*pX != 'c' || pX[1] > ' ' || (pX[2] != '#' && strncmp(pX + 2,"None",4)))
     {
       WB_ERROR_PRINT("%s fail 1, pX=\"%s\" pY=\"%s\" %d %c %d\n", __FUNCTION__, pX, pY, pX[1], pX[2], strncmp(pX + 2,"None",4));
-      free(pClr);
+      WBFree(pClr);
 
       return NULL;
     }
@@ -525,24 +1641,24 @@ char tbuf[256];
     else
     {
       WB_ERROR_PRINT("%s fail 2, pX=\"%s\"\n", __FUNCTION__, pX);
-      free(pClr);
+      WBFree(pClr);
       return NULL;
     }
 
     if(*pX)
     {
       WB_ERROR_PRINT("%s fail 3, pX=\"%s\"\n", __FUNCTION__, pX);
-      free(pClr);
+      WBFree(pClr);
       return NULL;
     }
   }
 
   // first usage of 'pRval'
-  pRval = malloc(iH * iW * 4); // pixel array, always 32-bit-wide values; B is first byte, G is 2nd byte, R is 3rd byte, 4th byte is zero
+  pRval = WBAlloc(iH * iW * 4); // pixel array, always 32-bit-wide values; B is first byte, G is 2nd byte, R is 3rd byte, 4th byte is zero
 
   if(!pRval)
   {
-    free(pClr);
+    WBFree(pClr);
     WB_ERROR_PRINT("%s fail, not enough memory for pRval, size=%d\n", __FUNCTION__, iH * iW * 4);
     return NULL;
   }
@@ -550,11 +1666,11 @@ char tbuf[256];
   if(ppTransparency && cNone[0]) // there is a 'None'
   {
     i3 = (iW + 7) / 8; // total number of bytes needed per row [padded]
-    pT = malloc(iH * i3 + 2);
+    pT = WBAlloc(iH * i3 + 2);
     if(!pT)
     {
-      free(pRval);
-      free(pClr);
+      WBFree(pRval);
+      WBFree(pClr);
       WB_ERROR_PRINT("%s fail, not enough memory for pT, size=%d\n", __FUNCTION__, (iH * iW) / 8 + 2);
       return NULL;
     }
@@ -576,8 +1692,8 @@ char tbuf[256];
     pX = *(ppX++);
     if(!pX)
     {
-      free(pRval);
-      free(pClr);
+      WBFree(pRval);
+      WBFree(pClr);
       WB_ERROR_PRINT("%s NULL pX unexpected, i2=%d\n", __FUNCTION__, i2);
       return NULL;
     }
@@ -593,7 +1709,7 @@ char tbuf[256];
       {
         if(!*pX)
         {
-          free(pClr);
+          WBFree(pClr);
           WB_ERROR_PRINT("%s premature end of string, %ld bytes\n", __FUNCTION__, (long)(pX - pY));
           return NULL;
         }
@@ -605,7 +1721,7 @@ char tbuf[256];
 
       if(!pC || memcmp(tbuf, pC->c, sizeof(pC->c)))
       {
-        free(pClr);
+        WBFree(pClr);
         WB_ERROR_PRINT("%s fail, did not locate color %-4.4s\n", __FUNCTION__, tbuf);
         return NULL;
       }
@@ -655,7 +1771,7 @@ char tbuf[256];
     }
   }
 
-  free(pClr);
+  WBFree(pClr);
   pClr = NULL;
 
   if(ppTransparency)
@@ -717,7 +1833,7 @@ int iRval = 0;
                                          1,//BlackPixel(pDisplay, DefaultScreen(pDisplay)), mask 'allow' foreground = 1
                                          0,//WhitePixel(pDisplay, DefaultScreen(pDisplay)), transparent background = 0
                                          1); // depth of one, always
-    free(pTrans);
+    WBFree(pTrans);
 
     if(!pxMask)
     {
@@ -813,7 +1929,7 @@ int iRval = 0;
     }
   }
 
-  free(pB);
+  WBFree(pB);
 
   if(pPixmap)
   {
@@ -907,7 +2023,7 @@ Pixmap pxTemp;
 
   if(!pTrans)
   {
-    free(pB);
+    WBFree(pB);
     fprintf(stderr, "Oh, by the way, no transparency\n");
     fflush(stderr);
     return;
@@ -959,8 +2075,8 @@ Pixmap pxTemp;
     XFreePixmap(pDisplay, pxTemp);
   }
 
-  free(pB);
-  free(pTrans);
+  WBFree(pB);
+  WBFree(pTrans);
 
 
 //  XImage *XCreateImage(Display *display,
@@ -1036,7 +2152,7 @@ no_stat:
 
     // check PATH environment variable, and locate first match
 
-    pRval = malloc(2 * PATH_MAX + strlen(szFileName));
+    pRval = WBAlloc(2 * PATH_MAX + strlen(szFileName));
 
     if(pRval)
     {
@@ -1104,13 +2220,13 @@ no_stat:
           }
           else
           {
-            free(p2);
+            WBFree(p2);
             p2 = NULL;
           }
         }
         else
         {
-          free(p2);
+          WBFree(p2);
           p2 = NULL;
         }
       }
@@ -1124,7 +2240,7 @@ no_stat:
       }
       else // could not find, nor get path info
       {
-        free(pRval);
+        WBFree(pRval);
         pRval = NULL;
       }
     }
@@ -1133,7 +2249,7 @@ no_stat:
     {
       if(pRval)
       {
-        free(pRval);
+        WBFree(pRval);
       }
 
       goto no_stat;
@@ -1148,9 +2264,17 @@ no_stat:
 }
 
 
-//////////////////
-// TEMPORARY FILES
-//////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                          //
+//   _____                                                         _____  _  _              //
+//  |_   _|___  _ __ ___   _ __    ___   _ __  __ _  _ __  _   _  |  ___|(_)| |  ___  ___   //
+//    | | / _ \| '_ ` _ \ | '_ \  / _ \ | '__|/ _` || '__|| | | | | |_   | || | / _ \/ __|  //
+//    | ||  __/| | | | | || |_) || (_) || |  | (_| || |   | |_| | |  _|  | || ||  __/\__ \  //
+//    |_| \___||_| |_| |_|| .__/  \___/ |_|   \__,_||_|    \__, | |_|    |_||_| \___||___/  //
+//                        |_|                              |___/                            //
+//                                                                                          //
+//////////////////////////////////////////////////////////////////////////////////////////////
+
 
 char * WBTempFile0(const char *szExt)
 {
@@ -1236,7 +2360,7 @@ static const char szH[16]="0123456789ABCDEF";
 
       if(h1 < 0) // error
       {
-        free(pRval);
+        WBFree(pRval);
         pRval = NULL;
 
         if(errno == EEXIST)
@@ -1279,6 +2403,60 @@ char *pRval = WBTempFile0(szExt);
 
   return pRval;
 }
+
+static void __add_to_temp_file_list(const char *szFile)
+{
+int i1 = strlen(szFile);
+char *pTemp;
+
+  // TODO:  thread-safe?
+
+  if(!pTempFileList)
+  {
+    cbTempFileList = PATH_MAX * 256;
+    pTempFileList = WBAlloc(cbTempFileList);
+
+    if(!pTempFileList)
+    {
+      return;
+    }
+
+    pTempFileListEnd = pTempFileList;
+  }
+  else if((pTempFileListEnd - pTempFileList) + i1 + 2 >= cbTempFileList)
+  {
+    pTemp = WBReAlloc(pTempFileList, cbTempFileList + (128 * PATH_MAX));
+    if(!pTemp)
+    {
+      return;
+    }
+
+    cbTempFileList += 128 * PATH_MAX; // using a 'while' loop sanity checks this against i1
+
+    if((pTempFileListEnd - pTempFileList) + i1 + 2 >= cbTempFileList) // sanity check
+    {
+      return; // don't bother re-allocating, this is probably NOT sane
+    }
+  }
+
+  memcpy(pTempFileListEnd, szFile, i1);
+  pTempFileListEnd += i1;
+
+  *(pTempFileListEnd++) = 0;
+  *pTempFileListEnd = 0; // always end with 2 0-bytes, point to 2nd one
+}
+
+
+//////////////////////////////////////////////////////////////////////////////
+//                                                                          //
+//             ____                                                         //
+//            |  _ \  _ __  ___    ___  ___  ___  ___   ___  ___            //
+//            | |_) || '__|/ _ \  / __|/ _ \/ __|/ __| / _ \/ __|           //
+//            |  __/ | |  | (_) || (__|  __/\__ \\__ \|  __/\__ \           //
+//            |_|    |_|   \___/  \___|\___||___/|___/ \___||___/           //
+//                                                                          //
+//                                                                          //
+//////////////////////////////////////////////////////////////////////////////
 
 
 WB_PROCESS_ID WBRunAsyncPipeV(WB_FILE_HANDLE hStdIn, WB_FILE_HANDLE hStdOut, WB_FILE_HANDLE hStdErr,
@@ -1326,7 +2504,7 @@ WB_FILE_HANDLE hIn, hOut, hErr;
 #ifndef WIN32
     hIn = open("/dev/null", O_RDONLY, 0);
 #else // WIN32
-    SECURITY_DESCRIPTOR *pSD = (SECURITY_DESCRIPTOR *)malloc(SECURITY_DESCRIPTOR_MIN_LENGTH);
+    SECURITY_DESCRIPTOR *pSD = (SECURITY_DESCRIPTOR *)WBAlloc(SECURITY_DESCRIPTOR_MIN_LENGTH);
 
     if(pSD)
     {
@@ -1335,7 +2513,7 @@ WB_FILE_HANDLE hIn, hOut, hErr;
 
       hIn = CreateFile("NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                        pSD, OPEN_EXISTING, NULL, NULL);
-      free(pSD);
+      WBFree(pSD);
     }
 #endif // WIN32
   }
@@ -1358,7 +2536,7 @@ WB_FILE_HANDLE hIn, hOut, hErr;
 #ifndef WIN32
     hOut = open("/dev/null", O_WRONLY, 0);
 #else // WIN32
-    SECURITY_DESCRIPTOR *pSD = (SECURITY_DESCRIPTOR *)malloc(SECURITY_DESCRIPTOR_MIN_LENGTH);
+    SECURITY_DESCRIPTOR *pSD = (SECURITY_DESCRIPTOR *)WBAlloc(SECURITY_DESCRIPTOR_MIN_LENGTH);
 
     if(pSD)
     {
@@ -1370,7 +2548,7 @@ WB_FILE_HANDLE hIn, hOut, hErr;
 
       // ALTERNATE:  use 'SetHandleInformation(hOut, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT)'
 
-      free(pSD);
+      WBFree(pSD);
     }
 #endif // WIN32
   }
@@ -1393,7 +2571,7 @@ WB_FILE_HANDLE hIn, hOut, hErr;
 #ifndef WIN32
     hErr = open("/dev/null", O_WRONLY, 0);
 #else // WIN32
-    SECURITY_DESCRIPTOR *pSD = (SECURITY_DESCRIPTOR *)malloc(SECURITY_DESCRIPTOR_MIN_LENGTH);
+    SECURITY_DESCRIPTOR *pSD = (SECURITY_DESCRIPTOR *)WBAlloc(SECURITY_DESCRIPTOR_MIN_LENGTH);
 
     if(pSD)
     {
@@ -1402,7 +2580,7 @@ WB_FILE_HANDLE hIn, hOut, hErr;
 
       hErr = CreateFile("NUL", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
                         pSD, OPEN_EXISTING, NULL, NULL);
-      free(pSD);
+      WBFree(pSD);
     }
 #endif // WIN32
   }
@@ -1443,7 +2621,7 @@ WB_FILE_HANDLE hIn, hOut, hErr;
 
     if(pAppName != szAppName)
     {
-      free(pAppName);
+      WBFree(pAppName);
     }
 
     return WB_INVALID_FILE_HANDLE;
@@ -1467,7 +2645,7 @@ WB_FILE_HANDLE hIn, hOut, hErr;
     nItems++;
   }
 
-  argv = (char **)malloc(64 + cbItems);
+  argv = (char **)WBAlloc(64 + cbItems);
   if(!argv)
   {
     close(hIn);
@@ -1476,7 +2654,7 @@ WB_FILE_HANDLE hIn, hOut, hErr;
 
     if(pAppName != szAppName)
     {
-      free(pAppName);
+      WBFree(pAppName);
     }
 
 //    WB_ERROR_PRINT("TEMPORARY:  %s HERE I AM (1)\n", __FUNCTION__);
@@ -1729,14 +2907,14 @@ WB_FILE_HANDLE hIn, hOut, hErr;
   // once I've forked, I don't have to worry about copied memory or shared memory
   // and it's safe to free the allocated 'argv' array.
 
-  free(argv);
+  WBFree(argv);
   close(hIn);
   close(hOut);
   close(hErr);
 
   if(pAppName != szAppName)
   {
-    free(pAppName);
+    WBFree(pAppName);
   }
 
 
@@ -1797,11 +2975,11 @@ unsigned int cbBuf;
 
 
   cbBuf = WBRUNRESULT_BUFFER_MINSIZE;
-  pRval = malloc(cbBuf);
+  pRval = WBAlloc(cbBuf);
 
   if(!pRval)
   {
-//    WB_ERROR_PRINT("TEMPORARY:  %s HERE I AM (1) malloc fail %d\n", __FUNCTION__, cbBuf);
+//    WB_ERROR_PRINT("TEMPORARY:  %s HERE I AM (1) WBAlloc fail %d\n", __FUNCTION__, cbBuf);
     return NULL;
   }
 
@@ -1820,7 +2998,7 @@ unsigned int cbBuf;
   if(0 > pipe(hP))
 #endif // WIN32
   {
-    free(pRval);
+    WBFree(pRval);
 //    WB_ERROR_PRINT("TEMPORARY:  %s HERE I AM (2)\n", __FUNCTION__);
     return NULL;
   }
@@ -1858,10 +3036,10 @@ unsigned int cbBuf;
       i2 = cbBuf - (p1 - pRval);
       if(i2 < WBRUNRESULT_BYTES_TO_READ / 8) // time to re-allocate
       {
-        p2 = realloc(pRval, cbBuf + WBRUNRESULT_BUFFER_MINSIZE / 2);
+        p2 = WBReAlloc(pRval, cbBuf + WBRUNRESULT_BUFFER_MINSIZE / 2);
         if(!p2)
         {
-          free(pRval);
+          WBFree(pRval);
           pRval = NULL;
 
 //          WB_ERROR_PRINT("TEMPORARY:  %s HERE I AM (4)\n", __FUNCTION__);
@@ -2010,7 +3188,7 @@ bad_file:
 #else // WIN32
       unlink(pTemp);
 #endif // WIN32
-      free(pTemp);
+      WBFree(pTemp);
 
 //      WB_ERROR_PRINT("TEMPORARY:  %s HERE I AM (2)\n", __FUNCTION__);
 
@@ -2054,14 +3232,23 @@ bad_file:
     unlink(pTemp);
 #endif // WIN32
 
-    free(pTemp);
+    WBFree(pTemp);
   }
 
   return pRval;
 }
 
 
-// DYNAMIC LIBRARY SUPPORT
+//////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                      //
+//   ____   _                            _   _      _  _                                //
+//  / ___| | |__    __ _  _ __  ___   __| | | |    (_)| |__   _ __  __ _  _ __  _   _   //
+//  \___ \ | '_ \  / _` || '__|/ _ \ / _` | | |    | || '_ \ | '__|/ _` || '__|| | | |  //
+//   ___) || | | || (_| || |  |  __/| (_| | | |___ | || |_) || |  | (_| || |   | |_| |  //
+//  |____/ |_| |_| \__,_||_|   \___| \__,_| |_____||_||_.__/ |_|   \__,_||_|    \__, |  //
+//                                                                              |___/   //
+//                                                                                      //
+//////////////////////////////////////////////////////////////////////////////////////////
 
 #ifdef WIN32
 
@@ -2102,10 +3289,20 @@ WB_PROCADDRESS WBGetProcAddress(WB_MODULE hModule, const char *szProcName)
 #endif // 'dlfunc' check  
 }
 
+#endif // POSIX, WIN32
 
-// ---------------------
-// SIMPLE THREAD SUPPORT
-// ---------------------
+//////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                          //
+//   _____  _                            _   ____                                     _     //
+//  |_   _|| |__   _ __  ___   __ _   __| | / ___|  _   _  _ __   _ __    ___   _ __ | |_   //
+//    | |  | '_ \ | '__|/ _ \ / _` | / _` | \___ \ | | | || '_ \ | '_ \  / _ \ | '__|| __|  //
+//    | |  | | | || |  |  __/| (_| || (_| |  ___) || |_| || |_) || |_) || (_) || |   | |_   //
+//    |_|  |_| |_||_|   \___| \__,_| \__,_| |____/  \__,_|| .__/ | .__/  \___/ |_|    \__|  //
+//                                                        |_|    |_|                        //
+//                                                                                          //
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+
 
 WB_THREAD_KEY WBThreadAllocLocal(void)
 {
@@ -2331,9 +3528,17 @@ void WBThreadClose(WB_THREAD hThread)
 }
 
 
-// ------------------------
-//  CONDITIONS AND MUTEXES
-// ------------------------
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                                                               //
+//    ____                   _  _  _    _                         _                _   __  __         _                          //
+//   / ___| ___   _ __    __| |(_)| |_ (_)  ___   _ __   ___     / \    _ __    __| | |  \/  | _   _ | |_  ___ __  __ ___  ___   //
+//  | |    / _ \ | '_ \  / _` || || __|| | / _ \ | '_ \ / __|   / _ \  | '_ \  / _` | | |\/| || | | || __|/ _ \\ \/ // _ \/ __|  //
+//  | |___| (_) || | | || (_| || || |_ | || (_) || | | |\__ \  / ___ \ | | | || (_| | | |  | || |_| || |_|  __/ >  <|  __/\__ \  //
+//   \____|\___/ |_| |_| \__,_||_| \__||_| \___/ |_| |_||___/ /_/   \_\|_| |_| \__,_| |_|  |_| \__,_| \__|\___|/_/\_\\___||___/  //
+//                                                                                                                               //
+//                                                                                                                               //
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 int WBCondCreate(WB_COND *pCond)
 {
@@ -2342,6 +3547,13 @@ int iRval = -1;
   if(pCond)
   {
 #ifdef WIN32
+    // because of problems under Windows, this will be defined as 'unsigned int'
+    // and I'll use the increment/decrement interlock functions and wait loops to
+    // monitor the signaling.
+
+    *pCond = 0;
+
+    iRval = 0; // success!
 #else  // WIN23
 //    pthread_condattr_t attr;
 //    iRval = pthread_condattr_init(&attr);
@@ -2356,9 +3568,7 @@ int iRval = -1;
 //      pthread_condattr_destroy(&attr);
 //    }
 
-    // because of problems under Windows, this will be defined as 'unsigned int'
-    // and I'll use the increment/decrement interlock functions and wait loops to
-    // monitor the signaling.
+    // note:  Implementing with 'interlock' in POSIX as well
 
     *pCond = 0;
 
@@ -2389,7 +3599,11 @@ int WBMutexCreate(WB_MUTEX *pMtx)
 void WBCondFree(WB_COND *pCond)
 {
 #ifdef WIN32
-  CloseHandle(*pCond);
+//  CloseHandle(*pCond);
+  if(pCond)
+  {
+    *pCond = 1; // forces a waiting thread to signal (though only one will probably do it)
+  }
 #else  // WIN23
   if(pCond)
   {
@@ -2466,8 +3680,8 @@ int WBMutexUnlock(WB_MUTEX *pMtx)
 
 int WBCondSignal(WB_COND *pCond)
 {
-#ifdef WIN32
-#else  // WIN23
+//#ifdef WIN32
+//#else  // WIN23
 //  return pthread_cond_signal(pCond);
 
   if(pCond)
@@ -2475,7 +3689,7 @@ int WBCondSignal(WB_COND *pCond)
     WBInterlockedExchange(pCond, 1); // assign to 1 [this is my trigger]
     return 0;
   }
-#endif // WIN32
+//#endif // WIN32
 
   return -1;
 }
@@ -2483,8 +3697,8 @@ int WBCondSignal(WB_COND *pCond)
 int WBCondWait(WB_COND *pCond, int nTimeout)
 {
 int iRval = -1;
-#ifdef WIN32
-#else  // WIN23
+//#ifdef WIN32
+//#else  // WIN23
 //WB_MUTEX xMtx;
 //
 //  if(WBMutexCreate(&xMtx)) // needed by call to pthread_cond_timedwait
@@ -2548,7 +3762,7 @@ int iRval = -1;
     }
   }
 
-#endif // WIN32
+//#endif // WIN32
 
   return iRval;
 }
@@ -2622,6 +3836,9 @@ int iRval = -1;
 
 unsigned int WBInterlockedDecrement(volatile unsigned int *pValue)
 {
+#ifdef WIN32
+  return InterlockedDecrement(pValue);
+#else // !WIN32
 unsigned int iRval;
 
   pthread_rwlock_wrlock(&xInterlockedRWLock);
@@ -2632,10 +3849,14 @@ unsigned int iRval;
   pthread_rwlock_unlock(&xInterlockedRWLock);
 
   return iRval;
+#endif // WIN32
 }
 
 unsigned int WBInterlockedIncrement(volatile unsigned int *pValue)
 {
+#ifdef WIN32
+  return InterlockedIncrement(pValue);
+#else // !WIN32
 unsigned int iRval;
 
   pthread_rwlock_wrlock(&xInterlockedRWLock);
@@ -2646,10 +3867,14 @@ unsigned int iRval;
   pthread_rwlock_unlock(&xInterlockedRWLock);
 
   return iRval;
+#endif // WIN32
 }
 
 unsigned int WBInterlockedExchange(volatile unsigned int *pValue, unsigned int nNewVal)
 {
+#ifdef WIN32
+  return InterlockedExchange(pValue, nNewVal); // pretty sure this is right...
+#else // !WIN32
 unsigned int iRval;
 
   pthread_rwlock_wrlock(&xInterlockedRWLock);
@@ -2664,6 +3889,9 @@ unsigned int iRval;
 
 unsigned int WBInterlockedRead(volatile unsigned int *pValue)
 {
+#ifdef WIN32
+  return *pValue; // for now; later, there might be a better way
+#else // !WIN32
 unsigned int iRval;
 
   pthread_rwlock_rdlock(&xInterlockedRWLock); // this only does a read lock
@@ -2673,6 +3901,7 @@ unsigned int iRval;
   pthread_rwlock_unlock(&xInterlockedRWLock);
 
   return iRval;
+#endif // WIN32
 }
 
 
@@ -2691,11 +3920,21 @@ int WBPrintPostScriptFile(const char *szPrinterName, const char *szFileName)
 {
 // use 'lpr-cups' if present; /usr/local/bin/lpr if present; then 'lpr'.
 // search order will be /usr/local/bin /usr/local/sbin /usr/bin /usr/sbin /bin /sbin for 'lpr'
+// prioritize this against the results using 'PATH'.  user might want something else...
+// (examples might be a lack of 'sbin' in PATH, or specifying system before local)
 // alternately COULD use 'which' output if 'which' is present.
 
 // typical command line will be 'lpr -P"printer name" filename'
 
 // TODO: postscript to binary-format conversion using 'ghostscript'
+
+// TODO:  check for presence of cups, get printer caps, specify more information on 'lpr' command
+
+// TODO:  use 'internet print protocol' to localhost:631/printers/printername
+
+
+// for Win32, might need to write a simple postscript renderer onto a printer display surface...
+
 
   return -1; // error (for now)
 }
@@ -2703,6 +3942,13 @@ int WBPrintPostScriptFile(const char *szPrinterName, const char *szFileName)
 char *WBGetPrinterList(void)
 {
   // open 'printcap' and list the entries
+
+  // TODO: check for presence of cups web interface, request printer list "somehow"
+  //       from there, I can grab individual printers' capabilities once I have their names
+
+  // TODO:  for Win32 generate the list via shell APIs
+
+  // TODO:  a 'select printer' dialog box that's standardized for all platforms
 
 
   return NULL; // for now

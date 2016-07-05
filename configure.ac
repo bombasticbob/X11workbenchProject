@@ -107,14 +107,16 @@ if test x$libXpm = xtrue ; then
   AC_CHECK_HEADER([X11/xpm.h],test_have_xpm=true,AC_MSG_WARN([missing xpm.h - you should consider installing libXpm]))
 fi
 
+# check for a few functions that I want to verify exist
 AC_CHECK_FUNCS([printf])
 AC_CHECK_FUNCS([alarm])
 AC_CHECK_FUNCS([memset])
 AC_CHECK_FUNCS([nanosleep])
-
-# the 'clock_gettime' function might require '-lrt'
+# the 'clock_gettime' function might require '-lrt' - see next section
 AC_CHECK_FUNCS([clock_gettime])
 
+
+# check for a couple of things that might need external libraries
 AC_CHECK_LIB(rt, clock_gettime, test_need_lrt=true)
 AC_CHECK_LIB(dl, dlopen, test_need_ldl=true)
 
@@ -123,6 +125,7 @@ AC_CHECK_LIB(dl, dlopen, test_need_ldl=true)
 # malloc_usable_size - mostly for debugging purposes, not supported everywhere
 
 AC_CHECK_FUNC(malloc_usable_size, [AC_DEFINE(HAVE_MALLOC_USABLE_SIZE,[1],[whether or not malloc_usable_size is available] ) ])
+
 
 ############################################################################################
 #    qsort_r - definition for GNU C and BSD differ, other platforms may not have it at all
@@ -188,6 +191,36 @@ else
 fi
 
 ############################################################################################
+
+
+############################################################################################
+#    LONG LONG DATATYPE - checking for support (simple)
+#
+
+AC_LANG_PUSH([C])
+  AC_MSG_CHECKING([that the 'long long' data type is supported])
+  AC_RUN_IFELSE(
+  [AC_LANG_SOURCE([[
+    #include <stdio.h>
+    #include <stdlib.h>
+    int main()
+    {
+      static long long llTemp1 = 0;
+      static unsigned long long ullTemp2 = 0;
+
+      return 0;
+    }]] )],
+    [
+      AC_MSG_RESULT([yes!!! (supported)])
+      AC_DEFINE([HAVE_LONGLONG],[1],[ HAVE_LONGLONG is defined whenever 'long long' is supported ])
+    ],
+    [
+      AC_MSG_RESULT([no (not supported)])
+    ] )
+AC_LANG_POP([C])
+
+############################################################################################
+
 
 AC_C_CONST
 AC_HEADER_STDC

@@ -144,6 +144,8 @@ extern "C" {
                          "_Open File\tIDM_FILE_OPEN\tOpen File\tCtrl+O\n"
                          "_Save File\tIDM_FILE_SAVE\tSave File\tCtrl+S\n"
                          "\tseparator\n"
+                         "\tdynamic\tIDM_RECENT_FILESn"
+                         "\tseparator\n"
                          "E_xit\tIDM_FILE_EXIT\tClose Application\tAlt+F4\n"
                          "\n";
 
@@ -153,6 +155,7 @@ extern "C" {
     FW_MENU_HANDLER_ENTRY("IDM_FILE_EXIT",FileExitHandler,NULL)
     FW_MENU_HANDLER_ENTRY("IDM_FILE_OPEN",FileOpenHandler,NULL)
     FW_MENU_HANDLER_ENTRY("IDM_FILE_SAVE",FileSaveHandler,NULL)
+    FW_MENU_HANDLER_ENTRY("IDM_RECENT_FILES",NULL,RecentFilesUIHandler)
   FW_MENU_HANDLER_END
 
   ---
@@ -306,7 +309,7 @@ enum WBStatusTabInfo_FLAGS
 };
 
 
-// WBChildFrame is defined HERE to avoid circular header file dependencies
+struct __WBChildFrameUI__; // forward declaration
 
 /** \struct __WBChildFrame__
   * \ingroup child_frame
@@ -328,38 +331,68 @@ enum WBStatusTabInfo_FLAGS
 
   typedef struct __WBChildFrame__
   {
-    unsigned int ulTag;               // tag indicating I'm a 'Child Frame' window
-    Window wID;                       // window identifier for the 'Child Frame' window.  may contain 'None' while being destroyed
-    WBFrameWindow *pOwner;            // a pointer to the WBFrameWindow owner
-    XFontStruct *pFont;               // default font for the window
+    unsigned int ulTag;
+      // tag indicating I'm a 'Child Frame' window
+    Window wID;
+      // window identifier for the 'Child Frame' window.  may contain 'None' while being destroyed
+    WBFrameWindow *pOwner;
+      // a pointer to the WBFrameWindow owner
+    XFontStruct *pFont;
+      // default font for the window
 
-    int iTop;                         // 0-based position of the top of the current viewport (in lines or pixels)
-    int iHeight;                      // 0-based height of the current viewport (in lines or pixels)
-    int iLeft;                        // 0-based position of the left of the current viewport (in characters or pixels)
-    int iWidth;                       // 0-based width of the current viewport (in characters or pixels)
+    WB_GEOM geom;                     
+      // client-area geometry (excludes scroll bars)
 
-    int iXExtent;                     // X extent for the display surface (determines scrolling behavior)
-    int iYExtent;                     // Y extent for the display surface (determines scrolling behavior)
+    int iTop;
+      // 0-based position of the top of the current viewport (in lines or pixels)
+    int iHeight;
+      // 0-based height of the current viewport (in lines or pixels)
+    int iLeft;
+      // 0-based position of the left of the current viewport (in characters or pixels)
+    int iWidth;
+      // 0-based width of the current viewport (in characters or pixels)
 
-    WB_SCROLLINFO scroll;             // 'scroll info' (horizontal and vertical min/max/pos and other details)
+    int iXExtent;
+      // cached X extent for the display surface (determines scrolling behavior)
+    int iYExtent;
+      // cached Y extent for the display surface (determines scrolling behavior)
 
-    int iSplit;                       // reserved - position for 'split'
+    WB_SCROLLINFO scroll;
+      // 'scroll info' (horizontal and vertical min/max/pos and other details)
 
-    WB_SCROLLINFO scrollSplit;        // 'scroll info' for 'split' area (vertical only)
+    int iSplit;
+      // reserved - position for 'split' (-1 for 'no split')
 
-    int iTabIndex;                    // Current tab index (for tabbed versions; -1 for "no tabs") - set by owner
-    int fFlags;                       // various bitflags defining features.
+    WB_SCROLLINFO scrollSplit;
+      // 'scroll info' for 'split' area (implementation-defined)
 
-    char *szDisplayName;              // display name shown in tab and title bar.  You should not alter this member directly.
-    Atom aImageAtom;                  // 'image' atom for display in tabs.  default is 'None'.  You should not alter this member directly.
+    int fFlags;
+      // various bitflags defining features.
 
-    char *pszMenuResource;            ///< malloc'd resource string for this child frame's menu (NULL = 'use default')
-    WBFWMenuHandler *pMenuHandler;    ///< malloc'd menu handler for this child frame's menu (NULL = 'use default')
+    char *szDisplayName;
+      // display name shown in tab and title bar.  You should not alter this member directly.
+    Atom aImageAtom;
+      // 'image' atom for display in tabs.  default is 'None'.  You should not alter this member directly.
 
-    WBWinEvent pUserCallback;         // message callback function pointer (can be NULL)
-    void (*destructor)(struct __WBChildFrame__ *);  // pointer to a destructor.  if not NULL, will be called by FWDestroyChildFrame()
+    char *szStatusText;
+      // Status text ('WBAlloc'd) to display when this child frame window has the input focus.
+      // Updated by 'superclass'.  Can be NULL.
 
-    struct __WBChildFrame__ *pNext;   // 'Next Object' pointer in an internally stored linked list
+    char *pszMenuResource;
+      // WBAlloc'd resource string for this child frame's menu (NULL = 'use default')
+    WBFWMenuHandler *pMenuHandler;
+      // WBAlloc'd menu handler for this child frame's menu (NULL = 'use default')
+
+    WBWinEvent pUserCallback;
+      // message callback function pointer (can be NULL)
+    void (*destructor)(struct __WBChildFrame__ *);
+      // pointer to a destructor.  if not NULL, will be called by FWDestroyChildFrame()
+
+    WBChildFrameUI *pUI;
+      // pointer to 'WBChildFrameUI' function pointer table (assigned by 'superclass')
+
+    struct __WBChildFrame__ *pNext;
+      // 'Next Object' pointer in an internally stored linked list (do not alter or use this)
   } WBChildFrame;
 
   * \endcode
@@ -376,35 +409,305 @@ typedef struct __WBChildFrame__
   WBFrameWindow *pOwner;            ///< a pointer to the WBFrameWindow owner
   XFontStruct *pFont;               ///< default font for the window
 
+  WB_GEOM geom;                     ///< client-area geometry (excludes scroll bars)
+
   int iTop;                         ///< 0-based position of the top of the current viewport (in lines or pixels)
   int iHeight;                      ///< 0-based height of the current viewport (in lines or pixels)
   int iLeft;                        ///< 0-based position of the left of the current viewport (in characters or pixels)
   int iWidth;                       ///< 0-based width of the current viewport (in characters or pixels)
 
-  int iXExtent;                     ///< X extent for the display surface (determines scrolling behavior)
-  int iYExtent;                     ///< Y extent for the display surface (determines scrolling behavior)
+  int iXExtent;                     ///< cached X extent for the display surface (determines scrolling behavior)
+  int iYExtent;                     ///< cached Y extent for the display surface (determines scrolling behavior)
 
   WB_SCROLLINFO scroll;             ///< 'scroll info' (horizontal and vertical min/max/pos and other details)
 
-  int iSplit;                       ///< reserved - position for 'split'
+  int iSplit;                       ///< reserved - position for 'split' (-1 for 'no split')
 
-  WB_SCROLLINFO scrollSplit;        ///< 'scroll info' for 'split' area (vertical only)
+  WB_SCROLLINFO scrollSplit;        ///< 'scroll info' for 'split' area (implementation-defined)
 
-  int iTabIndex;                    ///< Current tab index (for tabbed versions; -1 for "no tabs") - set by owner
   int fFlags;                       ///< various bitflags defining features.  See WBChildFrame_FLAGS enum.
 
   char *szDisplayName;              ///< display name shown in tab and title bar.  You should not alter this member directly.
   Atom aImageAtom;                  ///< 'image' atom for display in tabs.  default is 'None'.  You should not alter this member directly.
+
+  char *szStatusText;               ///< Status text ('WBAlloc'd) to display when this child frame window has the input focus.  Updated by 'superclass'.  can be NULL.
 
   char *pszMenuResource;            ///< resource string for this child frame's menu (NULL = 'use default')
   WBFWMenuHandler *pMenuHandler;    ///< menu handler for this child frame's menu (NULL = 'use default')
 
   WBWinEvent pUserCallback;         ///< message callback function pointer (can be NULL)
   void (*destructor)(struct __WBChildFrame__ *);  ///< pointer to a 'superclass' destructor.  If not NULL, will be called by FWDestroyChildFrame()
+  struct __WBChildFrameUI__ *pUI;   ///< pointer to 'WBChildFrameUI' function pointer table (assigned by 'superclass')
 
-  struct __WBChildFrame__ *pNext;   ///< 'Next Object' pointer in an internally stored linked list
+  struct __WBChildFrame__ *pNext;   ///< 'Next Object' pointer in an internally stored linked list (do not alter or use this)
 } WBChildFrame;
 
+
+// WBChildFrame is defined HERE to avoid circular header file dependencies
+// (also defining supporting structs for same reason)
+
+/** \struct __WBChildFrameUI__
+  * \ingroup child_frame
+  * \copydoc WBChildFrameUI
+**/
+/** \typedef WBChildFrameUI
+  * \ingroup child_frame
+  * \brief Structure that defines a Child Frame's UI, mainly for a 'superclass'
+  *
+  * The base user interface for a child frame does very little except interact with tabs and the
+  * Frame Window.  To make it really do something, you need some kind of interface. This function table
+  * defines the UI interface for a Child Frame that will allow it to perform basic editing and navigation
+  * functions.  If you need additional capabilities, you can hook the messages with the assigned callback
+  * function.  Otherwise, most of the work will already be done for your custom child frame.\n
+  *
+  * \code
+
+  typedef struct __WBChildFrameUI__
+  {
+    unsigned int ulTag;
+      // tag indicating I'm a 'Child Frame UI' structure
+
+    void (*do_char)(WBChildFrame *, XClientMessageEvent *);
+      // handler for regular WM_CHAR Client Messages (typed-in characters).
+      // NOT called for 'special' characters.
+
+    void (*scancode)(WBChildFrame *, XClientMessageEvent *);
+      // handler for 'other scan code' WM_CHAR Client Messages (typed-in characters)
+
+    void (*bkspace)(WBChildFrame *, int iACS);
+      // 'backspace' delete character (backspace equivalent).
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+
+    void (*del)(WBChildFrame *, int iACS);
+      // 'delete' char under cursor (delete equivalent).
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+
+    void (*tab)(WBChildFrame *, int iACS);
+      // 'tab' char, or tab navigation.
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+
+    void (*enter)(WBChildFrame *, int iACS);
+      // 'enter' char, or 'enter' for navigation.
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+
+    void (*uparrow)(WBChildFrame *, int iACS);
+      // 'up' arrow navigation.
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+
+    void (*downarrow)(WBChildFrame *, int iACS);
+      // 'down' arrow navigation.
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+
+    void (*leftarrow)(WBChildFrame *, int iACS);
+      // 'left' arrow navigation.
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+
+    void (*rightarrow)(WBChildFrame *, int iACS);
+      // 'right' arrow navigation.
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+
+    void (*home)(WBChildFrame *, int iACS);
+      // 'home' arrow navigation.
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+
+    void (*end)(WBChildFrame *, int iACS);
+      // 'end' arrow navigation.
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+
+    void (*pgup)(WBChildFrame *, int iACS);
+      // 'page up' navigation.
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+
+    void (*pgdown)(WBChildFrame *, int iACS);
+      // 'page down' navigation.
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+
+    void (*pgleft)(WBChildFrame *, int iACS);
+      // 'page left' navigation.
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+
+    void (*pgright)(WBChildFrame *, int iACS);
+      // 'page right' navigation.
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+
+    void (*help)(WBChildFrame *, int iACS);
+      // 'help' context (F1).
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+
+    void (*hover_notify)(WBChildFrame *, int x, int y);
+      // 'mouse hover' notification (x and y are pixel coords with respect to upper left corner)
+
+    void (*hover_cancel)(WBChildFrame *);
+      // 'mouse hover' cancel notification (cancel any 'hover' action)
+
+    int (*is_ins_mode)(WBChildFrame *);
+      // returns non-zero if in 'insert' mode, 0 for 'overwrite'
+
+    void (*toggle_ins_mode)(WBChildFrame *);
+      // toggles insert mode on/off (press 'INS' key)
+
+    void (*copy_to_cb)(WBChildFrame *);
+      // copy selection to clipboard
+
+    void (*paste_from_cb)(WBChildFrame *);
+      // paste from clipboard
+
+    void (*cut_to_cb)(WBChildFrame *);
+      // delete selection, copying to clipboard first
+
+    void (*delete_sel)(WBChildFrame *);
+      // delete selection only
+
+    void (*select_all)(WBChildFrame *);
+      // select all
+
+    void (*select_none)(WBChildFrame *);
+      // select none
+
+    void (*save)(WBChildFrame *, const char *szFileName);
+      // save to specified file name (NULL to keep same file name)
+
+    WB_PCSTR (* get_file_name)(WBChildFrame *);
+      // get (const) pointer to file name string
+
+    void (*mouse_click)(WBChildFrame *, int iX, int iY,
+                        int iButtonMask, int iACS);
+      // 'mouse click' notification.  See Also: aWM_POINTER
+
+    void (*mouse_dblclick)(WBChildFrame *, int iX, int iY,
+                           int iButtonMask, int iACS);
+      // 'mouse double click' notification.  See Also: aWM_POINTER
+
+    void (*mouse_drag)(WBChildFrame *, int iX, int iY,
+                       int iButtonMask, int iACS);
+      // 'mouse drag' (begin) notification.  See Also: aWM_POINTER
+
+    void (*mouse_drop)(WBChildFrame *, int iX, int iY,
+                       int iButtonMask, int iACS);
+      // 'mouse drop' (drag end) notification.  See Also: aWM_POINTER
+
+    void (*mouse_move)(WBChildFrame *, int iX, int iY);
+      // 'mouse motion' notification.  See Also: aWM_POINTER
+
+    void (*mouse_scrollup)(WBChildFrame *, int iX, int iY,
+                           int iButtonMask, int iACS);
+      // 'mouse scroll up' notification.  See Also: aWM_POINTER
+
+    void (*mouse_scrolldown)(WBChildFrame *, int iX, int iY,
+                             int iButtonMask, int iACS);
+      // 'mouse scroll down' notification.  See Also: aWM_POINTER
+
+    void (*mouse_cancel)(WBChildFrame *);
+      // 'mouse cancel' notification (cancel 'drag', etc.).
+      // See Also:  aWM_POINTER , WBMouseCancel()
+
+    void (*get_row_col)(WBChildFrame *, int *piR, int *piC);
+      // Obtain the current row/column cursor location for UI notification.
+      // 'piR' points to an integer to get the row, and
+      // 'piC' points to an integer to get the column.
+      // Both are 1-based values (<= 0 is 'error' or 'NA')
+
+    int (*has_selection)(WBChildFrame *);
+      // returns non-zero value if there is a selection                                                              
+
+    void (*undo)(WBChildFrame *);
+      // perform an undo
+
+    void (*redo)(WBChildFrame *);
+      // perform a re-do
+
+    int (*can_undo)(WBChildFrame *);
+      // returns non-zero value if 'can undo'
+
+    int (*can_redo)(WBChildFrame *);
+      // returns non-zero value if 'can redo'
+
+  } WBChildFrameUI;
+
+  * \endcode
+  *
+  * A window interface derived from 'WBChildFrame' needs a way for the 'abstract class' to invoke the
+  * UI functionality.  To make this work, the 'superclass' (i.e. derived) window interface can populate
+  * a WBChildFrameUI structure with function pointers, as needed, to implement the necessary elements.
+  *
+  * For those elements that are NOT implemented, you can use NULL for the function pointer.  That way if
+  * the derived window interface does not need 'hover' support, you can leave the 'hover_notify' and
+  * 'hover_cancel' function pointers as NULL, but populate everything else.
+  *
+  * For the 'iACS' parameters, use the 'iACS' information from the aWM_CHAR.  This is the 'Alt/Ctrl/Shift'
+  * flag that indicates which of those buttons were being held down at the time of the character translation.
+  * For more information on THAT, see \ref aWM_CHAR "WM_CHAR".
+  *
+  * The basic difference between 'do_char' and 'scancode' is that the 'character' events will be passed along
+  * to the 'do_char' callback, but 'scan code' events (NOT processed by one of the other callbacks) will be
+  * passed along via the 'scancode' callback.  This will allow your custom UI handler to interpret additional
+  * 'special' keys as needed.  The ones normally processed are:  insert, delete, home, end, pgup, pgdown, and
+  * the 'F1' key.
+  *
+  * NOTE:  if a menu defines hotkey combinations, no 'WM_CHAR' event will be generated for any of those.  Instead,
+  * the menu handler needs to interpret them correctly if the UI callback will need to be invoked.  One example
+  * in the X11workbench.c handler (for the main edit window UI) is the handling of the 'Edit' sub-menu, which
+  * includes hotkey combinations such as 'CTRL+V' for 'paste'.  When the 'paste' menu is invoked, the handler will
+  * need to grab the WBChildFrameUI structure for the currently active Child Window, and invoke its 'paste_from_cb'
+  * callback function directly.  Similarly, if 'F1' is invoked, it will need to call the 'help' function directly,
+  * passing the correct 'iACS' parameter value.
+  *
+**/
+typedef struct __WBChildFrameUI__
+{
+  unsigned int ulTag;                                       ///< tag indicating I'm a 'Child Frame UI' structure
+  void (*do_char)(WBChildFrame *, XClientMessageEvent *);   ///< handler for regular WM_CHAR Client Messages (typed-in characters). \details The XClientMessageEvent will be interpreted and characters added to the associated document or object.  This function should NOT be called for 'special' characters, like cursors, backspace, and so on.
+  void (*scancode)(WBChildFrame *, XClientMessageEvent *);  ///< handler for 'other scan code' WM_CHAR Client Messages.  \details For those characters NOT already processed as actual characters or 'special' characters, call this function.  The XClientMessageEvent will be interpreted, and characters may be added to the associated document or object.  In some cases, there may be additional actions performed.  This function should rarely be needed.
+  void (*bkspace)(WBChildFrame *, int iACS);                ///< 'backspace' delete character (backspace equivalent), or perform related 'backspace' operation via ctrl/alt/shift.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+  void (*del)(WBChildFrame *, int iACS);                    ///< 'delete' char under cursor (delete equivalent), or perform related 'delete' operation via ctrl/alt/shift.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+  void (*tab)(WBChildFrame *, int iACS);                    ///< 'tab' char, or tab navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+  void (*enter)(WBChildFrame *, int iACS);                  ///< 'enter' char, or 'enter' for navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+  void (*uparrow)(WBChildFrame *, int iACS);                ///< 'up' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+  void (*downarrow)(WBChildFrame *, int iACS);              ///< 'down' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+  void (*leftarrow)(WBChildFrame *, int iACS);              ///< 'left' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+  void (*rightarrow)(WBChildFrame *, int iACS);             ///< 'right' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+  void (*home)(WBChildFrame *, int iACS);                   ///< 'home' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+  void (*end)(WBChildFrame *, int iACS);                    ///< 'end' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+  void (*pgup)(WBChildFrame *, int iACS);                   ///< 'page up' navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+  void (*pgdown)(WBChildFrame *, int iACS);                 ///< 'page down' navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+  void (*pgleft)(WBChildFrame *, int iACS);                 ///< 'page left' navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+  void (*pgright)(WBChildFrame *, int iACS);                ///< 'page right' navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+  void (*help)(WBChildFrame *, int iACS);                   ///< 'help' context (F1).  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+  void (*hover_notify)(WBChildFrame *, int x, int y);       ///< 'mouse hover' notification \details x and y are pixel coords with respect to upper left corner
+  void (*hover_cancel)(WBChildFrame *);                     ///< 'mouse hover' cancel notification \details This will cancel any 'hover' action
+  int (*is_ins_mode)(WBChildFrame *);                       ///< Use this to determine whether you are in 'insert' or 'overwrite' mode. \details returns non-zero if in 'insert' mode, 0 for 'overwrite'
+  void (*toggle_ins_mode)(WBChildFrame *);                  ///< toggles insert mode on or off \details You can determine the current insert/overwrite state by calling is_ins_mode()
+  void (*copy_to_cb)(WBChildFrame *);                       ///< copy selection to clipboard \details implements 'copy' functionality.  The current selection will be copied to the clipboard
+  void (*paste_from_cb)(WBChildFrame *);                    ///< paste from clipboard \details implements 'paste' functionality.  The current clipboard contents will be pasted, either at the cursor location, or replacing the current selection
+  void (*cut_to_cb)(WBChildFrame *);                        ///< delete selection, copying to clipboard first \details implements 'cut' functionality
+  void (*delete_sel)(WBChildFrame *);                       ///< delete selection only \details deletes the current selection, but has no effect if there is no selection.  To delete a character, see 'del()'
+  void (*select_all)(WBChildFrame *);                       ///< select all \details implements the 'select all' functionality
+  void (*select_none)(WBChildFrame *);                      ///< select none \details implements the 'select none' functionality
+  void (*save)(WBChildFrame *, const char *szFileName);     ///< save to specified file name \details A value of 'NULL' will keep same file name.  If the file name is also NULL (or blank), nothing will be saved.
+
+  WB_PCSTR (* get_file_name)(WBChildFrame *);               ///< get a (const) pointer to the file name string \details Use this function to find out what the currently assigned file name is.  The returned pointer is NOT persistent across function calls.  If you need a copy, use SBCopyString() or similar
+
+  void (*mouse_click)(WBChildFrame *, int iX, int iY,
+                      int iButtonMask, int iACS);           ///< 'mouse click' notification.  \details part of the mouse UI handling.  'iX', 'iY', 'iButtonMask', and 'iACS'  are copied from the aWM_POINTER Client Message event.
+  void (*mouse_dblclick)(WBChildFrame *, int iX, int iY,
+                         int iButtonMask, int iACS);        ///< 'mouse double click' notification.  \details part of the mouse UI handling.  'iX', 'iY', 'iButtonMask', and 'iACS'  are copied from the aWM_POINTER Client Message event.
+  void (*mouse_drag)(WBChildFrame *, int iX, int iY,
+                     int iButtonMask, int iACS);            ///< 'mouse drag' (begin) notification.  \details part of the mouse UI handling.  'iX', 'iY', 'iButtonMask', and 'iACS'  are copied from the aWM_POINTER Client Message event.
+  void (*mouse_drop)(WBChildFrame *, int iX, int iY,
+                     int iButtonMask, int iACS);            ///< 'mouse drop' (drag end) notification.  \details part of the mouse UI handling.  'iX', 'iY', 'iButtonMask', and 'iACS'  are copied from the aWM_POINTER Client Message event.
+  void (*mouse_move)(WBChildFrame *, int iX, int iY);       ///< 'mouse motion' notification.  \details part of the mouse UI handling.  'iX' and 'iY' are copied from the aWM_POINTER Client Message event.
+  void (*mouse_scrollup)(WBChildFrame *, int iX, int iY,
+                         int iButtonMask, int iACS);        ///< 'mouse scroll up' notification.  \details part of the mouse UI handling.  'iX', 'iY', 'iButtonMask', and 'iACS'  are copied from the aWM_POINTER Client Message event.
+  void (*mouse_scrolldown)(WBChildFrame *, int iX, int iY,
+                           int iButtonMask, int iACS);      ///< 'mouse scroll down' notification.  \details part of the mouse UI handling.  'iX', 'iY', 'iButtonMask', and 'iACS'  are copied from the aWM_POINTER Client Message event.
+  void (*mouse_cancel)(WBChildFrame *);                     ///< 'mouse cancel' notification (cancel 'drag', etc.).  \details This is a notification only (any mouse capture must already have been handled).  \sa aWM_POINTER , WBMouseCancel()
+  void (*get_row_col)(WBChildFrame *, int *piR, int *piC);  ///< Obtain the current row/column cursor locationfor UI notification. \details 'piR' points to an integer to get the row, and 'piC' points to an integer to get the column.  Both are 1-based values, so a value \<\= 0 is considered 'error' or 'NA'
+  int (*has_selection)(WBChildFrame *);                     ///< returns non-zero value if there is a selection \details Since this affects specific UI behavior, you should use this to control enabling of the 'copy' and 'cut' menus, as an example
+  void (*undo)(WBChildFrame *);                             ///< perform an undo operation \details Use 'can_undo()' to determine whether an undo is possible
+  void (*redo)(WBChildFrame *);                             ///< perform a re-do \details Use 'can_redo()' to determine whether a re-do is possible
+  int (*can_undo)(WBChildFrame *);                          ///< returns non-zero value if 'can undo' \details Interfaces/Objects that support 'undo' AND have a non-empty undo buffer will return non-zero.
+  int (*can_redo)(WBChildFrame *);                          ///< returns non-zero value if 'can redo' \details Interfaces/Objects that support 're-do' AND have a non-empty re-do buffer will return non-zero.
+} WBChildFrameUI;
 
 
 
@@ -480,18 +783,19 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
 **/
 void FWRecalcLayout(Window wID);  // recalculate layout information (propagates to contained windows)
 
+
 /** \ingroup frame_window
   * \brief assign a new WBWinEvent callback function for a frame window
   *
   * \param pFW A pointer to the WBFrameWindow structure
   * \param pCallBack A function pointer of type \ref WBWinEvent for the user-defined event handler callback.  Can be NULL.
   *
-  * Use this function to assign the event handler callback for the frame window.
+  * Use this function to assign the event handler callback for the frame window. Not all events pass through
+  * the callback.  Some events are sent directly to the callback, and may have required implementation.
   *
   * Header File:  frame_window.h
 **/
 void FWSetUserCallback(WBFrameWindow *pFW, WBWinEvent pCallBack);
-  // assigns the user-defined callback function (one only).  Not all messages pass through the callback
 
 
 /** \ingroup frame_window
@@ -625,15 +929,44 @@ WBChildFrame * FWGetContainedWindowByIndex(const WBFrameWindow *pFrameWindow, in
 int FWAddContainedWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pNew);
 
 /** \ingroup frame_window
-  * \brief Removes a 'contained' window from a frame window (does not destroy the window)
+  * \brief Removes a 'contained' window from a frame window.  Does not destroy the 'contained' window.
   *
   * \param pFrameWindow A pointer to a WBFrameWindow structure for the frame window
-  * \param pCont A pointe to the WBChildFrame for the window that is to be removed from the 'contents' for the frame window
+  * \param pCont A pointer to the WBChildFrame for the window that is to be removed from the 'contents' for the frame window
   * \returns void
   *
   * Header File:  frame_window.h
 **/
 void FWRemoveContainedWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pCont);
+
+/** \ingroup frame_window
+  * \brief Replace a 'contained' window from a frame window
+  *
+  * \param pFrameWindow A pointer to a WBFrameWindow structure for the frame window
+  * \param pCont A pointer to the WBChildFrame for the window that is to be removed from the 'contents' for the frame window
+  * \param pContNew A pointer to the WBChildFrame for the window that is to replace the previous contained window
+  * \returns void
+  *
+  * sometimes the document type will change when you are editing or creating a new document.  As an example,
+  * you are creating a plain text file, but then name it with a '.c' extension, or with the name 'Makefile'.
+  * Your document editing window might decide to change the view based on that information, and you would then
+  * re-open the file with the new document editing window, and replace the current one with that one, then
+  * destroy the old one (after saving the new document, of course).  This provides a seamless way of making
+  * all of this happen without the user noticing anything EXCEPT the new view.
+  *
+  * An alternate purpose might be to view something in 'text mode' or 'graphic edit mode'.  A dialog resource
+  * or image resource editor might be a typical use for this.  In 'text mode' you view the resource as a text
+  * file (it might be a pixmap, for example). Switching to 'graphic edit mode' could display a graphical editor
+  * for the pixmap, which would allow you to draw, erase, add elements, change colors, etc. like any other
+  * graphical editor might do.
+  *
+  * Typically you'll have a default view for 'any document type'.  The application would need to swap it out
+  * for the correct view when the document type changes, by creating the new document view/edit window, and then
+  * calling this function.
+  *
+  * Header File:  frame_window.h
+**/
+void FWReplaceContainedWindow(WBFrameWindow *pFrameWindow, WBChildFrame *pCont, WBChildFrame *pContNew);
 
 /** \ingroup frame_window
   * \brief Sets the focus to a specific contained window using the Window ID
@@ -673,17 +1006,7 @@ int FWGetChildFrameIndex(WBFrameWindow *pFrameWindow, WBChildFrame *pCont);
   *
   * \param pFrameWindow A pointer to a WBFrameWindow structure for the frame window
   * \param pCont A pointer to a WBChildFrame structure for the contained window.  Use NULL for the current focus window
-  * \param iIndex
-  * \parblock
-  * The new 'tab order' index to assign to the 'contained' window, or a constant indicating how
-  * to adjust the index
-  *
-  * A value of 0 to n assigns THAT tab index.  Positive values greater than the total number of tabs moves it to the end.\n
-  * A value of -1 moves the tab 1 to the left\n
-  * A value of -2 moves the tab 1 to the right\n
-  *
-  * Use a value of '0' to move the tab to the beginning.
-  * \endparblock
+  * \param iIndex The new 'tab order' index to assign to the 'contained' window, or a constant indicating how to adjust the index\n A value of 0 to n assigns the specified tab index.  Positive values greater than the total number of tabs moves it to the end of the tab order.\n A value of -1 moves the tab 1 to the left\n A value of -2 moves the tab 1 to the right\n\n Use a value of '0' to move the tab to the beginning.
   * \returns void
   *
   * Header File:  frame_window.h

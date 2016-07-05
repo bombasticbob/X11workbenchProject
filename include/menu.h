@@ -73,9 +73,10 @@ extern "C" {
 **/
 #define WBMENU_RESERVE_DEFAULT (256 * sizeof(void *)) /**< default menu 'iReserveSpace' size **/
 
-#define WBMENU_POPUP_HIGH_BIT 0x80000000 /**< popup 'high bit' (TODO may become platform dependent) **/
-#define WBMENU_POPUP_MASK 0x7fffffff     /**< popup mask (TODO may become platform dependent) **/
-#define WBMENU_SEPARATOR -1              /**< marks menu as a 'separator' for WBMenuItem::iAction **/
+#define WBMENU_POPUP_HIGH_BIT 0x80000000    /**< popup 'high bit' (TODO may become platform dependent) **/
+#define WBMENU_DYNAMIC_HIGH_BIT 0x40000000  /**< marks menu item as 'dynamic' for WBMenuItem::iAction (TODO may become platform dependent) **/
+#define WBMENU_POPUP_MASK 0x3fffffff        /**< popup mask (TODO may become platform dependent) **/
+#define WBMENU_SEPARATOR -1                 /**< marks menu item as a 'separator' for WBMenuItem::iAction **/
 /**
   @}
 **/
@@ -95,6 +96,8 @@ extern "C" {
 
   typedef struct __WBMenuItem__
   {
+    unsigned int uiTag;    // a 'tag' identifying this as a WBMenuItem
+
     // the following data members are offsets from 'data' for each component of the menu item
     // '-1' generically indicates "none"
     int iMenuItemText;     // offset in 'data' to null-byte terminated strings (-1 if none)
@@ -103,8 +106,8 @@ extern "C" {
     int iHotKey;           // hotkey description (-1 if none)
 
     // the following data members are numeric properties (not offsets)
-    int iAction;           // high bit set for popup; -1 for separator; otherwise, it's a message
-                           // if hight bit set, corresponding lower bits are the popup menu ID
+    int iAction;           // high bit set for popup; -1 for separator, -2 for dynamic; otherwise, it's a message
+                           // if high bit set, corresponding lower bits are the popup menu ID
     int nHotKey;           // hotkey character translation (0 if none)
     int iTextWidth;        // width of menu text (in pixels; assign '-1' to calculate it)
     int iPosition;         // horizontal/vertical position of menu (in pixels; assign '-1' to calculate it)
@@ -121,6 +124,8 @@ extern "C" {
 **/
 typedef struct __WBMenuItem__
 {
+  unsigned int uiTag;    ///< a 'tag' identifying this as a WBMenuItem
+
   // the following data members are offsets from 'data' for each component of the menu item
   // '-1' generically indicates "none"
   int iMenuItemText;     ///< offset in 'data' to null-byte terminated strings (-1 if none)
@@ -129,7 +134,7 @@ typedef struct __WBMenuItem__
   int iHotKey;           ///< hotkey description (-1 if none)
 
   // the following data members are numeric properties (not offsets)
-  int iAction;           ///< high bit set for popup; -1 for separator; otherwise, it's a message
+  int iAction;           ///< high bit set for popup; -1 for separator, -2 for dynamic; otherwise, it's a message
                          ///< if hight bit set, corresponding lower bits are the popup menu ID
   int nHotKey;           ///< hotkey character translation (0 if none)
   int iTextWidth;        ///< width of menu text (in pixels; assign '-1' to calculate it)
@@ -156,6 +161,8 @@ typedef struct __WBMenuItem__
 
   typedef struct __WBMenu
   {
+    unsigned int uiTag;          // a 'tag' identifying this as a WBMenu
+
     int iMenuID;                 // menu identifier specified when menu was created (high bit set for popup)
 
     WBMenuItem **ppItems;        // An allocated array of menu items
@@ -175,6 +182,8 @@ typedef struct __WBMenuItem__
 **/
 typedef struct __WBMenu
 {
+    unsigned int uiTag;          ///< a 'tag' identifying this as a WBMenu
+
     int iMenuID;                 ///< menu identifier specified when menu was created (high bit set for popup)
 
     WBMenuItem **ppItems;        ///< An allocated array of menu items
@@ -186,6 +195,10 @@ typedef struct __WBMenu
     int nMaxPopups;              ///< The maximum number of popup menu entries that can be stored in 'ppPopups'
 
 } WBMenu;
+
+#define WBMENU_TAG     (*((const unsigned int *)"WBMM"))
+#define WBMENUITEM_TAG (*((const unsigned int *)"WBMI"))
+
 
 //------------------------------
 // construction and destruction
@@ -234,6 +247,18 @@ void MBDestroyMenu(WBMenu *pMenu);  // always destroy with this function
 **/
 WBMenu *MBCopyMenu(const WBMenu *pMenu, int iReserveSpace);
 
+/** \ingroup menu
+  * \brief Check whether a 'WBMenu' pointer is valid
+  *
+  * \param pMenu A (const) pointer to a WBMenu structure, created by MBCreateMenu()
+  * \returns A non-zero 'True' value if valid; zero if NOT valid
+  *
+  * Use this function to validate a 'WBMenu' pointer before attempting to use it
+  *
+  * Header File:  menu.h
+**/
+int MBIsMenuValid(const WBMenu *pMenu);
+
 //------------
 // menu items
 //------------
@@ -265,6 +290,18 @@ WBMenuItem *MBCreateMenuItem(const char **ppszResource);  // create single menu 
   * Header File:  menu.h
 **/
 void MBDestroyMenuItem(WBMenuItem *pMenuItem);
+
+/** \ingroup menu
+  * \brief Check whether a 'WBMenuItem' pointer is valid
+  *
+  * \param pMenuItem A (const) pointer to a WBMenuItem structure, created by MBCreateMenuItem()
+  * \returns A non-zero 'True' value if valid; zero if NOT valid
+  *
+  * Use this function to validate a 'WBMenuItem' pointer before attempting to use it
+  *
+  * Header File:  menu.h
+**/
+int MBIsMenuItemValid(const WBMenuItem *pMenuItem);
 
 /** \ingroup menu
   * \brief Add a WBMenuItem menu item to an existing WBMenu

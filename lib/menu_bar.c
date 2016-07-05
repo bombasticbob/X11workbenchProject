@@ -113,15 +113,61 @@ XColor clrMenuFG, clrMenuBG, clrMenuActiveFG, clrMenuActiveBG, clrMenuBorder1, c
 
 static int iInitColorFlag = 0;
 static XFontStruct *pDefaultMenuFont = NULL;  // default menu font
+
+/** \ingroup menu_bar
+  * \hideinitializer
+  * \brief Internal Client Message Atom for 'RESIZE' notification (tells menu bar to resize itself)
+  *
+  * XCLientMessageEvent members:
+  *   window = menu bar window ID
+  *   message_type = aMENU_RESIZE
+  *   format = 32
+  *
+  * (no data members)
+**/
 Atom aMENU_RESIZE = 0;
+
+/** \ingroup menu_bar
+  * \hideinitializer
+  * \brief Internal Client Message Atom for 'ACTIVATE' notification
+  *
+  * XClientMessageEvent members:
+  *   window = menu bar window ID
+  *   message_type = aMENU_ACTIVATE
+  *   format = 32
+  *
+  * To activate a specific menu item:
+  *   data.l[0] = (long) pointer to WBMenuItem (advisory only; 32-bit truncation)
+  *   data.l[1] = the index for menu item
+  *
+  * To move to the previous or next menu item in the list:
+  *   data.l[0] = 0
+  *   data.l[1] = 1 or -1; 1 moves 'next', -1 'previous'.  others undefined.
+  *
+**/
 Atom aMENU_ACTIVATE = 0;
+
+/** \ingroup menu_bar
+  * \hideinitializer
+  * \brief Internal Client Message Atom for 'DISPLAY POPUP' action
+  *
+  * XClientMessageEvent members:
+  *   window = menu bar window ID
+  *   message_type = aMENU_DISPLAY_POPUP
+  *   format = 32
+  *   data.l[0] = popup menu identifier
+  *   data.l[1] = X coordinate for popup 'left' side
+  *   data.l[2] = X coordinate for popup 'right' side (left side plus text extent)
+  *
+**/
 Atom aMENU_DISPLAY_POPUP = 0;
 
-// for release code, define DEBUG_TEST(X) as X
+
+// for release code, define DEBUG_VALIDATE(X) as X
 #ifdef NO_DEBUG
-#define DEBUG_TEST
+#define DEBUG_VALIDATE(X) X
 #else // NO_DEBUG
-#define DEBUG_TEST(X) if(!(X)) { WB_WARN_PRINT("%s:%d - %s\n", __FUNCTION__, __LINE__, "WARNING - " #X " failed!\n"); }
+#define DEBUG_VALIDATE(X) if(!(X)) { WB_WARN_PRINT("%s:%d - %s\n", __FUNCTION__, __LINE__, "WARNING - " #X " failed!\n"); }
 #endif // NO_DEBUG
 
 #define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
@@ -183,10 +229,6 @@ int MBInitGlobal(void)
 
   if(!iInitColorFlag)
   {
-//    const char *szMenuFG="#000000", *szMenuBG="#DCDAD5", //"#EEEBE7",//"#C0C0C0",
-//               *szMenuBorder1="#000000", *szMenuBorder2="#FFFFFF",
-//               *szMenuBorder3="#9C9A94";
-
     char szMenuFG[16], szMenuBG[16], szMenuActiveFG[16], szMenuActiveBG[16],
          szMenuBorder1[16], szMenuActiveDisabledFG[16], szMenuDisabledFG[16];
     static const char*szMenuBorder2="#FFFFFF", *szMenuBorder3="#9C9A94";
@@ -200,46 +242,55 @@ int MBInitGlobal(void)
     LOAD_COLOR("*Menu.disabledForeground",szMenuActiveDisabledFG,"#808080");
     LOAD_COLOR("*borderColor",szMenuBorder1,"#000000");
 
-    DEBUG_TEST(XParseColor(WBGetDefaultDisplay(), colormap, szMenuFG, &clrMenuFG));
-    DEBUG_TEST(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuFG));  // NOTE:  do I need 'XFreeColors' for these ?
+    // NOTE:  'DEBUG_VALIDATE' (defined above) simply validates the return and prints a message if it failed.
+    //        in a release build, the code is still executed, but no error checks are performed on the return value
 
-    DEBUG_TEST(XParseColor(WBGetDefaultDisplay(), colormap, szMenuBG, &clrMenuBG));
-    DEBUG_TEST(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuBG));
+    DEBUG_VALIDATE(XParseColor(WBGetDefaultDisplay(), colormap, szMenuFG, &clrMenuFG));
+    DEBUG_VALIDATE(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuFG));  // NOTE:  do I need 'XFreeColors' for these ?
 
-    DEBUG_TEST(XParseColor(WBGetDefaultDisplay(), colormap, szMenuActiveFG, &clrMenuActiveFG));
-    DEBUG_TEST(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuActiveFG));  // NOTE:  do I need 'XFreeColors' for these ?
+    DEBUG_VALIDATE(XParseColor(WBGetDefaultDisplay(), colormap, szMenuBG, &clrMenuBG));
+    DEBUG_VALIDATE(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuBG));
 
-    DEBUG_TEST(XParseColor(WBGetDefaultDisplay(), colormap, szMenuActiveBG, &clrMenuActiveBG));
-    DEBUG_TEST(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuActiveBG));
+    DEBUG_VALIDATE(XParseColor(WBGetDefaultDisplay(), colormap, szMenuActiveFG, &clrMenuActiveFG));
+    DEBUG_VALIDATE(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuActiveFG));  // NOTE:  do I need 'XFreeColors' for these ?
 
-    DEBUG_TEST(XParseColor(WBGetDefaultDisplay(), colormap, szMenuDisabledFG, &clrMenuDisabledFG));
-    DEBUG_TEST(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuDisabledFG));
+    DEBUG_VALIDATE(XParseColor(WBGetDefaultDisplay(), colormap, szMenuActiveBG, &clrMenuActiveBG));
+    DEBUG_VALIDATE(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuActiveBG));
 
-    DEBUG_TEST(XParseColor(WBGetDefaultDisplay(), colormap, szMenuActiveDisabledFG, &clrMenuActiveDisabledFG));
-    DEBUG_TEST(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuActiveDisabledFG));
+    DEBUG_VALIDATE(XParseColor(WBGetDefaultDisplay(), colormap, szMenuDisabledFG, &clrMenuDisabledFG));
+    DEBUG_VALIDATE(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuDisabledFG));
 
-    DEBUG_TEST(XParseColor(WBGetDefaultDisplay(), colormap, szMenuBorder1, &clrMenuBorder1));
-    DEBUG_TEST(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuBorder1));
+    DEBUG_VALIDATE(XParseColor(WBGetDefaultDisplay(), colormap, szMenuActiveDisabledFG, &clrMenuActiveDisabledFG));
+    DEBUG_VALIDATE(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuActiveDisabledFG));
 
-    DEBUG_TEST(XParseColor(WBGetDefaultDisplay(), colormap, szMenuBorder2, &clrMenuBorder2));
-    DEBUG_TEST(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuBorder2));
+    DEBUG_VALIDATE(XParseColor(WBGetDefaultDisplay(), colormap, szMenuBorder1, &clrMenuBorder1));
+    DEBUG_VALIDATE(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuBorder1));
 
-    DEBUG_TEST(XParseColor(WBGetDefaultDisplay(), colormap, szMenuBorder3, &clrMenuBorder3));
-    DEBUG_TEST(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuBorder3));
+    DEBUG_VALIDATE(XParseColor(WBGetDefaultDisplay(), colormap, szMenuBorder2, &clrMenuBorder2));
+    DEBUG_VALIDATE(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuBorder2));
+
+    DEBUG_VALIDATE(XParseColor(WBGetDefaultDisplay(), colormap, szMenuBorder3, &clrMenuBorder3));
+    DEBUG_VALIDATE(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuBorder3));
 
     // TODO:  make sure I was able to actually allocate these colors
 
     iInitColorFlag = 1;
   }
 
-  if(!aMENU_RESIZE)
-    aMENU_RESIZE = XInternAtom(WBGetDefaultDisplay(), "WB_MENU_RESIZE", False);
+  if(aMENU_RESIZE == None)
+  {
+    aMENU_RESIZE = WBGetAtom(WBGetDefaultDisplay(), "WB_MENU_RESIZE");
+  }
 
-  if(!aMENU_ACTIVATE)
-    aMENU_ACTIVATE = XInternAtom(WBGetDefaultDisplay(), "WB_MENU_ACTIVATE", False);
+  if(aMENU_ACTIVATE == None)
+  {
+    aMENU_ACTIVATE = WBGetAtom(WBGetDefaultDisplay(), "WB_MENU_ACTIVATE");
+  }
 
-  if(!aMENU_DISPLAY_POPUP)
-    aMENU_DISPLAY_POPUP = XInternAtom(WBGetDefaultDisplay(), "WB_MENU_DISPLAY_POPUP", False);
+  if(aMENU_DISPLAY_POPUP == None)
+  {
+    aMENU_DISPLAY_POPUP = WBGetAtom(WBGetDefaultDisplay(), "WB_MENU_DISPLAY_POPUP");
+  }
 
   return 1;
 }
@@ -310,7 +361,7 @@ WBMenuBarWindow *MBCreateMenuBarWindow(Window wIDParent, const char *pszResource
   xswa.colormap = DefaultColormap(pDisplay, DefaultScreen(pDisplay));
   xswa.bit_gravity = CenterGravity;
 
-  pRval = (WBMenuBarWindow *)malloc(sizeof(*pRval));
+  pRval = (WBMenuBarWindow *)WBAlloc(sizeof(*pRval));
 
   if(!pRval)
     return NULL;
@@ -324,15 +375,6 @@ WBMenuBarWindow *MBCreateMenuBarWindow(Window wIDParent, const char *pszResource
     WB_WARN_PRINT("%s - WARNING:  pMenu is NULL in WBMenuBarWindow object\n", __FUNCTION__);
   }
 
-//  pRval->wSelf = XCreateWindow(pDisplay, wIDParent,
-//                               xsh.x, xsh.y, xsh.width, xsh.height,
-//                               0, // no border
-//                               DefaultDepth(pDisplay, DefaultScreen(pDisplay)),
-//                               InputOutput,
-//                               DefaultVisual(pDisplay, DefaultScreen(pDisplay)),
-//                               CWBorderPixel | CWBackPixel | CWColormap | CWBitGravity,
-//                               &xswa);
-
   pRval->wSelf = WBCreateWindow(pDisplay, wIDParent, MBMenuWinEvent, "MenuBar",
                                 xsh.x, xsh.y, xsh.width, xsh.height, 0,
                                 InputOutput,
@@ -341,7 +383,7 @@ WBMenuBarWindow *MBCreateMenuBarWindow(Window wIDParent, const char *pszResource
 
   if(pRval->wSelf == -1)
   {
-    free(pRval);
+    WBFree(pRval);
     return NULL;
   }
 
@@ -441,7 +483,7 @@ void MBDestroyMenuBarWindow(WBMenuBarWindow *pMenuBar)
   }
 
   WBDestroyWindow(pMenuBar->wSelf);
-  free(pMenuBar);
+  WBFree(pMenuBar);
 }
 
 void MBSetMenuBarMenuResource(WBMenuBarWindow *pMenuBar, const char *pszResource)
@@ -811,13 +853,19 @@ let_parent_process_it:
   {
     if(((XClientMessageEvent *)pEvent)->message_type == aMENU_ACTIVATE)
     {
-      int iMenuItemIndex = ((XClientMessageEvent *)pEvent)->data.l[1];
+      int iMenuItemIndex = ((XClientMessageEvent *)pEvent)->data.l[1]; // index, prev, or next
+
+      /////////////////////////////////////////////
+      // TODO:  deal with dynamic menu elements
+      /////////////////////////////////////////////
 
       pItem = NULL;
 
       if(iMenuItemIndex >= 0 && iMenuItemIndex < pMenu->nItems &&
-         ((XClientMessageEvent *)pEvent)->data.l[0])
+         ((XClientMessageEvent *)pEvent)->data.l[0]) // prev/next or 'absolute' indicator - *NOT* equal to 'NULL'
       {
+        // select the menu item specified by the index in data.l[1]
+      
         if(pSelf->iSelected != iMenuItemIndex &&
            pSelf->iSelected >= 0 && pSelf->iSelected < pMenu->nItems)
         {
@@ -828,12 +876,15 @@ let_parent_process_it:
           geom.height = pSelf->iHeight;
           geom.border = 0;
 
-          WBInvalidateGeom(wID, &geom, FALSE); // invalidate menu item
+          WBInvalidateGeom(wID, &geom, FALSE); // invalidate rect for currently selected menu item
         }
 
         pSelf->iSelected = iMenuItemIndex;
         pItem = pMenu->ppItems[pSelf->iSelected];
 
+        // this next part is a 'self-check' which helps to validate the menu item pointer
+        // it does not actually USE the menu item pointer passed in the event (it's likely to get truncated)
+#warning potentially dangerous code - this should be reviewed an re-written
         if((unsigned long)pItem == (unsigned long)(((XClientMessageEvent *)pEvent)->data.l[0]))
         {
           geom.x = pItem->iPosition;
@@ -862,7 +913,10 @@ let_parent_process_it:
       }
       else if(iMenuItemIndex && !((XClientMessageEvent *)pEvent)->data.l[0])
       {
+        // select the PREVIOUS or the NEXT menu item
+
         int iOldSel = pSelf->iSelected;
+
         if(iOldSel < 0 || iOldSel >= pMenu->nItems)
         {
           iOldSel = pSelf->iPrevSel;
@@ -952,7 +1006,7 @@ let_parent_process_it:
                     __FUNCTION__, iMenuItemIndex, pMenu->nItems,
                     (void *)pItem, (void *)(((XClientMessageEvent *)pEvent)->data.l[0]));
     }
-    if(((XClientMessageEvent *)pEvent)->message_type == aMENU_DISPLAY_POPUP)
+    else if(((XClientMessageEvent *)pEvent)->message_type == aMENU_DISPLAY_POPUP)
     {
       WBMenuPopupWindow *pPopup;
       int iMenuItem = ((XClientMessageEvent *)pEvent)->data.l[0];

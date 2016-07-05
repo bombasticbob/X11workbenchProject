@@ -62,15 +62,6 @@
 
 #include "draw_text.h"
 
-#ifdef HAVE_MALLOC_USABLE_SIZE
-#ifdef __FreeBSD__
-#include <malloc_np.h>
-#else
-#include <malloc.h>
-#endif // __FreeBSD__
-#endif // HAVE_MALLOC_USABLE_SIZE
-
-
 
 // UTF-8 HANDLING
 // X11 has XFree86 extensions with 'Xutf8' versions of a lot of things
@@ -105,382 +96,32 @@
 
 
 /** \ingroup draw_text
-  * \internal
   * \brief calculate ideal bounds rectangle for text given a font, tab spacing, tab origin, and alignment
   *
   * \param pFont A pointer to an XFontStruct (NULL implies system default font)
   * \param pWords The DT_WORDS structure for the text (this function modifies DT_WORD::iX, DT_WORD::iY)
   * \param iTabWidth A positive integer in 'characters', or negative integer in pixels, indicating tab width
-  * \param iTabOrgin An unsigned integer indicating the tab origin, using the same units as iTabWidth, corresponding to the first character.
+  * \param iTabOrigin An unsigned integer indicating the tab origin, using the same units as iTabWidth, corresponding to the first character.
   * \param prcSource A pointer to the 'source' bounding rectangle in which the text is intended to fit
   * \param prcDest A pointer to the 'destination' bounding rectangle, based on the actual text size
   * \param iAlignment The desired text alignment, one or more of the DTAlignment bit flags
+  * \param iStartLine The starting line for which to calculate ideal bounds (0-based)
+  * \param iEndLine The ending line for which to calculate ideal bounds (0-based).  A value of -1 implies "all lines"
   * \returns zero if the text will fit within prcSource, -1 error, or 1 to indicate that prcDest is larger than prcSource
   *
   * Internal utility to calculate the bounding rectangle for formatted multi-line text, including word wrap, tab aligment,
   * and multiple line feeds.  The pre-parsed 'DT_WORDS' contains the text, and 'prcSource' indicates the desired bounding
   * rectangle. This function is CURRENTLY for internal use only, but this may change as code requirements develop
   *
+  * This function is used internally and should not be invoked.  It is declared 'static' and not visible outside of
+  * the file it's defined in.
 **/
 static int InternalCalcIdealBounds(XFontStruct *pFont, DT_WORDS *pWords, int iTabWidth, unsigned int iTabOrigin,
                                    const WB_RECT *prcSource, WB_RECT *prcDest, int iAlignment, int iStartLine, int iEndLine);
 
 
-static void InternalDebugDumpWords(DT_WORDS *pWords);
+static void InternalDebugDumpWords(DT_WORDS *pWords); ///< \brief internal debug function to dump 'DT_WORDS' 'words' object
 
-
-// ************************
-// generic string utilities
-// ************************
-
-char *WBCopyString(const char *pSrc)
-{
-char *pDest;
-int iLen;
-
-  if(!pSrc || !*pSrc)
-  {
-    pDest = malloc(2);
-
-    if(pDest)
-    {
-      *pDest = 0;
-    }
-  }
-  else
-  {
-    iLen = strlen(pSrc);
-
-    pDest = malloc(iLen + 1);
-
-    if(pDest)
-    {
-      memcpy(pDest, pSrc, iLen);
-      pDest[iLen] = 0;
-    }
-  }
-
-  return pDest;
-}
-
-char *WBCopyStringN(const char *pSrc, unsigned int nMaxChars)
-{
-char *pDest;
-int iLen;
-const char *p1;
-
-  if(!pSrc || !*pSrc)
-  {
-    pDest = malloc(2);
-
-    if(pDest)
-    {
-      *pDest = 0;
-    }
-  }
-  else
-  {
-    for(p1 = pSrc, iLen = 0; iLen < nMaxChars && *p1; p1++, iLen++)
-    { } // determine length of 'pStr' to copy
-
-    pDest = malloc(iLen + 1);
-
-    if(pDest)
-    {
-      memcpy(pDest, pSrc, iLen);
-      pDest[iLen] = 0;
-    }
-  }
-
-  return pDest;
-}
-
-
-void WBCatString(char **ppDest, const char *pSrc)  // concatenate onto malloc'd string
-{
-int iLen, iLen2;
-#ifdef HAVE_MALLOC_USABLE_SIZE
-int iMaxLen;
-#endif // HAVE_MALLOC_USABLE_SIZE
-char *p1, *p2;
-
-  if(!ppDest || !pSrc || !*pSrc)
-  {
-    return;
-  }
-
-  if(*ppDest)
-  {
-    p1 = p2 = *ppDest;
-
-#ifdef HAVE_MALLOC_USABLE_SIZE
-    iMaxLen = malloc_usable_size(p1);
-
-    if(iMaxLen <= 0)
-    {
-      return;
-    }
-#endif // HAVE_MALLOC_USABLE_SIZE
-
-    while(*p2
-#ifdef HAVE_MALLOC_USABLE_SIZE
-          && (p2 - p1) < iMaxLen
-#endif // HAVE_MALLOC_USABLE_SIZE
-         )
-    {
-      p2++;
-    }
-
-    iLen2 = strlen(pSrc);
-    iLen = iLen2 + (p2 - p1);
-
-#ifdef HAVE_MALLOC_USABLE_SIZE
-    if((iLen + 1) > iMaxLen)
-#endif // HAVE_MALLOC_USABLE_SIZE
-    {
-      *ppDest = realloc(p1, iLen + 1);
-      if(!*ppDest)
-      {
-        *ppDest = p1;
-        return;  // not enough memory
-      }
-
-      p2 = (p2 - p1) + *ppDest;  // re-position end of string
-    }
-
-    memcpy(p2, pSrc, iLen2);
-    p2[iLen2] = 0;  // make sure last byte is zero
-  }
-  else
-  {
-    *ppDest = WBCopyString(pSrc);
-  }
-}
-
-void WBCatStringN(char **ppDest, const char *pSrc, unsigned int nMaxChars)
-{
-int iLen, iLen2;
-#ifdef HAVE_MALLOC_USABLE_SIZE
-int iMaxLen;
-#endif // HAVE_MALLOC_USABLE_SIZE
-char *p1, *p2;
-const char *p3;
-
-
-  if(!ppDest || !pSrc || !*pSrc)
-  {
-    return;
-  }
-
-  if(*ppDest)
-  {
-    p1 = p2 = *ppDest;
-
-#ifdef HAVE_MALLOC_USABLE_SIZE
-    iMaxLen = malloc_usable_size(p1);
-
-    if(iMaxLen <= 0)
-    {
-      return;
-    }
-#endif // HAVE_MALLOC_USABLE_SIZE
-
-
-    while(*p2
-#ifdef HAVE_MALLOC_USABLE_SIZE
-          && (p2 - p1) < iMaxLen
-#endif // HAVE_MALLOC_USABLE_SIZE
-         )
-    {
-      p2++;
-    }
-
-    for(iLen2=0, p3 = pSrc; iLen2 < nMaxChars && *p3; p3++, iLen2++)
-    { }  // determine what the length of pSrc is up to a zero byte or 'nMaxChars', whichever is first
-
-    iLen = iLen2 + (p2 - p1);
-
-#ifdef HAVE_MALLOC_USABLE_SIZE
-    if((iLen + 1) > iMaxLen)
-#endif // HAVE_MALLOC_USABLE_SIZE
-    {
-      *ppDest = realloc(p1, iLen + 1);
-      if(!*ppDest)
-      {
-        *ppDest = p1; // restore the old pointer value
-        return;  // not enough memory
-      }
-
-      p2 = (p2 - p1) + *ppDest;  // re-position end of string
-    }
-
-    memcpy(p2, pSrc, iLen2);
-    p2[iLen2] = 0;  // make sure last byte is zero
-  }
-  else
-  {
-    *ppDest = WBCopyStringN(pSrc, nMaxChars);
-  }
-}
-
-void WBDeQuoteString(char *pString)
-{
-char *p1, *pDest;
-
-  p1 = pDest = pString;
-
-  while(*p1)
-  {
-    if(*p1 == '"' || *p1 == '\'')
-    {
-      char c1 = *(p1++);
-
-      while(*p1 &&
-            (*p1 != c1 || p1[1] == c1))
-      {
-        if(*p1 == c1)
-        {
-          p1++;
-        }
-
-        *(pDest++) = *(p1++);
-      }
-
-      if(*p1 == c1)
-      {
-        p1++;
-      }
-    }
-    else
-    {
-      if(pDest != p1)
-      {
-        *pDest = *p1;
-      }
-
-      pDest++;
-      p1++;
-    }
-  }
-
-  *pDest = 0; // make sure
-}
-
-int WBStringLineCount(const char *pSrc, unsigned int nMaxChars)
-{
-int iRval = 1;
-const char *p1;
-
-  if(!pSrc || (!nMaxChars && !*pSrc))
-  {
-    return 0;
-  }
-
-  if(!nMaxChars)
-  {
-    nMaxChars = strlen(pSrc);
-  }
-
-  do
-  {
-    p1 = WBStringNextLine(pSrc, &nMaxChars);
-    if(p1 && nMaxChars) // another line remains
-    {
-      iRval++;
-    }
-
-    pSrc = p1;
-
-  } while(pSrc && nMaxChars);
-
-  return iRval;
-}
-
-const char *WBStringNextLine(const char *pSrc, unsigned int *pnMaxChars)
-{
-int nMaxChars;
-
-  if(!pSrc)
-  {
-    if(pnMaxChars)
-    {
-      *pnMaxChars = 0;
-    }
-
-    return NULL;
-  }
-
-  if(pnMaxChars)
-  {
-    nMaxChars = *pnMaxChars;
-  }
-  else if(!*pSrc)
-  {
-    return NULL; // end of string (no more)
-  }
-  else
-  {
-    nMaxChars = strlen(pSrc);
-  }
-
-  // TODO:  handle MBCS differently? (for now, no special handling)
-
-  while(nMaxChars > 0)
-  {
-    if(*pSrc == '\r')
-    {
-      pSrc++;
-      nMaxChars--;
-
-      if(nMaxChars > 0 && *pSrc == '\n')
-      {
-        pSrc++;
-        nMaxChars--;
-      }
-
-      break;
-    }
-    else if(*pSrc == '\n')
-    {
-      pSrc++;
-      nMaxChars--;
-
-      if(nMaxChars > 0 && *pSrc == '\r')
-      {
-        pSrc++;
-        nMaxChars--;
-      }
-
-      break;
-    }
-    else if(*pSrc == '\f' || // form feed is like a newline
-            *pSrc == '\v')   // vertical tab (similar, for now)
-    {
-      pSrc++;
-      nMaxChars--;
-
-      break;
-    }
-// TODO:  check for UTF-8 paragraph and line separators?
-//        http://www.unicodemap.org/details/0x2028/index.html  (line separator - alternate LF?)
-//        http://www.unicodemap.org/details/0x202A/index.html  (paragraph separator - alternate to CTRL+L ?)
-    else if(!*pSrc) // TODO:  test for unicode?
-    {
-      nMaxChars = 0;
-      break;
-    }
-
-    pSrc++;
-    nMaxChars--;
-  }
-
-  if(pnMaxChars)
-  {
-    *pnMaxChars = 0;
-  }
-
-  return pSrc;
-}
 
 
 
@@ -553,7 +194,7 @@ DT_WORDS *pRval = *ppWords;
     int iNewLen = sizeof(*pRval)
                 + ((pRval->nMax & 0xffffff80) + 127) * sizeof(struct __DT_WORD__);
 
-    void *p3 = realloc(pRval, iNewLen);
+    void *p3 = WBReAlloc(pRval, iNewLen);
 
     if(!p3)
     {
@@ -564,13 +205,13 @@ DT_WORDS *pRval = *ppWords;
     }
 
     pRval = (DT_WORDS *)p3;
-#ifdef HAVE_MALLOC_USABLE_SIZE
-    pRval->nMax = (malloc_usable_size(pRval) - sizeof(DT_WORDS))
+//#ifdef HAVE_MALLOC_USABLE_SIZE
+    pRval->nMax = (WBAllocUsableSize(pRval) - sizeof(DT_WORDS))
                 / sizeof(struct __DT_WORD__)
                 + 1; // because DT_WORDS contains one struct __DT_WORD__
-#else // HAVE_MALLOC_USABLE_SIZE
+//#else // HAVE_MALLOC_USABLE_SIZE
     pRval->nMax = (pRval->nMax & 0xffffff80) + 128;
-#endif // HAVE_MALLOC_USABLE_SIZE
+//#endif // HAVE_MALLOC_USABLE_SIZE
   }
 
   *ppWords = pRval;
@@ -620,7 +261,7 @@ DT_WORDS * DTGetWordsFromText(XFontStruct *pFont, const char *szText, int iAlign
 {
   const char *p1, *p2;
 
-  DT_WORDS *pRval = malloc(sizeof(DT_WORDS) + sizeof(struct __DT_WORD__) * (INITIAL_DT_WORDS_COUNT - 1));
+  DT_WORDS *pRval = WBAlloc(sizeof(DT_WORDS) + sizeof(struct __DT_WORD__) * (INITIAL_DT_WORDS_COUNT - 1));
 
   if(!pRval)
   {
@@ -629,13 +270,13 @@ DT_WORDS * DTGetWordsFromText(XFontStruct *pFont, const char *szText, int iAlign
 
   pRval->nCount = 0;
   pRval->szText = szText;
-#ifdef HAVE_MALLOC_USABLE_SIZE
-  pRval->nMax = (malloc_usable_size(pRval) - sizeof(DT_WORDS)) // calculate actual # of structs it contains
+//#ifdef HAVE_MALLOC_USABLE_SIZE
+  pRval->nMax = (WBAllocUsableSize(pRval) - sizeof(DT_WORDS)) // calculate actual # of structs it contains
               / sizeof(struct __DT_WORD__)
               + 1; // because DT_WORDS contains one struct __DT_WORD__
-#else // HAVE_MALLOC_USABLE_SIZE
+//#else // HAVE_MALLOC_USABLE_SIZE
   pRval->nMax = INITIAL_DT_WORDS_COUNT;
-#endif // HAVE_MALLOC_USABLE_SIZE
+//#endif // HAVE_MALLOC_USABLE_SIZE
 
   if(!szText || !*szText)
   {
@@ -656,7 +297,7 @@ DT_WORDS * DTGetWordsFromText(XFontStruct *pFont, const char *szText, int iAlign
       {
         if(!CheckReAllocWords(&pRval))
         {
-          free(pRval);
+          WBFree(pRval);
           return NULL; // ERROR
         }
 
@@ -684,7 +325,7 @@ DT_WORDS * DTGetWordsFromText(XFontStruct *pFont, const char *szText, int iAlign
       {
         if(!CheckReAllocWords(&pRval))
         {
-          free(pRval);
+          WBFree(pRval);
           return NULL; // ERROR
         }
 
@@ -738,7 +379,7 @@ DT_WORDS * DTGetWordsFromText(XFontStruct *pFont, const char *szText, int iAlign
       {
         if(!CheckReAllocWords(&pRval))
         {
-          free(pRval);
+          WBFree(pRval);
           return NULL; // ERROR
         }
 
@@ -787,7 +428,7 @@ DT_WORDS * DTGetWordsFromText(XFontStruct *pFont, const char *szText, int iAlign
 
       if(!CheckReAllocWords(&pRval))
       {
-        free(pRval);
+        WBFree(pRval);
         return NULL; // ERROR
       }
 
@@ -851,7 +492,7 @@ DT_WORDS *pWords;
 
   iRval = InternalCalcIdealBounds(pFont, pWords, iTabWidth, iTabOrigin, prcSource, prcDest, iAlignment, 0, -1);
 
-  free(pWords);
+  WBFree(pWords);
 
   return iRval;
 }
@@ -1674,7 +1315,7 @@ XFontSet fSet;
   {
     InternalDebugDumpWords(pWords);
 
-    free(pWords);
+    WBFree(pWords);
 
     WB_ERROR_PRINT("%s - ERROR:  InternalCalcIdealBounds returns error\n",
                    __FUNCTION__);
@@ -1785,7 +1426,7 @@ XFontSet fSet;
   }
 
   XFreeFontSet(pDisplay, fSet);
-  free(pWords);
+  WBFree(pWords);
 }
 
 

@@ -131,7 +131,7 @@ file_help_buf_t *FBGetFileBufViaHandle(int iFile)
     return NULL;
   }
 
-  pRval = (file_help_buf_t *)malloc(sizeof(*pRval) + ((lFileSize + 256 + 128) & 0xffffff00L));
+  pRval = (file_help_buf_t *)WBAlloc(sizeof(*pRval) + ((lFileSize + 256 + 128) & 0xffffff00L));
 
   if(pRval)
   {
@@ -145,7 +145,7 @@ file_help_buf_t *FBGetFileBufViaHandle(int iFile)
     {
       if(read(iFile, pRval->cData, lFileSize) != lFileSize)
       {
-        free(pRval);
+        WBFree(pRval);
         pRval = NULL;
       }
     }
@@ -163,7 +163,7 @@ file_help_buf_t *FBGetFileBufFromBuffer(const char *pBuf, long cbBuf)
     return NULL;
   }
 
-  pRval = (file_help_buf_t *)malloc(sizeof(*pRval) + ((cbBuf + 256 + 128) & 0xffffff00L));
+  pRval = (file_help_buf_t *)WBAlloc(sizeof(*pRval) + ((cbBuf + 256 + 128) & 0xffffff00L));
   if(pRval)
   {
     bzero(pRval, sizeof(*pRval)); // this also takes care of pNext, pPrev
@@ -194,14 +194,14 @@ void FBDestroyFileBuf(file_help_buf_t *pBuf)
     pBuf->pNext = NULL;
   }
 
-  // TODO:  ppLineBuf should be part of 'cData'.  For now it's malloc'd
+  // TODO:  ppLineBuf should be part of 'cData'.  For now it's WBAlloc'd
 
   if(pBuf->ppLineBuf)
   {
-    free(pBuf->ppLineBuf);
+    WBFree(pBuf->ppLineBuf);
   }
 
-  free(pBuf);
+  WBFree(pBuf);
 }
 
 int FBParseFileBuf(file_help_buf_t *pBuf)
@@ -209,11 +209,11 @@ int FBParseFileBuf(file_help_buf_t *pBuf)
   int i1, iLines;
   const char *p1, /* *p2,*/ *pEnd;
 
-  // TODO:  ppLineBuf should be part of 'cData'.  For now it's malloc'd
+  // TODO:  ppLineBuf should be part of 'cData'.  For now it's WBAlloc'd
 
   if(pBuf->ppLineBuf)
   {
-    free(pBuf->ppLineBuf);
+    WBFree(pBuf->ppLineBuf);
     pBuf->ppLineBuf = NULL;
     pBuf->lLineCount = 0;
     pBuf->lLineBufSize = 0;
@@ -240,11 +240,11 @@ int FBParseFileBuf(file_help_buf_t *pBuf)
   // now allocate memory and REALLY assign the pointers
   iLines = i1;
 
-  // TODO:  ppLineBuf should be part of 'cData'.  For now it's malloc'd
+  // TODO:  ppLineBuf should be part of 'cData'.  For now it's WBAlloc'd
   //        if I need room for more lines, attach another file_help_buf_t
   //        and chain it to 'pNext'
 
-  pBuf->ppLineBuf = (char **)malloc((iLines + 1) * sizeof(char **));
+  pBuf->ppLineBuf = (char **)WBAlloc((iLines + 1) * sizeof(char **));
   if(!pBuf->ppLineBuf)
   {
     return -1;
@@ -376,7 +376,7 @@ static int InternalGrowFileBuf(file_help_buf_t **ppBuf, long cbOffset, long cbDa
   WB_DEBUG_PRINT(DebugLevel_Excessive, "TEMPORARY:  reallocating - %d %d %d\n",
                  (int)(*ppBuf)->lBufferSize, (int)lActualBufSize, (int)lNewSize);
 
-  pNew = (char *)realloc(*ppBuf, lNewSize);
+  pNew = (char *)WBReAlloc(*ppBuf, lNewSize);
 
   if(pNew)
   {
@@ -602,14 +602,14 @@ int iRval = 0;
 
 char *WBGetCurrentDirectory(void)
 {
-char *pRval = malloc(MAXPATHLEN + 2);
+char *pRval = WBAlloc(MAXPATHLEN + 2);
 int i1;
 
   if(pRval)
   {
     if(!getcwd(pRval, MAXPATHLEN))
     {
-      free(pRval);
+      WBFree(pRval);
       pRval = NULL;
     }
   }
@@ -702,7 +702,7 @@ struct stat sF;
       p3 = WBCopyString(p1);
       if(!p3)
       {
-        free(pTemp);
+        WBFree(pTemp);
         return NULL;
       }
 
@@ -722,7 +722,7 @@ struct stat sF;
         WBCatString(&p3, p2);
       }
 
-      free(pTemp);
+      WBFree(pTemp);
       pTemp = p3;
     }
   }
@@ -806,7 +806,7 @@ struct stat sF;
         {
           WB_ERROR_PRINT("%s:%d - did not find preceding '/' - %s\n", __FUNCTION__, __LINE__, pRval);
 
-          free(pRval);
+          WBFree(pRval);
           pRval = NULL;
 
           break;
@@ -846,13 +846,13 @@ struct stat sF;
           // now I get to put the symlink contents "in place".  If the symlink is
           // relative to the current directory, I'll want that.
 
-          p4 = (char *)malloc(MAXPATHLEN + 2);
+          p4 = (char *)WBAlloc(MAXPATHLEN + 2);
 
           if(!p4)
           {
             WB_ERROR_PRINT("%s:%d - not enough memory for buffer\n", __FUNCTION__, __LINE__);
 
-            free(pRval);
+            WBFree(pRval);
             pRval = NULL;
             break;
           }
@@ -864,8 +864,8 @@ struct stat sF;
             {
               WB_ERROR_PRINT("%s:%d - readlink returned %d for %s\n", __FUNCTION__, __LINE__, iLen, pRval);
 
-              free(p4);
-              free(pRval);
+              WBFree(p4);
+              WBFree(pRval);
               pRval = NULL;
 
               break;
@@ -874,7 +874,7 @@ struct stat sF;
             p4[iLen] = 0; // assume < MAXPATHLEN for now...
             if(p4[0] == '/') // it's an absolute path
             {
-              free(pRval);
+              WBFree(pRval);
               pRval = p4;
             }
             else
@@ -886,14 +886,14 @@ struct stat sF;
 
               *p3 = 0;
               WBCatString(&pRval, p4); // sub in the relative path
-              free(p4);
+              WBFree(p4);
             }
 
             if(!WBIsDirectory(pRval)) // must be a directory!
             {
               WB_ERROR_PRINT("%s:%d - %s not a directory\n", __FUNCTION__, __LINE__, pRval);
 
-              free(pRval);
+              WBFree(pRval);
               pRval = NULL;
               break; // this is an error
             }
@@ -905,7 +905,7 @@ struct stat sF;
               {
                 p4 = WBGetCanonicalPath(pRval); // recurse
 
-                free(pRval);
+                WBFree(pRval);
                 pRval = p4; // new canonical version of symlink path
               }
 
@@ -947,7 +947,7 @@ struct stat sF;
           // now I get to put the symlink contents "in place".  If the symlink is
           // relative to the current directory, I'll want that.
 
-          p4 = (char *)malloc(MAXPATHLEN + 2);
+          p4 = (char *)WBAlloc(MAXPATHLEN + 2);
 
           if(!p4)
           {
@@ -963,8 +963,8 @@ struct stat sF;
             {
               WB_ERROR_PRINT("%s:%d - readlink returned %d for %s\n", __FUNCTION__, __LINE__, iLen, pRval);
 
-              free(p4);
-              free(pRval);
+              WBFree(p4);
+              WBFree(pRval);
               pRval = NULL;
             }
             else
@@ -972,7 +972,7 @@ struct stat sF;
               p4[iLen] = 0; // assume < MAXPATHLEN for now...
               if(p4[0] == '/') // it's an absolute path
               {
-                free(pRval); // new path for old
+                WBFree(pRval); // new path for old
                 pRval = p4;
               }
               else
@@ -985,7 +985,7 @@ struct stat sF;
 
                 *p3 = 0;
                 WBCatString(&pRval, p4); // sub in the relative path
-                free(p4);
+                WBFree(p4);
               }
 
               if(pRval && WBIsDirectory(pRval)) // is the result a directory?
@@ -997,7 +997,7 @@ struct stat sF;
               {
                 p4 = WBGetCanonicalPath(pRval); // recurse to make sure I'm canonical (deal with '..' and '.' and so on)
 
-                free(pRval);
+                WBFree(pRval);
                 pRval = p4; // new canonical version of symlink path
               }
             }
@@ -1009,7 +1009,7 @@ struct stat sF;
 
   if(pTemp)
   {
-    free(pTemp);
+    WBFree(pTemp);
     pTemp = NULL; // by convention
   }
 
@@ -1057,7 +1057,7 @@ char *pBuf;
   iLen = strlen(szDirSpec);
   nMaxLen = iLen + 32;
 
-  pBuf = malloc(nMaxLen);
+  pBuf = WBAlloc(nMaxLen);
   if(!pBuf)
   {
     WB_ERROR_PRINT("ERROR - %s - Unable to allocate memory for buffer size %d\n", __FUNCTION__, nMaxLen);
@@ -1168,7 +1168,7 @@ char *pBuf;
     }
   }
 
-  pRval = malloc(sizeof(DIRLIST) + iLen + strlen(p1) + 2);
+  pRval = WBAlloc(sizeof(DIRLIST) + iLen + strlen(p1) + 2);
 
   if(pRval)
   {
@@ -1186,8 +1186,8 @@ char *pBuf;
     pRval->hFF = FindFirstFile(p2, &(pRval->fd))
     if(pRval->hFF == INVALID_HANDLE_VALUE)
     {
-      free(pBuf);
-      free(pRval);
+      WBFree(pBuf);
+      WBFree(pRval);
 
       pRval = NULL;
     }
@@ -1200,8 +1200,8 @@ char *pBuf;
     {
       WB_WARN_PRINT("WARNING - %s - Unable to open dir \"%s\", errno=%d\n", __FUNCTION__, pBuf, errno);
 
-      free(pBuf);
-      free(pRval);
+      WBFree(pBuf);
+      WBFree(pRval);
 
       pRval = NULL;
     }
@@ -1210,7 +1210,7 @@ char *pBuf;
   else
   {
     WB_ERROR_PRINT("ERROR - %s - Unable to allocate memory for DIRLIST\n", __FUNCTION__);
-    free(pBuf);  // no need to keep this around
+    WBFree(pBuf);  // no need to keep this around
   }
 
   return pRval;
@@ -1235,10 +1235,10 @@ void WBDestroyDirectoryList(void *pDirectoryList)
 #endif // WIN32,!WIN32
     if(pD->szPath)
     {
-      free((void *)(pD->szPath));
+      WBFree((void *)(pD->szPath));
     }
 
-    free(pDirectoryList);
+    WBFree(pDirectoryList);
   }
 }
 
@@ -1264,7 +1264,7 @@ DIRLIST *pDL = (DIRLIST *)pDirectoryList;
   }
 
   // TODO:  improve this, maybe cache buffer or string length...
-  pBuf = malloc(strlen(pDL->szPath) + 8 + NAME_MAX);
+  pBuf = WBAlloc(strlen(pDL->szPath) + 8 + NAME_MAX);
 
   if(!pBuf)
   {
@@ -1338,7 +1338,7 @@ DIRLIST *pDL = (DIRLIST *)pDirectoryList;
 
   if(pBuf)
   {
-    free(pBuf);
+    WBFree(pBuf);
   }
 
   return iRval;
@@ -1366,7 +1366,7 @@ DIRLIST *pDL = (DIRLIST *)pDirectoryList;
   }
 
   // TODO:  improve this, maybe cache buffer or string length...
-  pBuf = (char *)malloc(strlen(pDL->szPath) + 8 + (szFileName ? strlen(szFileName) : 0) + NAME_MAX);
+  pBuf = (char *)WBAlloc(strlen(pDL->szPath) + 8 + (szFileName ? strlen(szFileName) : 0) + NAME_MAX);
 
   if(!pBuf)
   {
@@ -1387,21 +1387,21 @@ DIRLIST *pDL = (DIRLIST *)pDirectoryList;
   }
 
   pRval = WBGetCanonicalPath(pBuf);
-  free(pBuf);
+  WBFree(pBuf);
 
   return pRval;
 }
 
 char *WBGetSymLinkTarget(const char *szFileName)
 {
-char *pRval = malloc(MAXPATHLEN + 2);
+char *pRval = WBAlloc(MAXPATHLEN + 2);
 
   if(pRval)
   {
     int iLen = readlink(szFileName, pRval, MAXPATHLEN);
     if(iLen <= 0)
     {
-      free(pRval);
+      WBFree(pRval);
       return NULL;
     }
 
@@ -1423,7 +1423,7 @@ char *pTemp, *pRval;
   }
 
   pRval = WBGetSymLinkTarget(pTemp);
-  free(pTemp);
+  WBFree(pTemp);
 
   return pRval;
 }
@@ -1459,7 +1459,7 @@ int iRval;
 //  WB_ERROR_PRINT("TEMPORARY:  stat on '%s' - \"%s\"\n", szFileName, pTemp);
 
   iRval = WBStat(pTemp, pdwModeAttrReturn);
-  free(pTemp);
+  WBFree(pTemp);
 
   return iRval;
 }

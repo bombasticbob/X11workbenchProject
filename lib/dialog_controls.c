@@ -315,10 +315,17 @@ int DLGControlDefaultCallback(Window wID, XEvent *pEvent)
 //      {
 //      }
 
-      WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
-                     "CLIENT MESSAGE - dialog control (NOT HANDLED) - %s\n",
-                     XGetAtomName(pDisplay, pEvent->xclient.message_type));
-
+#ifndef NO_DEBUG
+      {
+        char *p1 = WBGetAtomName(pDisplay, pEvent->xclient.message_type);
+        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
+                       "CLIENT MESSAGE - dialog control (NOT HANDLED) - %s\n", p1);
+        if(p1)
+        {
+          WBFree(p1);
+        }
+      }
+#endif // NO_DEBUG
       return 1;
   }
 
@@ -335,7 +342,7 @@ int DLGControlDefaultCallback(Window wID, XEvent *pEvent)
 ////                     "%s - DestroyNotify\n", __FUNCTION__);
 ////
 ////    WBSetWindowData(wID, 0, NULL);
-////    free(pDialogControl);
+////    WBFree(pDialogControl);
 ////
 //    return 1;
 //  }
@@ -362,7 +369,7 @@ int i1;
 #define DO_CREATE_CONTROL(X) if(aClass == a##X) \
   { return do_create_##X(pRval, iX, iY, iWidth, iHeight, #X, szTitle); }
 
-  pRval = malloc(i1 = GetWBDialogControlStructSize(aClass));
+  pRval = WBAlloc(i1 = GetWBDialogControlStructSize(aClass));
   if(!pRval)
   {
     return NULL;
@@ -387,7 +394,7 @@ int i1;
   if(WBDialogControlSetPropList(pRval, szPropertyList))
   {
     WB_ERROR_PRINT("%s - Error return from WBDialogSetPropList\n", __FUNCTION__);
-    free(pRval);
+    WBFree(pRval);
     return NULL;
   }
 
@@ -431,7 +438,7 @@ int i1;
     pRval->pPropList = NULL; // as a matter of course
   }
 
-  free(pRval);
+  WBFree(pRval);
 
   return NULL;
 }
@@ -636,7 +643,7 @@ BEGIN_CREATE_CONTROL(FRAME_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
-    free(pDialogControl);
+    WBFree(pDialogControl);
     return NULL;
   }
 
@@ -692,7 +699,7 @@ BEGIN_CREATE_CONTROL(TEXT_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
-    free(pDialogControl);
+    WBFree(pDialogControl);
     return NULL;
   }
 
@@ -746,7 +753,7 @@ BEGIN_CREATE_CONTROL(ICON_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
-    free(pDialogControl);
+    WBFree(pDialogControl);
     return NULL;
   }
 
@@ -803,7 +810,7 @@ BEGIN_CREATE_CONTROL(IMAGE_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
-    free(pDialogControl);
+    WBFree(pDialogControl);
     return NULL;
   }
 
@@ -839,7 +846,10 @@ BEGIN_CREATE_CONTROL(EDIT_CONTROL);
 
   // private member initialization
 //  pPrivate->pState = NULL;  // nothing, yet (until text is assigned)
-  WBInitializeTextObject(&(pPrivate->xTextObject));
+  WBInitializeInPlaceTextObject(&(pPrivate->xTextObject), None);
+
+  // NOTE:  it's assumed that vtable will NOT be NULL after calling that...
+
 
   // TODO:  determine single/multi line behavior.  for now, SINGLE only
   pPrivate->xTextObject.vtable->set_linefeed(&(pPrivate->xTextObject), LineFeed_NONE); // single-line
@@ -870,12 +880,14 @@ BEGIN_CREATE_CONTROL(EDIT_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
-    // destroy any allocated stuff thus far
-    pPrivate->xTextObject.vtable->destroy(&(pPrivate->xTextObject)); // by convention (really does nothing at this point)
+    // destroy any allocated 'text object' stuff thus far
+    WBDestroyInPlaceTextObject(&(pPrivate->xTextObject));
 
-    free(pDialogControl);
+    WBFree(pDialogControl);
     return NULL;
   }
+
+  pPrivate->xTextObject.wIDOwner = pDialogControl->wID; // TODO:  make assigning this an API function?
 
   // this one needs a special cursor
   WBSetWindowDefaultCursor(pDialogControl->wID, XC_xterm);//tcross);
@@ -934,7 +946,7 @@ BEGIN_CREATE_CONTROL(PUSHBUTTON_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
-    free(pDialogControl);
+    WBFree(pDialogControl);
     return NULL;
   }
 
@@ -987,7 +999,7 @@ BEGIN_CREATE_CONTROL(DEFPUSHBUTTON_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
-    free(pDialogControl);
+    WBFree(pDialogControl);
     return NULL;
   }
 
@@ -1039,7 +1051,7 @@ BEGIN_CREATE_CONTROL(CANCELBUTTON_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
-    free(pDialogControl);
+    WBFree(pDialogControl);
     return NULL;
   }
 
@@ -1090,7 +1102,7 @@ BEGIN_CREATE_CONTROL(RADIOBUTTON_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
-    free(pDialogControl);
+    WBFree(pDialogControl);
     return NULL;
   }
 
@@ -1141,7 +1153,7 @@ BEGIN_CREATE_CONTROL(FIRSTRADIOBUTTON_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
-    free(pDialogControl);
+    WBFree(pDialogControl);
     return NULL;
   }
 
@@ -1193,7 +1205,7 @@ BEGIN_CREATE_CONTROL(CHECKBUTTON_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
-    free(pDialogControl);
+    WBFree(pDialogControl);
     return NULL;
   }
 
@@ -1244,7 +1256,7 @@ BEGIN_CREATE_CONTROL(TRISTATEBUTTON_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
-    free(pDialogControl);
+    WBFree(pDialogControl);
     return NULL;
   }
 
@@ -1340,13 +1352,13 @@ BEGIN_CREATE_CONTROL(LIST_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
-    free(pDialogControl);
+    WBFree(pDialogControl);
     return NULL;
   }
 
   // initialize list element with default settings if not already initialized on window create
   if(DLGInitControlListInfoDefault(pDialogControl))
-//     DLGInitControlListInfo(pDialogControl, ListInfoFlags_SORTED, DLGCDefaultListInfoAllocator, free, NULL, NULL))
+//     DLGInitControlListInfo(pDialogControl, ListInfoFlags_SORTED, DLGCDefaultListInfoAllocator, WBFree, NULL, NULL))
   {
     WB_ERROR_PRINT("%s - Unable to initialize list entry for control\n", __FUNCTION__);
     if(pDialogControl->pPropList)
@@ -1356,7 +1368,7 @@ BEGIN_CREATE_CONTROL(LIST_CONTROL);
     }
 
     WBSetWindowData(pDialogControl->wID, 0, NULL);
-    free(pDialogControl);
+    WBFree(pDialogControl);
     return NULL;
   }
 
@@ -1396,7 +1408,7 @@ static int combo_callback(Window wID, XEvent *pEvent)
 
       if(pDialogControl->pCaption)
       {
-        free(pDialogControl->pCaption);
+        WBFree(pDialogControl->pCaption);
       }
 
       if(pDialogControl->pPropList)
@@ -1406,9 +1418,9 @@ static int combo_callback(Window wID, XEvent *pEvent)
       }
 
       // free up privately allocated stuff
-      pPrivate->xTextObject.vtable->destroy(&(pPrivate->xTextObject)); // destroy previously allocated object
+      WBDestroyInPlaceTextObject(&(pPrivate->xTextObject));
 
-      free(pDialogControl);
+      WBFree(pDialogControl);
     }
 
     return 1; // handled
@@ -1431,7 +1443,7 @@ BEGIN_CREATE_CONTROL(COMBO_CONTROL);
   // focus
   pDialogControl->pDlgControlEntry->iFlags |= WBDialogEntry_CAN_HAVE_FOCUS; // override 'default' when I have focus
 
-  WBInitializeTextObject(&(pPrivate->xTextObject));
+  WBInitializeInPlaceTextObject(&(pPrivate->xTextObject), None);
 
   // TODO:  determine single/multi line behavior.  for now, SINGLE only
   pPrivate->xTextObject.vtable->set_linefeed(&(pPrivate->xTextObject), LineFeed_NONE); // single-line
@@ -1455,22 +1467,25 @@ BEGIN_CREATE_CONTROL(COMBO_CONTROL);
     }
 
     // destroy any allocated stuff thus far
-    pPrivate->xTextObject.vtable->destroy(&(pPrivate->xTextObject)); // by convention (really does nothing at this point)
+    WBDestroyInPlaceTextObject(&(pPrivate->xTextObject)); // by convention
 
-    free(pDialogControl);
+    WBFree(pDialogControl);
     return NULL;
   }
 
+  pPrivate->xTextObject.wIDOwner = pDialogControl->wID; // TODO:  make assigning this an API function?
+
+
 //  // initialize list element with default settings if not already initialized on window create
 //  if(DLGInitControlListInfoDefault(pDialogControl))
-////     DLGInitControlListInfo(pDialogControl, ListInfoFlags_SORTED, DLGCDefaultListInfoAllocator, free, NULL, NULL))
+////     DLGInitControlListInfo(pDialogControl, ListInfoFlags_SORTED, DLGCDefaultListInfoAllocator, WBFree, NULL, NULL))
 //  {
 //    WB_ERROR_PRINT("%s - Unable to initialize list entry for control\n", __FUNCTION__);
 //    if(pDialogControl->pPropList)
 //      DLGCDestroyProperties(pDialogControl->pPropList);
 //
 //    WBSetWindowData(wID, 0, NULL);
-//    free(pDialogControl);
+//    WBFree(pDialogControl);
 //    return NULL;
 //  }
 
@@ -1522,13 +1537,13 @@ BEGIN_CREATE_CONTROL(TREE_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
-    free(pDialogControl);
+    WBFree(pDialogControl);
     return NULL;
   }
 
   // initialize list element with default settings if not already initialized on window create
   if(DLGInitControlListInfoDefault(pDialogControl))
-//     DLGInitControlListInfo(pDialogControl, ListInfoFlags_SORTED, DLGCDefaultListInfoAllocator, free, NULL, NULL))
+//     DLGInitControlListInfo(pDialogControl, ListInfoFlags_SORTED, DLGCDefaultListInfoAllocator, WBFree, NULL, NULL))
   {
     if(pDialogControl->pPropList)
     {
@@ -1536,7 +1551,7 @@ BEGIN_CREATE_CONTROL(TREE_CONTROL);
     }
 
     WBSetWindowData(pDialogControl->wID, 0, NULL);
-    free(pDialogControl);
+    WBFree(pDialogControl);
     return NULL;
   }
 
@@ -1750,7 +1765,7 @@ static int static_callback(Window wID, XEvent *pEvent)
 
       if(pDialogControl->pCaption)
       {
-        free(pDialogControl->pCaption);
+        WBFree(pDialogControl->pCaption);
       }
 
       if(pDialogControl->pPropList)
@@ -1759,7 +1774,7 @@ static int static_callback(Window wID, XEvent *pEvent)
         pDialogControl->pPropList = NULL; // as a matter of course
       }
 
-      free(pDialogControl);
+      WBFree(pDialogControl);
     }
 
     return 1;
@@ -1807,7 +1822,7 @@ static int edit_callback(Window wID, XEvent *pEvent)
 
       if(pDialogControl->pCaption)
       {
-        free(pDialogControl->pCaption);
+        WBFree(pDialogControl->pCaption);
       }
 
       if(pDialogControl->pPropList)
@@ -1819,15 +1834,15 @@ static int edit_callback(Window wID, XEvent *pEvent)
       DeleteTimer(pDisplay, wID, 1); // TODO:  use #define for timer ID
 
       // free up privately allocated stuff
-      pPrivate->xTextObject.vtable->destroy(&(pPrivate->xTextObject)); // destroy previously allocated object
+      WBDestroyInPlaceTextObject(&(pPrivate->xTextObject)); // destroy in-place text object
 
-      free(pDialogControl);
+      WBFree(pDialogControl);
     }
 
     return 1; // handled
   }
 
-  // MOUSE/KEYBOARD INPUT (
+  // MOUSE/KEYBOARD INPUT
   if(pEvent->type == ButtonPress ||
      pEvent->type == ButtonRelease ||
      pEvent->type == MotionNotify)
@@ -1993,7 +2008,7 @@ static int button_callback(Window wID, XEvent *pEvent)
 
       if(pDialogControl->pCaption)
       {
-        free(pDialogControl->pCaption);
+        WBFree(pDialogControl->pCaption);
       }
 
       if(pDialogControl->pPropList)
@@ -2002,7 +2017,7 @@ static int button_callback(Window wID, XEvent *pEvent)
         pDialogControl->pPropList = NULL; // as a matter of course
       }
 
-      free(pDialogControl);
+      WBFree(pDialogControl);
     }
 
     return 1;
@@ -2183,7 +2198,7 @@ static int list_callback(Window wID, XEvent *pEvent)
     {
       if(pDialogControl->pCaption)
       {
-        free(pDialogControl->pCaption);
+        WBFree(pDialogControl->pCaption);
       }
 
       if(pDialogControl->pPropList)
@@ -2192,7 +2207,7 @@ static int list_callback(Window wID, XEvent *pEvent)
         pDialogControl->pPropList = NULL; // as a matter of course
       }
 
-      free(pDialogControl);
+      WBFree(pDialogControl);
     }
 
     return 1;
@@ -2327,12 +2342,14 @@ static int list_callback(Window wID, XEvent *pEvent)
   if(pEvent->type == ClientMessage &&
      pEvent->xclient.message_type == aCONTROL_NOTIFY)
   {
+    char *p1 = WBGetAtomName(pDisplay,(Atom)pEvent->xclient.data.l[0]);
     WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DialogCtrl | DebugSubSystem_Dialog,
                    "%s - CONTROL_NOTIFY for window %d (%08xH) - %s %ld\n", __FUNCTION__,
-                   (int)wID, (int)wID, XGetAtomName(pDisplay,(Atom)pEvent->xclient.data.l[0]),
-                   pEvent->xclient.data.l[1]);
-
-
+                   (int)wID, (int)wID, p1, pEvent->xclient.data.l[1]);
+    if(p1)
+    {
+      WBFree(p1);
+    }
   }
   else if(pEvent->type == ClientMessage &&
           pEvent->xclient.message_type == aWM_CHAR)
@@ -2691,12 +2708,12 @@ char tbuf[NAME_MAX + 4];
       if(!pV) // in case of error
       {
         WB_ERROR_PRINT("%s - unable to get directory list for \"%s\"\n", __FUNCTION__, p1);
-        free(p1);
+        WBFree(p1);
 
         goto restore_cursor;
       }
 
-      free(p1);
+      WBFree(p1);
       p1 = NULL;
 
       // always add the '..' first, unless the path is '/'
@@ -2800,7 +2817,7 @@ static int tree_callback(Window wID, XEvent *pEvent)
     {
       if(pDialogControl->pCaption)
       {
-        free(pDialogControl->pCaption);
+        WBFree(pDialogControl->pCaption);
       }
 
       if(pDialogControl->pPropList)
@@ -2809,7 +2826,7 @@ static int tree_callback(Window wID, XEvent *pEvent)
         pDialogControl->pPropList = NULL; // as a matter of course
       }
 
-      free(pDialogControl);
+      WBFree(pDialogControl);
     }
 
     return 1;
@@ -2892,7 +2909,7 @@ char tbuf[NAME_MAX + 4];
       }
 
       pV = WBAllocDirectoryList(p1);
-      free(p1);
+      WBFree(p1);
       p1 = NULL;
 
       if(!pV) // in case of error
@@ -2987,7 +3004,7 @@ WB_RECT rctTemp;
       // re-assign caption
       if(pSelf->pCaption)
       {
-        free(pSelf->pCaption);
+        WBFree(pSelf->pCaption);
       }
 
       pSelf->pCaption = pPrivate->xTextObject.vtable->get_text(&(pPrivate->xTextObject));
@@ -3038,7 +3055,7 @@ WB_RECT rctTemp;
             {
               WBSetClipboardData(pDisplay, aSTRING, 8, pData, strlen(pData) + 1);
             }
-            free(pData);
+            WBFree(pData);
             pData = NULL; // by convention
           }
           else
@@ -3082,7 +3099,7 @@ WB_RECT rctTemp;
         {
           if(pData)
           {
-            free(pData);
+            WBFree(pData);
           }
 
           aType = aSTRING;
@@ -3104,14 +3121,14 @@ WB_RECT rctTemp;
           {
             if(iFormat == 8 * sizeof(wchar_t))
             {
-              char *pNew = malloc(sizeof(wchar_t) * (nData + 2));
+              char *pNew = WBAlloc(sizeof(wchar_t) * (nData + 2));
               if(pNew)
               {
                 memset(pNew, 0, sizeof(wchar_t) * (nData + 2));
                 wcstombs(pNew, (const wchar_t *)pData, sizeof(wchar_t) * (nData + 2));
               }
 
-              free(pData);
+              WBFree(pData);
               pData = pNew;
             }
             else
@@ -3119,7 +3136,7 @@ WB_RECT rctTemp;
               XBell(pDisplay, -100);
               WB_ERROR_PRINT("TEMPORARY - %s - clipboard format %d, can't 'PASTE'\n", __FUNCTION__, iFormat);
               
-              free(pData);
+              WBFree(pData);
               pData = NULL;
             }
           }
@@ -3135,7 +3152,7 @@ WB_RECT rctTemp;
               pPrivate->xTextObject.vtable->ins_chars(&(pPrivate->xTextObject), pData, nData);
             }
 
-            free(pData);
+            WBFree(pData);
             pData = NULL; // by convention
           }
           else
@@ -3178,7 +3195,7 @@ WB_RECT rctTemp;
               WBSetClipboardData(pDisplay, aSTRING, 8, pData, strlen(pData) + 1);
             }
 
-            free(pData);
+            WBFree(pData);
             pData = NULL; // by convention
 
             pPrivate->xTextObject.vtable->del_select(&(pPrivate->xTextObject)); // delete selection
@@ -3250,7 +3267,7 @@ WB_RECT rctTemp;
       // re-assign caption
       if(pSelf->pCaption)
       {
-        free(pSelf->pCaption);
+        WBFree(pSelf->pCaption);
       }
 
       pSelf->pCaption = pPrivate->xTextObject.vtable->get_text(&(pPrivate->xTextObject));
@@ -3260,7 +3277,7 @@ WB_RECT rctTemp;
 
     if(pSelf->pCaption)
     {
-      free(pSelf->pCaption); // cached text
+      WBFree(pSelf->pCaption); // cached text
     }
 
     pSelf->pCaption = pPrivate->xTextObject.vtable->get_text(&(pPrivate->xTextObject));
@@ -3549,14 +3566,14 @@ WB_RECT rctTemp;
             {
               if(iFormat == 8 * sizeof(wchar_t))
               {
-                char *pNew = malloc(sizeof(wchar_t) * (nData + 2));
+                char *pNew = WBAlloc(sizeof(wchar_t) * (nData + 2));
                 if(pNew)
                 {
                   memset(pNew, 0, sizeof(wchar_t) * (nData + 2));
                   wcstombs(pNew, (const wchar_t *)pData, sizeof(wchar_t) * (nData + 2));
                 }
 
-                free(pData);
+                WBFree(pData);
                 pData = pNew;
               }
               else
@@ -3564,7 +3581,7 @@ WB_RECT rctTemp;
                 XBell(pDisplay, -100);
                 WB_ERROR_PRINT("TEMPORARY - %s - clipboard format %d, can't 'PASTE'\n", __FUNCTION__, iFormat);
                 
-                free(pData);
+                WBFree(pData);
                 pData = NULL;
               }
             }
@@ -3580,7 +3597,7 @@ WB_RECT rctTemp;
                 pPrivate->xTextObject.vtable->ins_chars(&(pPrivate->xTextObject), pData, nData);
               }
 
-              free(pData);
+              WBFree(pData);
               pData = NULL; // by convention
             }
             else
@@ -3610,7 +3627,7 @@ WB_RECT rctTemp;
               WBSetClipboardData(pDisplay, aSTRING, 8, pData, strlen(pData) + 1);
             }
 
-            free(pData);
+            WBFree(pData);
           }
           else
           {
@@ -3644,7 +3661,7 @@ WB_RECT rctTemp;
         // re-assign caption
         if(pSelf->pCaption)
         {
-          free(pSelf->pCaption);
+          WBFree(pSelf->pCaption);
         }
 
         pSelf->pCaption = pPrivate->xTextObject.vtable->get_text(&(pPrivate->xTextObject));
@@ -4625,7 +4642,7 @@ static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
   pScrollInfo = (WB_SCROLLINFO *)WBDialogControlGetProperty2(pSelf, aDLGC_SCROLLINFO);
   if(!pScrollInfo)
   {
-    pScrollInfo = (WB_SCROLLINFO *)malloc(sizeof(*pScrollInfo));
+    pScrollInfo = (WB_SCROLLINFO *)WBAlloc(sizeof(*pScrollInfo));
     if(!pScrollInfo)
     {
       WB_ERROR_PRINT("%s:%d Out Of Memory\n", __FUNCTION__, __LINE__);

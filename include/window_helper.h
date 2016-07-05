@@ -2345,6 +2345,40 @@ void WBPostDelayedSetFocusAppEvent(Display *pDisplay, Window wID, Window wIDFrom
 void WBProcessExposeEvent(XExposeEvent *pEvent);  // paint optimization
 
 
+
+//////////////////////////////////////////////////////////////////////////////
+//                                                                          //
+//            _   _  ___   _   _        _                                   //
+//           | | | ||_ _| | | | |  ___ | | _ __    ___  _ __  ___           //
+//           | | | | | |  | |_| | / _ \| || '_ \  / _ \| '__|/ __|          //
+//           | |_| | | |  |  _  ||  __/| || |_) ||  __/| |   \__ \          //
+//            \___/ |___| |_| |_| \___||_|| .__/  \___||_|   |___/          //
+//                                        |_|                               //
+//                                                                          //
+//////////////////////////////////////////////////////////////////////////////
+
+
+/** \ingroup events
+  * \brief low-level event processing, internal handling of Expose events
+  *
+  * \param pDisplay The display for the mouse activity.  A value of NULL uses the default display, either for 'wID', or the system default if wID is 'None'.
+  * \param wID The window to post the 'WB_POINTER_CANCEL' message to.  This window should have the input focus.  A value of 'None' indicates the window with the input focus.
+  *
+  * Call this function to effectively 'cancel' any operation involving the mouse.
+  * This will un-do any 'drag' operations and send a WM_POINTER Client Message event
+  * with the 'WB_POINTER_CANCEL', and optionally un-grab the mouse (and keyboard,
+  * as needed).  In the case of a Modal operation, this may differ from normal
+  * Asynchronous operations.  Additionally, if there are any mouse messages already
+  * in the queue, this will not remove them.  It will be up to the caller to deal
+  * with that.  This function ONLY fixes the status and capture of the mouse.
+  *
+  * Header File:  window_helper.h
+**/
+void WBMouseCancel(Display *pDisplay, Window wID);
+
+
+
+
 ///////////////////////////////////////////////////////////////
 //    ____ _     ___ ____  ____   ___    _    ____  ____     //
 //   / ___| |   |_ _|  _ \| __ ) / _ \  / \  |  _ \|  _ \    //
@@ -2372,13 +2406,13 @@ void WBProcessExposeEvent(XExposeEvent *pEvent);  // paint optimization
   * \param paType Pointer to an atom indicating the requested data type ('None' for ANY), and returning the actual data type
   * \param piFormat pointer to the returned format (0, 8, 16, or 32)
   * \param pnData the size of the returned data (number of items, based on *piFormat)
-  * \return a pointer to the actual data (must use 'free()' to de-allocate the resource)
+  * \return a pointer to the actual data (must use 'WBFree()' to de-allocate the resource)
   *
   * This function will obtain the clipboard data associated with the specified data type, or
   * whichever data it finds first if 'None' is specified as 'paType'.  Some substitutions may occur,
   * such as 'XA_TEXT' vs 'UTF8' (for example), if data in the requested format is not available.
   * The returned value is a pointer to the actual data of size '*pnData' 'items' (which have a bit
-  * length as specified by '*piFormat').  You must call 'free()' to release the resource once you are done with it.
+  * length as specified by '*piFormat').  You must call 'WBFree()' to release the resource once you are done with it.
   *
   * Header File:  window_helper.h
 **/
@@ -2412,13 +2446,13 @@ int WBSetClipboardData(Display *pDisplay, Atom aType, int iFormat, const void *p
   * \param paType Pointer to an atom indicating the requested data type ('None' for ANY), and returning the actual data type
   * \param piFormat pointer to the returned format (0, 8, 16, or 32)
   * \param pnData the size of the returned data (number of items, based on *piFormat)
-  * \return a pointer to the actual data (must use 'free()' to de-allocate the resource)
+  * \return a pointer to the actual data (must use 'WBFree()' to de-allocate the resource)
   *
   * This function will obtain the selection data associated with the target and specified data type, or
   * whichever data it finds first if 'None' is specified as 'paType'.  Some substitutions may occur,
   * such as 'XA_TEXT' vs 'UTF8' (for example), if data in the requested format is not available.
   * The returned value is a pointer to the actual data of size '*pnData' 'items' (which have a bit
-  * length as specified by '*piFormat').  You must call 'free()' to release the resource once you are done with it.
+  * length as specified by '*piFormat').  You must call 'WBFree()' to release the resource once you are done with it.
   *
   * Header File:  window_helper.h
 **/

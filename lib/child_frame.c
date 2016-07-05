@@ -59,6 +59,13 @@
 #include "draw_text.h"
 
 
+
+static int ChildFrameDoPointerEvent(XClientMessageEvent *pEvent, Display *pDisplay,
+                                    Window wID, WBChildFrame *pC, WBChildFrameUI *pUI);
+
+static int ChildFrameDoCharEvent(XClientMessageEvent *pEvent, Display *pDisplay,
+                                 Window wID, WBChildFrame *pC, WBChildFrameUI *pUI);
+
 static WBChildFrame *pChildFrames = NULL;  // pointer to linked list of 'Child Frame' windows
 
 
@@ -182,7 +189,7 @@ int iRval = -1;
 
     // allocate space and make a copy
 
-    pChildFrame->pMenuHandler = (WBFWMenuHandler *)malloc(sizeof(WBFWMenuHandler) * (i1 + 2));
+    pChildFrame->pMenuHandler = (WBFWMenuHandler *)WBAlloc(sizeof(WBFWMenuHandler) * (i1 + 2));
 
     if(pChildFrame->pMenuHandler)
     {
@@ -255,6 +262,8 @@ Window wID;
 
   if(!pChildFrame)
   {
+    WB_ERROR_PRINT("ERROR:  %s - pChildFrame not valid\n", __FUNCTION__);
+
     return;
   }
 
@@ -274,11 +283,11 @@ Window wID;
     pChildFrame->pOwner = NULL;
   }
 
-  // NOW, free up any resources that were malloc'd - they must also be free'd
+  // NOW, free up any resources that were WBAlloc'd - they must also be free'd
 
   if(pChildFrame->szDisplayName)
   {
-    free(pChildFrame->szDisplayName);
+    WBFree(pChildFrame->szDisplayName);
     pChildFrame->szDisplayName = NULL;
   }
 
@@ -290,13 +299,19 @@ Window wID;
 
   if(pChildFrame->pMenuHandler)
   {
-    free(pChildFrame->pMenuHandler);
+    WBFree(pChildFrame->pMenuHandler);
     pChildFrame->pMenuHandler = NULL;
+  }
+
+  if(pChildFrame->szStatusText)
+  {
+    WBFree(pChildFrame->szStatusText);
+    pChildFrame->szStatusText = NULL;
   }
 
   if(pChildFrame->pszMenuResource)
   {
-    free(pChildFrame->pszMenuResource);
+    WBFree(pChildFrame->pszMenuResource);
     pChildFrame->pszMenuResource = NULL;
   }
 
@@ -392,12 +407,14 @@ void FWSetChildFrameMenu(WBChildFrame *pChildFrame, const char *szFocusMenu)
 {
   if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
   {
+    WB_ERROR_PRINT("ERROR:  %s - pChildFrame not valid\n", __FUNCTION__);
+
     return;
   }
 
   if(pChildFrame->pszMenuResource)
   {
-    free(pChildFrame->pszMenuResource);
+    WBFree(pChildFrame->pszMenuResource);
   }
 
   if(szFocusMenu)
@@ -415,12 +432,14 @@ void FWSetChildFrameMenuHandlers(WBChildFrame *pChildFrame, const WBFWMenuHandle
 {
   if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
   {
+    WB_ERROR_PRINT("ERROR:  %s - pChildFrame not valid\n", __FUNCTION__);
+
     return;
   }
 
   if(pChildFrame->pMenuHandler)
   {
-    free(pChildFrame->pMenuHandler);
+    WBFree(pChildFrame->pMenuHandler);
   }
 
   if(pHandlerArray)
@@ -436,7 +455,7 @@ void FWSetChildFrameMenuHandlers(WBChildFrame *pChildFrame, const WBFWMenuHandle
 
     // allocate space and make a copy
 
-    pChildFrame->pMenuHandler = (WBFWMenuHandler *)malloc(sizeof(WBFWMenuHandler) * (i1 + 2));
+    pChildFrame->pMenuHandler = (WBFWMenuHandler *)WBAlloc(sizeof(WBFWMenuHandler) * (i1 + 2));
 
     if(pChildFrame->pMenuHandler)
     {
@@ -454,12 +473,14 @@ void FWSetChildFrameDisplayName(WBChildFrame *pChildFrame, const char *szDisplay
 {
   if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
   {
+    WB_ERROR_PRINT("ERROR:  %s - pChildFrame not valid\n", __FUNCTION__);
+
     return;
   }
 
   if(pChildFrame->szDisplayName)
   {
-    free(pChildFrame->szDisplayName);
+    WBFree(pChildFrame->szDisplayName);
   }
 
   if(!szDisplayName)
@@ -474,6 +495,8 @@ void FWSetChildFrameImageAtom(WBChildFrame *pChildFrame, Atom aImage)
 {
   if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
   {
+    WB_ERROR_PRINT("ERROR:  %s - pChildFrame not valid\n", __FUNCTION__);
+
     return;
   }
 
@@ -484,11 +507,39 @@ void FWSetChildFrameExtent(WBChildFrame *pChildFrame, int iXExtent, int iYExtent
 {
   if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
   {
+    WB_ERROR_PRINT("ERROR:  %s - pChildFrame not valid\n", __FUNCTION__);
+
     return;
   }
 
+
+
+
   // NOTE:  see (and maybe call) FWChildFrameRecalcLayout, below
+
+  FWChildFrameRecalcLayout(pChildFrame); // for now, do it [later change mind?]
 }
+
+
+void FWSetChildFrameScrollInfo(WBChildFrame *pChildFrame, int iRow, int iMaxRow, int iCol, int iMaxCol,
+                               int iRowHeight, int iColWidth)
+{
+  if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - pChildFrame not valid\n", __FUNCTION__);
+
+    return;
+  }
+
+  // NOTE:  this function must *NOT* call FWChildFrameRecalcLayout, nor FWSetChildFrameExtent, in
+  //        order to prevent problems with recursion.  Instead, it must 'nuke out' (aka 'derive')
+  //        all of those things, independently.
+
+  WB_ERROR_PRINT("TODO:  %s - implement.  %p %u (%08xH)  %d, %d, %d, %d, %d, %d\n", __FUNCTION__,
+                 pChildFrame, (int)pChildFrame->wID, (int)pChildFrame->wID,
+                 iRow, iMaxRow, iCol, iMaxCol, iRowHeight, iColWidth);
+
+}                               
 
 
 void FWChildFrameRecalcLayout(WBChildFrame *pChildFrame)
@@ -500,6 +551,8 @@ int iL, iT, iW, iH;
 
   if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
   {
+    WB_ERROR_PRINT("ERROR:  %s - pChildFrame not valid\n", __FUNCTION__);
+
     return;
   }
 
@@ -509,6 +562,8 @@ int iL, iT, iW, iH;
 
   if(!pOwner) // irrelevant if NULL.  TODO:  properly validate this (anal retentive if DEBUG build)
   {
+    WB_ERROR_PRINT("ERROR:  %s - pOwner is NULL for Child Frame\n", __FUNCTION__);
+
     return;
   }
 
@@ -517,7 +572,28 @@ int iL, iT, iW, iH;
   iW = pOwner->iClientWidth;
   iH = pOwner->iClientHeight;
 
-// re-calculate these members of the WBChildFrame structure, as needed
+  // resize the window accordingly
+  XMoveWindow(pDisplay, pChildFrame->wID, iL, iT);
+  XResizeWindow(pDisplay, pChildFrame->wID, iW - 2, iH - 2); // allow 1 pixel for border
+
+  // calculate new client 'geom', backing out 2 additional pixels in all 4 directions
+
+  pChildFrame->geom.x = 2;
+  pChildFrame->geom.y = 2;
+  pChildFrame->geom.width = iW - 6;
+  pChildFrame->geom.height = iH - 6;  // the new width/height of client area
+
+
+  // TODO:  anything ELSE that I need to do when re-calculating the layout, scrollbars, whatever
+  //        just apply that to geom so that it reflects the correct viewpoirt in pixels
+  //        minus any border, decorations, scrollbars, whatever, with 0,0 being top,left
+  //        for the window [in this case, border is 1 pixel already]
+
+
+
+  // TODO:  if I need to show scrollbars, subtract height/width of bar (plus border) from
+  //        the geometry width and height, as needed
+
 
 //  pChildFrame->iLeft = iL converted to correct units and scrolled;
 //  pChildFrame->iTop = iT converted to correct units and scrolled;  
@@ -525,16 +601,6 @@ int iL, iT, iW, iH;
 //  pChildFrame->iHeight = iH converted to correct units;
     
 
-
-
-  // TODO:  anything ELSE that I need to do when re-calculating the layout, scrollbars, whatever
-  //        just apply that to iL, iT, iW, iH so that it reflects the correct viewpoirt in pixels
-  //        minus any border, decorations, scrollbars, whatever, with 0,0 being top,left
-
-
-  // resize the window accordingly
-  XMoveWindow(pDisplay, pChildFrame->wID, iL, iT);
-  XResizeWindow(pDisplay, pChildFrame->wID, iW - 2, iH - 2); // 1 pixel for border
 
   // NOW, tell the user callback function (if any) what's happening.
   // I must assume that the owning frame is valid and has already re-calc'd its layout
@@ -553,13 +619,33 @@ int iL, iT, iW, iH;
     evt.window = pChildFrame->wID;
     evt.message_type = aRESIZE_NOTIFY;
     evt.format = 32;  // always
-    evt.data.l[0] = iL;
-    evt.data.l[1] = iT;
-    evt.data.l[2] = iL + iW; // right
-    evt.data.l[3] = iT + iH; // bottom
+    evt.data.l[0] = pChildFrame->geom.x;                            // left
+    evt.data.l[1] = pChildFrame->geom.y;                            // top
+    evt.data.l[2] = pChildFrame->geom.x + pChildFrame->geom.width;  // right
+    evt.data.l[3] = pChildFrame->geom.y + pChildFrame->geom.height; // bottom
 
+    // required implementation.  superclass must process this and fix up scroll info
     pChildFrame->pUserCallback(evt.window, (XEvent *)&evt);
   }  
+
+
+  // TODO:  fix the scrollbars and invalidate rectangles
+
+}
+
+void FWChildFrameStatusChanged(WBChildFrame *pChildFrame)
+{
+  if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - pChildFrame not valid\n", __FUNCTION__);
+
+    return;
+  }
+
+  // for now, don't mess with the tabs, just set the text
+  // later, I may need to store the tab info.
+
+  FWSetStatusText(pChildFrame->pOwner, pChildFrame->szStatusText);
 }
 
 
@@ -571,6 +657,8 @@ XClientMessageEvent evt;
 
   if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
   {
+    WB_ERROR_PRINT("ERROR:  %s - pChildFrame not valid\n", __FUNCTION__);
+
     return -1; // an error
   }
 
@@ -687,6 +775,34 @@ int nChar = sizeof(tbuf);
         }
 
         break;
+
+      case ClientMessage:
+        if(pEvent->xclient.message_type == aWM_CHAR) // generated by WBDefault
+        {
+          if(pC->pUI)
+          {
+            iRval = ChildFrameDoCharEvent(&pEvent->xclient, WBGetWindowDisplay(wID), wID, pC, pC->pUI);
+          }
+//          else
+//          {
+//            WB_ERROR_PRINT("TEMPORARY:  %s - WM_CHAR, no UI\n", __FUNCTION__);
+//            WBDebugDumpEvent((XEvent *)pEvent);
+//          }
+        }
+        else if(pEvent->xclient.message_type == aWM_POINTER) // generated by WBDefault
+        {
+          if(pC->pUI)
+          {
+            iRval = ChildFrameDoPointerEvent(&pEvent->xclient, WBGetWindowDisplay(wID), wID, pC, pC->pUI);
+          }
+//          else
+//          {
+//            WB_ERROR_PRINT("TEMPORARY:  %s - WM_POINTER, no UI\n", __FUNCTION__);
+//            WBDebugDumpEvent((XEvent *)pEvent);
+//          }
+        }
+
+        break;
     }
   }
 
@@ -730,5 +846,725 @@ int nChar = sizeof(tbuf);
   return iRval;
 }
 
+
+
+static int ChildFrameDoPointerEvent(XClientMessageEvent *pEvent, Display *pDisplay,
+                                    Window wID, WBChildFrame *pC, WBChildFrameUI *pUI)
+{
+int iACS;
+int iX, iY;
+int iButtonMask;
+
+
+  if(wID == None || !pC || !pUI ||
+     pEvent->type != ClientMessage ||
+     pEvent->message_type != aWM_POINTER)
+  {
+    return 0; // sanity check (temporary?)
+  }
+
+#ifndef NO_DEBUG
+  WB_ERROR_PRINT("TEMPORARY:  %s - WM_POINTER\n", __FUNCTION__);
+  WBDebugDumpEvent((XEvent *)pEvent);
+#endif // NO_DEBUG
+
+
+  // left-click - position cursor, cancel selection
+  // shift-left-click - select from cursor to THIS point
+  // (other modifiers, ignore the modifier key)
+  // right-click - drop-down edit menu
+  // middle click - select word? paste?
+  // scroll wheel up/down - should be handled by scrollbar thingy
+  // left-drag - select from starting position
+  // right-drag - drag/drop?
+  // middle-drag - ?
+
+  iButtonMask = pEvent->data.l[1];  // WB_POINTER_BUTTON1 through WB_POINTER_BUTTON5 (bitmask)
+
+  iACS = pEvent->data.l[2];
+
+  iX = pEvent->data.l[3];
+  iY = pEvent->data.l[4];
+
+  switch(pEvent->data.l[0])
+  {
+    case WB_POINTER_CLICK:
+      if(pUI->mouse_click)
+      {
+        pUI->mouse_click(pC, iX, iY, iButtonMask, iACS);
+        return 1; // handled
+      }
+
+      break;
+
+    case WB_POINTER_DBLCLICK:
+      if(pUI->mouse_dblclick)
+      {
+        pUI->mouse_dblclick(pC, iX, iY, iButtonMask, iACS);
+        return 1; // handled
+      }
+
+      break;
+
+    case WB_POINTER_DRAG:
+      if(pUI->mouse_drag)
+      {
+        pUI->mouse_drag(pC, iX, iY, iButtonMask, iACS);
+
+        return wID; // do this to support pointer drag (it sets up a few things correctly)
+        // NOTE:  if the function isn't NULL it's expected to perform the correct operation
+        //        and if there's an error, it can post a 'DRAG CANCEL' request
+      }
+
+      break;
+
+    case WB_POINTER_DROP:
+      if(pUI->mouse_drop)
+      {
+        pUI->mouse_drop(pC, iX, iY, iButtonMask, iACS);
+        return 1; // handled
+      }
+
+      break;
+
+    case WB_POINTER_MOVE:
+      if(pUI->mouse_move)
+      {
+        pUI->mouse_move(pC, iX, iY); // assumes button/flags haven't changed since last time (useful only for drags)
+        return 1; // handled
+      }
+
+      break;
+
+    case WB_POINTER_CANCEL:
+      if(pUI->mouse_cancel)
+      {
+        pUI->mouse_cancel(pC);
+        return 1; // handled
+      }
+
+      break;
+
+    case WB_POINTER_SCROLLUP:
+      if(pUI->mouse_scrollup)
+      {
+        pUI->mouse_scrollup(pC, iX, iY, iButtonMask, iACS);
+        return 1; // handled
+      }
+
+      break;
+
+    case WB_POINTER_SCROLLDOWN:
+      if(pUI->mouse_scrollup)
+      {
+        pUI->mouse_scrolldown(pC, iX, iY, iButtonMask, iACS);
+        return 1; // handled
+      }
+
+      break;
+
+
+    default:
+
+      WB_ERROR_PRINT("TEMPORARY - %s - unhandled mousie message\n", __FUNCTION__);
+      WBDebugDumpEvent((XEvent *)pEvent);
+
+      break;
+  }
+
+  return 0; // must indicate 'did not handle' if I get here
+}
+
+static int ChildFrameDoCharEvent(XClientMessageEvent *pEvent, Display *pDisplay,
+                                 Window wID, WBChildFrame *pC, WBChildFrameUI *pUI)
+{
+int iKey, iACS, nChar;
+char *pBuf;
+int iRval = 0;
+
+
+  if(wID == None || !pC || !pUI ||
+     pEvent->type != ClientMessage ||
+     pEvent->message_type != aWM_CHAR)
+  {
+    return 0; // sanity check (temporary?)
+  }
+
+//#ifndef NO_DEBUG
+//  WB_ERROR_PRINT("TEMPORARY:  %s - WM_CHAR\n", __FUNCTION__);
+//  WBDebugDumpEvent((XEvent *)pEvent);
+//#endif // NO_DEBUG
+
+  iKey = pEvent->data.l[0];  // result from WBKeyEventProcessKey()
+  iACS = pEvent->data.l[1];
+  nChar = pEvent->data.l[2];
+  pBuf = (char *)&(pEvent->data.l[3]);
+
+
+  if(nChar > 0) // normal ASCII characters
+  {
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                   "%s KEY RELEASE for KEY %d KEYCODE %d  MASK=%d (%xH)\n",
+                   __FUNCTION__, iKey, ((XKeyEvent *)pEvent)->keycode,
+                   ((XKeyEvent *)pEvent)->state, ((XKeyEvent *)pEvent)->state);
+
+    if(iKey == 8) // backspace
+    {
+      WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                     "%s - BACKSPACE key pressed, iACS=%d (%xH)\n", __FUNCTION__, iACS, iACS);
+
+      if(pUI->bkspace)
+      {
+        pUI->bkspace(pC, iACS);
+      }
+      else
+      {
+        XBell(pDisplay, -100);
+      }
+
+      iRval = 1;
+    }
+    else if(iKey == 13)               // CR
+    {
+      if(pUI->enter)
+      {
+        pUI->enter(pC, iACS);
+      }
+      else if(pUI->do_char)
+      {
+        pUI->do_char(pC, pEvent);
+      }
+      else
+      {
+        XBell(pDisplay, -100);
+      }
+
+      iRval = 1;
+    }
+    else if(iKey == 10)               // LF
+    {
+      if(pUI->do_char)
+      {
+        pUI->do_char(pC, pEvent);
+      }
+      else if(pUI->enter) // just in case, allow 'LF' to be 'ENTER' if no char handler
+      {
+        pUI->enter(pC, iACS);
+      }
+      else
+      {
+        XBell(pDisplay, -100);
+      }
+
+      iRval = 1;
+    }
+    else if(iKey == 9)                // tab
+    {
+      if(pUI->tab)
+      {
+        pUI->tab(pC, iACS);
+      }
+      else if(pUI->do_char)
+      {
+        pUI->do_char(pC, pEvent); // treat tab like normal char
+      }
+      else
+      {
+        XBell(pDisplay, -100);
+      }
+
+      iRval = 1;
+    }
+    else if(iKey == 1)  // CTRL+A
+    {
+      WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                     "%s - CTRL+A key pressed, iACS=%d (%xH)\n", __FUNCTION__, iACS, iACS);
+
+      if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_CTRL)       // control key will always be pressed, but no shift
+      {
+        if(pUI->select_all)
+        {
+          pUI->select_all(pC);
+        }
+        else
+        {
+          XBell(pDisplay, -100);
+        }
+
+        iRval = 1;
+      }
+      else
+      {
+        if(pUI->do_char)
+        {
+          pUI->do_char(pC, pEvent); // normal 'A' character
+
+          iRval = 1;
+        }
+      }
+    }
+    else if(iKey == 3)  // CTRL+C
+    {
+      if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_CTRL)       // control key will always be pressed, but no shift
+      {
+        if(pUI->has_selection && pUI->copy_to_cb && pUI->has_selection(pC))
+        {
+          WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                         "%s - CTRL+C key pressed, iACS=%d (%xH)\n", __FUNCTION__, iACS, iACS);
+
+          pUI->copy_to_cb(pC);
+        }
+        else
+        {
+          XBell(pDisplay, -100);
+          WB_ERROR_PRINT("TEMPORARY - %s - no selection, can't 'COPY'\n", __FUNCTION__);
+        }
+
+        iRval = 1;
+      }
+      else
+      {
+        if(pUI->do_char)
+        {
+          pUI->do_char(pC, pEvent); // normal 'C' character
+
+          iRval = 1;
+        }
+      }
+    }
+    else if(iKey == 22) // CTRL+V
+    {
+      WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                     "%s - CTRL+V key pressed, iACS=%d (%xH)\n", __FUNCTION__, iACS, iACS);
+
+      if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_CTRL)       // control key will always be pressed, but no shift
+      {
+        // TODO:  check for valid clipboard selection - see if there's a clipboard owner maybe?
+
+        if(pUI->paste_from_cb)
+        {
+          pUI->paste_from_cb(pC);
+        }
+
+        iRval = 1;
+      }
+      else
+      {
+        if(pUI->do_char)
+        {
+          pUI->do_char(pC, pEvent); // normal 'V' character
+
+          iRval = 1;
+        }
+      }
+    }
+    else if(iKey == 24) // CTRL+X
+    {
+      WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                     "%s - CTRL+X key pressed, iACS=%d (%xH)\n", __FUNCTION__, iACS, iACS);
+
+      if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_CTRL)       // control key will always be pressed, but no shift
+      {
+        if(pUI->has_selection && pUI->cut_to_cb && pUI->has_selection(pC))
+        {
+          pUI->cut_to_cb(pC);
+        }
+        else
+        {
+          XBell(pDisplay, -100);
+        }
+
+        iRval = 1;
+      }
+      else
+      {
+        if(pUI->do_char)
+        {
+          pUI->do_char(pC, pEvent); // normal 'X' character
+
+          iRval = 1;
+        }
+      }
+    }
+    else if(iKey == 26) // ctrl+Z
+    {
+      WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                     "%s - CTRL+Z key pressed, iACS=%d (%xH)\n", __FUNCTION__, iACS, iACS);
+
+      if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_CTRL)       // control key will always be pressed, but no shift
+      {
+        if(pUI->can_undo && pUI->undo && pUI->can_undo(pC))
+        {
+          pUI->undo(pC);
+        }
+        else
+        {
+          XBell(pDisplay, -100);
+        }
+
+        iRval = 1;
+      }
+      else if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_CTRL | WB_KEYEVENT_SHIFT)) // shift, no alt
+      {
+        if(pUI->can_redo && pUI->redo && pUI->can_redo(pC))
+        {
+          pUI->redo(pC);
+        }
+        else
+        {
+          XBell(pDisplay, -100);
+        }
+
+        iRval = 1;
+      }
+      else
+      {
+        if(pUI->do_char)
+        {
+          pUI->do_char(pC, pEvent); // normal 'Z' character
+
+          iRval = 1; // "handled"
+        }
+
+        // ONLY assign 'iRval' if the character was processed
+      }
+
+      // NOT assigning 'iRval' for all conditions here...
+    }
+    else if(iKey == '\x1b') // ESC
+    {
+      WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                     "%s - ESC key pressed, iACS=%d (%xH)\n", __FUNCTION__, iACS, iACS);
+
+      // cancel mousie things and 'select none'
+
+      if(pUI->mouse_cancel)
+      {
+        pUI->mouse_cancel(pC);
+      }
+
+      if(pUI->select_none)
+      {
+        pUI->select_none(pC);
+      }
+
+      if(!pUI->select_none && !pUI->mouse_cancel)
+      {
+        XBell(pDisplay, -100);
+      }
+
+      iRval = 1;
+    }
+    else
+    {
+      if(pUI->do_char)
+      {
+        pUI->do_char(pC, pEvent);
+
+        iRval = 1; // "handled"
+      }
+
+      // NOTE:  don't call 'XBell' if I don't return "handled", and no 'do_char' means "not handled"
+    }
+  }
+  else // SPECIAL characters.
+  {
+    if(iACS & WB_KEYEVENT_KEYSYM)
+    {
+      // TODO:  international, 'dead' and other KEYSYM key assignments
+#define KEYSYM_MATCH_CURSOR_NAME(X) (iKey == XK_##X || iKey == XK_KP_##X)
+
+      if(KEYSYM_MATCH_CURSOR_NAME(Home))
+      {
+        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                       "%s - Home key pressed iACS=%d (%08xH)\n", __FUNCTION__, iACS, iACS);
+
+        if(pUI->home)
+        {
+          pUI->home(pC, iACS);
+        }
+
+        iRval = 1;
+      }
+      else if(KEYSYM_MATCH_CURSOR_NAME(End))
+      {
+        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                       "%s - End key pressed iACS=%d (%08xH)\n", __FUNCTION__, iACS, iACS);
+
+        if(pUI->end)
+        {
+          pUI->end(pC, iACS);
+        }
+
+        iRval = 1;
+      }
+      else if(KEYSYM_MATCH_CURSOR_NAME(Left))
+      {
+        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                       "%s - Left key pressed iACS=%d (%08xH)\n", __FUNCTION__, iACS, iACS);
+
+        if(pUI->leftarrow)
+        {
+          pUI->leftarrow(pC, iACS);
+        }
+
+        iRval = 1;
+      }
+      else if(KEYSYM_MATCH_CURSOR_NAME(Right))
+      {
+        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                       "%s - Right key pressed iACS=%d (%08xH)\n", __FUNCTION__, iACS, iACS);
+
+        if(pUI->rightarrow)
+        {
+          pUI->rightarrow(pC, iACS);
+        }
+
+        iRval = 1;
+      }
+      else if(KEYSYM_MATCH_CURSOR_NAME(Up))
+      {
+        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                       "%s - Up key pressed iACS=%d (%08xH)\n", __FUNCTION__, iACS, iACS);
+
+        if(pUI->uparrow)
+        {
+          pUI->uparrow(pC, iACS);
+        }
+
+        iRval = 1;
+      }
+      else if(KEYSYM_MATCH_CURSOR_NAME(Down))
+      {
+        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                       "%s - Down key pressed iACS=%d (%08xH)\n", __FUNCTION__, iACS, iACS);
+
+        if(pUI->downarrow)
+        {
+          pUI->downarrow(pC, iACS);
+        }
+        else
+        {
+          XBell(pDisplay, -100);
+        }
+
+        iRval = 1;
+      }
+      else if(KEYSYM_MATCH_CURSOR_NAME(Page_Up))
+      {
+        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                       "%s - Page Up key pressed iACS=%d (%08xH)\n", __FUNCTION__, iACS, iACS);
+
+        if(iACS & WB_KEYEVENT_CTRL) // page left
+        {
+          if(pUI->pgleft)
+          {
+            pUI->pgleft(pC, iACS /* & ~WB_KEYEVENT_CTRL */); // TODO:  turn off 'ctrl' bit?
+          }
+          else
+          {
+            XBell(pDisplay, -100);
+          }
+
+          iRval = 1;
+        }
+        else
+        {
+          if(pUI->pgup)
+          {
+            pUI->pgup(pC, iACS);
+          }
+          else
+          {
+            XBell(pDisplay, -100);
+          }
+
+          iRval = 1;
+        }
+      }
+      else if(KEYSYM_MATCH_CURSOR_NAME(Page_Down))
+      {
+        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                       "%s - Page Down key pressed iACS=%d (%08xH)\n", __FUNCTION__, iACS, iACS);
+
+        if(iACS & WB_KEYEVENT_CTRL) // page right
+        {
+          if(pUI->pgright)
+          {
+            pUI->pgright(pC, iACS /* & ~WB_KEYEVENT_CTRL */); // TODO:  turn off 'ctrl' bit?
+          }
+          else
+          {
+            XBell(pDisplay, -100);
+          }
+
+          iRval = 1;
+        }
+        else
+        {
+          if(pUI->pgdown)
+          {
+            pUI->pgdown(pC, iACS);
+          }
+          else
+          {
+            XBell(pDisplay, -100);
+          }
+
+          iRval = 1;
+        }
+      }
+      else if(KEYSYM_MATCH_CURSOR_NAME(Begin)) // beginning of current line
+      {
+        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                       "%s - Beginning Of Line key pressed iACS=%d (%08xH)\n", __FUNCTION__, iACS, iACS);
+
+        // treat this as 'home' key
+
+        if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift
+        {
+          if(pUI->home)
+          {
+            pUI->home(pC, WB_KEYEVENT_SHIFT);
+          }
+          else
+          {
+            XBell(pDisplay, -100);
+          }
+
+          iRval = 1;
+        }
+        else if((iACS & WB_KEYEVENT_ACSMASK) == 0) // normal
+        {
+          if(pUI->home)
+          {
+            pUI->home(pC, iACS);
+          }
+          else
+          {
+            XBell(pDisplay, -100);
+          }
+
+          iRval = 1;
+        }
+      }
+      else if(KEYSYM_MATCH_CURSOR_NAME(Insert)) // toggle 'insert' mode, copy, or paste
+      {
+        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                       "%s - Insert key pressed iACS=%d (%08xH)\n", __FUNCTION__, iACS, iACS);
+
+        if((iACS & WB_KEYEVENT_ACSMASK) == 0) // normal
+        {
+          if(pUI->toggle_ins_mode)
+          {
+            pUI->toggle_ins_mode(pC);
+
+            // TODO:  update status bar text
+          }
+          else
+          {
+            XBell(pDisplay, -100);
+          }
+
+          iRval = 1;
+        }
+        else if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // SHIFT+insert (paste)
+        {
+          if(pUI->paste_from_cb)
+          {
+            pUI->paste_from_cb(pC);
+          }
+          else
+          {
+            XBell(pDisplay, -100);
+          }
+
+          iRval = 1;
+        }
+        else if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_CTRL) // CTRL+insert (copy)
+        {
+          if(pUI->has_selection && pUI->copy_to_cb && pUI->has_selection(pC))
+          {
+            pUI->copy_to_cb(pC);
+          }
+          else
+          {
+            XBell(pDisplay, -100);
+          }
+
+          iRval = 1;
+        }
+      }
+      else if(KEYSYM_MATCH_CURSOR_NAME(Delete)) // delete key (keypad may use this)
+      {
+        WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                       "%s - Delete key pressed iACS=%d (%08xH)\n", __FUNCTION__, iACS, iACS);
+
+        if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift+del (cut)
+        {
+          if(pUI->has_selection && pUI->cut_to_cb && pUI->has_selection(pC))
+          {
+            pUI->cut_to_cb(pC);
+          }
+          else
+          {
+            XBell(pDisplay, -100);
+          }
+
+          iRval = 1;
+        }
+        else if(iACS & WB_KEYEVENT_CTRL) // ctrl+del (??)  alt+del (??) any other combo?
+        {
+          WB_ERROR_PRINT("TEMPORARY:  %s - Delete key pressed with iACS=%d (%08xH)\n", __FUNCTION__, iACS, iACS);
+
+          if(pUI->del)
+          {
+            pUI->del(pC, iACS);
+          }
+          else
+          {
+            XBell(pDisplay, -100);
+          }
+
+          iRval = 1; // for now handle it THIS way
+        }
+        else // if((iACS & WB_KEYEVENT_ACSMASK) == 0) // normal or "other flags"
+        {
+          if(pUI->del)
+          {
+            pUI->del(pC, iACS);
+          }
+          else
+          {
+            XBell(pDisplay, -100);
+          }
+
+          iRval = 1;
+        }
+      }
+#undef KEYSYM_MATCH_CURSOR_NAME
+      else
+      {
+        if(pUI->scancode)
+        {
+          pUI->scancode(pC, pEvent);
+
+          iRval = 1; // handled
+        }
+        else
+        {
+          // is it an unknown cursor key?  let's find out (dump it)
+          WB_DEBUG_PRINT(DebugLevel_WARN | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                         "%s - CURSOR KEY? %d (%08xH)  %d (%08xH)\n",
+                         __FUNCTION__, iKey, iKey, iACS, iACS);
+
+          // 'iRval' left at 0 for "not handled"
+        }
+      }
+    }
+  }
+
+  return 0; // "not handled"
+}
 
 

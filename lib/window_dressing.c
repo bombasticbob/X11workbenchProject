@@ -62,22 +62,29 @@
 #include "draw_text.h"
 
 
-// also in window_helper.c
-#define GCAll (GCFunction | GCPlaneMask | GCForeground | GCBackground | GCLineWidth | \
-               GCLineStyle | GCCapStyle | GCJoinStyle | GCFillStyle | GCFillRule | \
-               GCTile | GCStipple | GCTileStipXOrigin | GCTileStipYOrigin | GCFont | \
-               GCSubwindowMode | GCGraphicsExposures | GCClipXOrigin | GCClipYOrigin | \
-               GCClipMask | GCDashOffset | GCDashList | GCArcMode)
-
-
-
-static XColor clrScrollFG, clrScrollBG, clrScrollAFG, clrScrollABG,
-              clrScrollHFG, clrScrollHBG, clrScrollBD, clrScrollBD2, clrScrollBD3;
+static XColor clrScrollFG,  ///< foreground scroll bar color
+              clrScrollBG,  ///< background scroll bar color
+              clrScrollAFG, ///< active foreground scroll bar color
+              clrScrollABG, ///< active background scroll bar color
+              clrScrollHFG, ///< highlight foreground scroll bar color
+              clrScrollHBG, ///< highlight background scroll bar color
+              clrScrollBD,  ///< standard scroll bar border color
+              clrScrollBD2, ///< 3D highlight scroll bar border color (light)
+              clrScrollBD3; ///< 3D highlight scroll bar border color (dark)
+/** \hideinitializer
+  * \brief initialization flag for scroll colors.  when zero, colors not yet initialized
+**/
 static int iInitScrollColorFlag = 0;
 
+/** \brief macro to load a color, mostly for readability
+**/
 #define LOAD_COLOR0(X,Y) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) > 0) {  }
+/** \brief macro to load a color with a fallback, mostly for readability
+**/
 #define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
 
+/** \brief internal utility to check and initialize scroll bar standard colors
+**/
 static void CheckInitScrollColors(void)
 {
   // TODO:  consider freeing the colors with XFreeColors on exit
@@ -149,6 +156,62 @@ static void CheckInitScrollColors(void)
   }
 }
 
+
+/** \brief integer square root of a value 0-255
+**/
+static unsigned char isqrt(unsigned char iVal)
+{
+unsigned char aAnswers[256] =
+{
+  0,1,1,2,2,2,2,3,3,3,3,3,3,4,4,4,
+  4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,6,
+  6,6,6,6,6,6,6,6,6,6,6,7,7,7,7,7,
+  7,7,7,7,7,7,7,7,7,8,8,8,8,8,8,8,
+  8,8,8,8,8,8,8,8,8,9,9,9,9,9,9,9,
+  9,9,9,9,9,9,9,9,9,9,9,10,10,10,10,10,
+  10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11,
+  11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,
+  11,11,11,11,11,12,12,12,12,12,12,12,12,12,12,12,
+  12,12,12,12,12,12,12,12,12,12,12,12,12,13,13,13,
+  13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,
+  13,13,13,13,13,13,13,14,14,14,14,14,14,14,14,14,
+  14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,
+  14,14,14,15,15,15,15,15,15,15,15,15,15,15,15,15,
+  15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
+  15,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16
+};
+
+
+  return aAnswers[iVal & 0xff];
+}
+
+/** \brief integer 255 * cos(iVal * pi / 512) calculation via lookup table
+**/
+static unsigned char icos(unsigned char iVal)
+{
+unsigned char aAnswers[256] =
+{
+255,255,255,255,255,255,255,255,255,255,255,254,254,254,254,254,
+254,254,253,253,253,253,253,252,252,252,252,252,251,251,251,250,
+250,250,249,249,249,248,248,248,247,247,247,246,246,245,245,244,
+244,244,243,243,242,242,241,241,240,240,239,238,238,237,237,236,
+236,235,234,234,233,232,232,231,231,230,229,228,228,227,226,226,
+225,224,223,223,222,221,220,220,219,218,217,216,215,215,214,213,
+212,211,210,209,208,208,207,206,205,204,203,202,201,200,199,198,
+197,196,195,194,193,192,191,190,189,188,187,186,185,184,183,181,
+180,179,178,177,176,175,174,172,171,170,169,168,167,165,164,163,
+162,161,159,158,157,156,154,153,152,151,149,148,147,146,144,143,
+142,140,139,138,136,135,134,132,131,130,128,127,126,124,123,122,
+120,119,117,116,115,113,112,110,109,108,106,105,103,102,100,99,
+98,96,95,93,92,90,89,87,86,84,83,81,80,79,77,76,
+74,73,71,70,68,67,65,63,62,60,59,57,56,54,53,51,
+50,48,47,45,44,42,41,39,37,36,34,33,31,30,28,27,
+25,23,22,20,19,17,16,14,13,11,9,8,6,5,3,2
+};
+
+
+  return aAnswers[iVal & 0xff];
+}
 
 
 #if 0 /* this function not currently used.  consider removeing it in a refactor */
@@ -816,59 +879,6 @@ long lBG, lFG;
   XSetBackground(pDisplay, gc, lBG); // restore color context
 }
 
-
-// integer square root of a value 0-255
-static unsigned char isqrt(unsigned char iVal)
-{
-unsigned char aAnswers[256] =
-{
-  0,1,1,2,2,2,2,3,3,3,3,3,3,4,4,4,
-  4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,6,
-  6,6,6,6,6,6,6,6,6,6,6,7,7,7,7,7,
-  7,7,7,7,7,7,7,7,7,8,8,8,8,8,8,8,
-  8,8,8,8,8,8,8,8,8,9,9,9,9,9,9,9,
-  9,9,9,9,9,9,9,9,9,9,9,10,10,10,10,10,
-  10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11,
-  11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,
-  11,11,11,11,11,12,12,12,12,12,12,12,12,12,12,12,
-  12,12,12,12,12,12,12,12,12,12,12,12,12,13,13,13,
-  13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,
-  13,13,13,13,13,13,13,14,14,14,14,14,14,14,14,14,
-  14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,
-  14,14,14,15,15,15,15,15,15,15,15,15,15,15,15,15,
-  15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
-  15,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16
-};
-
-
-  return aAnswers[iVal & 0xff];
-}
-
-static unsigned char icos(unsigned char iVal)
-{
-unsigned char aAnswers[256] =
-{
-255,255,255,255,255,255,255,255,255,255,255,254,254,254,254,254,
-254,254,253,253,253,253,253,252,252,252,252,252,251,251,251,250,
-250,250,249,249,249,248,248,248,247,247,247,246,246,245,245,244,
-244,244,243,243,242,242,241,241,240,240,239,238,238,237,237,236,
-236,235,234,234,233,232,232,231,231,230,229,228,228,227,226,226,
-225,224,223,223,222,221,220,220,219,218,217,216,215,215,214,213,
-212,211,210,209,208,208,207,206,205,204,203,202,201,200,199,198,
-197,196,195,194,193,192,191,190,189,188,187,186,185,184,183,181,
-180,179,178,177,176,175,174,172,171,170,169,168,167,165,164,163,
-162,161,159,158,157,156,154,153,152,151,149,148,147,146,144,143,
-142,140,139,138,136,135,134,132,131,130,128,127,126,124,123,122,
-120,119,117,116,115,113,112,110,109,108,106,105,103,102,100,99,
-98,96,95,93,92,90,89,87,86,84,83,81,80,79,77,76,
-74,73,71,70,68,67,65,63,62,60,59,57,56,54,53,51,
-50,48,47,45,44,42,41,39,37,36,34,33,31,30,28,27,
-25,23,22,20,19,17,16,14,13,11,9,8,6,5,3,2
-};
-
-
-  return aAnswers[iVal & 0xff];
-}
 
 void WBDraw3DBorderTab(Display *pDisplay, Drawable dw, GC gc, WB_GEOM *pgeomOutline,
                        int fFocus, unsigned long lFGColor, unsigned long lBGColor,

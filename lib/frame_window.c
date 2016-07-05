@@ -79,6 +79,8 @@
 #define STATUS_BAR_HEIGHT        20
 #define DEFAULT_STATUS_BAR_TAB   16 /* default 16 characters per column */
 
+#define DEFAULT_STATUS_STRING "Status: none"
+
 // NOTE:  estimating twice the average font char width as 12.  Should see at least 2 tabs, always, with min width (YMMV)
 #define FRAME_WINDOW_MIN_WIDTH  (100 + 12 * TAB_BAR_TAB_WIDTH)             /* re-sizable window absolute minimum width */
 #define FRAME_WINDOW_MIN_HEIGHT (100 + TAB_BAR_HEIGHT + STATUS_BAR_HEIGHT) /* re-sizable window absolute minimum height */
@@ -110,13 +112,13 @@ typedef struct __FRAME_WINDOW__
   int nLeftTab, nRightTab;           // left and right tab indices, same order as in ppChildFrames (0 if no tabs)
   int nCloseTab;                     // a flag that indicates I'm closing a tab (UI mostly, triggers event on mouse-up)
 
-  char *szTitle;                     // title bar string (malloc'd)
-  char *szStatus;                    // status bar string (malloc'd)
+  char *szTitle;                     // title bar string (WBAlloc'd)
+  char *szStatus;                    // status bar string (WBAlloc'd)
 
   int nAvgCharWidth;                 // average character width for the specified font
 
   int nStatusBarTabs;                // # of tab entries.  can be negative if pStatusBarTabs is NULL
-  int *pStatusBarTabs;               // status bar tab values (malloc'd).  may be NULL.
+  int *pStatusBarTabs;               // status bar tab values (WBAlloc'd).  may be NULL.
 
   char *pDefaultMenuResource;        // menu resource for 'default' menu
 
@@ -166,7 +168,7 @@ int __internal_do_status_tab_cols(FRAME_WINDOW *pFrameWindow, const WB_RECT *prc
                                   struct __status_tab_cols__ **ppTabs, int *pnCol);
 
 
-static FRAME_WINDOW *pFrames = NULL;  // pointer to linked list of frame windows (malloc'd)
+static FRAME_WINDOW *pFrames = NULL;  // pointer to linked list of frame windows (WBAlloc'd)
 
 static XColor clrFG, clrBG, clrBD, clrBD2, clrBD3, clrABG;
 static int iInitColorFlag = 0;
@@ -211,7 +213,7 @@ WBMenuBarWindow *pMB;
       }
     }
 
-    free(pTemp->ppChildFrames);
+    WBFree(pTemp->ppChildFrames);
 
     pTemp->ppChildFrames = NULL;
     pTemp->nChildFrames = 0; // by convention
@@ -234,31 +236,31 @@ WBMenuBarWindow *pMB;
 
   if(pTemp->szTitle)
   {
-    free(pTemp->szTitle);
+    WBFree(pTemp->szTitle);
     pTemp->szTitle = NULL;
   }
 
   if(pTemp->szStatus)
   {
-    free(pTemp->szStatus);
+    WBFree(pTemp->szStatus);
     pTemp->szStatus = NULL;
   }
 
   if(pTemp->pStatusBarTabs)
   {
-    free(pTemp->pStatusBarTabs);
+    WBFree(pTemp->pStatusBarTabs);
     pTemp->pStatusBarTabs = NULL;
   }
 
   if(pTemp->pDefMenuHandler)
   {
-    free(pTemp->pDefMenuHandler);
+    WBFree(pTemp->pDefMenuHandler);
     pTemp->pDefMenuHandler = NULL;
   }
 
   if(pTemp->pDefaultMenuResource)
   {
-    free(pTemp->pDefaultMenuResource);
+    WBFree(pTemp->pDefaultMenuResource);
     pTemp->pDefaultMenuResource = NULL;
   }
 }
@@ -275,7 +277,7 @@ void WBFrameWindowExit()
     // slightly different - free the structure first, THEN destroy the window
     WBSetWindowData(pTemp->wbFW.wID, 0, NULL);
     __internal_destroy_frame_window(pTemp);
-    free(pTemp);
+    WBFree(pTemp);
 
     WBDestroyWindow(pTemp->wbFW.wID);  // making sure...
   }
@@ -289,7 +291,7 @@ Display *pDisplay = WBGetDefaultDisplay();
 
   if(aTAB_MESSAGE == None)
   {
-    aTAB_MESSAGE = XInternAtom(pDisplay, "FW_TAB_MESSAGE", False);
+    aTAB_MESSAGE = WBGetAtom(pDisplay, "FW_TAB_MESSAGE");
 
     if(aTAB_MESSAGE == None)
     {
@@ -334,8 +336,6 @@ static void InternalCheckFWColors(void)
      else LOAD_COLOR("*border", szBD, "black"); // default for gnome
 
     LOAD_COLOR("selected_bg_color", szABG, "#0040FF"); // a slightly greenish blue for the 'selected' color
-
-    WB_ERROR_PRINT("TEMPORARY:  %s - szABG is \"%s\"\n", __FUNCTION__, szABG);
 
     XParseColor(WBGetDefaultDisplay(), colormap, szFG, &clrFG);
     XAllocColor(WBGetDefaultDisplay(), colormap, &clrFG);
@@ -416,7 +416,7 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
   XWMHints xwmh;
 //  Atom aProto[3];
 
-  pNew = (FRAME_WINDOW *)malloc(sizeof(*pNew));
+  pNew = (FRAME_WINDOW *)WBAlloc(sizeof(*pNew));
 
   if(!pNew)
   {
@@ -437,10 +437,10 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
 
   if(szTitle)
   {
-    pNew->szTitle = malloc(strlen(szTitle) + 1);
+    pNew->szTitle = WBAlloc(strlen(szTitle) + 1);
     if(!pNew->szTitle)
     {
-      free(pNew);
+      WBFree(pNew);
       return NULL;
     }
     strcpy(pNew->szTitle, szTitle);
@@ -456,16 +456,8 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
 
   // do the default status now
 
-  if(WBFrameWindow_STATUS_BAR & pNew->wbFW.iFlags)
-  {
-    pNew->szStatus = WBCopyString("Status: none"); // default status bar text (mostly for testing)
-//    WB_ERROR_PRINT("TEMPORARY: %s - window has a status bar\n", __FUNCTION__);
-  }
-  else
-  {
-    pNew->szStatus = NULL;
-//    WB_ERROR_PRINT("TEMPORARY: %s - window has NO status bar\n", __FUNCTION__);
-  }
+  pNew->szStatus = NULL;
+
 
   // add struct to beginning of linked list 'cause it's faster that way
 
@@ -601,8 +593,8 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
 
   if(iFlags & WBFrameWindow_APP_WINDOW)
   {
-    WB_ERROR_PRINT("TEMPORARAY:  %s - setting %u (%08xH) as application window\n",
-                   __FUNCTION__, (int)pNew->wbFW.wID, (int)pNew->wbFW.wID);
+//    WB_ERROR_PRINT("TEMPORARY:  %s - setting %u (%08xH) as application window\n",
+//                   __FUNCTION__, (int)pNew->wbFW.wID, (int)pNew->wbFW.wID);
     
     WBSetApplicationWindow(pNew->wbFW.wID);
   }
@@ -665,9 +657,9 @@ void FWDestroyFrameWindow2(WBFrameWindow *pFrameWindow)
   }
   else
   {
-    // I must destroy malloc'd entries and contained windows in lieu of 'FWDefaultCallback'
+    // I must destroy WBAlloc'd entries and contained windows in lieu of 'FWDefaultCallback'
     __internal_destroy_frame_window((FRAME_WINDOW *)pFrameWindow);
-    free(pFrameWindow);
+    WBFree(pFrameWindow);
   }
 }
 
@@ -721,7 +713,7 @@ FRAME_WINDOW *pFrameWindow;
       pFrameWindow->pMenuHandler = NULL; // don't re-use pointer
     }
 
-    free(pFrameWindow->pDefMenuHandler);
+    WBFree(pFrameWindow->pDefMenuHandler);
 
     pFrameWindow->pDefMenuHandler = NULL;
   }
@@ -739,7 +731,7 @@ FRAME_WINDOW *pFrameWindow;
 
   // allocate space and make a copy
 
-  pFrameWindow->pDefMenuHandler = (WBFWMenuHandler *)malloc(sizeof(WBFWMenuHandler) * (i1 + 2));
+  pFrameWindow->pDefMenuHandler = (WBFWMenuHandler *)WBAlloc(sizeof(WBFWMenuHandler) * (i1 + 2));
 
   if(pFrameWindow->pDefMenuHandler)
   {
@@ -805,7 +797,7 @@ XFontStruct *pFont;
     pFrameWindow->nLeftTab = 0;
     pFrameWindow->nRightTab = 0;
 
-    WB_ERROR_PRINT("TEMPORARY:  %s - EMPTY tab rectangle\n", __FUNCTION__);
+//    WB_ERROR_PRINT("TEMPORARY:  %s - EMPTY tab rectangle\n", __FUNCTION__);
 
     memcpy(&(pFrameWindow->rctLastTabBarRect), pRect, sizeof(*pRect));
 
@@ -850,17 +842,15 @@ XFontStruct *pFont;
 
   pRect->bottom = pRect->top + iBarHeight;
 
-#ifndef NO_DEBUG
   if(memcmp(&(pFrameWindow->rctLastTabBarRect), pRect, sizeof(*pRect)))
   {
-    WB_ERROR_PRINT("TEMPORARY:  %s - new 'last tab bar rect': %d, %d, %d, %d\n", __FUNCTION__,
-                   pRect->left, pRect->top, pRect->right, pRect->bottom);
+//    WB_ERROR_PRINT("TEMPORARY:  %s - new 'last tab bar rect': %d, %d, %d, %d\n", __FUNCTION__,
+//                   pRect->left, pRect->top, pRect->right, pRect->bottom);
 
     // since the rectangle has changed, I need to re-paint things
 
     WBInvalidateRect(pFrameWindow->wbFW.wID, pRect, 0); // make sure I re-paint the tab bar, but not *RIGHT* *NOW*
   }
-#endif // NO_DEBUG
 
   memcpy(&(pFrameWindow->rctLastTabBarRect), pRect, sizeof(*pRect)); // cache for later
 
@@ -877,7 +867,8 @@ XFontStruct *pFont;
     return;
   }
 
-  // verify valid 'focus tab'
+  // verify valid 'focus tab' to maintain consistency
+
   if(pFrameWindow->nFocusTab < 0)
   {
     pFrameWindow->bTabBarRectAntiRecurse = 1;
@@ -890,8 +881,8 @@ XFontStruct *pFont;
   {
     pFrameWindow->bTabBarRectAntiRecurse = 1;
 
-    WB_ERROR_PRINT("TEMPORARY:  %s - focus tab exceeds # child frames - %d >= %d\n", __FUNCTION__,
-                   pFrameWindow->nFocusTab, pFrameWindow->nChildFrames);
+    WB_ERROR_PRINT("WARN:  %s - focus tab exceeds # child frames - %d >= %d (fixing it)\n",
+                   __FUNCTION__, pFrameWindow->nFocusTab, pFrameWindow->nChildFrames);
 
     FWSetFocusWindowIndex(&(pFrameWindow->wbFW), pFrameWindow->nChildFrames - 1);
 
@@ -899,25 +890,29 @@ XFontStruct *pFont;
   }
 
   // figure out what the width of a single 'tab' will be
+
   pFrameWindow->nTabBarTabWidth = (TAB_BAR_TAB_WIDTH * pFrameWindow->nAvgCharWidth)
                                 + 6 + 14;  // 6 is border and spacing plus 12 for doc icon and spacing
+    // TODO:  use some kind of '#define' for these 'magic number' values
+
 
   // verify the right/left tabs are 'in range' by calculating tab width and placement
 
-  // CALCULATE TOTAL WIDTH OF TAB AREA, THEN DIVIDE BY TAB BAR WIDTH
-  nVisibleTabs = pRect->right - pRect->left
+  nVisibleTabs = pRect->right - pRect->left  // CALCULATE TOTAL WIDTH OF TAB AREA, THEN DIVIDE BY TAB BAR WIDTH
                - TAB_BAR_SCROLL_WIDTH * 2
                - TAB_BAR_ADD_BUTTON_WIDTH
                - 8; // 8 pixels for additional spacing - 1 per scroll button, 2 more for 'add' buttun, + 2 more
 
-  // figure out how many "full" tabs I can view in the current tab bar area
-  nVisibleTabs /= pFrameWindow->nTabBarTabWidth;
+  nVisibleTabs /= pFrameWindow->nTabBarTabWidth;  // figure out how many "full" tabs I can view in the current tab bar area
+
   if(nVisibleTabs <= 0)
   {
     nVisibleTabs = 1; // always, just in case
   }
 
-  // now, adjust the tab bar width UP to match "that"
+
+  // now, RE-adjust the tab bar width UP to match "that" number of tabs visible
+  // this value will be cached in the FRAME_WINDOW structure for when I paint it
 
   pFrameWindow->nTabBarTabWidth = (pRect->right - pRect->left
                                    - TAB_BAR_SCROLL_WIDTH * 2
@@ -993,6 +988,7 @@ Window wIDMenu;
 WBMenuBarWindow *pMB;
 WBChildFrame *pCW;
 int i1, iMax;
+int fPaintNow = 0;
 
 
   pFrameWindow = (FRAME_WINDOW *)FWGetFrameWindowStruct(wID);
@@ -1072,6 +1068,11 @@ int i1, iMax;
 
 
   // next, inform all of the child frames that I'm different now
+  // NOTE:  I won't be re-calculating child frames unless the frame window changed
+  //        but if you must FORCE it, call THIS function first, then FWChildFrameRecalcLayout()
+  //        on whatever child frame window(s) you need to force re-calc on.  There is
+  //        no harm in re-calling the layout recalc for the child frame after this function
+  //        returns to the caller.
 
   for(i1=0; i1 < iMax; i1++)
   {
@@ -1083,13 +1084,17 @@ int i1, iMax;
     }
   }
 
+  fPaintNow = 1; // before I exit, update the child frame window
+
+
   // temporarily use 'error level' so I can always see this
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
                  "%s - %d, %d, %d, %d\n", __FUNCTION__,
                  pFrameWindow->wbFW.iClientX, pFrameWindow->wbFW.iClientY,
                  pFrameWindow->wbFW.iClientWidth, pFrameWindow->wbFW.iClientHeight);
 
-  WBInvalidateGeom(wID, NULL, 1); // and, finally, force a re-paint (mostly hidden by child frame, except tabs, borders, etc.)
+  WBInvalidateGeom(wID, NULL, 1); // and, finally, force a re-paint on myself (mostly hidden by child frame, except tabs, borders, etc.)
+
 
 check_curtab:
 
@@ -1112,15 +1117,21 @@ check_curtab:
 
     if(pCW)
     {
-      WBInvalidateRect(pCW->wID, NULL, 0);  // invalidate window
+      if(!fPaintNow) // if I didn't do it already
+      {
+        FWChildFrameRecalcLayout(pCW); // just in case, inform the child frame of a possible layout change.
+      }
+
+      WBInvalidateRect(pCW->wID, NULL, 0);  // invalidate the child frame window
+      fPaintNow = 1;
     }
   }
 
-  // if re-calc layout in any way caused a need to update the child window, do it NOW
-  // this is a do-nothing if the invalid region is empty
-
-  if(pCW)
+  if(pCW && fPaintNow)
   {
+    // if re-calc layout in any way caused a need to update the child window, do it NOW
+    // this is a do-nothing if the invalid region is empty
+
     WBUpdateWindow/*Immediately*/(pCW->wID);
   }
 }
@@ -1197,7 +1208,7 @@ int iRval;
   {
     pFrameWindow->nMaxChildFrames = 256; // for now
 
-    pFrameWindow->ppChildFrames = (WBChildFrame **)malloc(pFrameWindow->nMaxChildFrames * sizeof(WBChildFrame *));
+    pFrameWindow->ppChildFrames = (WBChildFrame **)WBAlloc(pFrameWindow->nMaxChildFrames * sizeof(WBChildFrame *));
     if(!pFrameWindow->ppChildFrames)
     {
       pFrameWindow->nMaxChildFrames = 0;
@@ -1212,8 +1223,8 @@ no_memory:
   }
   else if((pFrameWindow->nChildFrames + 1) >= pFrameWindow->nMaxChildFrames)
   {
-    void *pTemp = realloc(pFrameWindow->ppChildFrames,
-                          (pFrameWindow->nMaxChildFrames + 128) * sizeof(WBChildFrame *));
+    void *pTemp = WBReAlloc(pFrameWindow->ppChildFrames,
+                            (pFrameWindow->nMaxChildFrames + 128) * sizeof(WBChildFrame *));
 
     if(!pTemp)
     {
@@ -1233,9 +1244,12 @@ no_memory:
 
   pNew->pOwner = &(pFrameWindow->wbFW); // set THIS frame as the owner in the contained tab
 
-  WB_ERROR_PRINT("TEMPORARY:  %s - adding tab %d window %u (%08xH)\n",
-                 __FUNCTION__, iRval, (int)pNew->wID, (int)pNew->wID);
+//  WB_ERROR_PRINT("TEMPORARY:  %s - adding tab %d window %u (%08xH)\n",
+//                 __FUNCTION__, iRval, (int)pNew->wID, (int)pNew->wID);
 
+  FWRecalcLayout(pFW->wID);       // recalc layout for frame window, first (in case it needs it)
+  FWChildFrameRecalcLayout(pNew); // make sure I recalculate the child frame layout based on the owner
+  
   FWSetFocusWindowIndex(pFW, iRval); // set focus to it
 
   return iRval;
@@ -1248,9 +1262,9 @@ int iIndex, i2;
 
   pFrameWindow = InternalGet_FRAME_WINDOW(pFW);
 
-  if(!pFrameWindow)
+  if(!pFrameWindow || !pCont)
   {
-    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
+    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer or invalid child window pointer!\n", __FUNCTION__);
 
     return;
   }
@@ -1272,7 +1286,12 @@ int iIndex, i2;
       }
 #endif // NO_DEBUG
 
-      pCont->pOwner = NULL; // for now, always do this
+      if(pCont->wID != None)
+      {
+        WBUnmapWindow(WBGetWindowDisplay(pCont->wID), pCont->wID); // unmap it (make it invisible) [MUST do this]
+      }
+
+      pCont->pOwner = NULL; // for now, always do this.  it prevents trying to re-remove it, etc.
 
       for(i2=iIndex + 1; i2 < pFrameWindow->nChildFrames; i2++)
       {
@@ -1313,11 +1332,15 @@ int iIndex, i2;
 
         pFrameWindow->nChildFrames = 0; // make sure
 
+        FWSetStatusText(pFW, NULL); // remove status text
+
         FWRecalcLayout(pFW->wID); // recalculate layout (this also updates the frame window and whatnot)
         WBInvalidateRect(pFW->wID, NULL, 1); // update everything NOW.  it's 'empty'
       }
       else if(iIndex == pFrameWindow->nFocusTab) // is it the focus window? (not always)
       {
+        FWRecalcLayout(pFW->wID); // recalculate layout (this also updates the frame window and whatnot)
+
         // focus window changes, so make sure everything is informed
 
         if(iIndex < pFrameWindow->nChildFrames)
@@ -1342,6 +1365,60 @@ int iIndex, i2;
     }
   }
 }
+
+void FWReplaceContainedWindow(WBFrameWindow *pFW, WBChildFrame *pCont, WBChildFrame *pContNew)
+{
+FRAME_WINDOW *pFrameWindow;
+int iIndex;
+
+
+  pFrameWindow = InternalGet_FRAME_WINDOW(pFW);
+
+  if(!pFrameWindow || !pCont || !pContNew)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer or invalid child frame pointer!\n", __FUNCTION__);
+
+    return;
+  }
+
+  if(!pFrameWindow->ppChildFrames || !pFrameWindow->nChildFrames)
+  {
+    // TODO:  call 'Add' ?
+
+    return; // no child windows in list
+  }
+
+  for(iIndex=0; iIndex < pFrameWindow->nChildFrames; iIndex++)
+  {
+    if(pFrameWindow->ppChildFrames[iIndex] == pCont)
+    {
+      if(pCont->wID != None)
+      {
+        WBUnmapWindow(WBGetWindowDisplay(pCont->wID), pCont->wID); // unmap it (make it invisible) [MUST do this]
+      }
+
+      pCont->pOwner = NULL; // for now, always do this.  it prevents trying to re-remove it, etc.
+
+      // now add the NEW window.
+
+      pFrameWindow->ppChildFrames[iIndex] = pContNew;
+
+      pContNew->pOwner = &(pFrameWindow->wbFW); // set THIS frame as the owner in the contained tab
+
+      FWRecalcLayout(pFW->wID);           // recalc layout for frame window, first (in case it needs it)
+      FWChildFrameRecalcLayout(pContNew); // make sure I recalculate the layout based on the owner
+
+//      WB_ERROR_PRINT("TEMPORARY:  %s - replacing tab %d, window %u (%08xH)\n",
+//                     __FUNCTION__, iIndex, (int)pContNew->wID, (int)pContNew->wID);
+
+      if(iIndex == pFrameWindow->nFocusTab) // is it the focus window? (not always)
+      {
+        FWSetFocusWindowIndex(pFW, iIndex); // this handles the change-out properly
+      }
+    }
+  }
+}
+
 
 void FWSetFocusWindow(WBFrameWindow *pFW, WBChildFrame *pCont)
 {
@@ -1412,7 +1489,23 @@ WBMenuBarWindow *pMBW;
   pFrameWindow->nFocusTab = iIndex; // set focus to THIS one
   pFrameWindow->nCloseTab = -1;     // mark that I'm NOT closing a tab (make sure)
 
-  // go through the list and hide all of the others NOT the focus window
+  // invalidate the tab bar rectangle first, before I continue
+  WBInvalidateRect(pFW->wID, &(pFrameWindow->rctLastTabBarRect), 0);
+
+  FWRecalcLayout(pFW->wID); // recalculate layout (this also updates the frame window and whatnot)
+  // note that recalc'ing the layout does NOT re-paint the window.
+
+  pC = pFrameWindow->ppChildFrames[iIndex];
+
+  WBMapWindow(pDisplay, pC->wID);     // make sure it's mapped (probably isn't)
+  WBSetInputFocus(pC->wID);
+
+  // notify the child frame that its status has changed.  this will fix status text
+  // for the frame window, and update it as needed
+
+  FWChildFrameStatusChanged(pC);
+
+  // NOW, go through the list and hide all of the others NOT the focus window
   for(i1=0; i1 < pFrameWindow->nChildFrames; i1++)
   {
     if(i1 == iIndex)
@@ -1430,21 +1523,17 @@ WBMenuBarWindow *pMBW;
     }
   }
 
-  // invalidate the tab bar rectangle first, before I continue
-  WBInvalidateRect(pFW->wID, &(pFrameWindow->rctLastTabBarRect), 0);
 
-  FWRecalcLayout(pFW->wID); // recalculate layout (this also updates the frame window and whatnot)
-  // note that recalc'ing the layout does NOT re-paint the window.
+  // -------------------
+  // ASSIGN CORRECT MENU
+  // -------------------
 
-  pC = pFrameWindow->ppChildFrames[iIndex];
-
-  WBMapWindow(pDisplay, pC->wID);     // make sure it's mapped (probably isn't)
-
-  // NOW, switch to the menu associated with the current frame
   wMB = WBGetMenuWindow(pFrameWindow->wbFW.wID);
 
-  if(wMB != None)
+  if(wMB != None) // we have a menu bar window
   {
+    // NOW, switch to the menu associated with the current child frame
+
     pMBW = MBGetMenuBarWindowStruct(wMB);
 
     if(pMBW)
@@ -1541,13 +1630,13 @@ WBChildFrame *pC = NULL;
       iIndex = 0;
     }
 
-    WB_ERROR_PRINT("TEMPORARY:  %s - move prev %d\n", __FUNCTION__, iIndex);
+//    WB_ERROR_PRINT("TEMPORARY:  %s - move prev %d\n", __FUNCTION__, iIndex);
   }
   else if(iIndex == -2)
   {
     iIndex = iI + 1;
 
-    WB_ERROR_PRINT("TEMPORARY:  %s - move next %d\n", __FUNCTION__, iIndex);
+//    WB_ERROR_PRINT("TEMPORARY:  %s - move next %d\n", __FUNCTION__, iIndex);
   }
 
   if(iIndex >= pFrameWindow->nChildFrames)
@@ -1644,7 +1733,7 @@ FRAME_WINDOW *pFrameWindow;
 
   if(pFrameWindow->szStatus)
   {
-    free(pFrameWindow->szStatus);
+    WBFree(pFrameWindow->szStatus);
     pFrameWindow->szStatus = NULL;
   }
 
@@ -1680,7 +1769,7 @@ FRAME_WINDOW *pFrameWindow;
 
   if(pFrameWindow->pStatusBarTabs)
   {
-    free(pFrameWindow->pStatusBarTabs);
+    WBFree(pFrameWindow->pStatusBarTabs);
 
     pFrameWindow->pStatusBarTabs = NULL;
   }
@@ -1689,7 +1778,7 @@ FRAME_WINDOW *pFrameWindow;
 
   if(pTabs)
   {
-    pFrameWindow->pStatusBarTabs = (int *)malloc(sizeof(int) * (nTabs + 1));
+    pFrameWindow->pStatusBarTabs = (int *)WBAlloc(sizeof(int) * (nTabs + 1));
 
     if(!pFrameWindow->pStatusBarTabs)
     {
@@ -1935,7 +2024,7 @@ int i1;
         evt.data.l[0] = CLOSE_TAB_MESSAGE;
         evt.data.l[1] = pFrameWindow->nCloseTab;
 
-        WB_ERROR_PRINT("TEMPORARY:  %s - close tab %d\n", __FUNCTION__, pFrameWindow->nCloseTab);
+//        WB_ERROR_PRINT("TEMPORARY:  %s - close tab %d\n", __FUNCTION__, pFrameWindow->nCloseTab);
 
         pFrameWindow->nCloseTab = -1; // NOT closing a tab now (make sure) (also fixes the UI)
       }
@@ -2397,7 +2486,7 @@ WB_RECT rct, rctExpose, rctTemp, rctPrev;
 WB_GEOM geom;
 GC gc;
 int i1;
-
+const char *pszStatus;
 
 
   if(!(WBFrameWindow_STATUS_BAR & pFrameWindow->wbFW.iFlags)) // window has a status bar?
@@ -2493,7 +2582,7 @@ int i1;
 
     XSetForeground(pDisplay, gc, clrFG.pixel); // by convention, set it to FG [for text I need this]
 
-    if(pFrameWindow->szStatus && pFont)
+    if(pFont)
     {
       rctTemp.left = rct.left + 8;     // this is the outside bounding rectangle
       rctTemp.top = rct.top + 2;       // for the entire status bar.
@@ -2511,8 +2600,15 @@ int i1;
 
         iFixedTab *= pFrameWindow->nAvgCharWidth; //WBFontAvgCharWidth(pDisplay, pFont);
 
+        pszStatus = pFrameWindow->szStatus;
+
+        if(!pszStatus)
+        {
+          pszStatus = DEFAULT_STATUS_STRING; // default status text when none defined
+        }
+
         DTDrawSingleLineText(pFont,
-                             pFrameWindow->szStatus, pDisplay,
+                             pszStatus, pDisplay,
                              gc, pFrameWindow->wbFW.wID,
                              iFixedTab, 0, // fixed tab widths
                              &rctTemp, DTAlignment_VCENTER | DTAlignment_HLEFT);
@@ -2544,10 +2640,10 @@ int i1;
             rctTemp.bottom = rctPrev.bottom; // restore these two 'just in case'
           }
 
-          // free the 3 'malloc'd arrays
-          free(ppCols);
-          free(pData);
-          free(pTabs);
+          // WBFree the 3 'WBAlloc'd arrays
+          WBFree(ppCols);
+          WBFree(pData);
+          WBFree(pTabs);
         }
       }
     }                         
@@ -2579,6 +2675,7 @@ int __internal_do_status_tab_cols(FRAME_WINDOW *pFrameWindow, const WB_RECT *prc
 int i1, i2, i3, i4, iTab, nCol;
 char *p1;
 
+
 //      if(!pFrameWindow->pStatusBarTabs || !pFrameWindow->nStatusBarTabs) // fixed tab width (or no tabs)
 
   // this is where things get a bit more fun.  Look through 'pStatusBarTabs' for
@@ -2591,7 +2688,14 @@ char *p1;
   *ppTabs = NULL;
   *pppCols = NULL;
 
-  *ppData = WBCopyString(pFrameWindow->szStatus);
+  if(pFrameWindow->szStatus)
+  {
+    *ppData = WBCopyString(pFrameWindow->szStatus);
+  }
+  else
+  {
+    *ppData = WBCopyString(DEFAULT_STATUS_STRING); // default status text when none defined
+  }
 
   if(!*ppData)
   {
@@ -2636,22 +2740,22 @@ error_return:
 
   // 'nCol' is now the total # of columns I'll be printing to.  Allocate pppCols now
 
-  *pppCols = (char **)malloc(sizeof(char *)*(nCol + 2));
+  *pppCols = (char **)WBAlloc(sizeof(char *)*(nCol + 2));
 
   if(!*pppCols)
   {
 error_return2:
 
-    free(*ppData);
+    WBFree(*ppData);
     *ppData = NULL;
 
     goto error_return;
   }
 
-  *ppTabs = (struct __status_tab_cols__ *)malloc(sizeof(**ppTabs) * (pFrameWindow->nStatusBarTabs + 1));
+  *ppTabs = (struct __status_tab_cols__ *)WBAlloc(sizeof(**ppTabs) * (pFrameWindow->nStatusBarTabs + 1));
   if(!*ppTabs)
   {
-    free(*pppCols);
+    WBFree(*pppCols);
     *pppCols = NULL;
 
     goto error_return2;    
@@ -2895,14 +2999,14 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 
 #ifndef NO_DEBUG
         {
-          char *p1 = XGetAtomName(WBGetWindowDisplay(wID), pEvent->xclient.message_type);
+          char *p1 = WBGetAtomName(WBGetWindowDisplay(wID), pEvent->xclient.message_type);
 
           WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
                          "%s - CLIENT MESSAGE:  %s\n", __FUNCTION__, p1);
 
           if(p1)
           {
-            XFree(p1);
+            WBFree(p1);
           }
         }
 #endif // NO_DEBUG
@@ -2972,9 +3076,10 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
             {
               long lID = pHandler->lMenuID;
 
-              if(pHandler->lMenuID >= 0x10000L)
+              if(pHandler->lMenuID >= 0x10000L) // TODO:  this isn't compatible with the WBGetAtom paradigm...
               {
-                lID = XInternAtom(WBGetDefaultDisplay(), (const char *)lID, False);
+#warning this is potentially dangerous code.  find a better way of managing this
+                lID = WBGetAtom(WBGetDefaultDisplay(), (const char *)lID);
 
                 if(!lID)
                 {
@@ -3036,7 +3141,8 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 
               if(pHandler->lMenuID >= 0x10000L)
               {
-                lID = XInternAtom(WBGetDefaultDisplay(), (const char *)lID, False);
+#warning this is potentially dangerous code
+                lID = WBGetAtom(WBGetDefaultDisplay(), (const char *)lID);
 
                 if(!lID)
                 {
@@ -3091,7 +3197,7 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 #ifndef NO_DEBUG
         else
         {
-          char *p1 = XGetAtomName(WBGetWindowDisplay(wID), pEvent->xclient.message_type);
+          char *p1 = WBGetAtomName(WBGetWindowDisplay(wID), pEvent->xclient.message_type);
 
           WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Frame,
                          "%s - Client message %s not handled by frame window\n",
@@ -3099,7 +3205,7 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 
           if(p1)
           {
-            XFree(p1);
+            WBFree(p1);
           }
         }
 #endif // NO_DEBUG
@@ -3151,7 +3257,9 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
         evt.window = wID;
         evt.message_type = aMENU_COMMAND;
         evt.format = 32;  // always
-        evt.data.l[0] = XInternAtom(pDisplay, "IDM_FILE_NEW", 0);
+
+#warning potentially incompatible code, hard-coding a menu resource identifier
+        evt.data.l[0] = WBGetAtom(pDisplay, "IDM_FILE_NEW"); // TODO:  make this a #define someplace, or register it?
 
         WBPostEvent(wID, (XEvent *)&evt);
       }
@@ -3320,7 +3428,7 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
           WBSetWindowData(wID, 0, NULL);
 
           __internal_destroy_frame_window(pFrameWindow); // this destroys the children
-          free(pFrameWindow);
+          WBFree(pFrameWindow);
 
           // NOTE:  caller must unregister the callback, etc.
         }
@@ -3429,7 +3537,7 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 
     __internal_destroy_frame_window(pFrameWindow);
 
-    free(pFrameWindow);
+    WBFree(pFrameWindow);
 
 //    if(boolQuitFlag)
 //      bQuitFlag = TRUE;  // set the global 'quit' flag if I'm an application top-level window

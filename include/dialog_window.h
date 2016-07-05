@@ -691,13 +691,17 @@ int DLGMessageBox(int iType, Window wIDOwner, const char *szTitle, const char *s
 /** \ingroup dialog_api
   * \brief Displays a special purpose dialog window that retrieves a character string as input
   *
-  * \return A 'malloc'd memory block containing a null-byte terminated input string, or NULL on cancel/error
   * \param wIDOwner Owner Window ID (or None)
   * \param szTitle A null-byte terminated string containing the title, to be displayed in the window manager's title area
   * \param szPrompt A null-byte terminated string that is to be displayed in a message area on the dialog window
   * \param szDefault A null-byte terminated string containing the default value.  May be NULL
   * \param iWidth The specified width of the dialog window, or -1 for default
   * \param iMaxChar The maximum number of characters in the input string
+  * \returns A 'WBAlloc'd memory block containing a null-byte terminated input string, or NULL on cancel/error
+  *
+  * Use this function to display an 'Input' box, and return back the text in an allocated buffer.
+  *
+  * NOTE:  non-NULL return values must be free'd by the caller using WBFree()
   *
   * Header File:  dialog_window.h
 **/
@@ -732,14 +736,14 @@ enum FileDialogEnum
 };
 
 /** \ingroup dialog_api
-  * \brief Display a modal File Dialog window, returning a malloc'd pointer to a null-byte terminated string containing a fully qualified file or path name
+  * \brief Display a modal File Dialog window, returning a WBAlloc'd pointer to a null-byte terminated string containing a fully qualified file or path name
   *
-  * \return Returns either a NULL on cancel/error, or a malloc'd pointer to a null-byte terminated string containing a fully qualified file or path name
   * \param iType See the \ref MessageBoxEnum enumeration for a list of possible values
   * \param wIDOwner The owner's Window ID (or None)
   * \param szDefPath A null-byte terminated string containing the default path name (may be NULL for current directory)
   * \param szDefName A null-byte terminated string contianing the default file name (may be NULL, no path specifiers allowed)
   * \param szExtAndDescList Information containing the known extensions and file types.  May be NULL.  See below for format.
+  * \returns Either a NULL on cancel/error, or a WBAlloc'd pointer to a null-byte terminated string containing a fully qualified file or path name
   *
   * Use this to display an X11 Work Bench Toolkit custom File Dialog based on the specified parameters.  These file dialogs
   * have been intionally tweeked for better UI performance than other file dialogs.\n
@@ -758,6 +762,8 @@ enum FileDialogEnum
   *
   * This describes 3 file types with extensions '.txt', '.doc', and '.sh' with a 4th file type of 'other files' that
   * encompasses everything else.  Simple pattern matching is applied to each file name for the selected pattern.
+  *
+  * NOTE:  non-NULL return values must be free'd by the caller using WBFree()
   *
   * Header File:  dialog_window.h
 **/

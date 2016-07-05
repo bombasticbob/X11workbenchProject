@@ -153,13 +153,14 @@ extern XColor clrMenuBorder2;          ///< menu border color 2
 extern XColor clrMenuBorder3;          ///< menu border color 3
 extern XColor clrMenuDisabledFG;       ///< menu 'disabled' foreground color
 extern XColor clrMenuActiveDisabledFG; ///< menu 'disabled but active' foreground color
-
-extern Atom aMENU_RESIZE;              ///< Atom for 'RESIZE' client event
-extern Atom aMENU_DISPLAY_POPUP;       ///< Atom for 'DISPLAY POPUP' client event
-extern Atom aMENU_ACTIVATE;            ///< Atom for 'ACTIVATE' client event
 /**
  @}
 **/
+
+// these are documented in menu_bar.c
+extern Atom aMENU_RESIZE;              ///< Atom for 'RESIZE' client event
+extern Atom aMENU_DISPLAY_POPUP;       ///< Atom for 'DISPLAY POPUP' client event
+extern Atom aMENU_ACTIVATE;            ///< Atom for 'ACTIVATE' client event
 
 
 /** \ingroup menu_bar

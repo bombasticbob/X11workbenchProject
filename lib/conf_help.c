@@ -649,8 +649,8 @@ void * CHOpenConfFile(const char *szAppName, int iFlags)
 
   // create struct
 
-  pRval = (CONF_FILE *)malloc(sizeof(*pRval) + strlen(szAppName) * 4 + sizeof(szGlobalPath)
-                              + sizeof(szGlobalXPath) + sizeof(szLocalPath) + 16 + PATH_MAX * 2);
+  pRval = (CONF_FILE *)WBAlloc(sizeof(*pRval) + strlen(szAppName) * 4 + sizeof(szGlobalPath)
+                               + sizeof(szGlobalXPath) + sizeof(szLocalPath) + 16 + PATH_MAX * 2);
   if(!pRval)
   {
     return NULL;
@@ -682,7 +682,7 @@ void * CHOpenConfFile(const char *szAppName, int iFlags)
     {
       mkdir(p4, 0755); // TODO:  check user's UMASK, 'stat' first to see if I need to create it, etc.
       strncpy(szLocalPath0, p4, sizeof(szLocalPath0));
-      free(p4);
+      WBFree(p4);
     }
 
     if(szLocalPath0[strlen(szLocalPath0) - 1] != '/')
@@ -697,7 +697,7 @@ void * CHOpenConfFile(const char *szAppName, int iFlags)
     {
 // NOTE:  p5 not being used; commented out because of linux gcc warnings
 //      p5 = DoMakePath(p4, p6, szAppName, szConf); // then THIS one
-      free(p6);
+      WBFree(p6);
     }
     else
     {
@@ -1448,7 +1448,7 @@ int CHWriteConfFileString(void * hFile, const char *szSection,
         }
         else
         {
-          pBuf = (char *)malloc(iDataLen + iIdentifierLen + 4);
+          pBuf = (char *)WBAlloc(iDataLen + iIdentifierLen + 4);
 
           if(!pBuf)
           {
@@ -1470,11 +1470,11 @@ int CHWriteConfFileString(void * hFile, const char *szSection,
           }
           else
           {
-            free(pBuf);
+            WBFree(pBuf);
             return -1; // error
           }
 
-          free(pBuf);
+          WBFree(pBuf);
         }
 
         return 0;  // success
@@ -1491,7 +1491,7 @@ int CHWriteConfFileString(void * hFile, const char *szSection,
     // last entry, searching back from 'pEndSection' skipping blank lines and comments
     // until I get to 'pSection' or an entry, whichever happens first.
 
-    pBuf = (char *)malloc(iDataLen + iIdentifierLen + 4);
+    pBuf = (char *)WBAlloc(iDataLen + iIdentifierLen + 4);
 
     if(!pBuf)
     {
@@ -1526,7 +1526,7 @@ int CHWriteConfFileString(void * hFile, const char *szSection,
       FBInsertLineIntoFileBuf(&(pTemp->pfhbG), i1, pBuf);
     }
 
-    free(pBuf);
+    WBFree(pBuf);
 
     return 0;  // ok!
   }
@@ -1545,7 +1545,7 @@ int CHWriteConfFileString(void * hFile, const char *szSection,
     i1 =  iDataLen + iIdentifierLen + 2;
   }
 
-  pBuf = (char *)malloc(i1 + 2);
+  pBuf = (char *)WBAlloc(i1 + 2);
 
   if(!pBuf)
   {
@@ -1563,7 +1563,7 @@ int CHWriteConfFileString(void * hFile, const char *szSection,
     FBInsertLineIntoFileBuf(&(pTemp->pfhbL), pTemp->pfhbL->lLineCount, pBuf);
     if(i2 >= pTemp->pfhbL->lLineCount)
     {
-      free(pBuf);
+      WBFree(pBuf);
 
       WB_ERROR_PRINT("%s - FBInsertLineIntoFileBuf failed (a)\n", __FUNCTION__);
       return -1;
@@ -1574,7 +1574,7 @@ int CHWriteConfFileString(void * hFile, const char *szSection,
 
     i2 = pTemp->pfhbL->lLineCount;
     FBInsertLineIntoFileBuf(&(pTemp->pfhbL), pTemp->pfhbL->lLineCount, pBuf);
-    free(pBuf);
+    WBFree(pBuf);
 
     if(i2 >= pTemp->pfhbL->lLineCount)
     {
@@ -1588,7 +1588,7 @@ int CHWriteConfFileString(void * hFile, const char *szSection,
     FBInsertLineIntoFileBuf(&(pTemp->pfhbG), pTemp->pfhbG->lLineCount, pBuf);
     if(i2 >= pTemp->pfhbG->lLineCount)
     {
-      free(pBuf);
+      WBFree(pBuf);
       WB_ERROR_PRINT("%s - FBInsertLineIntoFileBuf failed (c)\n", __FUNCTION__);
       return -1;
     }
@@ -1597,7 +1597,7 @@ int CHWriteConfFileString(void * hFile, const char *szSection,
 
     i2 = pTemp->pfhbG->lLineCount;
     FBInsertLineIntoFileBuf(&(pTemp->pfhbG), pTemp->pfhbG->lLineCount, pBuf);
-    free(pBuf);
+    WBFree(pBuf);
 
     if(i2 >= pTemp->pfhbG->lLineCount)
     {
@@ -1607,7 +1607,7 @@ int CHWriteConfFileString(void * hFile, const char *szSection,
   }
   else
   {
-    free(pBuf);
+    WBFree(pBuf);
     WB_ERROR_PRINT("%s - pfhbG and pfhbL are both NULL\n", __FUNCTION__);
 
     return -1; // error
@@ -1846,12 +1846,12 @@ char tbuf[256];
     if(aType != a_XSETTINGS_SETTINGS)
     {
 #ifndef NO_DEBUG
-      char *p1 = XGetAtomName(pDisplay, aType);
+      char *p1 = WBGetAtomName(pDisplay, aType);
       WB_ERROR_PRINT("TEMPORARY:  %s:%d - %s returned type %d (%s)\n",
                      __FILE__, __LINE__, __FUNCTION__, (int)aType, p1);
       if(p1)
       {
-        XFree(p1);
+        WBFree(p1);
       }
 #endif // NO_DEBUG
 
@@ -1992,11 +1992,11 @@ char tbuf[256];
 
   if(pXSettings)
   {
-    free(pXSettings);
+    WBFree(pXSettings);
     pXSettings = NULL;
   }
 
-  pXSettings = (CHXSettings *)malloc(cbSize + sizeof(CHXSettings));
+  pXSettings = (CHXSettings *)WBAlloc(cbSize + sizeof(CHXSettings));
 
   if(!pXSettings)
   {
@@ -2024,7 +2024,7 @@ char tbuf[256];
       WB_ERROR_PRINT("%s:%d - %s CHXSettings data corrupt (data buffer too small)\n",
                       __FILE__, __LINE__, __FUNCTION__);
 
-      free(pXSettings);
+      WBFree(pXSettings);
       pXSettings = NULL;
 
       XFree(pData);
@@ -2078,7 +2078,7 @@ char tbuf[256];
             WB_ERROR_PRINT("%s:%d - %s CHXSettings data corrupt (data buffer too small)\n",
                             __FILE__, __LINE__, __FUNCTION__);
 
-            free(pXSettings);
+            WBFree(pXSettings);
             pXSettings = NULL;
 
             XFree(pData);
@@ -2119,7 +2119,7 @@ static void __settings_cleanup(void)
 {
   if(pXSettings)
   {
-    free(pXSettings);
+    WBFree(pXSettings);
     pXSettings = NULL;
   }
 }
@@ -2361,7 +2361,7 @@ int i1, cbRval = 4096;
     pEnd = pTagContents + cbLength;
   }
 
-  pC = pRval = malloc(cbRval);
+  pC = pRval = WBAlloc(cbRval);
   if(!pRval)
   {
     WB_ERROR_PRINT("%s - not enough memory\n", __FUNCTION__);
@@ -2489,7 +2489,7 @@ int i1, cbRval = 4096;
 
       if(!p5)
       {
-        free(pRval);
+        WBFree(pRval);
         WB_ERROR_PRINT("%s - not enough memory\n", __FUNCTION__);
         return NULL;
       }
@@ -2505,12 +2505,12 @@ int i1, cbRval = 4096;
         }
 
         cbRval += i1;
-        p4 = realloc(pRval, cbRval);
+        p4 = WBReAlloc(pRval, cbRval);
 
         if(!p4)
         {
-          free(p5);
-          free(pRval);
+          WBFree(p5);
+          WBFree(pRval);
           WB_ERROR_PRINT("%s - not enough memory\n", __FUNCTION__);
           return NULL;
         }
@@ -2532,7 +2532,7 @@ int i1, cbRval = 4096;
       pC += strlen(pC) + 1;
       *pC = 0;
 
-      free(p5); // done with it
+      WBFree(p5); // done with it
     }
     else // no value
     {
@@ -2546,11 +2546,11 @@ no_value:
         }
 
         cbRval += i1;
-        p4 = realloc(pRval, cbRval);
+        p4 = WBReAlloc(pRval, cbRval);
 
         if(!p4)
         {
-          free(pRval);
+          WBFree(pRval);
           WB_ERROR_PRINT("%s - not enough memory\n", __FUNCTION__);
           return NULL;
         }
@@ -2696,7 +2696,7 @@ int i1;
 
     if(*szDesktopFile != '/')
     {
-      p1 = malloc(PATH_MAX + strlen(szDesktopFile));
+      p1 = WBAlloc(PATH_MAX + strlen(szDesktopFile));
       if(p1)
       {
         // NOTE:  there may be some system config var that tells me whether to use "/usr/share" or "/usr/local/share"
@@ -2717,7 +2717,7 @@ int i1;
 
         if(i1 >= sizeof(aszPaths)/sizeof(aszPaths[0]))
         {
-          free(p1);
+          WBFree(p1);
           p1 = NULL;
         }
       }
@@ -2743,13 +2743,13 @@ int i1;
 
   if(!pTemp)
   {
-    free(p1);
+    WBFree(p1);
     return NULL;
   }
 
   pRval = WBRunResult("grep",pTemp,p1,NULL);
 
-  free(p1);
+  WBFree(p1);
   p1 = NULL;
 
   WB_ERROR_PRINT("TEMPORARY: %s - result \"%s\"\n", __FUNCTION__, pRval);
@@ -2761,7 +2761,7 @@ int i1;
     // TODO:  find the '=' and use THAT instead?
   }
 
-  free(pTemp);
+  WBFree(pTemp);
 
   // right-trim the result (always)
   if(pRval)
@@ -2774,7 +2774,7 @@ int i1;
 
     if(!*pRval) // if the resulting string is BLANK
     {
-      free(pRval);
+      WBFree(pRval);
       pRval = NULL;
     }
   }

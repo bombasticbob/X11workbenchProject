@@ -84,10 +84,10 @@ extern "C" {
     int nFlags;                         // flags (sorted, etc.)
     Window wOwner;                      // owning window [to be notified on change]
     void *(*pfnAllocator)(const void *, int); // copy constructor to call for each item that's added
-                                        // typically this will call 'malloc' followed by 'memcpy'
+                                        // typically this will call 'WBAlloc' followed by 'memcpy'
                                         // if NULL, the caller-supplied pointer is assigned to 'aItems' as-is
     void (*pfnDestructor)(void *);      // destructor to call for each item that's removed
-                                        // typically this will point to 'free'
+                                        // typically this will point to 'WBFree'
                                         // if NULL, the caller-supplied pointer is ignored
 
     void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, GC gcPaint, WB_GEOM *pGeom);
@@ -116,13 +116,13 @@ typedef struct __LISTINFO__
   Window wOwner;           ///< owning window [to be notified on change]
   /** \brief pointer to the copy constructor to call for each item that's added
     *
-    * typically this will call 'malloc' followed by 'memcpy' to construct a new pointer\n
+    * typically this will call 'WBAlloc' followed by 'memcpy' to construct a new pointer\n
     * if this is NULL, the caller-supplied pointer is assigned to 'aItems' as-is
   **/
   void *(*pfnAllocator)(const void *, int);
   /** \brief destructor to call for each item that's removed
     *
-    * typically this will point to 'free()'.  if it is NULL, the caller-supplied pointer is ignored on cleanup
+    * typically this will point to 'WBFree()'.  if it is NULL, the caller-supplied pointer is ignored on cleanup
   **/
   void (*pfnDestructor)(void *);
   /** \brief display callback function to paint the entry on the display surface
@@ -275,7 +275,7 @@ typedef struct _WB_LIST_CURSEL_
   {
     WBDialogControl wbDLGCtrl; // Standard dialog control members
     WBListCurSel sel;          // selection state, must follow wbDLGCtrl
-    int *pSelBitmap;           // bitmap of selections (when applicable) (use 'malloc/free')
+    int *pSelBitmap;           // bitmap of selections (when applicable) (use 'WBAlloc/WBFree')
     int cbBitmap;              // size of bitmap (in bytes, granular at sizeof(int))
   } WBListControl;
 
@@ -287,7 +287,7 @@ typedef struct _WB_LIST_CONTROL_
 {
   WBDialogControl wbDLGCtrl; ///< Standard dialog control members
   WBListCurSel sel;          ///< selection state, must follow wbDLGCtrl
-  int *pSelBitmap;           ///< bitmap of selections (when applicable) (use 'malloc/free')
+  int *pSelBitmap;           ///< bitmap of selections (when applicable) (use 'WBAlloc/WBFree')
   int cbBitmap;              ///< size of bitmap (in bytes, granular at sizeof(int))
 } WBListControl;
 

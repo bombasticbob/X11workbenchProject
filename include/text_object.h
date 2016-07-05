@@ -155,11 +155,16 @@ enum _DragState_
 
 struct _text_object_; // forward declaration
 
-
+/** \struct _text_object_vtable_
+  * \ingroup text_object
+  * \copydoc TEXT_OBJECT_VTABLE
+**/
 /** \ingroup text_object
+  * \typedef TEXT_OBJECT_VTABLE
   * \brief 'vtable' structure for TEXT_OBJECT
   *
   * \code
+
   typedef struct _text_object_vtable_
   {
     void (* destroy)(struct _text_object_ *pThis);
@@ -254,6 +259,7 @@ struct _text_object_; // forward declaration
     void (* cursor_blink)(struct _text_object_ *pThis, int bHasFocus);
 
   } TEXT_OBJECT_VTABLE;
+
   * \endcode
 **/
 typedef struct _text_object_vtable_
@@ -263,6 +269,7 @@ typedef struct _text_object_vtable_
     * \return void
   **/
   void (* destroy)(struct _text_object_ *pThis);
+
   /** \brief Call this to initialize or re-initialize an object.  Must call 'destroy' first for an existing object.
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \return void
@@ -310,6 +317,7 @@ typedef struct _text_object_vtable_
     * whenever there is no text in the object.  This allows you to detect an 'empty' text object.
   **/
   int (* get_rows)(const struct _text_object_ *pThis);
+
   /** \brief Call this function to obtain the estimated column extent of the document.
     *
     * \param pThis A pointer to the TEXT_OBJECT structure
@@ -332,6 +340,7 @@ typedef struct _text_object_vtable_
     * Other file types are defined as one of the 'file type' constants
   **/
   int (* get_filetype)(const struct _text_object_ *pThis);
+
   /** \brief Set the current file type for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param iInsMode An integer indicating the new file type, one of the 'file type' definitions
@@ -349,6 +358,7 @@ typedef struct _text_object_vtable_
     * iLineFeed  values:  0 (single line)  1 (newline) 2 (return) 3 (crlf) 4 (lfcr)
   **/
   int (* get_linefeed)(const struct _text_object_ *pThis);
+
   /** \brief Set the current linefeed type for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param iInsMode An integer indicating the new 'linefeed' type for end of line
@@ -363,6 +373,7 @@ typedef struct _text_object_vtable_
     * \return an integer indicating the current insert mode
   **/
   int (* get_insmode)(const struct _text_object_ *pThis);
+
   /** \brief Set the current insert mode for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param iInsMode An integer indicating the new insert mode
@@ -375,6 +386,7 @@ typedef struct _text_object_vtable_
     * \return an integer indicating the current selection mode
   **/
   int (* get_selmode)(const struct _text_object_ *pThis);
+
   /** \brief Set the current selection mode for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param iSelMode An integer indicating the new selection mode
@@ -393,6 +405,7 @@ typedef struct _text_object_vtable_
     * A tab type of zero uses the 'default' behavior for the application and file type.
   **/
   int (* get_tab)(const struct _text_object_ *pThis);
+
   /** \brief Set the current tab type for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param iTab An integer indicating the new tab type
@@ -411,9 +424,10 @@ typedef struct _text_object_vtable_
     * \return an integer indicating the current scroll mode
   **/
   int (* get_scrollmode)(const struct _text_object_ *pThis);
+
   /** \brief Set the current scroll mode for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
-    * \param iSelMode An integer indicating the new selection mode
+    * \param iScrollMode An integer indicating the new scroll mode
     * \return void
   **/
   void (* set_scrollmode)(struct _text_object_ *pThis, int iScrollMode);
@@ -424,6 +438,7 @@ typedef struct _text_object_vtable_
     * \return void
   **/
   void (* get_select)(const struct _text_object_ *pThis, WB_RECT *pRct);
+
   /** \brief Set the current selection rectangle as WB_RECT
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param pRct A const pointer to the source WB_RECT containing the new selection rectangle, or NULL for 'no selection'
@@ -456,6 +471,7 @@ typedef struct _text_object_vtable_
     * \return an integer indicating the current row
   **/
   int (* get_row)(const struct _text_object_ *pThis);
+
   /** \brief Set the current row cursor for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param iRow The row position, where 0 is the top row
@@ -468,6 +484,7 @@ typedef struct _text_object_vtable_
     * \return an integer indicating the current column (independent of hard tabs or end of line)
   **/
   int (* get_col)(const struct _text_object_ *pThis);
+
   /** \brief Set the current column cursor for the object
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param iCol The column position, where 0 is the left-most column (independent of hard tabs or end of line).
@@ -484,6 +501,7 @@ typedef struct _text_object_vtable_
     * \return void
   **/
   void (* del_select)(struct _text_object_ *pThis);
+
   /** \brief Replace the current selection assigned via 'set_select' with new text
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param szText A pointer to the text to replace the selection with (NULL or "" effectively performs 'del_select')
@@ -498,6 +516,7 @@ typedef struct _text_object_vtable_
     * \return void
   **/
   void (* del_chars)(struct _text_object_ *pThis, int nChar); // delete 1 or more chars, negative deletes BEFORE cursor, 0 does nothing
+
   /** \brief Insert 'n' characters (including new lines) from the current cursor.
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param pChar A pointer to the text to insert.  NULL effectively does nothing.
@@ -529,16 +548,19 @@ typedef struct _text_object_vtable_
     * \return An integer indicating whether 'undo' is possible.  A non-zero value is 'TRUE', zero 'FALSE.
   **/
   int (* can_undo)(struct _text_object_ *pThis);
+
   /** \brief Perform a single 'undo' operation
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \return void
   **/
   void (* undo)(struct _text_object_ *pThis);
+
   /** \brief Indicate whether a 'redo' operation is possible (mostly for menu UI)
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \return An integer indicating whether 'undo' is possible.  A non-zero value is 'TRUE', zero 'FALSE.
   **/
   int (* can_redo)(struct _text_object_ *pThis);
+
   /** \brief Perform a single 'redo' operation
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \return void
@@ -629,14 +651,17 @@ typedef struct _text_object_vtable_
     * \param pThis A pointer to the TEXT_OBJECT structure
   **/
   void (* cursor_up)(struct _text_object_ *pThis);
+
   /** \brief Move the current cursor position down one line
     * \param pThis A pointer to the TEXT_OBJECT structure
   **/
   void (* cursor_down)(struct _text_object_ *pThis);
+
   /** \brief Move the current cursor position left one column
     * \param pThis A pointer to the TEXT_OBJECT structure
   **/
   void (* cursor_left)(struct _text_object_ *pThis);
+
   /** \brief Move the current cursor position right one column
     * \param pThis A pointer to the TEXT_OBJECT structure
   **/
@@ -646,14 +671,17 @@ typedef struct _text_object_vtable_
     * \param pThis A pointer to the TEXT_OBJECT structure
   **/
   void (* page_up)(struct _text_object_ *pThis);
+
   /** \brief Move the current cursor position down one page
     * \param pThis A pointer to the TEXT_OBJECT structure
   **/
   void (* page_down)(struct _text_object_ *pThis);
+
   /** \brief Move the current cursor position left one page
     * \param pThis A pointer to the TEXT_OBJECT structure
   **/
   void (* page_left)(struct _text_object_ *pThis);
+
   /** \brief Move the current cursor position right one page
     * \param pThis A pointer to the TEXT_OBJECT structure
   **/
@@ -663,14 +691,17 @@ typedef struct _text_object_vtable_
     * \param pThis A pointer to the TEXT_OBJECT structure
   **/
   void (* cursor_home)(struct _text_object_ *pThis);
+
   /** \brief Move the cursor to 'end' (full doc width or EOL)
     * \param pThis A pointer to the TEXT_OBJECT structure
   **/
   void (* cursor_end)(struct _text_object_ *pThis);
+
   /** \brief Move the cursor to the top line
     * \param pThis A pointer to the TEXT_OBJECT structure
   **/
   void (* cursor_top)(struct _text_object_ *pThis);
+
   /** \brief Move the cursor to the last line
     * \param pThis A pointer to the TEXT_OBJECT structure
   **/
@@ -730,6 +761,7 @@ typedef struct _text_object_vtable_
 } TEXT_OBJECT_VTABLE;
 
 
+
 /** \ingroup text_object
   * \brief returns the default vtable for a TEXT_OBJECT structure
 **/
@@ -747,10 +779,16 @@ extern const TEXT_OBJECT_VTABLE WBDefaultTextObjectVTable;
 #define TEXT_OBJECT_TAG (*((const unsigned int *)"WBTX"))
 
 
+/** \struct _text_object_
+  * \ingroup text_object
+  * \copydoc TEXT_OBJECT
+**/
 /** \ingroup text_object
+  * \typedef TEXT_OBJECT
   * \brief 'base class' structure for TEXT_OBJECT
   *
   * \code
+
   typedef struct _text_object_
   {
     const TEXT_OBJECT_VTABLE *vtable;  // method function pointers (similar to C++ virtual members)
@@ -782,9 +820,9 @@ extern const TEXT_OBJECT_VTABLE WBDefaultTextObjectVTable;
     int iBlinkState;           // cursor blink state
     int iDragState;            // if '1' bit is set, cursor drag.  if '2' bit is set, mouse drag
 
-    int iAsc;                  // font height ascension
-    int iDesc;                 // font height descension
-    int iFontWidth;            // width of font in pixels (fixed pitch) - assigned by 'expose' handler
+    int iAsc;                  // font height ascension (cached)
+    int iDesc;                 // font height descension (cached)
+    int iFontWidth;            // width of font in pixels (fixed pitch) - cached by 'expose' handler
 
     // viewport
 
@@ -800,14 +838,10 @@ extern const TEXT_OBJECT_VTABLE WBDefaultTextObjectVTable;
     void *pUndo;               // pointer to 'undo' buffer.  NULL if empty.
     void *pRedo;               // pointer to 'redo' buffer.  NULL if empty.
 
-
-    // user-defined members - owner maintains these exclusively.  They should be
-    // pre-assigned to NULL by the owner, and are not re-initialized on destroy() or init()
-
-    char *pDesc;               // descriptive text (optional, owner-maintained)
-    char *pFileName;           // filename (optional, owner-maintained)
   } TEXT_OBJECT;
+
   * \endcode
+  *
 **/
 typedef struct _text_object_
 {
@@ -857,19 +891,14 @@ typedef struct _text_object_
   void *pUndo;               ///< pointer to 'undo' buffer.  NULL if empty.
   void *pRedo;               ///< pointer to 'redo' buffer.  NULL if empty.
 
-
-  // user-defined members - owner maintains these exclusively.  They should be
-  // pre-assigned to NULL by the owner, and are not re-initialized on destroy() or init()
-
-  char *pDesc;               ///< descriptive text (optional, owner-maintained)
-  char *pFileName;           ///< filename (optional, owner-maintained)
-
 } TEXT_OBJECT;
 
 /** \ingroup text_object
   * \brief 'TEXT_OBJECT' validator
   * \param pObj A const pointer to a (possible) TEXT_OBJECT structure
   * \return non-zero if the object is a valid TEXT_OBJECT, zero otherwise
+  *
+  * Header File:  text_object.h
 **/
 static __inline__ int WBIsValidTextObject(const TEXT_OBJECT *pObj)
 {
@@ -877,25 +906,50 @@ static __inline__ int WBIsValidTextObject(const TEXT_OBJECT *pObj)
 }
 
 /** \ingroup text_object
-  * \brief initialize a TEXT_OBJECT structure
+  * \brief initialize an 'in-place' TEXT_OBJECT structure
   *
   * \param pTextObject A pointer to the TEXT_OBJECT structure to be initialized
+  * \param wIDOwner The owning window's Window ID.  Can be 'None'
   *
-  * Use this function to initialize a TEXT_OBJECT as an automatic variable or as part of an array.\n
-  * Make sure you call the 'destroy' API function right before de-allocating.
+  * Use this function to initialize a TEXT_OBJECT as an automatic variable or as part of an array.
+  *
+  * Make sure you call WBDestroyInPlaceTextObject() right before de-allocating it.
+  *
+  * Header File:  text_object.h
 **/
-static __inline__ void WBInitializeTextObject(TEXT_OBJECT *pTextObject)
+static __inline__ void WBInitializeInPlaceTextObject(TEXT_OBJECT *pTextObject, Window wIDOwner)
 {
   if(pTextObject)
   {
-    memset(pTextObject, 0, sizeof(*pTextObject)); // most objects will accept 'nulling' as "unassigned"
-
-    pTextObject->ulTag = TEXT_OBJECT_TAG;
-    pTextObject->wIDOwner = None;
-    pTextObject->iLineFeed = LineFeed_DEFAULT;
+    bzero(pTextObject, sizeof(*pTextObject)); // most contained things will accept 'nulling' as "unassigned"
 
     pTextObject->vtable = WBGetDefaultTextObjectVTable();
     pTextObject->vtable->init(pTextObject);
+
+    pTextObject->wIDOwner = wIDOwner;
+  }
+}
+
+/** \ingroup text_object
+  * \brief Destroy a previously initialized 'in-place' TEXT_OBJECT structure
+  *
+  * \param pTextObject A pointer to the TEXT_OBJECT structure to be initialized
+  *
+  * Use this function to destroy an in-place TEXT_OBJECT that is an automatic variable or
+  * a part of an array.
+  *
+  * \sa WBInitializeInPlaceTextObject()
+  *
+  * Header File:  text_object.h
+**/
+static __inline__ void WBDestroyInPlaceTextObject(TEXT_OBJECT *pTextObject)
+{
+  if(pTextObject &&
+     WBIsValidTextObject(pTextObject) &&
+     pTextObject->vtable &&
+     pTextObject->vtable->destroy)
+  {
+    pTextObject->vtable->destroy(pTextObject);
   }
 }
 
@@ -957,21 +1011,29 @@ typedef struct _text_buffer_
   * \param pBuf Optional initializer text.  Can be NULL or 'blank', which will pre-allocate space for a default number of lines
   * \param cbBufSize Length of data pointed to by 'pBuf'.  Zero implies zero-byte terminated string
   * \return A 'malloc'd pointer to a TEXT_BUFFER object.  Use 'WBFreeTextBuffer' to free it safely.
+  *
+  * Header File:  text_object.h
 **/
 TEXT_BUFFER * WBAllocTextBuffer(const char *pBuf, unsigned int cbBufSize);
+
 /** \ingroup text_object
   * \brief Re-allocator for TEXT_BUFFER object
   *
   * \param ppBuf A pointer to a TEXT_BUFFER pointer that may be re-assigned (as needed).
   * \param nLinesToAdd The number of additional lines that need to be added [or have space reserved for]
   * \return A non-zero value on error, or zero on success
+  *
+  * Header File:  text_object.h
 **/
 int WBCheckReAllocTextBuffer(TEXT_BUFFER **ppBuf, int nLinesToAdd);
+
 /** \ingroup text_object
   * \brief Re-allocator for TEXT_BUFFER object, returns ZERO on success.  Pointer may be modified (or not).
   *
   * \param pBuf A pointer to a TEXT_BUFFER that has been previously allocated.  It assumes that valid 'aLines' entries contain pointers allocated via 'WBAlloc'
   * \return void
+  *
+  * Header File:  text_object.h
 **/
 void WBFreeTextBuffer(TEXT_BUFFER *pBuf);
 
@@ -988,8 +1050,11 @@ void WBFreeTextBuffer(TEXT_BUFFER *pBuf);
   * For complex edits, use WBTextBufferRefreshCache().\n
   * If you join a pair of lines, call this function once for the deleted line, then again
   * for the new (joined) line.
+  *
+  * Header File:  text_object.h
 **/
 void WBTextBufferLineChange(TEXT_BUFFER *pBuf, unsigned long nLine, int nNewLen);
+
 /** \ingroup text_object
   * \brief Text buffer 'cached information' refresh function
   *
@@ -1002,39 +1067,12 @@ void WBTextBufferLineChange(TEXT_BUFFER *pBuf, unsigned long nLine, int nNewLen)
   * You should call this function following an 'undo' or other complex edit operation,
   * in lieu of WBTextBufferLineChange().  Also, for single-line edits, it may be better
   * to ALWAYS use this function.
+  *
+  * Header File:  text_object.h
 **/
 void WBTextBufferRefreshCache(TEXT_BUFFER *pBuf);
 
 
-/** \ingroup sub_alloc
-  * \brief High performance memory sub-allocator 'allocate'
-  *
-  * \param nSize The length of memory being requested
-  * \return A pointer to the allocated buffer, always aligned on a 'pointer size' boundary.  Do NOT overrun the buffer!
-**/
-void *WBAlloc(int nSize);
-
-/** \ingroup sub_alloc
-  * \brief High performance memory sub-allocator 'free'
-  *
-  * \param pBuf A pointer to the previously sub-allocated memory
-  * \return void
-**/
-void WBFree(void *pBuf);
-
-/** \ingroup sub_alloc
-  * \brief High performance memory sub-allocator 're-allocate'
-  *
-  * \param pBuf A pointer to the previously sub-allocated memory
-  * \param nNewSize The desired 'new' size of the memory block
-  * \return A pointer to the new allocated memory block, or NULL on error.  If the return value is NOT NULL, the previous pointer becomes invalid.
-**/
-void * WBReAlloc(void *pBuf, int nNewSize);
-
-/** \ingroup sub_alloc
-  * \brief High performance memory sub-allocator 'trash masher' - call periodically to minimize wasted memory
-**/
-void WBSubAllocTrashMasher(void);
 
 
 /** \ingroup text_object
@@ -1048,6 +1086,8 @@ void WBSubAllocTrashMasher(void);
   *
   * This is being implemented as an object, similar to a C++ class with virtual member functions,
   * for the purpose of being able to re-assign the vtable and thereby overload its functionality.
+  *
+  * Header File:  text_object.h
 **/
 TEXT_OBJECT *WBTextObjectConstructor(unsigned long cbStructSize, const char *szText, unsigned long cbLen, Window wIDOwner);
 
@@ -1059,8 +1099,101 @@ TEXT_OBJECT *WBTextObjectConstructor(unsigned long cbStructSize, const char *szT
   * \return void
   *
   * Use this function to SAFELY destroy an object allocated using WBTextObjectConstructor
+  *
+  * Header File:  text_object.h
 **/
 void WBTextObjectDestructor(TEXT_OBJECT *pObj);
+
+
+/** \ingroup text_object
+  * \brief Calculate the correct per-line height (in pixels) for a specified font ascent and descent
+  *
+  * \param iAscent The 'ascent' for the display font
+  * \param iDescent The 'descent' for the display font
+  * \return A calculated line height (in pixels) that includes the line spacing.
+  *
+  * Use this function to consistently get the line height from font information.  The Text Object expose
+  * handler uses this calculation exclusively.  Sometimes owning objects need to know exactly how this
+  * is being calculated to properly handle scrolling, etc. and this function returns the same results that
+  * the expose handler will use to determine where to draw text in the display geometry.
+  *
+  * Header File:  text_object.h
+**/
+int WBTextObjectCalculateLineHeight(int iAscent, int iDescent);
+
+
+
+// MBCS-related utilities
+
+/** \ingroup text_object
+  * \brief Insert multi-byte characters into a malloc'd string, at a specified column
+  *
+  * \param pString A pointer to a malloc'd buffer containing a multi-byte character string.  The string must terminate with a zero byte.
+  * \param iCol A zero-based column at which point to insert the text.
+  * \param pszMBString A pointer to a buffer containing the multi-byte characters to insert
+  * \param cbString The length of the multi-byte character string (in bytes, not characters), or -1 to use a terminating zero byte as 'end of string'
+  * \param bOverwrite Non-zero to 'overwrite' rather than insert the characters.  Overwrite can extend the length of the string.
+  * \return A pointer to a malloc'd string containing the results.  If different from 'pString', the 'pString' pointer value will no longer be valid.  On error, it will return NULL
+  *
+  * This function performs the somewhat complicated 'insert a multi-byte character' functionality in a consistent
+  * AND column-based manner, so that a string that has multi-byte characters can be edited in the same way as a string
+  * that has characters with consistent length.  In this way, ANY multi-byte character that is available at a future
+  * point in time can be supported.  The alternative would be to convert to "a unicode format", which may limit the character
+  * set that could be used; as an example, 16-bit unicode characters won't include characters that are available in the
+  * 24-bit Unicode character set.  Having a ridiculously large bit-length for a single character is not much of a consolation,
+  * and so this function (and others) will deal with multiple byte characters as they are, in an independent manner.
+  *
+  * Header File:  text_object.h
+**/  
+char * WBInsertMBChars(char *pString, int iCol, const char *pszMBString, int cbString, int bOverwrite);
+
+
+/** \ingroup text_object
+  * \brief Delete a specified number of multi-byte characters from a string 'in place', starting at a specified column
+  *
+  * \param pString A pointer to a buffer containing a multi-byte character string.  The string must terminate with a zero byte.
+  * \param iCol A zero-based column at which point to delete the text.
+  * \param nDel An integer indicating the number of multi-byte characters to delete.  A negative number will delete 'backspace' style, starting with the PREVIOUS character.  Positive deletes beginning with the character at 'iCol'.
+  * \returns The number of deletions remaining (preserving the sign of 'nDel') after the operation completes.
+  *
+  * This function performs the somewhat complicated 'delete a multi-byte character' functionality in a consistent
+  * AND column-based manner, so that a string that has multi-byte characters can be edited in the same way as a string
+  * that has characters with consistent length.  It also returns the number of delete operations remaining.
+  *
+  * In many cases, a series of 'backspaces' or 'deletes' may extend into a previous or subsequent line.  In these cases,
+  * they must be handled in a separate call involving the previous or next line's multi-byte character buffer.  The caller
+  * is responsible for handlnig this, as well as for collapsing the lines or joining them together.
+  *
+  * Header File:  text_object.h
+**/
+int WBDelMBChars(char *pString, int iCol, int nDel);
+
+
+/** \ingroup text_object
+  * \brief Obtain the length of a multi-byte character string in 'characters' (not bytes)
+  *
+  * \param pString A pointer to a buffer containing a multi-byte character string.  The string must terminate with a zero byte.
+  * \returns The length of the multi-byte character string in 'characters'
+  *
+  * Header File:  text_object.h
+**/  
+int WBGetMBLength(char *pString);
+
+
+/** \ingroup text_object
+  * \brief Obtain the pointer to a specific multi-byte character within a multi-byte character string, by specifying it's column
+  *
+  * \param pString A pointer to a buffer containing a multi-byte character string.  The string must terminate with a zero byte.
+  * \param iCol A zero-based column at which point to return a pointer to the multi-byte character
+  * \param pcbLen A pointer to an integer that receives the length of the character being pointed to by the return value.  This pointer may be NULL
+  * \returns A pointer to the multi-byte character located at the 'iCol' position within the string.  If 'iCol' is out range, the return value will point to the terminating zero byte.  On error, the return value will be NULL.
+  *
+  * Header File:  text_object.h
+**/  
+char * WBGetMBCharPtr(char *pString, int iCol, int *pcbLen);
+
+
+
 
 #ifdef __cplusplus
 };

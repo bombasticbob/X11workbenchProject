@@ -149,9 +149,9 @@ static int MessageBoxCallback(Window wID, XEvent *pEvent)
 {
 WBDialogWindow *pDlg = DLGGetDialogWindowStruct(wID);
 struct _MESSAGE_BOX_ *pUserData = (struct _MESSAGE_BOX_ *)(pDlg ? pDlg->pUserData : NULL);
-//#ifndef NODEBUG
+//#ifndef NO_DEBUG
 //WB_UINT64 ullTime = WBGetTimeIndex();
-//#endif // NODEBUG
+//#endif // NO_DEBUG
 
 
   if(pEvent->type == ClientMessage && pEvent->xclient.message_type == aDIALOG_INIT)
@@ -414,7 +414,7 @@ struct _INPUT_BOX_ *pUserData = (struct _INPUT_BOX_ *)(pDlg ? pDlg->pUserData : 
 
           if(pUserData->szRval)
           {
-            free(pUserData->szRval);
+            WBFree(pUserData->szRval);
           }
           if(pText)
           {
@@ -516,7 +516,7 @@ Window wIDDlg;
 
   if(sRval.szRval)
   {
-    free(sRval.szRval);
+    WBFree(sRval.szRval);
   }
 
   return NULL;
@@ -533,7 +533,7 @@ struct _FILE_DIALOG_
   const char *szDefPath;
   const char *szDefName;
   const char *szExtAndDescList;
-  char *szPathName;  // malloc'd
+  char *szPathName;  // WBAlloc'd
 };
 
 
@@ -587,7 +587,7 @@ char *p1, *p2;
         DLGSetControlProperty(pDlg, FILE_DIALOG_FILE_LIST_CONTROL,
                               aDLGC_PATH, p1);
 
-        free(p1);
+        WBFree(p1);
       }
     }
 
@@ -619,7 +619,7 @@ char *p1, *p2;
 
             if(pUserData->szPathName)
             {
-              free(pUserData->szPathName);
+              WBFree(pUserData->szPathName);
             }
 
             if(pPath && pPath[0] == '/')
@@ -660,7 +660,7 @@ char *p1, *p2;
                 p1 = WBGetCanonicalPath(pUserData->szPathName);
                 if(p1)
                 {
-                  free(pUserData->szPathName);
+                  WBFree(pUserData->szPathName);
                   pUserData->szPathName = p1;
                 }
                 else
@@ -696,7 +696,7 @@ char *p1, *p2;
                 // also I want to make sure that the file name control contains the new path
                 DLGSetControlCaption(pDlg, FILE_DIALOG_FILE_NAME_CONTROL, p1);
 
-                free(p1);
+                WBFree(p1);
               }
 
               return 1; // handled (do not close the dialog box)
@@ -734,7 +734,7 @@ char *p1, *p2;
                       if(p1)
                       {
                         DLGSetControlCaption(pDlg, FILE_DIALOG_FILE_NAME_CONTROL, p1);
-                        free(p1);
+                        WBFree(p1);
                       }
                     }
                   }
@@ -776,11 +776,19 @@ char *p1, *p2;
             DLGNotifyDlg(pDlg, aCONTROL_NOTIFY, aLIST_NOTIFY, FILE_DIALOG_FILE_LIST_CONTROL,
                          WB_LIST_SELCHANGE, pEvent->xclient.data.l[3], 0); // duplicates a 'SEL CHANGE" event
 
-            WB_WARN_PRINT("%s - LIST_NOTIFY WB_LIST_DBLCLICK control notification message %ld (%s)  %ld (%08lxH), %ld (%08lxH)\n",
-                          __FUNCTION__, pEvent->xclient.data.l[0],
-                          XGetAtomName(WBGetWindowDisplay(wID), (Atom)pEvent->xclient.data.l[0]),
-                          pEvent->xclient.data.l[1], pEvent->xclient.data.l[1],
-                          pEvent->xclient.data.l[2], pEvent->xclient.data.l[2]);
+            {
+#ifndef NO_DEBUG
+              char *p1 = WBGetAtomName(WBGetWindowDisplay(wID), (Atom)pEvent->xclient.data.l[0]);
+              WB_WARN_PRINT("%s - LIST_NOTIFY WB_LIST_DBLCLICK control notification message %ld (%s)  %ld (%08lxH), %ld (%08lxH)\n",
+                            __FUNCTION__, pEvent->xclient.data.l[0],  p1,
+                            pEvent->xclient.data.l[1], pEvent->xclient.data.l[1],
+                            pEvent->xclient.data.l[2], pEvent->xclient.data.l[2]);
+              if(p1)
+              {
+                WBFree(p1);
+              }
+#endif // NO_DEBUG
+            }
 
             DLGNotifyDlgAsync(pDlg, aCONTROL_NOTIFY, aBUTTON_PRESS, IDOK, 0, 0, 0); // post a button press event
 
@@ -792,12 +800,21 @@ char *p1, *p2;
         break;
 
       default:
-        WB_WARN_PRINT("%s - TODO:  control notification message %ld (%s)  %ld (%08lxH), %ld (%08lxH)\n",
-                      __FUNCTION__, pEvent->xclient.data.l[0],
-                      XGetAtomName(WBGetWindowDisplay(wID), (Atom)pEvent->xclient.data.l[0]),
-                      pEvent->xclient.data.l[1], pEvent->xclient.data.l[1],
-                      pEvent->xclient.data.l[2], pEvent->xclient.data.l[2]);
+        {
+#ifndef NO_DEBUG
+          char *p1 = WBGetAtomName(WBGetWindowDisplay(wID), (Atom)pEvent->xclient.data.l[0]);
 
+          WB_WARN_PRINT("%s - TODO:  control notification message %ld (%s)  %ld (%08lxH), %ld (%08lxH)\n",
+                        __FUNCTION__, pEvent->xclient.data.l[0], p1,
+                        pEvent->xclient.data.l[1], pEvent->xclient.data.l[1],
+                        pEvent->xclient.data.l[2], pEvent->xclient.data.l[2]);
+
+          if(p1)
+          {
+            WBFree(p1);
+          }
+#endif // NO_DEBUG
+        }
     }
   }
   else if(pEvent->xclient.message_type == aGOTFOCUS)
@@ -810,11 +827,25 @@ char *p1, *p2;
   }
   else
   {
+#ifndef NO_DEBUG
+    char *p1 = WBGetAtomName(WBGetWindowDisplay(wID), (Atom)pEvent->xclient.message_type);
+    char *p2 = WBGetAtomName(WBGetWindowDisplay(wID), (Atom)pEvent->xclient.data.l[0]);
+
     WB_WARN_PRINT("%s - unhandled notification %s %ld (%s)  %ld (%08lxH), %ld (%08lxH)\n",
-                  __FUNCTION__, XGetAtomName(WBGetWindowDisplay(wID), (Atom)pEvent->xclient.message_type),
-                  pEvent->xclient.data.l[0], XGetAtomName(WBGetWindowDisplay(wID), (Atom)pEvent->xclient.data.l[0]),
+                  __FUNCTION__, p1,
+                  pEvent->xclient.data.l[0], p2,
                   pEvent->xclient.data.l[1], pEvent->xclient.data.l[1],
                   pEvent->xclient.data.l[2], pEvent->xclient.data.l[2]);
+
+    if(p1)
+    {
+      WBFree(p1);
+    }
+    if(p2)
+    {
+      WBFree(p2);
+    }
+#endif // NO_DEBUG
   }
 
   return 0;
@@ -885,7 +916,9 @@ Window wIDDlg;
   // it ends up here on 'cancel', etc. - so if a buffer was allocated, free it
 
   if(data.szPathName)
-    free(data.szPathName);
+  {
+    WBFree(data.szPathName);
+  }
 
   return NULL;
 }
@@ -1050,12 +1083,12 @@ unsigned int ai1[3];
 
   if(data.szCopyright)
   {
-    free((void *)data.szCopyright);
+    WBFree((void *)data.szCopyright);
   }
 
   if(data.pImageData)
   {
-    free(data.pImageData);
+    WBFree(data.pImageData);
   }
 
   BEGIN_XCALL_DEBUG_WRAPPER
@@ -1418,7 +1451,7 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 //                       pI->bytes_per_line, pI->height, pI->depth);
         
         pData->cbImageData = PXM_GetImageDataLength(pI);
-        pData->pImageData = malloc(pData->cbImageData + 4);
+        pData->pImageData = WBAlloc(pData->cbImageData + 4);
 
         if(pData->pImageData)
         {

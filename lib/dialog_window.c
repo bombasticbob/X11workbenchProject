@@ -70,14 +70,6 @@
 #include "draw_text.h"
 
 
-#ifdef HAVE_MALLOC_USABLE_SIZE
-#ifdef __FreeBSD__
-#include <malloc_np.h>
-#else
-#include <malloc.h>
-#endif // __FreeBSD__
-#endif // HAVE_MALLOC_USABLE_SIZE
-
 #define THIS_SUBSYSTEM DebugSubSystem_Dialog
 
 
@@ -95,12 +87,12 @@
   {
     WBDialogWindow wbDLG;            // WBDialogWIndow structure, required to be at the beginning
 
-    WBDialogEntry *pwContents;       // malloc'd array of child window/control information as
+    WBDialogEntry *pwContents;       // WBAlloc'd array of child window/control information as
                                      // WBDialogEntry following order of windows creation and tab order
 
     int nContents;                   // size of 'pwContents' when pwContents is not NULL
     int nMaxContents;                // extent of 'pwContents' when pwContents is not NULL
-    char *szTitle;                   // title bar string (malloc'd pointer, must free on destroy)
+    char *szTitle;                   // title bar string (WBAlloc'd pointer, must WBFree on destroy)
 
     WBWinEvent pDLGCallback;         // pointer to dialog window callback function
 
@@ -120,11 +112,11 @@ typedef struct __DIALOG_WINDOW__
 {
   WBDialogWindow wbDLG;            ///< WBDialogWIndow structure, required to be at the beginning
 
-  WBDialogEntry *pwContents;       ///< malloc'd array of child window/control information as \ref WBDialogEntry following order of windows creation and tab order
+  WBDialogEntry *pwContents;       ///< WBAlloc'd array of child window/control information as \ref WBDialogEntry following order of windows creation and tab order
 
   int nContents;                   ///< size of 'pwContents' when pwContents is not NULL
   int nMaxContents;                ///< extent of 'pwContents' when pwContents is not NULL
-  char *szTitle;                   ///< title bar string (malloc'd pointer, must free on destroy)
+  char *szTitle;                   ///< title bar string (WBAlloc'd pointer, must WBFree on destroy)
 
   WBWinEvent pDLGCallback;         ///< pointer to dialog window callback function
 
@@ -137,7 +129,7 @@ static int InternalCreateChildWindows(DIALOG_WINDOW *pDlg, const char *szDialogR
 
 int DLGDefaultCallback(Window wID, XEvent *pEvent);  // default callback for dialog windows (call for default processing)
 
-static DIALOG_WINDOW *pDialogs = NULL;  // pointer to linked list of dialog windows (malloc'd)
+static DIALOG_WINDOW *pDialogs = NULL;  // pointer to linked list of dialog windows (WBAlloc'd)
 
 static XColor clrFG, clrBG, clrBD;
 static int iInitColorFlag = 0;
@@ -167,11 +159,13 @@ static void __internal_destroy_dialog_window(DIALOG_WINDOW *pTemp)
       // TODO:  do I need to release/free 'aClass' or shall I organize this elsewhere?
     }
 
-    free(pwContents);
+    WBFree(pwContents);
   }
 
   if(pTemp->szTitle)
-    free(pTemp->szTitle);
+  {
+    WBFree(pTemp->szTitle);
+  }
 
   pTemp->szTitle = NULL;
 }
@@ -203,10 +197,12 @@ void WBDialogWindowExit()
     // slightly different - free the structure first, THEN destroy the window
     WBSetWindowData(pTemp->wbDLG.wID, 0, NULL);
     __internal_destroy_dialog_window(pTemp);
-    free(pTemp);
+    WBFree(pTemp);
 
     if(wID > 0)
+    {
       WBDestroyWindow(wID);  // making sure...
+    }
   }
 
 }
@@ -252,7 +248,7 @@ WBDialogWindow *DLGCreateDialogWindow(const char *szTitle, const char *szDialogR
                                       int iX, int iY, int iWidth, int iHeight,
                                       WBWinEvent pUserCallback, int iFlags, void *pUserData)
 {
-  DIALOG_WINDOW *pNew = malloc(sizeof(DIALOG_WINDOW));
+  DIALOG_WINDOW *pNew = WBAlloc(sizeof(DIALOG_WINDOW));
   Display *pDisplay = WBGetDefaultDisplay();
   XSetWindowAttributes xswa;  /* Temporary Set Window Attribute struct */
   XSizeHints  xsh;            /* Size hints for window manager */
@@ -260,9 +256,9 @@ WBDialogWindow *DLGCreateDialogWindow(const char *szTitle, const char *szDialogR
 //  Atom aProto[3];
   XClientMessageEvent evt;
   int i1;
-//#ifndef NODEBUG
+//#ifndef NO_DEBUG
 //  WB_UINT64 ullTime = WBGetTimeIndex();
-//#endif // NODEBUG
+//#endif // NO_DEBUG
 
 
 //  WB_ERROR_PRINT("TEMPORARY:  %s line %d  delta tick %lld\n", __FUNCTION__, __LINE__, (WBGetTimeIndex() - ullTime));
@@ -286,10 +282,10 @@ WBDialogWindow *DLGCreateDialogWindow(const char *szTitle, const char *szDialogR
 
   if(szTitle)
   {
-    pNew->szTitle = malloc(strlen(szTitle) + 1);
+    pNew->szTitle = WBAlloc(strlen(szTitle) + 1);
     if(!pNew->szTitle)
     {
-      free(pNew);
+      WBFree(pNew);
 
       WB_ERROR_PRINT("%s - not enough memory to create dialog window (2)\n", __FUNCTION__);
       return NULL;
@@ -573,9 +569,9 @@ void DLGDestroyDialogWindow2(WBDialogWindow *pDialogWindow)
   }
   else
   {
-    // I must destroy malloc'd entries and contained windows in lieu of 'DLGDefaultCallback'
+    // I must destroy WBAlloc'd entries and contained windows in lieu of 'DLGDefaultCallback'
     __internal_destroy_dialog_window((DIALOG_WINDOW *)pDialogWindow);
-    free(pDialogWindow);
+    WBFree(pDialogWindow);
   }
 
 }
@@ -650,7 +646,7 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
 
           __internal_destroy_dialog_window(pDialogWindow);
 
-          free(pDialogWindow); // 'pDialogWindow' will never be referenced again
+          WBFree(pDialogWindow); // 'pDialogWindow' will never be referenced again
 
           // note - this MIGHT recurse
           WBDestroyWindow(wID); // should be safe to call this under any circumstances
@@ -708,20 +704,36 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
             return 1; // handled
           }
 
-          WB_WARN_PRINT("%s - TODO:  LIST_NOTIFY control notification message %ld (%s)  %ld (%08lxH), %ld (%08lxH)\n",
-                        __FUNCTION__, pEvent->xclient.data.l[0],
-                        XGetAtomName(pDisplay, (Atom)pEvent->xclient.data.l[0]),
-                        pEvent->xclient.data.l[1], pEvent->xclient.data.l[1],
-                        pEvent->xclient.data.l[2], pEvent->xclient.data.l[2]);
+#ifndef NO_DEBUG
+          {
+            char *p1 = WBGetAtomName(pDisplay, (Atom)pEvent->xclient.data.l[0]);
+            WB_WARN_PRINT("%s - TODO:  LIST_NOTIFY control notification message %ld (%s)  %ld (%08lxH), %ld (%08lxH)\n",
+                          __FUNCTION__, pEvent->xclient.data.l[0], p1,
+                          pEvent->xclient.data.l[1], pEvent->xclient.data.l[1],
+                          pEvent->xclient.data.l[2], pEvent->xclient.data.l[2]);
+            if(p1)
+            {
+              WBFree(p1);
+            }
+          }
+#endif // NO_DEBUG
 
           return 0;  // NOT handled (default response for unhandled stuff
         }
 
-        WB_WARN_PRINT("%s - TODO:  control notification messages %ld (%s)  %ld (%08lxH), %ld (%08lxH)\n",
-                      __FUNCTION__, pEvent->xclient.data.l[0],
-                      XGetAtomName(pDisplay, (Atom)pEvent->xclient.data.l[0]),
-                      pEvent->xclient.data.l[1], pEvent->xclient.data.l[1],
-                      pEvent->xclient.data.l[2], pEvent->xclient.data.l[2]);
+#ifndef NO_DEBUG
+        {
+          char *p1 = WBGetAtomName(pDisplay, (Atom)pEvent->xclient.data.l[0]);
+          WB_WARN_PRINT("%s - TODO:  control notification messages %ld (%s)  %ld (%08lxH), %ld (%08lxH)\n",
+                        __FUNCTION__, pEvent->xclient.data.l[0], p1,
+                        pEvent->xclient.data.l[1], pEvent->xclient.data.l[1],
+                        pEvent->xclient.data.l[2], pEvent->xclient.data.l[2]);
+          if(p1)
+          {
+            WBFree(p1);
+          }
+        }
+#endif // NO_DEBUG
       }
       else if(pEvent->xclient.message_type == aGOTFOCUS)   // 'focus change' messages
       {
@@ -1006,11 +1018,18 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
 
         if(wFocus != None && (wFocus == wID || WBIsChildWindow(wID, wFocus)))
         {
+#ifndef NO_DEBUG
+          char *p1 = WBGetAtomName(pDisplay, (Atom)pEntry->iID);
+
           WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Dialog,
                          "%s - me or child has focus, setting to %d (%s), %d (%08xH)\n",
-                         __FUNCTION__, pEntry->iID,
-                         XGetAtomName(pDisplay, (Atom)pEntry->iID),
+                         __FUNCTION__, pEntry->iID, p1,
                          (int)pEntry->wID, (int)pEntry->wID);
+          if(p1)
+          {
+            WBFree(p1);
+          }
+#endif // NO_DEBUG
 
           //XSetInputFocus(pDisplay, pEntry->wID, RevertToParent, CurrentTime);
           WBSetInputFocus(pEntry->wID);
@@ -1049,11 +1068,25 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
 
           if(WBIsValid(pDisplay, wID))
           {
-            WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Dialog,
-                           "%s - me or child has focus, setting to %d (%s), %d (%08xH)\n",
+#ifndef NO_DEBUG
+            WB_IF_DEBUG_LEVEL(DebugLevel_Heavy | DebugSubSystem_Dialog)
+            {
+              char *p1 = NULL;
+              if(pDialogWindow->pwContents[i1].iID < WB_MIN_STD_CTRL_ID)
+              {
+                p1 = WBGetAtomName(pDisplay, (Atom)pDialogWindow->pwContents[i1].iID);
+              }
+
+              WBDebugPrint("%s - me or child has focus, setting to %d (%s), %d (%08xH)\n",
                            __FUNCTION__, pDialogWindow->pwContents[i1].iID,
-                           XGetAtomName(pDisplay, (Atom)pDialogWindow->pwContents[i1].iID),
+                           (const char *)(p1 ? p1 : "NULL"),
                            (int)pDialogWindow->pwContents[i1].wID, (int)pDialogWindow->pwContents[i1].wID);
+              if(p1)
+              {
+                WBFree(p1);
+              }
+            }
+#endif // NO_DEBUG
 
             //XSetInputFocus(pDisplay, wID, RevertToParent, CurrentTime);
             WBSetInputFocus(wID);
@@ -1080,13 +1113,27 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
             // TODO:  check visibility?
             if(WBIsValid(pDisplay,wID))
             {
-              pDialogWindow->pwContents[i1].iFlags |= WBDialogEntry_HAS_FOCUS;
+#ifndef NO_DEBUG
+              WB_IF_DEBUG_LEVEL(DebugLevel_Heavy | DebugSubSystem_Dialog)
+              {
+                char *p1 = NULL;
+                if(pDialogWindow->pwContents[i1].iID < WB_MIN_STD_CTRL_ID)
+                {
+                  p1 = WBGetAtomName(pDisplay, (Atom)pDialogWindow->pwContents[i1].iID);
+                }
 
-              WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Dialog,
-                             "%s - me or child has focus, setting to %d (%s), %d (%08xH)\n",
+                WBDebugPrint("%s - me or child has focus, setting to %d (%s), %d (%08xH)\n",
                              __FUNCTION__, pDialogWindow->pwContents[i1].iID,
-                             XGetAtomName(pDisplay, (Atom)pDialogWindow->pwContents[i1].iID),
+                             (const char *)(p1 ? p1 : "NULL"),
                              (int)pDialogWindow->pwContents[i1].wID, (int)pDialogWindow->pwContents[i1].wID);
+                if(p1)
+                {
+                  WBFree(p1);
+                }
+              }
+#endif // NO_DEBUG
+
+              pDialogWindow->pwContents[i1].iFlags |= WBDialogEntry_HAS_FOCUS;
 
               //XSetInputFocus(pDisplay, wID, RevertToParent, CurrentTime);
               WBSetInputFocus(wID);
@@ -1148,7 +1195,7 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
       Window wIDOwner = pDialogWindow->wbDLG.wIDOwner;
       __internal_destroy_dialog_window(pDialogWindow);
 
-      free(pDialogWindow);
+      WBFree(pDialogWindow);
 
       // if the window had an owner, raise it and assign focus to it
 
@@ -1472,27 +1519,27 @@ Display *pDisplay = WBGetWindowDisplay(pDLG->wID);
 
 // creating child windows
 
-enum
+enum DlgResourceStringKeywordIndices
 {
-  x__BEGIN_DIALOG=0,
-  x__END_DIALOG,
-  x__FONT,
-  x__CONTROL,
-  x__ID,
-  x__X,
-  x__Y,
-  x__WIDTH,
-  x__HEIGHT,
-  x__VISIBLE,
-  x__TITLE,
-  x__VATOP,
-  x__VABOTTOM,
-  x__VACENTER,
-  x__HALEFT,
-  x__HARIGHT,
-  x__HACENTER,
-  x__VRESIZE,
-  x__HRESIZE
+  DlgResourceKW__BEGIN_DIALOG=0,
+  DlgResourceKW__END_DIALOG,
+  DlgResourceKW__FONT,
+  DlgResourceKW__CONTROL,
+  DlgResourceKW__ID,
+  DlgResourceKW__X,
+  DlgResourceKW__Y,
+  DlgResourceKW__WIDTH,
+  DlgResourceKW__HEIGHT,
+  DlgResourceKW__VISIBLE,
+  DlgResourceKW__TITLE,
+  DlgResourceKW__VATOP,
+  DlgResourceKW__VABOTTOM,
+  DlgResourceKW__VACENTER,
+  DlgResourceKW__HALEFT,
+  DlgResourceKW__HARIGHT,
+  DlgResourceKW__HACENTER,
+  DlgResourceKW__VRESIZE,
+  DlgResourceKW__HRESIZE
 };
 
 static const char * const aszKeywords[]={ "BEGIN_DIALOG","END_DIALOG","FONT","CONTROL","ID","X","Y","WIDTH","HEIGHT","VISIBLE","TITLE",
@@ -1500,6 +1547,7 @@ static const char * const aszKeywords[]={ "BEGIN_DIALOG","END_DIALOG","FONT","CO
                                           "VRESIZE","HRESIZE",
                                           NULL };
 
+// some built-in symbols for dialog resources and their corresponding symbol IDs
 static const char * const aszSymbols[]={ "IDOK", "IDCANCEL", "IDYES", "IDNO", "IDRETRY", "IDABORT", "IDIGNORE", "IDSTATIC", "IDNONE", NULL };
 static const int iIDSymbols[]={ IDOK, IDCANCEL, IDYES, IDNO, IDRETRY, IDABORT, IDIGNORE, IDSTATIC, IDNONE, -1 };
 
@@ -1524,8 +1572,8 @@ int iRval;
     p1++;
 
   // must be 'BEGIN_DIALOG'
-  if((p1 - p2) != strlen(aszKeywords[x__BEGIN_DIALOG]) ||
-     memcmp(p2, aszKeywords[x__BEGIN_DIALOG], (p1 - p2)) != 0)
+  if((p1 - p2) != strlen(aszKeywords[DlgResourceKW__BEGIN_DIALOG]) ||
+     memcmp(p2, aszKeywords[DlgResourceKW__BEGIN_DIALOG], (p1 - p2)) != 0)
   {
     WB_WARN_PRINT("%s - dialog box resource missing 'BEGIN_DIALOG'\n", __FUNCTION__);
     return 0;
@@ -1553,18 +1601,24 @@ char tbuf[256];
   if(iLen > 0)
   {
     if(iLen >= sizeof(tbuf))
+    {
       iLen = sizeof(tbuf) - 1;
+    }
 
     memcpy(tbuf, szVal, iLen);
   }
 
   if(iLen < 0)
+  {
     iLen = 0;
+  }
 
   tbuf[iLen] = 0;
 
   if(!tbuf[0])
+  {
     return 0;
+  }
 
   WBDeQuoteString(tbuf);
 
@@ -1578,14 +1632,16 @@ char tbuf[256];
   for(i1=0; aszSymbols[i1]; i1++)
   {
     if(!strcmp(tbuf, aszSymbols[i1]))
+    {
       return iIDSymbols[i1];
+    }
   }
 
   // TODO:  registered list of symbol names
 
   // now assume it's an atom, and return that
 
-  return XInternAtom(WBGetDefaultDisplay(), tbuf, 0);
+  return WBGetAtom(WBGetDefaultDisplay(), tbuf);
 }
 
 
@@ -1601,8 +1657,8 @@ struct _KIDS_
   int iID;      // ID for control entry
   int iX, iY, iWidth, iHeight;  // that too
   int iFlags;
-  char *szTitle;  // pointer to malloc'd string with title
-  char *szProp;   // pointer to malloc'd string with additional properties
+  char *szTitle;  // pointer to WBAlloc'd string with title
+  char *szProp;   // pointer to WBAlloc'd string with additional properties
 } *pKids = NULL;
 char tbuf[256];
 
@@ -1623,7 +1679,9 @@ char tbuf[256];
               (*p1 != c || p1[1] == c))
         {
           if(*p1 == c)
+          {
             p1++;
+          }
 
           if(*p1 == '\n' || *p1 == '\r') // not allowed
           {
@@ -1637,7 +1695,9 @@ char tbuf[256];
         }
 
         if(*p1 == c)
+        {
           p1++;
+        }
       }
       else
       {
@@ -1655,7 +1715,9 @@ char tbuf[256];
         p3 = p2 + i1;
 
         if(*p3 == ':')
+        {
           p3++;
+        }
 
         break;
       }
@@ -1669,18 +1731,18 @@ char tbuf[256];
       return 0;
     }
 
-    if(iKW == x__END_DIALOG)
+    if(iKW == DlgResourceKW__END_DIALOG)
     {
       if(!pKids)
       {
-        pKids = malloc(sizeof(*pKids));  // because it can't be NULL
+        pKids = WBAlloc(sizeof(*pKids));  // because it can't be NULL
         nKids = 0;
       }
 
       break;
     }
 
-    if(iKW == x__BEGIN_DIALOG)
+    if(iKW == DlgResourceKW__BEGIN_DIALOG)
     {
       WB_WARN_PRINT("%s - nested dialogs not supported (yet)\n", __FUNCTION__);
 
@@ -1690,12 +1752,11 @@ char tbuf[256];
 
     switch(iKW)
     {
-      case   x__CONTROL:
-//        fprintf(stderr, "TEMPORARY:  control definition %-.20s\n", p3);
+      case DlgResourceKW__CONTROL:
 
         if(!pKids)
         {
-          pKids = malloc(iCurSize = (256 * sizeof(*pKids)));
+          pKids = WBAlloc(iCurSize = (256 * sizeof(*pKids)));
           if(!pKids)
           {
             WB_ERROR_PRINT("%s - not enough memory for controls\n", __FUNCTION__);
@@ -1703,16 +1764,20 @@ char tbuf[256];
             break;
           }
 
-#ifdef HAVE_MALLOC_USABLE_SIZE
-          iCurSize = malloc_usable_size(pKids); // re-evaluate actual size
-#endif // HAVE_MALLOC_USABLE_SIZE
+//#ifdef HAVE_MALLOC_USABLE_SIZE
+          iCurSize = WBAllocUsableSize(pKids); // re-evaluate actual size
+//#endif // HAVE_MALLOC_USABLE_SIZE
 
           nKids = 1;
         }
         else if((nKids + 1) * sizeof(*pKids) > iCurSize)
         {
-          int iNewSize = (nKids + 128) * sizeof(*pKids);
-          void *p0 = realloc(pKids, iNewSize);
+          int iNewSize;
+          void *p0;
+          
+          iNewSize = (nKids + 128) * sizeof(*pKids);
+          p0 = WBReAlloc(pKids, iNewSize);
+
           if(!p0)
           {
             WB_ERROR_PRINT("%s - not enough memory for all controls\n", __FUNCTION__);
@@ -1720,11 +1785,11 @@ char tbuf[256];
             break;
           }
 
-#ifdef HAVE_MALLOC_USABLE_SIZE
-          iCurSize = malloc_usable_size(p0); // re-evaluate actual size
-#else  // HAVE_MALLOC_USABLE_SIZE
-          iCurSize = iNewSize;
-#endif // HAVE_MALLOC_USABLE_SIZE
+//#ifdef HAVE_MALLOC_USABLE_SIZE
+          iCurSize = WBAllocUsableSize(p0); // re-evaluate actual size
+//#else  // HAVE_MALLOC_USABLE_SIZE
+//          iCurSize = iNewSize;
+//#endif // HAVE_MALLOC_USABLE_SIZE
 
           pKids = (struct _KIDS_ *)p0;
           nKids++;
@@ -1742,6 +1807,7 @@ char tbuf[256];
         {
           WB_WARN_PRINT("%s - Invalid control name %-.20s\n", __FUNCTION__, p3);
           iKW = -1;
+
           break;
         }
 
@@ -1751,11 +1817,11 @@ char tbuf[256];
         WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Dialog,
                        "%s - control %s\n", __FUNCTION__, tbuf);
 
-        pKids[nKids - 1].aClass = XInternAtom(WBGetDefaultDisplay(), tbuf, 0);
+        pKids[nKids - 1].aClass = WBGetAtom(WBGetDefaultDisplay(), tbuf);
 
         break;
 
-      case   x__ID:
+      case DlgResourceKW__ID:
         if(!nKids) // ID applied to dialog box is ignored
         {
           WB_WARN_PRINT("%s - Ignoring ID for dialog box, %.20s\n", __FUNCTION__, p3);
@@ -1767,7 +1833,7 @@ char tbuf[256];
 
         break;
 
-      case   x__X:
+      case DlgResourceKW__X:
         if(!nKids) // X applied to dialog box is ignored
         {
           WB_WARN_PRINT("%s - Ignoring X for dialog box, %.20s\n", __FUNCTION__, p3);
@@ -1779,7 +1845,7 @@ char tbuf[256];
 
         break;
 
-      case   x__Y:
+      case DlgResourceKW__Y:
         if(!nKids) // Y applied to dialog box is ignored
         {
           WB_WARN_PRINT("%s - Ignoring Y for dialog box, %.20s\n", __FUNCTION__, p3);
@@ -1791,7 +1857,7 @@ char tbuf[256];
 
         break;
 
-      case   x__WIDTH:
+      case DlgResourceKW__WIDTH:
         if(!nKids)
         {
           pDlg->wbDLG.iClientWidth = get_id_val(p3, p1 - p3);
@@ -1803,7 +1869,7 @@ char tbuf[256];
 
         break;
 
-      case   x__HEIGHT:
+      case DlgResourceKW__HEIGHT:
         if(!nKids)
         {
           pDlg->wbDLG.iClientHeight = get_id_val(p3, p1 - p3);
@@ -1815,7 +1881,7 @@ char tbuf[256];
 
         break;
 
-      case   x__VATOP:
+      case DlgResourceKW__VATOP:
         if(!nKids) // visible applied to dialog box is ignored
         {
           WB_WARN_PRINT("%s - RESERVED:  'top aligned' property on dialog box\n", __FUNCTION__);
@@ -1828,7 +1894,7 @@ char tbuf[256];
 
         break;
 
-      case   x__VABOTTOM:
+      case DlgResourceKW__VABOTTOM:
         if(!nKids) // visible applied to dialog box is ignored
         {
           WB_WARN_PRINT("%s - RESERVED:  'top aligned' property on dialog box\n", __FUNCTION__);
@@ -1841,7 +1907,7 @@ char tbuf[256];
 
         break;
 
-      case   x__VACENTER:
+      case DlgResourceKW__VACENTER:
         if(!nKids) // visible applied to dialog box is ignored
         {
           WB_WARN_PRINT("%s - RESERVED:  'top aligned' property on dialog box\n", __FUNCTION__);
@@ -1854,7 +1920,7 @@ char tbuf[256];
 
         break;
 
-      case   x__HALEFT:
+      case DlgResourceKW__HALEFT:
         if(!nKids) // visible applied to dialog box is ignored
         {
           WB_WARN_PRINT("%s - RESERVED:  'top aligned' property on dialog box\n", __FUNCTION__);
@@ -1867,7 +1933,7 @@ char tbuf[256];
 
         break;
 
-      case   x__HARIGHT:
+      case DlgResourceKW__HARIGHT:
         if(!nKids) // visible applied to dialog box is ignored
         {
           WB_WARN_PRINT("%s - RESERVED:  'top aligned' property on dialog box\n", __FUNCTION__);
@@ -1880,7 +1946,7 @@ char tbuf[256];
 
         break;
 
-      case   x__HACENTER:
+      case DlgResourceKW__HACENTER:
         if(!nKids) // visible applied to dialog box is ignored
         {
           WB_WARN_PRINT("%s - RESERVED:  'top aligned' property on dialog box\n", __FUNCTION__);
@@ -1893,7 +1959,7 @@ char tbuf[256];
 
         break;
 
-      case   x__HRESIZE:
+      case DlgResourceKW__HRESIZE:
         if(!nKids)
         {
           pDlg->wbDLG.iFlags |= WBDialogEntry_HResize;
@@ -1905,7 +1971,7 @@ char tbuf[256];
 
         break;
 
-      case   x__VRESIZE:
+      case DlgResourceKW__VRESIZE:
         if(!nKids)
         {
           pDlg->wbDLG.iFlags |= WBDialogEntry_VResize;
@@ -1917,13 +1983,13 @@ char tbuf[256];
 
         break;
 
-      case   x__TITLE:
+      case DlgResourceKW__TITLE:
         if(!nKids)
         {
           if(pDlg->szTitle)
-            free(pDlg->szTitle);
+            WBFree(pDlg->szTitle);
 
-          pDlg->szTitle = malloc(p1 - p3 + 1);
+          pDlg->szTitle = WBAlloc(p1 - p3 + 1);
           if(!pDlg->szTitle)
           {
             WB_WARN_PRINT("%s - Not enough memory for dialog box title %-.20s\n", __FUNCTION__, p3);
@@ -1941,9 +2007,9 @@ char tbuf[256];
           struct _KIDS_ *pKid = pKids + nKids - 1;
 
           if(pKid->szTitle)
-            free(pKid->szTitle);
+            WBFree(pKid->szTitle);
 
-          pKid->szTitle = malloc(p1 - p3 + 1);
+          pKid->szTitle = WBAlloc(p1 - p3 + 1);
           if(!pKid->szTitle)
           {
             WB_WARN_PRINT("%s - Not enough memory for control title %-.20s\n", __FUNCTION__, p3);
@@ -1959,13 +2025,13 @@ char tbuf[256];
 
         break;
 
-      case   x__FONT:
+      case DlgResourceKW__FONT:
         WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Dialog,
                        "%s - font definition %-.20s\n", __FUNCTION__, p3);
         // TODO:  only valid for dialog box at this time?
         break;
 
-      case   x__VISIBLE:
+      case DlgResourceKW__VISIBLE:
         if(!nKids) // visible applied to dialog box is ignored
         {
           WB_WARN_PRINT("%s - RESERVED:  'visible' property on dialog box\n", __FUNCTION__);
@@ -1986,15 +2052,15 @@ char tbuf[256];
         {
           if(pKids[i1].szTitle)
           {
-            free(pKids[i1].szTitle);
+            WBFree(pKids[i1].szTitle);
           }
           if(pKids[i1].szProp)
           {
-            free(pKids[i1].szProp);
+            WBFree(pKids[i1].szProp);
           }
         }
 
-        free(pKids);
+        WBFree(pKids);
         pKids = NULL;  // my error flag below
       }
 
@@ -2017,7 +2083,7 @@ char tbuf[256];
   {
     iCurContentSize = ((nKids + 384) & 0xffffff00L)
                     * sizeof(*(pDlg->pwContents));
-    pDlg->pwContents = (WBDialogEntry *)malloc(iCurContentSize);
+    pDlg->pwContents = (WBDialogEntry *)WBAlloc(iCurContentSize);
 
     if(!pDlg->pwContents)
     {
@@ -2029,24 +2095,24 @@ char tbuf[256];
       {
         if(pKids[i1].szTitle)
         {
-          free(pKids[i1].szTitle);
+          WBFree(pKids[i1].szTitle);
         }
         if(pKids[i1].szProp)
         {
-          free(pKids[i1].szProp);
+          WBFree(pKids[i1].szProp);
         }
       }
 
-      free(pKids);
+      WBFree(pKids);
 
       *pszDialogResource = p1;  // point of error
 
       return 0;
     }
 
-#ifdef HAVE_MALLOC_USABLE_SIZE
-    iCurContentSize = malloc_usable_size(pDlg->pwContents); // re-evaluate actual size
-#endif // HAVE_MALLOC_USABLE_SIZE
+//#ifdef HAVE_MALLOC_USABLE_SIZE
+    iCurContentSize = WBAllocUsableSize(pDlg->pwContents); // re-evaluate actual size
+//#endif // HAVE_MALLOC_USABLE_SIZE
 
     pDlg->nContents = 0;  // force it
 
@@ -2057,7 +2123,7 @@ char tbuf[256];
   else if((pDlg->nContents + nKids) > pDlg->nMaxContents) // unlikely but maybe later?
   {
     int iNewSize = (pDlg->nContents + nKids + 128) * sizeof(*(pDlg->pwContents));
-    void *p0 = realloc(pDlg->pwContents, iNewSize);
+    void *p0 = WBReAlloc(pDlg->pwContents, iNewSize);
 
     if(!p0)
     {
@@ -2066,26 +2132,26 @@ char tbuf[256];
       {
         if(pKids[i1].szTitle)
         {
-          free(pKids[i1].szTitle);
+          WBFree(pKids[i1].szTitle);
         }
         if(pKids[i1].szProp)
         {
-          free(pKids[i1].szProp);
+          WBFree(pKids[i1].szProp);
         }
       }
 
-      free(pKids);
+      WBFree(pKids);
 
       *pszDialogResource = p1;  // point of error
 
       return 0;
     }
 
-#ifdef HAVE_MALLOC_USABLE_SIZE
-    iCurContentSize = malloc_usable_size(p0); // re-evaluate actual size
-#else  // HAVE_MALLOC_USABLE_SIZE
-    iCurContentSize = iNewSize;
-#endif // HAVE_MALLOC_USABLE_SIZE
+//#ifdef HAVE_MALLOC_USABLE_SIZE
+    iCurContentSize = WBAllocUsableSize(p0); // re-evaluate actual size
+//#else  // HAVE_MALLOC_USABLE_SIZE
+//    iCurContentSize = iNewSize;
+//#endif // HAVE_MALLOC_USABLE_SIZE
 
     pDlg->pwContents = (WBDialogEntry *)p0;
     // calculate 'nMaxContents' from actual memory block size
@@ -2120,10 +2186,18 @@ char tbuf[256];
 
     if(!pCtrl)
     {
+#ifndef NO_DEBUG
+      char *p1 = WBGetAtomName(WBGetDefaultDisplay(), pEntry->aClass);
+
       WB_ERROR_PRINT("%s - Unable to create control %d via WBDialogControlCreate\n", __FUNCTION__, i1);
-      WB_WARN_PRINT("%s - class: %s  title: %s  id: %d\n", __FUNCTION__,
-                    XGetAtomName(WBGetDefaultDisplay(), pEntry->aClass), pKids[i1].szTitle,
-                    pKids[i1].iID);
+      WB_WARN_PRINT("%s - class: %s  title: %s  id: %d\n", __FUNCTION__, p1, pKids[i1].szTitle, pKids[i1].iID);
+
+      if(p1)
+      {
+        WBFree(p1);
+      }
+#endif // NO_DEBUG
+
       iRval = 0;
       break;
     }
@@ -2139,15 +2213,15 @@ char tbuf[256];
   {
     if(pKids[i1].szTitle)
     {
-      free(pKids[i1].szTitle);
+      WBFree(pKids[i1].szTitle);
     }
     if(pKids[i1].szProp)
     {
-      free(pKids[i1].szProp);
+      WBFree(pKids[i1].szProp);
     }
   }
 
-  free(pKids);   // not needed now
+  WBFree(pKids);   // not needed now
 
   *pszDialogResource = p1;
 

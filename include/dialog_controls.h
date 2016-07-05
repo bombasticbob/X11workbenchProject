@@ -340,9 +340,9 @@ int WBDialogControlSetPropList(WBDialogControl *pCtrl, const char *szPropList); 
 /** \ingroup dlgctrl
   * \brief Mid-level dialog control property assignment (character string)
   *
-  * Strings are stored internally within the property list as a memory block allocated via 'malloc()'.
-  * If an existing pointer is already present when a new string is assigned, it is destroyed via 'free()'.
-  * The assigned value is then copied into a memory block allocated via 'malloc()' and stored in the property list.
+  * Strings are stored internally within the property list as a memory block allocated via 'WBAlloc()'.
+  * If an existing pointer is already present when a new string is assigned, it is destroyed via 'WBFree()'.
+  * The assigned value is then copied into a memory block allocated via 'WBAlloc()' and stored in the property list.
   *
   * Header File:  dialog_controls.h
 **/
@@ -350,14 +350,14 @@ int WBDialogControlSetProperty(WBDialogControl *pCtrl, Atom aPropName, const cha
 /** \ingroup dlgctrl
   * \brief Mid-level dialog control property list assignment (generic pointer)
   *
-  * Pointers assigned as a property must have been allocated using 'malloc()' (or NULL).  Any existing
-  * pointer already assigned to this property will be automatically destroyed using 'free()'.
+  * Pointers assigned as a property must have been allocated using 'WBAlloc()' (or NULL).  Any existing
+  * pointer already assigned to this property will be automatically destroyed using 'WBFree()'.
   * The property itself is considered to be 'owned' by the property list, and will be cleaned up
   * when the control window is destroyed.
   *
   * Header File:  dialog_controls.h
 **/
-void WBDialogControlSetProperty2(WBDialogControl *pCtrl, Atom aPropName, void *szPropVal); // szPropVal must be malloc'd pointer or NULL
+void WBDialogControlSetProperty2(WBDialogControl *pCtrl, Atom aPropName, void *szPropVal); // szPropVal must be WBAlloc'd pointer or NULL
 
 /** \ingroup dlgctrl
   * \brief Mid-level dialog control property retrieval (character string)
@@ -372,17 +372,17 @@ const char *WBDialogControlGetProperty(WBDialogControl *pCtrl, Atom aPropName);
 /** \ingroup dlgctrl
   * \brief Mid-level dialog control property list retrieval (generic pointer)
   *
-  * Pointers assigned as a property must have been allocated using 'malloc()'.  Any existing
-  * pointer already assigned to this property will be automatically destroyed using 'free()'.
+  * Pointers assigned as a property must have been allocated using 'WBAlloc()'.  Any existing
+  * pointer already assigned to this property will be automatically destroyed using 'WBFree()'.
   * The property itself is considered to be 'owned' by the property list, and will be cleaned up
   * when the control window is destroyed.
   *
   * Header File:  dialog_controls.h
 **/
-void *WBDialogControlGetProperty2(WBDialogControl *pCtrl, Atom aPropName); // returns actual malloc'd pointer or NULL
+void *WBDialogControlGetProperty2(WBDialogControl *pCtrl, Atom aPropName); // returns actual WBAlloc'd pointer or NULL
 
-// NOTE:  use WBDialogControlSetProperty2 to directly assign malloc'd pointer, and modify actual data returned by above
-//        Assigning different pointer in WBDialogControlGetProperty2 'free's existing pointer
+// NOTE:  use WBDialogControlSetProperty2 to directly assign WBAlloc'd pointer, and modify actual data returned by above
+//        Assigning different pointer in WBDialogControlGetProperty2 'WBFree's existing pointer
 //        Destroying property list does the same thing.
 
 
@@ -760,16 +760,20 @@ static __inline__ const char * DLGGetControlProperty(WBDialogWindow *pDialog, in
 }
 
 
+/** \ingroup dlgctrl
+  * @{
+**/
 // standard control IDs
-#define IDOK     0x7ffffff0
-#define IDNO     0x7ffffff1
-#define IDYES    0x7ffffff2
-#define IDABORT  0x7ffffff3
-#define IDRETRY  0x7ffffff4
-#define IDIGNORE 0x7ffffff5
-#define IDCANCEL 0x7fffffff
-#define IDSTATIC -1 /* may be repeated for static items */
-#define IDNONE   0 /* this may be repeated as needed for things that need no ID */
+#define WB_MIN_STD_CTRL_ID 0x7ffffff0 /**< minimum value for standard dialog control ID **/
+#define IDOK     0x7ffffff0           /**< 'OK' button **/
+#define IDNO     0x7ffffff1           /**< 'NO' button **/
+#define IDYES    0x7ffffff2           /**< 'YES' button **/
+#define IDABORT  0x7ffffff3           /**< 'ABORT' button **/
+#define IDRETRY  0x7ffffff4           /**< 'RETRY' button **/
+#define IDIGNORE 0x7ffffff5           /**< 'IGNORE' button **/
+#define IDCANCEL 0x7fffffff           /**< 'CANCEL' button **/
+#define IDSTATIC -1                   /**< non-unique 'static' item; may exist more than once within a dialog resource **/
+#define IDNONE   0                    /**< 'no ID' -  this may be repeated as needed for things that need no ID **/
 
 
 // standard atoms for control types
@@ -1156,15 +1160,15 @@ int DLGInitControlListInfo(WBDialogControl *pCtrl, int nFlags,
                            int (*pfnSort)(const void *, const void *));
 
 /** \ingroup dlglist
-  * \brief wrapper macro for DLGInitControlListInfo() for standard malloc'd text data
+  * \brief wrapper macro for DLGInitControlListInfo() for standard WBAlloc'd text data
   *
-  * This macro creates a standard malloc'd text data list entry using DLGCDefaultListInfoAllocator()
-  * and free, for sorted text data with standard display and sort comparison functions
-  *  NOTE:  using DLGInitControlListInfoDefault implies string data that's malloc'd.  For some other scheme of maintaining
+  * This macro creates a standard WBAlloc'd text data list entry using DLGCDefaultListInfoAllocator()
+  * and WBFree, for sorted text data with standard display and sort comparison functions
+  *  NOTE:  using DLGInitControlListInfoDefault implies string data that's WBAlloc'd.  For some other scheme of maintaining
   *         and copying data pointers for a listbox, substitute your own function pointers as needed.
 **/
 #define DLGInitControlListInfoDefault(X) \
-  DLGInitControlListInfo(X, ListInfoFlags_SORTED, DLGCDefaultListInfoAllocator, free, NULL, NULL)
+  DLGInitControlListInfo(X, ListInfoFlags_SORTED, DLGCDefaultListInfoAllocator, WBFree, NULL, NULL)
 
 
 
@@ -1297,14 +1301,14 @@ int DLGGetControlListSelectionBits(WBDialogControl *pCtrl, unsigned int *piBits,
 /** \ingroup dlglist
   * \brief Query the selection text as multiple strings in an allocated buffer
   *
-  * The return value is a single allocated buffer (using 'malloc') containing a set of string entries,
+  * The return value is a single allocated buffer (using 'WBAlloc') containing a set of string entries,
   * each separated by a newline character, corresponding to the selected list entries (TEXT elements only).\n
   * The return value is NULL if there are no selections or on error.\n
-  * For non-NULL return values, the caller must use 'free()' to destroy the allocated buffer.
+  * For non-NULL return values, the caller must use 'WBFree()' to destroy the allocated buffer.
   *
   * Header File:  dialog_controls.h
 **/
-char * DLGGetControlListSelectionText(WBDialogControl *pCtrl); // caller must 'free()' non-NULL returned pointer
+char * DLGGetControlListSelectionText(WBDialogControl *pCtrl); // caller must 'WBFree()' non-NULL returned pointer
   // this returns TEXT elements (separated by line feeds) for corresponding selected LB entries
   // use this for multi-selection listboxes with unique text entries for which the list text is desired
 

@@ -130,12 +130,12 @@ char **envp = envp0;
 
     if(envp && envp != envp0)
     {
-      free(envp);
+      WBFree(envp);
     }
 
     if(argv && argv != argv0)
     {
-      free(argv);
+      WBFree(argv);
     }
   }
   else
@@ -772,7 +772,7 @@ static int FileOpenHandler(XClientMessageEvent *pEvent)
     // TODO:  do something with file name
 
 
-    free(pFile);  // required resource cleanup
+    WBFree(pFile);  // required resource cleanup
   }
 
   return 1; // handled
@@ -957,7 +957,7 @@ static int HelpContentsHandler(XClientMessageEvent *pEvent)
   {
     DoContextSensitiveHelp(pTemp);
 
-    free(pTemp);
+    WBFree(pTemp);
   }
 //  else
 //  {
@@ -1007,7 +1007,7 @@ SIGINFO_ENTRY(SIGABRT),  //    create core image       abort(3) call (formerly S
 SIGINFO_ENTRY(SIGEMT),   //    create core image       emulate instruction executed
 #endif // SIGEMT
 SIGINFO_ENTRY(SIGFPE),   //    create core image       floating-point exception
-//SIGINFO_ENTRY(SIGKILL),  //    terminate process       kill program
+////SIGINFO_ENTRY(SIGKILL),  //    terminate process       kill program
 SIGINFO_ENTRY(SIGBUS),   //    create core image       bus error
 SIGINFO_ENTRY(SIGSEGV),  //    create core image       segmentation violation
 SIGINFO_ENTRY(SIGSYS),   //    create core image       non-existent system call invoked
@@ -1015,9 +1015,9 @@ SIGINFO_ENTRY(SIGPIPE),  //    terminate process       write on a pipe with no r
 SIGINFO_ENTRY(SIGALRM),  //    terminate process       real-time timer expired
 SIGINFO_ENTRY(SIGTERM),  //    terminate process       software termination signal
 SIGINFO_ENTRY(SIGURG),   //    discard signal          urgent condition present on socket
-//SIGINFO_ENTRY(SIGSTOP),  //    stop process            stop (cannot be caught or ignored)
-SIGINFO_ENTRY(SIGTSTP),  //    stop process            stop signal generated from keyboard
-SIGINFO_ENTRY(SIGCONT),  //    discard signal          continue after stop
+////SIGINFO_ENTRY(SIGSTOP),  //    stop process            stop (cannot be caught or ignored)
+//SIGINFO_ENTRY(SIGTSTP),  //    stop process            stop signal generated from keyboard
+//SIGINFO_ENTRY(SIGCONT),  //    discard signal          continue after stop
 SIGINFO_ENTRY(SIGCHLD),  //    discard signal          child status has changed
 SIGINFO_ENTRY(SIGTTIN),  //    stop process            background read attempted from control terminal
 SIGINFO_ENTRY(SIGTTOU),  //    stop process            background write attempted to control terminal
@@ -1042,8 +1042,10 @@ static int bCtrlCFlag = 0; // when I hit ctrl+c multiple times, kill the app any
 
   int i1;
 
+#if 0 /* this is broken now that I have a worker thread - no longer compatible */
   if(iSig == SIGTSTP) // suspend - special 'way cool' handling here [auto-fork!]
   {
+
     WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Application,
                    "\n**********************************************"
                    "\nSignal received:  SIGTSTP (detaching via fork)"
@@ -1078,13 +1080,13 @@ static int bCtrlCFlag = 0; // when I hit ctrl+c multiple times, kill the app any
     {
       exit(0);
     }
-
     return;
   }
   else if(iSig == SIGCONT) // continue
   {
     return;  // for now, just do nothing
   }
+#endif // 0
 
   for(i1=0; i1 < sizeof(aSigInfo)/sizeof(aSigInfo[0]); i1++)
   {
@@ -1096,9 +1098,9 @@ static int bCtrlCFlag = 0; // when I hit ctrl+c multiple times, kill the app any
     if(aSigInfo[i1].nSignal == iSig)
     {
       WB_DEBUG_PRINT(DebugLevel_ERROR | DebugSubSystem_Application,
-                     "Signal received:  %s\n", aSigInfo[i1].szSignal);
+                     "\nX11workbench - Signal received:  %s\n", aSigInfo[i1].szSignal);
 
-      // only some signals will actually terminate the app.  I shall look for those now.
+      // only some signals will actually terminate the application.  I shall look for those now.
 
       if(iSig == SIGHUP || iSig == SIGINT || iSig == SIGQUIT ||
          iSig == SIGILL || iSig == SIGTRAP || iSig == SIGABRT ||
@@ -1115,6 +1117,7 @@ static int bCtrlCFlag = 0; // when I hit ctrl+c multiple times, kill the app any
           if(!bCtrlCFlag)
           {
             WB_ERROR_PRINT("\n----------------------------------------------------------------------------"
+                           "\n                    X11workbench CTRL+C signal handler"
                            "\nINT/STOP/TERM, waiting for soft termination - signal again to terminate NOW!"
                            "\n----------------------------------------------------------------------------\n");
             fflush(stderr); // make sure it flushes output IMMEDIATELY
@@ -1123,6 +1126,7 @@ static int bCtrlCFlag = 0; // when I hit ctrl+c multiple times, kill the app any
           else
           {
             WB_ERROR_PRINT("\n----------------------------------------------------------------------------"
+                           "\n                    X11workbench CTRL+C signal handler"
                            "\nINT/STOP/TERM, aborting waiting for soft termination - terminate RIGHT NOW!!"
                            "\n----------------------------------------------------------------------------\n");
             exit(1); // exit with abnormal termination
@@ -1138,6 +1142,8 @@ static int bCtrlCFlag = 0; // when I hit ctrl+c multiple times, kill the app any
 
       if(iSig == SIGKILL || iSig == SIGSEGV)  // special handling, must terminate process
       {
+        WB_ERROR_PRINT("caught signal %d, terminating now\n", iSig);
+
         exit(0);
       }
 
@@ -1252,7 +1258,7 @@ find_url_opener:
     {
       if(p1)
       {
-        free(p1);
+        WBFree(p1);
       }
 
       p1 = CHGetMimeDefaultApp("x-scheme-handler/http"); // Mate uses this one
@@ -1273,7 +1279,7 @@ find_url_opener:
         }
         else
         {
-          free(p2);
+          WBFree(p2);
           p2 = p1 + strlen(p1);
 
           while(p2 > p1 && *(p2 - 1) <= ' ')
@@ -1298,7 +1304,7 @@ find_url_opener:
       }
 
       strcpy(szHelpBrowser, p1);
-      free(p1);
+      WBFree(p1);
 
       p1 = NULL;
       p2 = NULL;
@@ -1307,7 +1313,7 @@ find_url_opener:
     {
       if(p1)
       {
-        free(p1);
+        WBFree(p1);
       }
 
       WB_ERROR_PRINT("%s - No default browser available!\n", __FUNCTION__);
@@ -1321,7 +1327,7 @@ find_url_opener:
     if(p1)
     {
       strncpy(szDocFilePath, p1, sizeof(szDocFilePath) - 2);
-      free(p1);
+      WBFree(p1);
     }
     else
     {
@@ -1420,7 +1426,7 @@ find_url_opener:
                         }
                       }
 
-                      free(p3);
+                      WBFree(p3);
                       if(szDoxyTag[0])
                       {
                         break;
@@ -1467,7 +1473,7 @@ find_url_opener:
                         }
                       }
 
-                      free(p3);
+                      WBFree(p3);
                       if(szDoxyTag[0])
                       {
                         break;
@@ -1520,7 +1526,7 @@ find_url_opener:
   {
     if(p2)
     {
-      free(p2);
+      WBFree(p2);
       p2 = NULL;
     }
 
@@ -1544,7 +1550,7 @@ fail_to_run_man2html:
 
   p3 = InternalMan2Html(szTerm, p2);
 
-  free(p2);
+  WBFree(p2);
   p2 = NULL;
 
   if(!p3)
@@ -1558,7 +1564,7 @@ fail_to_run_man2html:
     // write 'p3' to a temp html file now
   if(!p2) // new temp file name
   {
-    free(p3);
+    WBFree(p3);
     p3 = NULL;
 
 //      WB_ERROR_PRINT("TEMPORARY:  here I am (2)\n");
@@ -1569,8 +1575,8 @@ fail_to_run_man2html:
   {
 //      WB_ERROR_PRINT("TEMPORARY:  here I am (3) p2=\"%s\"\n", p2);
 
-    free(p2);
-    free(p3);
+    WBFree(p2);
+    WBFree(p3);
     p2 = p3 = NULL;
 
     goto fail_to_run_man2html;
@@ -1583,8 +1589,8 @@ fail_to_run_man2html:
   // TODO:  does '--new-instance' work properly?
 
 
-  free(p2);
-  free(p3);
+  WBFree(p2);
+  WBFree(p3);
   p1 = p2 = p3 = NULL;
 
   if(hProcess != WB_INVALID_FILE_HANDLE)
@@ -1609,7 +1615,7 @@ fail_to_run_help:
     DLGMessageBox(MessageBox_OK | MessageBox_MiddleFinger, wIDOwner,
                   "Context Help", p1);
 
-    free(p1);
+    WBFree(p1);
   }
 }
 
@@ -1626,7 +1632,7 @@ char *pRval;
     return NULL;
   }
 
-  pRval = malloc(nLen * 8 * (sizeof(szNBSP) - 1) + 2);
+  pRval = WBAlloc(nLen * 8 * (sizeof(szNBSP) - 1) + 2);
 
   if(pRval)
   {
@@ -1709,7 +1715,7 @@ static const char szNBSP[]="&nbsp;";
         if(pTemp)
         {
           WBCatString(&pRval, pTemp);
-          free(pTemp);
+          WBFree(pTemp);
           pTemp = NULL;
         }
 
@@ -1722,7 +1728,7 @@ static const char szNBSP[]="&nbsp;";
             WBCatString(&pRval, pHyphenBuf);
           }
 
-          free(pHyphenBuf);
+          WBFree(pHyphenBuf);
           pHyphenBuf = NULL;
         }
 
@@ -1750,7 +1756,7 @@ static const char szNBSP[]="&nbsp;";
       if(pTemp)
       {
         WBCatString(&pRval, pTemp);
-        free(pTemp);
+        WBFree(pTemp);
         pTemp = NULL;
       }
 
@@ -1791,7 +1797,7 @@ static const char szNBSP[]="&nbsp;";
 
         WBCatString(&pRval, pHyphenBuf);
 
-        free(pHyphenBuf);
+        WBFree(pHyphenBuf);
         pHyphenBuf = NULL;
       }
 
@@ -1851,10 +1857,10 @@ static const char szNBSP[]="&nbsp;";
           // each tab converts to a variable number of spaces up to NBSP_TAB_WIDTH
           // this is a little silly but it's probably the easiest way to make it work
 
-          pTemp = malloc(i1 * NBSP_TAB_WIDTH * (sizeof(szNBSP) - 1) + cbLineLen + 4);
+          pTemp = WBAlloc(i1 * NBSP_TAB_WIDTH * (sizeof(szNBSP) - 1) + cbLineLen + 4);
           if(!pTemp)
           {
-            free(pRval);
+            WBFree(pRval);
             pRval = NULL;
 
             break; // buh-bye (error)
@@ -1883,7 +1889,7 @@ static const char szNBSP[]="&nbsp;";
 
           WBCatString(&pRval, pTemp);
 
-          free(pTemp);
+          WBFree(pTemp);
           pTemp = NULL;
         }
 
@@ -1965,11 +1971,11 @@ static const char szNBSP[]="&nbsp;";
         p5++;
       }
 
-      pTemp = malloc(i1 * NBSP_TAB_WIDTH * (sizeof(szNBSP) - 1) + cbLineLen * 12 + 4); // way more than enough space (12 times the length)
+      pTemp = WBAlloc(i1 * NBSP_TAB_WIDTH * (sizeof(szNBSP) - 1) + cbLineLen * 12 + 4); // way more than enough space (12 times the length)
 
       if(!pTemp)
       {
-        free(pRval);
+        WBFree(pRval);
         pRval = NULL;
         break;
       }
@@ -2243,7 +2249,7 @@ static const char szNBSP[]="&nbsp;";
         WBCatString(&pRval, pTemp);
       }
 
-      free(pTemp);
+      WBFree(pTemp);
       pTemp = NULL; // by convention
     }
   }

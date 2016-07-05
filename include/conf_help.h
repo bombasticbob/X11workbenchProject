@@ -538,12 +538,12 @@ int CHGetCursorBlinkTime(Display *pDisplay);
 // XML help
 
 /** \ingroup text_xml
-  * \brief Parses contents of an XML tag, returning as malloc'd string list similar to environment strings
+  * \brief Parses contents of an XML tag, returning as WBAlloc'd string list similar to environment strings
   *
   * \param pTagContents A pointer to the string position just past the tag name
   * \param cbLength The length of the tag contents up the trailing '>'.  Preceding characters
   * (such as '-->' or '/>') will be ignored, as well as the trailing '>'
-  * \returns A malloc'd string list, similar in format to 'environ'; i.e. "VALUE=xxxx xxxx xxxx\0"
+  * \returns A WBAlloc'd string list, similar in format to 'environ'; i.e. "VALUE=xxxx xxxx xxxx\0"
   * with possible embedded quotes (not doubled or '\'d) ending in a zero byte.
   * The end is marked with an additional '\0'
   *
@@ -575,10 +575,10 @@ const char *CHFindEndOfXMLTag(const char *pTagContents);
   * \brief Get the MIME type for a particular file name or extension
   *
   * \param szFileName A const pointer to a string containing the filename or '.ext' for which to obtain the MIME type
-  * \returns 'malloc'd pointer to a zero-byte terminated character string containing the MIME type
+  * \returns 'WBAlloc'd pointer to a zero-byte terminated character string containing the MIME type
   *
-  * This function will return NULL on error, or a malloc'd pointer to a string.  Caller must free any non-NULL pointer
-  * returned by this function.
+  * This function will return NULL on error, or a WBAlloc'd pointer to a string.  Caller must free any non-NULL pointer
+  * returned by this function, using WBFree()
   *
   * Header File:  conf_help.h
 **/
@@ -588,13 +588,13 @@ char *CHGetFileMimeType(const char *szFileName);
   * \brief Get the default application for a particular MIME type
   *
   * \param szMimeType A const pointer to a character string containing the MIME type
-  * \returns 'malloc'd pointer to a zero-byte terminated character string containing the default application name
+  * \returns 'WBAlloc'd pointer to a zero-byte terminated character string containing the default application name
   *
   * In the case of a '.desktop' file name being returned, use CHGetDesktopFileInfo() to obtain the actual path name
   * and other information associated with the application.
   *
-  * This function will return NULL on error, or a malloc'd pointer to a string.  Caller must free any non-NULL pointer
-  * returned by this function.
+  * This function will return NULL on error, or a WBAlloc'd pointer to a string.  Caller must free any non-NULL pointer
+  * returned by this function, using WBFree()
   *
   * Header File:  conf_help.h
 **/
@@ -605,10 +605,10 @@ char *CHGetMimeDefaultApp(const char *szMimeType);
   *
   * \param szDesktopFile A const pointer to a character string containing the desktop file name
   * \param szInfo A const pointer to a character string containing the tag for the desired information
-  * \returns 'malloc'd pointer to a zero-byte terminated character string containing the desired information
+  * \returns 'WBAlloc'd pointer to a zero-byte terminated character string containing the desired information
   *
-  * This function will return NULL on error, or a malloc'd pointer to a string.  Caller must free any non-NULL pointer
-  * returned by this function.
+  * This function will return NULL on error, or a WBAlloc'd pointer to a string.  Caller must free any non-NULL pointer
+  * returned by this function, using WBFree()
   *
   * Header File:  conf_help.h
 **/

@@ -89,8 +89,8 @@
 
 
 
-#define INIT_ATOM(X) if(a##X == None){ a##X = XInternAtom(WBGetDefaultDisplay(),X##_STR,0); }
-#define INIT_ATOM2(X,Y) if(X == None){ X = XInternAtom(WBGetDefaultDisplay(),Y,0); }
+#define INIT_ATOM(X) if(a##X == None){ a##X = WBGetAtom(WBGetDefaultDisplay(),X##_STR); }
+#define INIT_ATOM2(X,Y) if(X == None){ X = WBGetAtom(WBGetDefaultDisplay(),Y); }
 
 #define DEFAULT_LISTINFO_MAX 16384 /* default initial max # of items in LISTINFO */
 
@@ -399,48 +399,52 @@ Atom aLIST_SELCHANGE = None;  // list selection has changed (send to self)
 
 // internal-only properties (still have global scope for inline functions, etc.)
 /** \ingroup dlgctrl
-  * \internal
   * \hideinitializer
   * \brief dialog control TEXT property - see WBDialogControlGetText()
+  *
+  * This is used internally and should not be invoked directly
 */
 Atom aDLGC_TEXT = None;  // dialog control 'text' property, i.e. 'GetText'
 /** \ingroup dlgctrl
-  * \internal
   * \hideinitializer
   * \brief dialog control CAPTION property - see WBDialogControlGetCaption()
 */
 Atom aDLGC_CAPTION = None;  // dialog control 'caption' property, i.e. 'GetCaption' (not an actual property, notification only)
 /** \ingroup dlgctrl
-  * \internal
   * \hideinitializer
   * \brief dialog control FONT property - reserved
+  *
+  * This is used internally and should not be invoked directly
 */
 Atom aDLGC_FONT = None;
 /** \ingroup dlgctrl
-  * \internal
   * \hideinitializer
   * \brief dialog control SCROLLINFO property - see \ref WB_SCROLLINFO structure
   *
   * Property contains the WB_SCROLLINFO structure, to be maintained by APIs only.
+  *
+  * This is used internally and should not be invoked directly
 */
 Atom aDLGC_SCROLLINFO = None;  // scrollbar info structure (horizontal AND vertical)
                                // (scrollbars, listboxes, combo boxes, multi-line edit)
 /** \ingroup dlgctrl
-  * \internal
   * \hideinitializer
   * \brief dialog control LISTINFO property - see DLGInitControlListInfo() etc.
   *
   * Contains the listbox 'info' structure, to be maintained by APIs only
+  *
+  * This is used internally and should not be invoked directly
 */
 Atom aDLGC_LISTINFO = None;    // listbox info structure
 
 /** \ingroup dlgctrl
-  * \internal
   * \hideinitializer
   * \brief dialog control PATH property, for file and directory controls
   *
   * Text property identifying a directory name, standard for file and directory controls.
   * Can be maintained and queried directly using property API functions.
+  *
+  * This is used internally and should not be invoked directly
 */
 Atom aDLGC_PATH = None;
 
@@ -517,7 +521,7 @@ char *szOldCaption = pCtrl->pCaption;
 
   if(szOldCaption)
   {
-    free(szOldCaption);
+    WBFree(szOldCaption);
   }
 
   WBInvalidateGeom(pCtrl->wID, NULL, 0);
@@ -781,7 +785,7 @@ const WB_DIALOG_PROP *pP = WBDialogControlGetDialogProp(pCtrl, aPropName);
 static WBDialogPropList * __ConstructPropList(void)
 {
   int iInitialSize = sizeof(WBDialogPropList) + INITIAL_PROPERTY_MAX * sizeof(WB_DIALOG_PROP);
-  WBDialogPropList *pRval = (WBDialogPropList *)malloc(iInitialSize);
+  WBDialogPropList *pRval = (WBDialogPropList *)WBAlloc(iInitialSize);
 
   if(pRval)
   {
@@ -845,7 +849,7 @@ Atom aProp;
                    * sizeof(pPropList->aDlgProp[0])
                    + sizeof(*pPropList);
 
-      pPropList = (WBDialogPropList *)realloc(pPropList, iNewSize);
+      pPropList = (WBDialogPropList *)WBReAlloc(pPropList, iNewSize);
       if(!pPropList)
       {
         WB_ERROR_PRINT("%s - unable to RE-allocate property list for window %d (%08xH)\n",
@@ -885,7 +889,7 @@ Atom aProp;
       }
       else
       {
-        free(pProp->pVal);
+        WBFree(pProp->pVal);
       }
     }
 
@@ -931,7 +935,7 @@ WB_DIALOG_PROP sProp;
         }
         else
         {
-          free(pProp->pVal);
+          WBFree(pProp->pVal);
         }
 
         pProp->pVal = NULL;  // necessary, for the next step
@@ -1019,7 +1023,7 @@ int i1;
       }
       else
       {
-        free(pProp->pVal);
+        WBFree(pProp->pVal);
       }
 
 #if 0
@@ -1052,7 +1056,7 @@ int i1;
 
   pPropList->nProps = 0; // matter of course
 
-  free(pPropList); // caller must ensure no duplicate destruction happens
+  WBFree(pPropList); // caller must ensure no duplicate destruction happens
 }
 
 
@@ -1077,7 +1081,7 @@ void * DLGCDefaultListInfoAllocator(const void *pData, int cbData)
     }
   }
 
-  pRval = malloc(cbData + 1);
+  pRval = WBAlloc(cbData + 1);
 
   if(pRval)
   {
@@ -1154,7 +1158,7 @@ LISTINFO *pLI;
 
     return DLGInitControlListInfo(pCtrl, bFlags ? nFlags : ListInfoFlags_SORTED,
                                   bAllocator ? pfnAllocator : DLGCDefaultListInfoAllocator,
-                                  bDestructor ? pfnDestructor : free,
+                                  bDestructor ? pfnDestructor : WBFree,
                                   bDisplay ? pfnDisplay : NULL,
                                   bSort ? pfnSort : NULL);
   }
@@ -1218,7 +1222,7 @@ LISTINFO *DLGCListInfoConstructor(Window wOwner, int nMax, int nFlags,
                                   void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *),
                                   int (*pfnSort)(const void *, const void *))
 {
-LISTINFO *pRval = malloc(sizeof(*pRval) + nMax * sizeof(const void *));
+LISTINFO *pRval = WBAlloc(sizeof(*pRval) + nMax * sizeof(const void *));
 
   if(pRval)
   {
@@ -1280,11 +1284,11 @@ void **paData;
     }
     else if(paData[i1])
     {
-      free(paData[i1]);
+      WBFree(paData[i1]);
     }
   }
 
-  free(pListInfo);
+  WBFree(pListInfo);
 }
 
 //typedef struct __LISTINFO__
@@ -1293,10 +1297,10 @@ void **paData;
 //  int nFlags;                         // flags (sorted, etc.)
 //  Window wOwner;                      // owning window [to be notified on change]
 //  void *(*pfnAllocator)(void *, int); // copy constructor to call for each item that's added
-//                                      // typically this will call 'malloc' followed by 'memcpy'
+//                                      // typically this will call 'WBAlloc' followed by 'memcpy'
 //                                      // if NULL, the caller-supplied pointer is assigned to 'aItems' as-is
 //  void (*pfnDestructor)(void *);      // destructor to call for each item that's removed
-//                                      // typically this will point to 'free'
+//                                      // typically this will point to 'WBFree'
 //                                      // if NULL, the caller-supplied pointer is ignored
 //
 //  void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, GC gcPaint, WB_GEOM *pGeom);
@@ -1404,7 +1408,7 @@ int DLGAddControlListEntry(WBDialogControl *pCtrl, const char *pData, long cbDat
     propTemp.lVal = 0;
     propTemp.pVal = DLGCListInfoConstructor(pCtrl->wID, DEFAULT_LISTINFO_MAX, ListInfoFlags_SORTED,
                                             DLGCDefaultListInfoAllocator,
-                                            free,
+                                            WBFree,
                                             DLGCDefaultListControlDisplayProc,
                                             NULL);
 
@@ -1462,7 +1466,7 @@ int DLGAddControlListEntry(WBDialogControl *pCtrl, const char *pData, long cbDat
     i1 = sizeof(*pListInfo)
        + nItems * sizeof(pListInfo->aItems[0]);
 
-    propTemp.pVal = realloc(pListInfo, i1);
+    propTemp.pVal = WBReAlloc(pListInfo, i1);
 
     if(!propTemp.pVal)
     {

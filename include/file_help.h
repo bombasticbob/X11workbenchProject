@@ -120,7 +120,7 @@ extern "C" {
     long lLineCount;                 // number of lines in 'cData' when ppLineBuf not NULL
     long lLineBufSize;               // size of memory block pointed to by 'ppLineBuf'
     int  iFlags;                     // various bit flags
-    char **ppLineBuf;                // array of pointers to beginning of each line (malloc'd TODO: make it part of 'cData'?)
+    char **ppLineBuf;                // array of pointers to beginning of each line (WBAlloc'd TODO: make it part of 'cData'?)
     char cData[sizeof(char *)];      // the data itself (aligned to size of a pointer)
   } file_help_buf_t;
 
@@ -144,7 +144,7 @@ typedef struct __file_help_buf__
   long lLineCount;                 ///< number of lines in 'cData' when ppLineBuf not NULL
   long lLineBufSize;               ///< size of memory block pointed to by 'ppLineBuf'
   int  iFlags;                     ///< various bit flags
-  char **ppLineBuf;                ///< array of pointers to beginning of each line (malloc'd TODO: make it part of 'cData'?)
+  char **ppLineBuf;                ///< array of pointers to beginning of each line (WBAlloc'd TODO: make it part of 'cData'?)
   char cData[sizeof(char *)];      ///< the data itself (aligned to size of a pointer)
 } file_help_buf_t;
 
@@ -416,7 +416,8 @@ int WBReplicateFilePermissions(const char *szProto, const char *szTarget);
   *
   * \returns valid pointer or NULL on error
   *
-  * A convenience function that wraps the 'getcwd()' API and returns a 'malloc'd pointer to a string
+  * A convenience function that wraps the 'getcwd()' API and returns a 'WBAlloc'd pointer to a string.
+  * The caller must free any non-NULL return values using WBFree()
 **/
 char *WBGetCurrentDirectory(void);
 
@@ -435,12 +436,14 @@ int WBIsDirectory(const char *szName);
   * \brief Return the canonical path for a file name (similar to POSIX 'realpath()' funtion)
   *
   * \param szFileName The file name to query.  If the name contains symbolic links, they will be resolved.
-  * \returns A malloc'd buffer containing the canonical path, or NULL on error.
+  * \returns A WBAlloc'd buffer containing the canonical path, or NULL on error.
   *
   * Use this function to determine the canonical name for a specified path.  If the path does not exist,
   * those elements of the path that DO exist will be resolved, and the remaining parts of the name will
   * be added to form the canonical path.  If an element of the specified directory name is NOT actually
   * a directory (or a symlink to a directory), the function will return NULL indicating an error.
+  *
+  * The caller must free any non-NULL return values using WBFree()
 **/
 char *WBGetCanonicalPath(const char *szFileName);
 
@@ -454,6 +457,7 @@ char *WBGetCanonicalPath(const char *szFileName);
   * then subsequently passing it to 'WBNextDirectoryEntry' to obtain information about
   * each entry in the directory.  This function does NOT return '.' or '..' as valid
   * file names.\n
+  *
   * The pointer returned by this function must be destroyed using \ref WBDestroyDirectoryList()\n
   *
   * NOTE:  you may not specify a wildcard within a directory name unless it is the the specification
@@ -492,9 +496,11 @@ int WBNextDirectoryEntry(void *pDirectoryList, char *szNameReturn,
   *
   * \param pDirectoryList A pointer to a 'Directory List' object.  May be NULL.
   * \param szFileName A pointer to a file within the directory.  This file does not need to exist.
-  * \returns A 'malloc'd buffer containing the fully qualified file name as an ASCII string.
+  * \returns A 'WBAlloc'd buffer containing the fully qualified file name as an ASCII string.
   *
   * Use this function to get a canonical file name for a file within a directory listing.
+  *
+  * The caller must free any non-NULL return values using WBFree()
 **/
 char *WBGetDirectoryListFileFullPath(const void *pDirectoryList, const char *szFileName);
 
@@ -502,10 +508,12 @@ char *WBGetDirectoryListFileFullPath(const void *pDirectoryList, const char *szF
   * \brief Obtain the target of a symbolic link
   *
   * \param szFileName A pointer to the file name of the symbolic link
-  * \returns A 'malloc'd buffer containing the link target path as an ASCII string (unaltered)
+  * \returns A 'WBAlloc'd buffer containing the link target path as an ASCII string (unaltered)
   *
   * Use this function to retrieve a symbolic link's target file name.  May be a relative path.
   * For a canonical equivalent, use WBGetCanonicalPath()
+  *
+  * The caller must free any non-NULL return values using WBFree()
 **/
 char *WBGetSymLinkTarget(const char *szFileName);
 
@@ -514,11 +522,13 @@ char *WBGetSymLinkTarget(const char *szFileName);
   *
   * \param pDirectoryList A pointer to a 'Directory List' object.  May be NULL.
   * \param szFileName A pointer to the file name of the symbolic link
-  * \returns A 'malloc'd buffer containing the unmodified link target path as an ASCII string
+  * \returns A 'WBAlloc'd buffer containing the unmodified link target path as an ASCII string
   *
   * Use this function to retrieve a symbolic link's target file name with respect to a 'Directory List'
   * object (for relative paths).  The link target is unmodified, and may be a relative path.
   * For a canonical equivalent, use WBGetCanonicalPath()
+  *
+  * The caller must free any non-NULL return values using WBFree()
 **/
 char *WBGetDirectoryListSymLinkTarget(const void *pDirectoryList, const char *szFileName);
 
