@@ -61,10 +61,15 @@
 #include <time.h>
 #include <X11/cursorfont.h>
 
+#include <locale.h>
+
 #include "window_helper.h" // for debug output; also includes platform.h and font_helper.h
 #include "draw_text.h"
 
 #define FONT_DUMP_DEBUG_LEVEL DebugLevel_Heavy
+
+//#define USE_FONT_LIST_FOR_FONT_SET /* define this to make a list of matching names for a font list */
+
 
 typedef struct WBFontInfo
 {
@@ -78,7 +83,14 @@ typedef struct WBFontInfo
 
 #ifndef NO_DEBUG
 static void WBDumpFontStruct(const XFontStruct *pFont);
+static void WBDumpMatchingFontNames(Display *pDisplay, const char *szFontName);
+static void WBDumpFontSet(Display *pDisplay, XFontSet fontSet);
 #endif // NO_DEBUG
+
+
+static char *InternalCheckSetLocale(void);
+
+
 
 XFontStruct *WBCopyFont(XFontStruct *pOldFont)
 {
@@ -858,19 +870,32 @@ char tbuf[512], tbuf2[512], tbuf3[512];
 //
 // -foundry-family-weight-slant-sWidth-adstyle-pixelsize-pointsize-resX-resY-spacing-avgwidth-registry-encoding
 //
-// foundry = adoby, b&h, xfree86, etc.
+// foundry = adoby, b&h, xfree86, misc, etc.
 // family = lucida, terminal, courier, etc.
 // weight = bold, demibold, medium, regular
-// slant = i, o, r (italic, oblique???, regular???)
-// sWidth = normal, semicondensed
+// slant = i, o, r (italic, oblique, roman) - sometimes combinations like ro, ri
+// sWidth = normal, semicondensed, condensed, narrow, double-width
 // adstyle = (blank), sans, ja, ko, ???
 // pixelsize = height in pixels
 // pointsize = width in 10*points
 // resX, resY = resolution?
-// spacing = c, m, p (condensed, medium, proportional)
-// avgWidth (in points?)
+// spacing = c, m, p (character, monospace, proportional)
+// avgWidth (in tenths of a pixel)
 // registry (i.e. 'iso8859' etc.)
 // encoding (the '-' value following the registry, such as '1' for 'iso8859-1')
+
+
+//#ifndef NO_DEBUG
+//  {
+//  static int iOnce = 0;
+//    if(!iOnce) // note this is SLOW and locks up the X server while it does it's thang
+//    {
+//      iOnce = 1;
+//
+//      WBDumpMatchingFontNames(pDisplay, "-*-*-*-*-*-*-*-*-*-*-C-*-*-*");
+//    }
+//  }
+//#endif // NO_DEBUG
 
 
   // step 1:  if it's a font alias, get the REAL font info.  I'll need to do this if I'm requesting
@@ -1064,6 +1089,261 @@ int iRval = 0;
   return iRval;
 }
 
+int WBFontSetDescent(Display *pDisplay, XFontSet fontSet)
+{
+XFontStruct **ppFontStruct = NULL;
+char **ppFontNames = NULL;
+int i1, i2, iN, iMax;
+
+
+  if(fontSet == None)
+  {
+    fontSet = WBGetDefaultFontSet(pDisplay);
+
+    if(fontSet == None)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - no default font set available\n", __FUNCTION__);
+      return 0;
+    }
+  }
+
+  iN = XFontsOfFontSet(fontSet, &ppFontStruct, &ppFontNames);
+
+  // obtain the average character width of the ENTIRE font set
+
+  for(iMax=0, i1=0; i1 < iN; i1++)
+  {
+    if(!ppFontStruct[i1])
+    {
+      continue;
+    }
+
+    i2 = ppFontStruct[i1]->descent;
+
+    if(i2 > iMax)
+    {
+      iMax = i2;
+    }
+    
+//    WBDebugPrint("TEMPORARY:  %s - %4d: %2d  %s\n", __FUNCTION__, i1, i2, ppFontNames[i1]);
+  }
+
+  return iMax;
+}
+
+int WBFontSetAscent(Display *pDisplay, XFontSet fontSet)
+{
+XFontStruct **ppFontStruct = NULL;
+char **ppFontNames = NULL;
+int i1, i2, iN, iMax;
+
+
+  if(fontSet == None)
+  {
+    fontSet = WBGetDefaultFontSet(pDisplay);
+
+    if(fontSet == None)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - no default font set available\n", __FUNCTION__);
+      return 0;
+    }
+  }
+
+  iN = XFontsOfFontSet(fontSet, &ppFontStruct, &ppFontNames);
+
+  // obtain the average character width of the ENTIRE font set
+
+  for(iMax=0, i1=0; i1 < iN; i1++)
+  {
+    if(!ppFontStruct[i1])
+    {
+      continue;
+    }
+
+    i2 = ppFontStruct[i1]->ascent;
+
+    if(i2 > iMax)
+    {
+      iMax = i2;
+    }
+    
+//    WBDebugPrint("TEMPORARY:  %s - %4d: %2d  %s\n", __FUNCTION__, i1, i2, ppFontNames[i1]);
+  }
+
+  return iMax;
+}
+
+int WBFontSetHeight(Display *pDisplay, XFontSet fontSet)
+{
+XFontStruct **ppFontStruct = NULL;
+char **ppFontNames = NULL;
+int i1, i2, iN, iMaxD, iMaxH;
+
+
+  if(fontSet == None)
+  {
+    fontSet = WBGetDefaultFontSet(pDisplay);
+
+    if(fontSet == None)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - no default font set available\n", __FUNCTION__);
+      return 0;
+    }
+  }
+
+  iN = XFontsOfFontSet(fontSet, &ppFontStruct, &ppFontNames);
+
+  // obtain the average character width of the ENTIRE font set
+
+  for(iMaxD=0, iMaxH=0, i1=0; i1 < iN; i1++)
+  {
+    if(!ppFontStruct[i1])
+    {
+      continue;
+    }
+
+    i2 = ppFontStruct[i1]->descent;
+    
+    if(i2 > iMaxD)
+    {
+      iMaxD = i2;
+    }
+
+    i2 = ppFontStruct[i1]->ascent;
+
+    if(i2 > iMaxH)
+    {
+      iMaxH = i2;
+    }
+    
+//    WBDebugPrint("TEMPORARY:  %s - %4d: %2d  %s\n", __FUNCTION__, i1, i2, ppFontNames[i1]);
+  }
+
+  return iMaxD + iMaxH;
+}
+
+int WBFontSetAvgCharWidth(Display *pDisplay, XFontSet fontSet)
+{
+XFontStruct **ppFontStruct = NULL;
+char **ppFontNames = NULL;
+int i1, i2, iN, iTotal, iMax, iCount;
+
+
+  if(fontSet == None)
+  {
+    fontSet = WBGetDefaultFontSet(pDisplay);
+
+    if(fontSet == None)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - no default font set available\n", __FUNCTION__);
+      return 0;
+    }
+  }
+
+  iN = XFontsOfFontSet(fontSet, &ppFontStruct, &ppFontNames);
+
+  // obtain the average character width of the ENTIRE font set
+
+  for(iCount=0, iMax=0, iTotal=0, i1=0; i1 < iN; i1++)
+  {
+    if(!ppFontStruct[i1])
+    {
+      continue;
+    }
+
+    iCount++;    
+
+    i2 = WBFontAvgCharWidth(pDisplay, ppFontStruct[i1]);
+
+    if(i2 > 0)
+    {
+      iTotal += i2;
+
+      if(i2 > iMax)
+      {
+        iMax = i2;
+      }
+    }
+    
+//    WBDebugPrint("TEMPORARY:  %s - %4d: %2d  %s\n", __FUNCTION__, i1, i2, ppFontNames[i1]);
+  }
+
+  if(iCount)
+  {
+    iTotal += iCount >> 1; // rounding
+    iTotal /= iCount;
+  }
+
+  if(iTotal > iMax)
+  {
+    iTotal = iMax; // sort of a safety valve, should not be a problem
+  }  
+
+  return iTotal;
+}
+
+XCharStruct WBFontSetMaxBounds(Display *pDisplay, XFontSet fontSet)
+{
+XCharStruct rVal;
+XFontStruct **ppFontStruct = NULL;
+char **ppFontNames = NULL;
+int i1, iN, iMax;
+
+
+  bzero(&rVal, sizeof(rVal));
+
+  if(fontSet == None)
+  {
+    fontSet = WBGetDefaultFontSet(pDisplay);
+
+    if(fontSet == None)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - no default font set available\n", __FUNCTION__);
+      return rVal;
+    }
+  }
+
+  iN = XFontsOfFontSet(fontSet, &ppFontStruct, &ppFontNames);
+
+  // obtain the average character width of the ENTIRE font set
+
+  for(iMax=0, i1=0; i1 < iN; i1++)
+  {
+    if(!ppFontStruct[i1])
+    {
+      continue;
+    }
+
+    if(rVal.lbearing < ppFontStruct[i1]->max_bounds.lbearing)
+    {
+      rVal.lbearing = ppFontStruct[i1]->max_bounds.lbearing;
+    }
+
+    if(rVal.rbearing < ppFontStruct[i1]->max_bounds.rbearing)
+    {
+      rVal.rbearing = ppFontStruct[i1]->max_bounds.rbearing;
+    }
+
+    if(rVal.width < ppFontStruct[i1]->max_bounds.width)
+    {
+      rVal.width = ppFontStruct[i1]->max_bounds.width;
+    }
+
+    if(rVal.ascent < ppFontStruct[i1]->max_bounds.ascent)
+    {
+      rVal.ascent = ppFontStruct[i1]->max_bounds.ascent;
+    }
+
+    if(rVal.descent < ppFontStruct[i1]->max_bounds.descent)
+    {
+      rVal.descent = ppFontStruct[i1]->max_bounds.descent;
+    }
+    
+//    WBDebugPrint("TEMPORARY:  %s - %4d: %2d  %s\n", __FUNCTION__, i1, i2, ppFontNames[i1]);
+  }
+
+  return rVal;
+}
 
 XFontStruct *WBLoadModifyFont(Display *pDisplay, const XFontStruct *pOriginal,
                               int iFontSize, int iFlags)
@@ -1131,20 +1411,19 @@ XFontStruct *pRval;
     }
   }
 
-  // POOBAH
-
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Font,
                  "%s(%s)\n", __FUNCTION__, pName);
 
   pRval = WBLoadFont(pDisplay, pName, iFontSize, iFlags);
 
+  if(!pRval)
+  {
+    pRval = XLoadQueryFont(pDisplay, pName);  // a copy of the original
+  }
+
   WBFree(pName); // required (no longer need XFree, using 'WBGetAtomName()'
   pName = NULL; // by convention to prevent re-use
 
-  if(!pRval)
-  {
-    return XLoadQueryFont(pDisplay, pName);  // a copy of the original
-  }
 
 #ifndef NO_DEBUG /* assign this to disable debugging - most likely a -D in Makefile */
   if((WBGetDebugLevel() & DebugLevel_MASK) >= FONT_DUMP_DEBUG_LEVEL ||
@@ -1157,18 +1436,326 @@ XFontStruct *pRval;
   return pRval;  // the NEW font!
 }
 
+XFontSet WBCopyModifyFontSet(Display *pDisplay, XFontSet fsOrig, int iFontSize, int iFlags)
+{
+XFontSet fsRval = None;
+char *p1, *pLocale, *pName, *pDef = NULL;
+char **ppMissing = NULL;
+int nMissing = 0;
+char tbuf[512];
 
+
+  if(fsOrig == None)
+  {
+    fsOrig = WBGetDefaultFontSet(pDisplay);
+
+    if(fsOrig == None)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - no default font set available\n", __FUNCTION__);
+      return None;
+    }
+  }
+
+  // grab the font name as a copy in 'pName'
+
+  p1 = XBaseFontNameListOfFontSet(fsOrig);  // grab the base name.  this is NOT an allocated pointer
+  if(!p1)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - font set can't get base name\n", __FUNCTION__);
+    return None;
+  }
+
+  pName = WBCopyString(p1);
+  if(!pName)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no memory for copying base name\n", __FUNCTION__);
+    return None;
+  }  
+
+  p1 = strchr(pName, ','); // is there a comma?
+  if(p1)
+  {
+    *p1 = 0; // terminate string (use ONLY the first one)
+  }
+
+  // use the string I created the font with to load a similar font, after I
+  // modify the settings info.
+
+  // if the user specified 'iFontSize' of zero, and did NOT include any
+  // font size flags, make sure I duplicate the correct font size
+
+  if(!iFontSize && iFlags) // only if I specify flags AND didn't specify a size...
+  {
+    WB_FONT_INFO *pFI = WBParseFontName(pName);
+
+    iFlags &= ~WBFontFlag_SIZE_MASK; // reserved for the future
+
+    if(pFI)
+    {
+      if(pFI->iPixelSize > 0)
+      {
+        iFontSize = pFI->iPixelSize;
+        iFlags |= WBFontFlag_SIZE_PIXELS;
+      }
+      else if(pFI->iPointSize > 0)
+      {
+        iFontSize = pFI->iPointSize;
+        iFlags |= WBFontFlag_SIZE_POINTS;
+      }
+      else
+      {
+        WBFree(pFI);
+        pFI = NULL; // flag (see below)
+      }
+    }
+
+    if(!pFI) // usually a big problem, but I'll work around it
+    {
+      iFontSize = WBFontSetHeight(pDisplay, fsOrig);    // just do this
+      iFlags |= WBFontFlag_SIZE_PIXELS;
+    }
+    else
+    {
+      WBFree(pFI);
+    }
+  }
+
+  // at this point pName is assumed to be a properly formatted font string
+  // this is the same (more or less) as what WBLoadFont will grab, except that I'm
+  // using what I had before.
+  
+  // TODO:  If I get "no font set" as my return, I'll need to attempt the original font set in its place
+
+  if(iFlags || iFontSize) // specifying zero for both of these gives me a direct copy
+  {
+    tbuf[0] = 0;
+
+    InternalBuildFontString(pName, iFontSize, iFlags, tbuf, sizeof(tbuf), FALSE);
+
+    // TODO:  soft-match?  particularly for size.  see WBLoadModifyFont()
+  }
+  else
+  {
+    strncpy(tbuf, pName, sizeof(tbuf));
+  }
+
+  WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Font,
+                 "%s(%s)\n", __FUNCTION__, pName);
+
+
+  // NOW we duplicate the process of creating the original font set
+
+  pLocale = InternalCheckSetLocale(); // change to correct UTF-8 supporting font
+
+  // OK - allocate 'tbuf' font first, and if that fails, use 'pName' again for a copy
+
+  // NOTE:  'pDef' is owned by the font set.  do NOT XFree it or modify its contents
+
+  fsRval = XCreateFontSet(pDisplay, tbuf, &ppMissing, &nMissing, &pDef); // 6-7 milliseconds!!! (don't do this a lot)
+
+  if(fsRval == None && // try again with original string
+     strcmp(tbuf, pName)) // they're not identical so it's worth trying this
+  {
+    fsRval = XCreateFontSet(pDisplay, pName, &ppMissing, &nMissing, &pDef);
+  }
+
+//  WB_ERROR_PRINT("TEMPORARY:  %s - setting locale back to \"%s\"\n", __FUNCTION__, pLocale);
+
+  if(pLocale)
+  {
+    setlocale(LC_ALL, pLocale);
+    WBFree(pLocale);
+    pLocale = NULL;
+  }
+  else
+  {
+    setlocale(LC_ALL, "C"); // will set things back to "the default" I hope
+  }
+
+
+  // TODO:  dump info?
+
+
+  if(ppMissing || nMissing > 0)
+  {
+    if(ppMissing)
+    {
+      XFreeStringList(ppMissing);
+    }
+    else
+    {
+      WB_ERROR_PRINT("*BUG*  %s - nMissing is %d\n", __FUNCTION__, nMissing);
+    }
+  }
+
+
+  WBFree(pName);
+  pName = NULL; // by convention to prevent re-use
+
+
+#ifndef NO_DEBUG /* assign this to disable debugging - most likely a -D in Makefile */
+  if((WBGetDebugLevel() & DebugLevel_MASK) >= FONT_DUMP_DEBUG_LEVEL ||
+     (WBGetDebugLevel() & DebugSubSystem_Font))
+  {
+    WBDumpFontSet(pDisplay, fsRval);
+  }
+#endif // NO_DEBUG
+
+
+  return fsRval;  // the NEW font set!
+}
+
+
+
+#ifdef USE_FONT_LIST_FOR_FONT_SET
+
+static char * InternalGetMatchingFontNameList(Display *pDisplay, const char *szFontName)
+{
+char *pRval, *p1;
+char **ppNames;
+int i1, iCount, iLen;
+XFontStruct *pFSInfo;
+
+  pRval = NULL;
+
+  ppNames = XListFontsWithInfo(pDisplay, szFontName, 8192, &iCount, &pFSInfo);
+
+  if(ppNames)
+  {
+    for(i1=0, iLen=1; i1 < iCount; i1++)
+    {
+      iLen += strlen(ppNames[i1]) + 1;
+    }
+
+    pRval = WBAlloc(iLen + 1);
+
+    if(pRval)
+    {
+      for(i1=0, p1=pRval; i1 < iCount; i1++)
+      {
+        if(i1 > 0)
+        {
+          *(p1++) = ','; // comma-separated font name list
+        }
+
+        strcpy(p1, ppNames[i1]);
+        p1 += strlen(p1);
+      }
+    }
+
+    XFreeFontInfo(ppNames, pFSInfo, iCount);
+  }
+
+  if(!pRval) // fallback, try desperately to make this work
+  {
+    pRval = WBCopyString(szFontName);
+  }
+
+  return pRval;
+}
+
+#endif // USE_FONT_LIST_FOR_FONT_SET
+
+
+static char *InternalCheckSetLocale(void)
+{
+char *p1, *pLocale, *pNewLocale;
+static const char szUTF8[]=".UTF-8";
+
+
+  p1 = setlocale(LC_CTYPE, NULL); // get the current locale
+
+  if(p1)
+  {
+    pLocale = WBCopyString(p1);
+  }
+  else
+  {
+    WB_ERROR_PRINT("ERROR:  %s - not enough memory\n", __FUNCTION__);
+
+    return NULL; // error (unable to copy string)
+  }
+
+  // TODO:  treat this section differently when UTF8 *NOT* supported by libX11
+  // determine whether this is a UTF-8 locale
+  if(!strcasecmp(pLocale + strlen(pLocale) - (sizeof(szUTF8)-1), szUTF8)) // already UTF-8 capable?
+  {
+//    WB_ERROR_PRINT("TEMPORARY:  %s - locale \"%s\" already supports UTF-8\n", __FUNCTION__, pLocale);
+
+    WBFree(pLocale);
+    pLocale = NULL;
+  }
+  else
+  {
+    pNewLocale = NULL;
+
+    if(!strcasecmp(pLocale, "C") || // is it the 'C' locale or 'POSIX' locale?
+       !strcasecmp(pLocale, "POSIX"))
+    {
+      pNewLocale = WBCopyString("en_US.UTF-8"); // use THIS one (should work)
+    }
+    else
+    {
+      pNewLocale = WBCopyString(pLocale);
+
+      if(pNewLocale)
+      {
+        p1 = pNewLocale + strlen(pNewLocale);
+
+        while(p1 > pNewLocale && *(--p1) != '.') { }
+
+        if(p1 > pNewLocale)
+        {
+          *p1 = 0; // the '.' so I can use .UTF-8 as my suffix
+        }
+
+        WBCatString(&pNewLocale, szUTF8); // tack on the '.UTF-8' thing
+      }
+    }
+
+    if(pNewLocale) // still valid
+    {
+      if(setlocale(LC_CTYPE, pNewLocale)) // not NULL
+      {
+//        WB_ERROR_PRINT("TEMPORARY:  %s - set locale to \"%s\"\n", __FUNCTION__, pNewLocale);
+      }
+      else
+      {
+//        WB_ERROR_PRINT("TEMPORARY:  %s - unable to set locale to \"%s\"\n", __FUNCTION__, pNewLocale);
+        // TODO:  search for a locale that will work
+
+        WBFree(pNewLocale);
+        pNewLocale = NULL; // as a flag
+      }
+    }
+    
+    if(pNewLocale) // this is also a flag to say that I successfully changed the locale
+    {
+      WBFree(pNewLocale);
+    }
+    else
+    {
+      WB_ERROR_PRINT("TEMPORARY:  %s - fallback, set locale to \"en_US.UTF-8\"\n", __FUNCTION__);
+
+      setlocale(LC_CTYPE, "en_US.UTF-8"); // as a fallback.  for now, hard-coded to simply allow UTF-8 characters
+    }
+  }
+
+  return pLocale; // original locale I need to change back to
+}
 
 XFontSet WBFontSetFromFont(Display *pDisplay, const XFontStruct *pFont)
 {
 unsigned long lName;
-char *pName = NULL;
+char *pName = NULL, *pDef = NULL;
 XFontSet rVal = None;
 char **ppMissing = NULL;
 int nMissing = 0;
-char *pDef = NULL;
-char *p1;
+char *p1, *pLocale;
 static const char szISO[]="-ISO8859-";
+//#ifndef NO_DEBUG
+//unsigned long long ullTemp;
+//#endif // NO_DEBUG
 
   // step 1:  generate font string from XFontStruct
 
@@ -1189,22 +1776,9 @@ static const char szISO[]="-ISO8859-";
     if(!pName && pDisplay)
     {
       pName = WBGetAtomName(WBGetDefaultDisplay(), (Atom)lName);
+        // NOTE:  'pName' is an editable WBAlloc'd pointer that's a copy of the atom name
     }
   }
-
-// NOTE:  this is no longer needed.  WBGetAtomName returns an editable pointer allocated with 'WBAlloc()'
-//  if(pName) // make a copy of 'pName' so that I can edit it
-//  {
-//    p1 = WBCopyString(pName);
-//
-//    XFree(pName);
-//    pName = NULL;    
-//
-//    if(p1)
-//    {
-//      pName = p1; // I can edit the copy
-//    }
-//  }
 
   if(!pName)
   {
@@ -1212,54 +1786,120 @@ static const char szISO[]="-ISO8859-";
     return NULL;
   }
 
-//  WB_ERROR_PRINT("TEMPORARY:  %s font name is \"%s\"\n", __FUNCTION__, pName);
+  p1 = WBReAlloc(pName, strlen(pName) * 2 + 64); // make sure it's big enough to edit it
+
+  if(!p1)
+  {
+    WBFree(pName);
+
+    WB_ERROR_PRINT("%s - no memory to update font name, returning NULL\n", __FUNCTION__);
+    return NULL;
+  }
+
+  pName = p1; // now big enough to be edited
+
+
+  // font name is an alias name, or starts with a '-' and is of the form:
+  // -foundry-family-weight-slant-sWidth-adstyle-pixelsize-pointsize-resX-resY-spacing-avgwidth-registry-encoding
+  //
+  // foundry = adoby, b&h, xfree86, misc, etc.
+  // family = lucida, terminal, courier, etc.
+  // weight = bold, demibold, medium, regular
+  // slant = i, o, r (italic, oblique, roman) - sometimes combinations like ro, ri
+  // sWidth = normal, semicondensed, condensed, narrow, double-width
+  // adstyle = (blank), sans, ja, ko, ???
+  // pixelsize = height in pixels
+  // pointsize = width in 10*points
+  // resX, resY = resolution?
+  // spacing = c, m, p (character, monospace, proportional)
+  // avgWidth (in tenths of a pixel)
+  // registry (i.e. 'iso8859' etc.)
+  // encoding (the '-' value following the registry, such as '1' for 'iso8859-1')
+
 
   // using the font's name string, create a single entry font set for it
   // if the final entry is ISO8859-# change it to *-*
+  // ( TODO:  check for other language-dependent things, or maybe just do the last 2 '-'s ? )
 
-  // TODO:  check for other language-dependent things, or maybe just do the last 2 '-'s ?
+
+//  // if the starting string is "-Misc-", change to "-*-" to allow ALL
+//
+//  if(!strncasecmp(pName, "-Misc-", 6))
+//  {
+//    strcpy(pName, "-*-");
+//    strcpy(pName + 3, pName + 6);
+//  }
 
   p1 = pName + strlen(pName) - sizeof(szISO);
-  while(p1 > pName && strncmp(p1, szISO, sizeof(szISO)-1))
+
+  while(p1 > pName && strncasecmp(p1, szISO, sizeof(szISO)-1)) // note must be case INsensitive compare...
   {
     p1--;
   }
+
   if(p1 > pName) // found
   {
-//    static int iOnce = 0;
-//    if(!iOnce)
-//    {
-//      WB_ERROR_PRINT("TEMPORARY %s changing \"%s\" to \"-*-*\"\n", __FUNCTION__, p1);
-//    }
-
-    strcpy(p1, "-*-*");
-
-//    if(!iOnce)
-//    {
-//      iOnce++;
-//      WBDumpFontInfo(pName);
-//    }
+    strcpy(p1, "-*-*"); // this allows all of the code sets to be included (fastest method)
   }
 
-  rVal = XCreateFontSet(pDisplay, pName, &ppMissing, &nMissing, &pDef);
+//#ifndef NO_DEBUG
+//  ullTemp = WBGetTimeIndex();
+//#endif // NO_DEBUG
+
+  pLocale = InternalCheckSetLocale();
+
+//#ifndef NO_DEBUG
+//  WB_ERROR_PRINT("TEMPORARY:  %s - setlocale took %ld micros\n", __FUNCTION__, (long)(WBGetTimeIndex() - ullTemp));
+//  ullTemp = WBGetTimeIndex();
+//#endif // NO_DEBUG
+
+  // NOTE:  'pDef' is owned by the font set.  do NOT XFree it or modify its contents
+
+  rVal = XCreateFontSet(pDisplay, pName, &ppMissing, &nMissing, &pDef); // 6-7 milliseconds!!!
+
+//#ifndef NO_DEBUG
+//  WB_ERROR_PRINT("TEMPORARY:  %s - XCreateFontSet took %ld micros\n", __FUNCTION__, (long)(WBGetTimeIndex() - ullTemp));
+//  ullTemp = WBGetTimeIndex();
+//#endif // NO_DEBUG
+
+  if(pLocale)
+  {
+//    WB_ERROR_PRINT("TEMPORARY:  %s - setting locale back to \"%s\"\n", __FUNCTION__, pLocale);
+
+    setlocale(LC_CTYPE, pLocale);
+
+    WBFree(pLocale);
+    pLocale = NULL;
+  }
+//  else
+//  {
+//    setlocale(LC_CTYPE, "C"); // will set things back to "the default" I hope
+//  }
+
 
   // TODO:  dump info?
 
-  if(ppMissing)
+
+  if(ppMissing || nMissing > 0)
   {
-//    int i1;
-//    for(i1=0; i1 < nMissing; i1++)
-//    {
-//      WB_ERROR_PRINT("MISSING %d : %s\n", i1, ppMissing[i1]);
-//    }
+    if(ppMissing)
+    {
+  //    int i1;
+  //
+  //    WB_ERROR_PRINT("TEMPORARY:  %s\n", __FUNCTION__);
+  //
+  //    for(i1=0; i1 < nMissing; i1++)
+  //    {
+  //      WB_ERROR_PRINT("  %d : %s\n", i1, ppMissing[i1]);
+  //    }
 
-    XFreeStringList(ppMissing);
+      XFreeStringList(ppMissing);
+    }
+    else
+    {
+      WB_ERROR_PRINT("*BUG*  %s - nMissing is %d\n", __FUNCTION__, nMissing);
+    }
   }
-
-//  if(pDef) DO NOT DO THIS!
-//  {
-//    XFree(pDef); // NO NO NO (warning)
-//  }
 
   WBFree(pName);
   pName = NULL; // by convention to prevent re-use
@@ -1268,8 +1908,189 @@ static const char szISO[]="-ISO8859-";
   {
     WB_ERROR_PRINT("%s - no result, returning NULL\n", __FUNCTION__);
   }
+//#ifndef NO_DEBUG
+//  else
+//  {
+//    WBDumpFontSet(pDisplay, rVal);
+//  }
+//#endif // NO_DEBUG
 
   return rVal;
+}
+
+
+XFontSet WBFontSetFromFontSingle(Display *pDisplay, const XFontStruct *pFont)
+{
+unsigned long lName;
+char *pName = NULL, *pDef = NULL;
+XFontSet rVal = None;
+char **ppMissing = NULL;
+int nMissing = 0;
+char *p1, *pLocale;
+
+  // step 1:  generate font string from XFontStruct
+
+  if(!pFont)
+  {
+    pFont = WBGetDefaultFont();
+    if(!pFont)
+    {
+      WB_ERROR_PRINT("%s - no font, returning NULL\n", __FUNCTION__);
+      return NULL;
+    }
+  }
+
+  if(XGetFontProperty((XFontStruct *)pFont, XA_FONT, &lName))
+  {
+    pName = WBGetAtomName(pDisplay ? pDisplay : WBGetDefaultDisplay(), (Atom)lName);
+
+    if(!pName && pDisplay)
+    {
+      pName = WBGetAtomName(WBGetDefaultDisplay(), (Atom)lName);
+        // NOTE:  'pName' is an editable WBAlloc'd pointer that's a copy of the atom name
+    }
+  }
+
+  if(!pName)
+  {
+    WB_ERROR_PRINT("%s - no font name, returning NULL\n", __FUNCTION__);
+    return NULL;
+  }
+
+  p1 = setlocale(LC_CTYPE, NULL); // get the current locale
+
+  if(p1)
+  {
+    pLocale = WBCopyString(p1);
+  }
+  else
+  {
+    pLocale = NULL;
+  }
+
+  setlocale(LC_CTYPE, "C"); // set to 'C' locale, which gives me a single font set only that matches THIS one
+
+  // NOTE:  'pDef' is owned by the font set.  do NOT XFree it or modify its contents
+
+  rVal = XCreateFontSet(pDisplay, pName, &ppMissing, &nMissing, &pDef); // 6-7 milliseconds!!!
+
+  WB_ERROR_PRINT("TEMPORARY:  %s - setting locale back to \"%s\"\n", __FUNCTION__, pLocale);
+
+  if(pLocale)
+  {
+    setlocale(LC_CTYPE, pLocale);
+    WBFree(pLocale);
+    pLocale = NULL;
+  }
+//  else
+//  {
+//    setlocale(LC_ALL, "C"); // will set things back to "the default" I hope
+//  }
+
+
+  // TODO:  dump info?
+
+
+  if(ppMissing || nMissing > 0)
+  {
+    if(ppMissing)
+    {
+      XFreeStringList(ppMissing);
+    }
+    else
+    {
+      WB_ERROR_PRINT("*BUG*  %s - nMissing is %d\n", __FUNCTION__, nMissing);
+    }
+  }
+
+  WBFree(pName);
+  pName = NULL; // by convention to prevent re-use
+
+  if(!rVal)
+  {
+    WB_ERROR_PRINT("%s - no result, returning NULL\n", __FUNCTION__);
+  }
+#ifndef NO_DEBUG
+  else
+  {
+    WBDumpFontSet(pDisplay, rVal);
+  }
+#endif // NO_DEBUG
+
+  return rVal;
+}
+
+
+XFontStruct * WBFontFromFontSet(Display *pDisplay, XFontSet fontSet)
+{
+XFontStruct **ppFontStruct = NULL;
+char **ppFontNames = NULL;
+int i1, iN;
+XFontStruct *pRval = NULL;
+
+
+  if(fontSet == None)
+  {
+    fontSet = WBGetDefaultFontSet(pDisplay);
+
+    if(fontSet == None)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - no default font set available\n", __FUNCTION__);
+      return 0;
+    }
+  }
+
+  iN = XFontsOfFontSet(fontSet, &ppFontStruct, &ppFontNames);
+
+  // get the first valid font struct and make a copy
+
+  for(i1=0; i1 < iN; i1++)
+  {
+    if(ppFontStruct[i1])
+    {
+      pRval = WBCopyFont(ppFontStruct[i1]);  // first one that's valid is my bail-out point
+
+      if(pRval) // bail if it worked
+      {
+        break;
+      }
+    }
+  }
+
+  return pRval;
+}
+
+
+int WBTextWidth(XFontSet fontSet, const char *szText, int cbText)
+{
+int iLen, iRval;
+
+
+  if(!fontSet || !cbText || !szText || (cbText < 0 && !*szText))
+  {
+    return 0;
+  }
+  else if(cbText < 0)
+  {
+    iLen = strlen(szText);
+  }
+  else
+  {
+    iLen = cbText;
+  }
+
+  iRval = WB_TEXT_ESCAPEMENT(fontSet, szText, iLen);
+
+//  if(iRval <= 0)
+//  {
+//    iLen = mblen(szUTF8, nLength); // width estimate
+//    iLen = XTextWidth(pFont, " ", 1) * iLen;
+//
+//    WB_ERROR_PRINT("%s WOULD BE returning %d, NOW returning %d\n", __FUNCTION__, iRval, iLen);
+//    iRval = iLen;
+//  }
+
+  return iRval;
 }
 
 
@@ -1348,5 +2169,55 @@ int i1;
                 pFont->ascent,
                 pFont->descent);
 }
+
+static void WBDumpMatchingFontNames(Display *pDisplay, const char *szFontName)
+{
+char **ppNames;
+int i1, iCount;
+XFontStruct *pFSInfo;
+
+  ppNames = XListFontsWithInfo(pDisplay, szFontName, 8192, &iCount, &pFSInfo);
+
+  if(ppNames)
+  {
+    WBDebugPrint("%s - fonts matching \"%s\"\n", __FUNCTION__, szFontName);
+
+    for(i1=0; i1 < iCount; i1++)
+    {
+      WBDebugPrint(" %4d: %s\n", i1, ppNames[i1]);
+    }
+  }
+  else
+  {
+    WBDebugPrint("%s - NO fonts match \"%s\"\n", __FUNCTION__, szFontName);
+
+  }
+
+  if(ppNames)
+  {
+    XFreeFontInfo(ppNames, pFSInfo, iCount);
+  }
+}
+
+static void WBDumpFontSet(Display *pDisplay, XFontSet fontSet)
+{
+XFontStruct **ppFontStruct = NULL;
+char **ppFontNames = NULL;
+int i1, iN;
+
+  iN = XFontsOfFontSet(fontSet, &ppFontStruct, &ppFontNames);
+
+  WBDebugPrint("%s - font set contains %d fonts\n", __FUNCTION__, iN);
+  WBDebugPrint("font set locale \"%s\"\n", XLocaleOfFontSet(fontSet));
+
+  WBDebugPrint("base name:  \"%s\"\n\n", XBaseFontNameListOfFontSet(fontSet));
+
+  for(i1=0; i1 < iN; i1++)
+  {
+    WBDebugPrint("  %4d: %s\n", i1, ppFontNames[i1]);
+  }
+}
+
+
 #endif // NO_DEBUG
 

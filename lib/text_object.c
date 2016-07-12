@@ -65,34 +65,6 @@
 #include "text_object.h"
 
 
-// UTF-8 HANDLING
-// X11 has XFree86 extensions with 'Xutf8' versions of a lot of things
-// which is only applicable with the following
-//#ifdef X_HAVE_UTF8_STRING
-//   I use the utf8 version
-// etc.
-//
-// Unfortunately many things that I use don't have that available
-// like XTextWidth for one (maybe I could use Xutf8TextExtents?)
-// Using Xmb and Xwc equivalent methods should work on Interix
-//
-// SEE ALSO:  draw_text.c (similar section)
-//
-//#ifdef X_HAVE_UTF8_STRING
-#if 0
-
-#define WB_TEXT_EXTENTS Xutf8TextExtents
-#define WB_TEXT_ESCAPEMENT Xutf8TextEscapement
-#define WB_DRAW_STRING Xutf8DrawString
-
-#else  // X_HAVE_UTF8_STRING
-
-#define WB_TEXT_EXTENTS XmbTextExtents
-#define WB_TEXT_ESCAPEMENT XmbTextEscapement
-#define WB_DRAW_STRING XmbDrawString
-
-#endif // X_HAVE_UTF8_STRING
-
 
 // INTERNAL STRUCTURES
 
@@ -628,7 +600,7 @@ char *p1;
     if(pBuf->aLines[0])
     {
       pBuf->aLineCacheLen[0] = // refactored, do this assignment here instead
-        pBuf->nMaxCol = pBuf->nMinMaxCol = strlen(pBuf->aLines[0]); // assign length to 'max' and 'minmax'
+        pBuf->nMaxCol = pBuf->nMinMaxCol = WBGetMBLength(pBuf->aLines[0]); // assign length to 'max' and 'minmax'
 //      if(pBuf->nMaxCol) 'refactored out' (left to document process, remove later)
 //      {
 //        pBuf->aLineCache[0] = 0; this value already assigned by 'memset'
@@ -651,14 +623,14 @@ char *p1;
       continue;
     }
 
-    i1 = strlen(p1);
+    i1 = WBGetMBLength(p1);
 
     if(!i1)
     {
       continue;
     }
 
-    if(i1 > pBuf->nMinMaxCol) // assum data is consistent
+    if(i1 > pBuf->nMinMaxCol) // assume data is consistent
     {
       // perform an insertion sort into 'aLineCache'
 
@@ -837,7 +809,7 @@ struct __internal_undo_redo_buffer *pUndo, *pTU, *pTU2;
   {
     if(cbStartText < 0)
     {
-      cbStartText = strlen(pStartText);
+      cbStartText = strlen(pStartText); // TODO:  WBGetMBLength ?
     }
 
     if(cbStartText > 0)
@@ -850,7 +822,7 @@ struct __internal_undo_redo_buffer *pUndo, *pTU, *pTU2;
   {
     if(cbEndText < 0)
     {
-      cbEndText = strlen(pEndText);
+      cbEndText = strlen(pEndText); // TODO:  WBGetMBLength?
     }
 
     if(cbEndText > 0)
@@ -888,6 +860,8 @@ struct __internal_undo_redo_buffer *pUndo, *pTU, *pTU2;
   {
     memset(&(pUndo->rctSelNew), 0, sizeof(WB_RECT));
   }
+
+  // this code should work on multi-byte characters as well...
 
   pUndo->nOld = cbLen;
   if(cbLen)
@@ -1197,15 +1171,15 @@ int iIsBoxMode, iIsLineMode;
 
       for(i1=iRow, cb1=4; i1 < pTB->nEntries && i1 <= iEndRow; i1++)
       {
-        i2 = strlen(pTB->aLines[i1]);
+        i2 = strlen(pTB->aLines[i1]); // use 'strlen' here, as I want the REAL length
 
         // last line in 'normal' select mode limits width - 'iEndCol' may be 0
         if(i1 == iEndRow        // i.e. "the last line" in the selected area
            && !iIsLineMode)     // NOT 'line mode' (will be always false for single-row selects)
         {
-          if(i2 > iEndCol) // trim the line accordingly
+          if(i2 > iEndCol) // trim the indicated length of the line accordingly
           {
-            i2 = iEndCol;
+            i2 = WBGetMBCharPtr(pTB->aLines[i1], iEndCol, NULL) - pTB->aLines[i1];
           }
         }
 
@@ -1237,8 +1211,10 @@ int iIsBoxMode, iIsLineMode;
       p1 = pRval;
       for(i1=iRow, p1 = pRval; i1 < pTB->nEntries && i1 <= iEndRow; i1++)
       {
+        char *pTheLine = pTB->aLines[i1];
+
         // TODO:  validate pRval + cb1 > p1 + length of "the stuff that follows"
-        i2 = i3 = strlen(pTB->aLines[i1]);
+        i2 = i3 = strlen(pTheLine); // the TRUE 'binary' length
 
         // TODO: for box mode limit the width on all lines and pad with white space as needed
 
@@ -1270,37 +1246,41 @@ int iIsBoxMode, iIsLineMode;
           {
             if(i2 >= iEndCol)
             {
-              i2 = iEndCol - iCol;
+              i2 = WBGetMBCharPtr(pTheLine, iEndCol, NULL) - WBGetMBCharPtr(pTheLine, iCol, NULL);
             }
-            else
+            else if(iCol > 0)
             {
-              i2 -= iCol;
+              i2 -= WBGetMBCharPtr(pTheLine, iCol, NULL) - pTheLine;
             }
           }
-          else if(!iIsLineMode || iEndCol == 0)
+          else if(!iIsLineMode)
           {
-            if(i2 >= iEndCol) // this will ALSO force i2 = 0 for line mode on last row with iEndCol == 0
+            if(i2 >= iEndCol)
             {
-              i2 = iEndCol;
+              i2 = WBGetMBCharPtr(pTheLine, iEndCol, NULL) - pTheLine;
             }
+          }
+          else if(iEndCol == 0)
+          {
+            i2 = 0; // typically 'last row'
           }
         }
 
         // check for stream mode on the first line, and start with 'iCol'
         if(!iIsBoxMode && !iIsLineMode && i1 == iRow) // on first line, start at 'iCol'
         {
-          i2 -= iCol; // subtract starting column for total length
+          i2 -= WBGetMBCharPtr(pTheLine, iCol, NULL) - pTheLine; // subtract starting column offset for total length
         }
 
         if(i2 > 0) // might be < 0 depending
         {
           if(iIsLineMode || i1 > iCol) // multi-line select NOT on first line, or line mode
           {
-            memcpy(p1, pTB->aLines[i1], i2);
+            memcpy(p1, pTheLine, i2);
           }
           else
           {
-            memcpy(p1, pTB->aLines[i1] + iCol, i2);
+            memcpy(p1, WBGetMBCharPtr(pTheLine, iCol, NULL), i2);
           }
           p1 += i2;
         }
@@ -1312,7 +1292,10 @@ int iIsBoxMode, iIsLineMode;
         if(iIsBoxMode) // iRow < iEndRow also
         {
           // for box mode, pad any 'remaining' length with space
-          i2 = iEndCol - iCol - i2;  // I need THAT MANY white spaces
+          i2 = iEndCol - iCol // the ending width we're SUPPOSED to have
+             - WBGetMBLength(WBGetMBCharPtr(pTheLine, iCol, NULL)); // the actual length in 'columns' starting at 'iCol'
+
+          // I need THAT MANY white spaces for box mode
           if(i2 > 0)
           {
             memset(p1, ' ', i2);
@@ -1643,7 +1626,7 @@ TEXT_BUFFER *pBuf;
     if(pBuf && pBuf->nEntries > 0) // only if NOT empty
     {
       if(pThis->iLineFeed == LineFeed_NONE ||
-         !pBuf->aLines[0] || !strlen(pBuf->aLines[0])) // "blank line"
+         !pBuf->aLines[0] || !*(pBuf->aLines[0])) // strlen(pBuf->aLines[0])) // "blank line"
       {
         return 1;  // for multiline, even a blank line counts as '1'
       }
@@ -1985,16 +1968,26 @@ WB_RECT rctSel;
 
       if(pL)
       {
-        iLen = strlen(pL);
+        iLen = WBGetMBLength(pL);
         if(iLen >= rctSel.left)
         {
           if(iLen <= rctSel.right)
           {
-            pL[rctSel.left] = 0; // just truncate the string
+            char *pTempL = WBGetMBCharPtr(pL, rctSel.left, NULL);
+            if(pTempL)
+            {
+              *pTempL = 0; // just truncate the string
+            }
           }
           else
           {
-            strcpy(pL + rctSel.left, pL + rctSel.right);
+            char *pTempL = WBGetMBCharPtr(pL, rctSel.left, NULL);
+            char *pTempR = WBGetMBCharPtr(pL, rctSel.right, NULL);
+
+            if(pTempL && pTempR)
+            {
+              strcpy(pTempL, pTempR); // thereby squeezing the string together and deleting the selection
+            }
           }
         }
       }
@@ -2031,10 +2024,10 @@ WB_RECT rctSel;
         }
       }
     }
-    else if(pThis->iSelMode == SelectMode_BOX)
+    else if(pThis->iSelMode == SelectMode_BOX) // multiline delete BOX mode
     {
     }
-    else if(pThis->iSelMode == SelectMode_LINE)
+    else if(pThis->iSelMode == SelectMode_LINE) // multiline delete LINE mode
     {
     }
     else // default 'char'
@@ -2043,40 +2036,34 @@ WB_RECT rctSel;
       {
         pL = pBuf->aLines[rctSel.top];
 
-        if(pL)
+        if(rctSel.right > 0)
         {
-          iLen = strlen(pL);
-          if(iLen > rctSel.left) // the "delete point"
+          char *pJoin, *pNew;
+
+          pJoin = WBGetMBCharPtr(pBuf->aLines[rctSel.bottom], rctSel.right, NULL);
+          pNew = WBJoinMBLine(pL, rctSel.left, pJoin);
+
+          if(!pNew) // error
           {
-            pL[rctSel.left] = 0; // truncate the line here
+            WB_ERROR_PRINT("ERROR - %s - memory allocation error, errno=%d\n", __FUNCTION__, errno);
+            return; // no undo buffer when there's a memory error
           }
-        }
-
-        if(rctSel.right > 0) // merge bottom line with this one
-        {
-          pTemp = pBuf->aLines[rctSel.bottom];
-
-          if(pTemp)
+          pBuf->aLines[rctSel.top] = pNew;
+          if(pL) // just in case
           {
-            pL = WBReAlloc(pL, strlen(pL) + strlen(pTemp) + 2);
-            if(pL)
-            {
-              pBuf->aLines[rctSel.top] = pL;
-              strcat(pL, pTemp);
-              WBFree(pTemp);
-              pBuf->aLines[rctSel.bottom] = NULL; // so it's not re-used
-            }
-            else
-            {
-              WB_ERROR_PRINT("ERROR - %s - memory allocation error (partial delete performed) errno=%d\n", __FUNCTION__, errno);
-              return; // no undo buffer when there's a memory error
-            }
+            WBFree(pL);
           }
 
           i2 = rctSel.bottom + 1; // start copying the NEXT line
         }
         else
         {
+          char *pTemp = WBGetMBCharPtr(pL, rctSel.left, NULL);
+          if(pTemp) // just in case
+          {
+            *pTemp = 0; // truncate line at this position
+          }
+
           i2 = rctSel.bottom; // start copying THIS line (since I'm not joining them)
         }
 
@@ -2115,26 +2102,36 @@ WB_RECT rctSel;
 
           if(pL)
           {
-            strcpy(pL, pL + rctSel.right);
+            char *pTempR = WBGetMBCharPtr(pL, rctSel.right, NULL);
+            if(pTempR)
+            {
+              strcpy(pL, pTempR);
+            }
+            else
+            {
+              *pL = 0; // for now, truncate the line if this happens
+            }
           }
 
           if(pBuf->aLines[rctSel.top])
           {
             WBFree(pBuf->aLines[rctSel.top]);
+            pBuf->aLines[rctSel.top] = NULL; // by convention (it's re-assigned in the next line though)
           }
 
           pBuf->aLines[rctSel.top] = pL;
-          pBuf->aLines[rctSel.bottom] = NULL; // to prevent re-use of pointer
+          pBuf->aLines[rctSel.bottom] = NULL; // by convention, to prevent re-use of pointer
 
           for(i1=rctSel.top + 1, i2=rctSel.bottom + 1; i2 < pBuf->nEntries; i1++, i2++)
           {
             if(pBuf->aLines[i1])
             {
               WBFree(pBuf->aLines[i1]);
+              pBuf->aLines[i1] = NULL; // by convention (re-assigned in next line)
             }
 
             pBuf->aLines[i1] = pBuf->aLines[i2];
-            pBuf->aLines[i2] = NULL; // for now, to prevent accidental pointer re-use later
+            pBuf->aLines[i2] = NULL; // by convention, to prevent accidental pointer re-use later
           }
 
           pBuf->nEntries = i1;
@@ -2256,7 +2253,7 @@ static void __internal_del_chars(struct _text_object_ *pThis, int nChar)
 {
 TEXT_BUFFER *pBuf;
 int i1, i2, iLen;
-char *pL, *pL2, *pTemp;
+char *pL, *pL2, *pL3;
 WB_RECT rctInvalid;
 
 
@@ -2271,26 +2268,38 @@ WB_RECT rctInvalid;
   //       in the line (from the cursor) _STOP_ at the beginning/end of the line.  Only a delete with cursor
   //       AT the beginning or end of the line will merge.  Merge also considers the virtual cursor position.
 
-  if(WBIsValidTextObject(pThis))
+  if(!WBIsValidTextObject(pThis))
   {
-    __internal_invalidate_cursor(pThis, 0);
-    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+    return; // error
+  }
 
-    if(nChar > 0 || pThis->iCol == 0)
-    {
-      __internal_calc_rect(pThis, &rctInvalid, pThis->iRow, pThis->iCol, pThis->iRow, pThis->iCol + 1);
-    }
-    else if(pThis->iCol > 0)
-    {
-      __internal_calc_rect(pThis, &rctInvalid, pThis->iRow, pThis->iCol - 1, pThis->iRow, pThis->iCol);
-    }
+  __internal_invalidate_cursor(pThis, 0);
+  pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
 
-    pBuf = (TEXT_BUFFER *)(pThis->pText);
+  if(nChar > 0 || pThis->iCol == 0)
+  {
+    __internal_calc_rect(pThis, &rctInvalid, pThis->iRow, pThis->iCol, pThis->iRow, pThis->iCol + 1);
+  }
+  else if(pThis->iCol > 0)
+  {
+    __internal_calc_rect(pThis, &rctInvalid, pThis->iRow, pThis->iCol - 1, pThis->iRow, pThis->iCol);
+  }
 
-    if(!pBuf || !pBuf->nEntries || pThis->iRow > pBuf->nEntries ||
-       (pThis->iRow == pBuf->nEntries && nChar > 0)) // ending row only allows a backspace from the 1st column
+  pBuf = (TEXT_BUFFER *)(pThis->pText);
+
+  if(!pBuf || !pBuf->nEntries || pThis->iRow > pBuf->nEntries ||
+     (pThis->iRow == pBuf->nEntries && nChar > 0)) // ending row only allows a backspace from the 1st column
+  {
+    return;  // do nothing
+  }
+
+  while(nChar) // while I have characters to delete
+  {
+    // if I hit a limit and 'nChar' is still non-zero, break out and return anyway
+
+    if(pThis->iRow >= pBuf->nEntries || pThis->iRow < 0)
     {
-      return;  // do nothing
+      return; // empty
     }
 
     pL = pBuf->aLines[pThis->iRow];
@@ -2299,34 +2308,50 @@ WB_RECT rctInvalid;
       return; // do nothing (TODO:  error message?)
     }
 
-    iLen = strlen(pL);
+    iLen = WBGetMBLength(pL);
 
-    // for the first delete, if it's at an edge, merge lines
+    if(nChar < 0 && pThis->iCol == 0 && // backspace prior to beginning of line
+       (pThis->iRow <= 0 || pThis->iLineFeed == LineFeed_NONE)) // single line and backspace past begin of column
+    {
+      return; // exit
+    }
+
+    if(nChar > 0 && pThis->iCol >= iLen && // delete past end of line
+       (pThis->iRow >= pBuf->nEntries || pThis->iLineFeed == LineFeed_NONE)) // single line and backspace past begin of column
+    {
+      return; // exit
+    }
+
+    // if it's at an edge, merge lines
 
     if(pThis->iRow > 0 && nChar < 0 && pThis->iCol == 0) // backspace while at the start of a line
     {
       pL2 = pBuf->aLines[pThis->iRow - 1];
-
       if(!pL2)
       {
-        return; // do nothing (TODO:  error message?)
+        pThis->iCol = 0; // a kind of 'fallback' - put column cursor at zero
       }
-
-      // allocate memory for merged line
-      i2 = strlen(pL2); // also the new column position
-      pTemp = WBReAlloc(pL2, i2 + iLen + 2);
-      if(!pTemp)
+      else
       {
-        return; // do nothing (TODO:  error message?)
+        i2 = WBGetMBLength(pL2); // now THIS is the new column position
+
+        pL2 = WBJoinMBLine(pL, i2, pBuf->aLines[pThis->iRow + 1]);
+
+        if(!pL2)
+        {
+          return; // do nothing (TODO:  error message?)
+        }
+
+        WBFree(pL);
+
+        pBuf->aLines[pThis->iRow - 1] = pL2; // the new pointer
+
+        pThis->iCol = i2; // the new position (end of previous line)
       }
-
-      pBuf->aLines[pThis->iRow - 1] = pTemp; // the new pointer
-
-      strcpy(pTemp + i2, pL); // merge them
 
       for(i1=pThis->iRow; i1 < pBuf->nEntries; i1++)
       {
-        pBuf->aLines[i1 - 1] = pBuf->aLines[i1];
+        pBuf->aLines[i1 - 1] = pBuf->aLines[i1]; // pack them up by one line
       }
 
       pBuf->nEntries--;
@@ -2334,13 +2359,13 @@ WB_RECT rctInvalid;
 
       WBFree(pL); // free up memory for old line
 
-      pThis->iRow--;
-      pThis->iCol = i2;
+      pThis->iRow--; // since I moved up
 
-      nChar++;
+      nChar++; // backspacing, so increment
 
       __internal_add_undo(pThis, UNDO_DELETE, pThis->iSelMode,
-                          pThis->iRow, i2, &(pThis->rctSel), "\n", 1,
+                          pThis->iRow, pThis->iCol, &(pThis->rctSel),
+                          "\n", 1, // this is what I'm deleting - the newline
                           pThis->iRow + 1, 0, NULL, NULL, 0);
 
       __internal_merge_rect(pThis, &rctInvalid, pThis->iRow, 0, -1, -1);
@@ -2348,52 +2373,38 @@ WB_RECT rctInvalid;
     else if(pThis->iCol >= iLen && nChar > 0 && pThis->iRow < (pBuf->nEntries - 1))
     {
       pL2 = pBuf->aLines[pThis->iRow + 1];
-
-      if(!pL2)
+      if(pL2)
       {
-        return; // do nothing (TODO:  error message?)
-      }
+        pL = WBJoinMBLine(pL, pThis->iCol, pBuf->aLines[pThis->iRow + 1]);
 
-      // allocate memory for merged line
-      i2 = strlen(pL2);
-
-      if(i2 > 0) // if it's empty we don't copy anything
-      {
-        pTemp = WBReAlloc(pL, i2 + pThis->iCol + 2);
-           // note that 'iCol' is the point we'll be copying to, not 'iLen'
-        if(!pTemp)
+        if(!pL)
         {
           return; // do nothing (TODO:  error message?)
         }
 
-        pBuf->aLines[pThis->iRow] = pTemp; // the new pointer
+        WBFree(pL2);
 
-        if(iLen < pThis->iCol)
-        {
-          memset(pTemp + iLen, ' ', pThis->iCol - iLen); // fill with white space up to 'iCol'
-        }
-
-        strcpy(pTemp + pThis->iCol, pL); // merge them
+        pBuf->aLines[pThis->iRow] = pL; // the new pointer
       }
 
       pBuf->nEntries--;
 
-      for(i1=pThis->iRow; i1 < pBuf->nEntries; i1++)
+      // merge UP the lines
+      for(i1=pThis->iRow + 1; i1 < pBuf->nEntries; i1++)
       {
         pBuf->aLines[i1] = pBuf->aLines[i1 + 1];
       }
 
       pBuf->aLines[pBuf->nEntries] = NULL; // so that pointers aren't accidentally re-used
 
-      WBFree(pL2); // free up memory for old line
-
       nChar--;
 
       __internal_add_undo(pThis, UNDO_DELETE, pThis->iSelMode,
-                          pThis->iRow, iLen, &(pThis->rctSel), "\n", 1,
+                          pThis->iRow, iLen, &(pThis->rctSel),
+                          "\n", 1,
                           pThis->iRow + 1, 0, NULL, NULL, 0);
 
-      __internal_merge_rect(pThis, &rctInvalid, pThis->iRow, 0, pThis->iRow, -1); // invalidate entire row
+      __internal_merge_rect(pThis, &rctInvalid, pThis->iRow, 0, -1, -1); // invalidate entire row and those that follow
     }
 
     // OK now that _THAT_ is done, delete "up to the end of the string if needed"
@@ -2406,25 +2417,33 @@ WB_RECT rctInvalid;
       return; // do nothing (TODO:  error message?)
     }
 
+    // TODO:  use WBDelMBChars
+
     if(nChar < 0 && pThis->iCol > 0)
     {
       // TODO:  handle hard tab translation?  For now "leave it"
 
-      nChar = -nChar;
-      if(nChar > pThis->iCol)
+      i2 = -nChar;
+      if(i2 > pThis->iCol)
       {
-        nChar = pThis->iCol;
+        i2 = pThis->iCol;
       }
+
+      // position to which I delete
+      pL2 = WBGetMBCharPtr(pL, pThis->iCol - i2, NULL);  // column to which I delete (backspace)
+      pL3 = WBGetMBCharPtr(pL, pThis->iCol, NULL);  // position FROM where I delete/backspace
+
 
       // create undo record first, before I actually delete things
       __internal_add_undo(pThis, UNDO_DELETE, pThis->iSelMode,
-                          pThis->iRow, pThis->iCol - nChar, &(pThis->rctSel),
-                          pL + pThis->iCol - nChar, nChar,
+                          pThis->iRow, pThis->iCol + nChar, &(pThis->rctSel),
+                          pL2, pL3 - pL2, // text pointer AND 'true length' in bytes
                           pThis->iRow, pThis->iCol, NULL, NULL, 0);
 
-      strcpy(pL + pThis->iCol - nChar, pL + pThis->iCol); // delete things down
+      strcpy(pL2, pL3); // delete things down
 
-      pThis->iCol -= nChar;
+      pThis->iCol -= i2;
+      nChar += i2; // # of characters actually deleted (added 'cause nChar is negative)
 
       __internal_merge_rect(pThis, &rctInvalid, pThis->iRow, pThis->iCol, pThis->iRow, -1); // invalidate remainder of row
     }
@@ -2432,18 +2451,26 @@ WB_RECT rctInvalid;
     {
       // TODO:  handle hard tab translation?  For now "leave it"
 
-      if(nChar > iLen - pThis->iCol)
+      i2 = nChar;
+
+      if(i2 > iLen - pThis->iCol)
       {
-        nChar = iLen - pThis->iCol;
+        i2 = iLen - pThis->iCol;
       }
+
+      // position to which I delete
+      pL2 = WBGetMBCharPtr(pL, pThis->iCol + i2, NULL);  // column to which I delete
+      pL3 = WBGetMBCharPtr(pL, pThis->iCol, NULL);  // position FROM where I delete/backspace
 
       // create undo record first, before I actually delete things
       __internal_add_undo(pThis, UNDO_DELETE, pThis->iSelMode,
                           pThis->iRow, pThis->iCol, &(pThis->rctSel),
-                          pL + pThis->iCol, nChar,
+                          pL3, pL2 - pL3, // text pointer AND 'true length' in bytes
                           pThis->iRow, pThis->iCol + nChar, NULL, NULL, 0);
 
-      strcpy(pL + pThis->iCol, pL + pThis->iCol + nChar); // delete things down
+      strcpy(pL3, pL2); // delete things down
+
+      nChar -= i2;
 
       // NOTE:  column does not change
       __internal_merge_rect(pThis, &rctInvalid, pThis->iRow, pThis->iCol, pThis->iRow, -1); // invalidate remainder of row
@@ -2555,10 +2582,11 @@ WB_RECT rctInvalid;
 
       if(!pBuf) // no buffer, so add text now
       {
-        pBuf = pThis->pText = WBAllocTextBuffer(p1, p2 - p1);
+        pBuf = pThis->pText = WBAllocTextBuffer(p1, p2 - p1); // this copies the data, too
 
         pThis->iRow = 0; // always
-        pThis->iCol = p2 - p1; // effectively, like pressing 'end' after inserting
+        pThis->iCol = WBGetMBColIndex(p1, p2); // the col index of 'p2' within 'p1' ('MB' length of 'p1 through p2')
+        // new col will be 'end of string'.  by using this value, it's effectively, like pressing 'end' after inserting
 
         __internal_add_undo(pThis, UNDO_INSERT, pThis->iSelMode,
                             pThis->iRow, 0, &(pThis->rctSel), NULL, 0, // old col was 0, always
@@ -2572,6 +2600,12 @@ WB_RECT rctInvalid;
           pThis->iRow = 0; // force it
         }
 
+        iLen = 0; // pre-assign for later (so it won't be "unassigned" by accident on error)
+
+        //------------------------------------------------
+        // calculating buffer size, allocating line buffer
+        //------------------------------------------------
+
         if(pBuf->nEntries <= 0 || !pBuf->aLines[0])
         {
           if(pBuf->nEntries <= 0)
@@ -2583,9 +2617,10 @@ WB_RECT rctInvalid;
 
           if(pL)
           {
-            if(pThis->iCol > 0)
+            if(pThis->iCol > 0) // this works because a space is always 1 byte long
             {
               memset(pL, ' ', pThis->iCol);
+              pL[pThis->iCol] = 0;
             }
 
             iLen = pThis->iCol;
@@ -2594,23 +2629,36 @@ WB_RECT rctInvalid;
         else
         {
           pTemp = pBuf->aLines[0];
-          i1 = iLen = strlen(pTemp); // the actual length
+
+          i1 = strlen(pTemp); // the actual length
+
+          iLen = WBGetMBLength(pTemp); // the # of columns
 
           if(iLen < pThis->iCol)
           {
-            i1 = pThis->iCol; // the alloc length
+            i1 += pThis->iCol - iLen; // add the alloc length for white space following 'iCol'
           }
 
-          if(pThis->iInsMode == InsertMode_OVERWRITE)
+          if(pThis->iInsMode == InsertMode_OVERWRITE &&
+             iLen >= pThis->iCol) // only if I actually overwrite something
           {
-            if(i1 < pThis->iCol + p2 - p1)
+            if(iLen < pThis->iCol + WBGetMBColIndex(p1, p2)) // will overwrite extend the string??
             {
-              i1 = pThis->iCol + p2 - p1; // extent of the text I'm adding when I overwrite
+              char *pTempC = WBGetMBCharPtr(pTemp, pThis->iCol, NULL);
+
+              if(pTempC)
+              {
+                i1 = (pTempC - pTemp) + (p2 - p1); // extent of teh text I'm adding when I overwrite
+              }
+              else
+              {
+                i1 += p2 - p1; // fallback in case of problems
+              }
             }
           }
           else
           {
-            i1 += p2 - p1;
+            i1 += p2 - p1; // I'm extending the string by 'that much'
           }
 
           pL = WBReAlloc(pTemp, i1 + 2);
@@ -2625,27 +2673,38 @@ WB_RECT rctInvalid;
           }
         }
 
+        //-------------------------------------------
+        // copying data into buffer at column 'iCol'
+        //-------------------------------------------
+
         if(pL)
         {
+          char *pTempL;
           if(iLen < pThis->iCol)
           {
-            memset(pL + iLen, ' ', pThis->iCol - iLen); // pad with spaces
+            pTempL = pL + strlen(pL); // will always be this
 
-            pL[pThis->iCol + p2 - p1] = 0;              // I need a terminating zero byte
+            memset(pTempL, ' ', pThis->iCol - iLen); // pad with spaces
+            
+            pTempL += pThis->iCol - iLen; // advance the pointer to where 'iCol' is
+            *pTempL = 0;                  // make sure it ends in a zero byte
           }
           else if(iLen > pThis->iCol &&                    // insert 'in the middle'
                   pThis->iInsMode != InsertMode_OVERWRITE) // NOT overwriting
           {
+            pTempL = WBGetMBCharPtr(pL, pThis->iCol, NULL);
+
             // make room for text
             if(WB_LIKELY((iLen - pThis->iCol + 1) > 0)) // probably always true
             {
-              memmove(pL + pThis->iCol + (p2 - p1), pL + pThis->iCol, iLen - pThis->iCol + 1);
-                // note that this includes teh zero byte.
+              memmove(pTempL + (p2 - p1), pTempL, strlen(pTempL) + 1); // note that this includes the zero byte at the end
             }
           }
-          else if((p2 - p1) + pThis->iCol >= iLen)
+          else if((p2 - p1) + pThis->iCol >= iLen) // overwriting AND it extends the buffer?
           {
-            pL[pThis->iCol + p2 - p1] = 0; // I need a terminating zero byte
+            pTempL = WBGetMBCharPtr(pL, pThis->iCol, NULL);
+
+            pTempL[p2 - p1] = 0; // I need a terminating zero byte immediately after where the text will go
           }
 
           __internal_add_undo(pThis, UNDO_INSERT, pThis->iSelMode,
@@ -2657,9 +2716,9 @@ WB_RECT rctInvalid;
                               pThis->iRow, pThis->iCol + (p2 - p1), NULL,
                               p1, p2 - p1); // the new text
 
-          memcpy(pL + pThis->iCol, p1, p2 - p1); // insert the data
+          memcpy(pL + pThis->iCol, p1, p2 - p1); // insert the data (but not the terminating zero byte)
 
-          pThis->iCol += p2 - p1; // always advance the cursor to this point (overwrite OR insert)
+          pThis->iCol += WBGetMBColIndex(p1, p2); // always advance the cursor to this point (overwrite OR insert)
         }
       }
     }
@@ -2985,9 +3044,9 @@ WB_RECT rctSel;
         iCol = 0;  // for now also force column 0 if there's no buffer or a NULL entry for it or at end of document
       }
       else if(pThis->iLineFeed == LineFeed_NONE &&
-              iCol > strlen(pBuf->aLines[iRow]))
+              iCol > WBGetMBLength(pBuf->aLines[iRow]))
       {
-        iCol = strlen(pBuf->aLines[iRow]);  // don't select pos past end of line for single-line edit
+        iCol = WBGetMBLength(pBuf->aLines[iRow]);  // don't select pos past end of line for single-line edit
       }
     }
 
@@ -3392,7 +3451,7 @@ TEXT_BUFFER *pBuf;
         }
         else
         {
-          int iLen = strlen(pBuf->aLines[0]);
+          int iLen = WBGetMBLength(pBuf->aLines[0]);
 
           if(pThis->iRow != 0)
           {
@@ -3550,7 +3609,7 @@ TEXT_BUFFER *pBuf;
       if(pL)
       {
         p2 = pL;
-        while(*p2 && *p2 <= ' ') // TODO:  adjust for 'hard tab' char which might be '\xa0'...
+        while(*p2 && *p2 <= ' ') // TODO:  adjust for 'hard tab' char which might be 'U+00A0'...
         {
           p2++;
         }
@@ -3655,7 +3714,7 @@ TEXT_BUFFER *pBuf;
       }
       else
       {
-        pThis->iCol = strlen(pL);
+        pThis->iCol = WBGetMBLength(pL);
       }
     }
 
@@ -3853,9 +3912,8 @@ TEXT_BUFFER *pBuf;
 WB_GEOM geomV, geomP, geomC;
 XFontStruct *pFont = NULL, **ppFonts = NULL;
 char **ppNames, *pL;
-int i1, iLen, iFontHeight, iFontWidth, nFonts, iAsc=0, iDesc=0, /* iW, */ iX, iY, iPX, iPY;
+int i1, iLen, iFontHeight, iFontWidth, nFonts, iAsc, iDesc, iX, iY, iPX, iPY;
 XFontSet fSet;
-//XFontSetExtents *pExt;
 Pixmap pxTemp;
 unsigned long clrFG, clrBG, clrHFG, clrHBG;
 GC gc2 = None;
@@ -3925,8 +3983,8 @@ GC gc2 = None;
 
   // at this point I must use 'fSet' to do all of the font metrics + drawing
 
-// NOTE:  pExt not being used; commented out because of linux gcc warnings
-//  pExt = XExtentsOfFontSet(fSet); // get extents for the font set (reserved)
+  // NOTE:  doing the call directly instead of calling WBFontSetAscent() etc. so only loop once
+
   nFonts = XFontsOfFontSet(fSet, &ppFonts, &ppNames); // returns # of items (do NOT free resources!  They are owned by the font set)
 
   // TODO:  XFontStruct::direction indicates LTR RTL TTB or BTT for painting - for now _ONLY_ LTR_TTB will apply
@@ -3940,7 +3998,7 @@ GC gc2 = None;
 
   // to find the floor of the font, I'll need to determine max iAsc and iDesc
 
-  for(i1=0; i1 < nFonts; i1++)
+  for(i1=0, iAsc=0, iDesc=0; i1 < nFonts; i1++)
   {
     if(iAsc < ppFonts[i1]->ascent)
     {
@@ -3952,7 +4010,7 @@ GC gc2 = None;
     }
   }
 
-  // get the font width for a space
+  // NOW get the font width for a space (TODO:  average char width instead?)
 
   iFontWidth = WB_TEXT_ESCAPEMENT(fSet, " ", 1);
 
@@ -4204,9 +4262,6 @@ GC gc2 = None;
       iY = geomV.y + (geomV.height - iAsc - iDesc) / 2 + iAsc; // iY is now "the baseline" for the font
       iX = geomV.x;
 
-// variable 'iW' is not eing used.  uncomment this later if you need it.  linux gcc warning avoidance
-//      iW = 0;
-
       pL = pBuf->aLines[0];
       if(!pL)
       {
@@ -4227,6 +4282,10 @@ GC gc2 = None;
       {
         pxTemp = None;
       }
+
+      //--------------------------------------------
+      // DRAWING BACKGROUND AND HIGHLIGHT RECTANGLE
+      //--------------------------------------------
 
       if(pxTemp != None)
       {
@@ -4280,9 +4339,11 @@ GC gc2 = None;
         XSetForeground(pDisplay, gc, clrFG);
       }
 
+      //---------------------------------------
       // DRAW the text and the vertical cursor
+      //---------------------------------------
 
-      iLen = strlen(pL);
+      iLen = WBGetMBLength(pL);
 
       pThis->iCursorX = pThis->iCursorY = pThis->iCursorHeight = 0; // to indicate "not drawn"
 
@@ -4290,7 +4351,7 @@ GC gc2 = None;
       {
         WB_RECT rctChar, rctCursor;
 
-        if(i1 == pThis->iCol) // display the cursor
+        if(i1 == pThis->iCol) // display the cursor (NOTE:  row ALWAYS matches)
         {
           pThis->iCursorX = iX - 1;
 
@@ -4338,7 +4399,7 @@ GC gc2 = None;
         rctChar.top = iY - iAsc;
         rctChar.bottom = iY + iDesc;
         rctChar.left = iX + 1;
-        rctChar.right = iX + iFontWidth - 1; // since I'm checking overlap, make it a bit 'skinner'
+        rctChar.right = iX + iFontWidth - 1; // since I'm checking overlap, make it a bit 'skinnier'
 
         if(WBRectOverlapped(rctChar, pThis->rctHighLight))
         {
@@ -4363,9 +4424,21 @@ GC gc2 = None;
         {
           if(WBGeomOverlapped(geomC, geomP)) // only if the character's geometry overlaps the paint geometry
           {
-            WB_DRAW_STRING(pDisplay, pxTemp ? pxTemp : wID, fSet,
-                           gc2 != None ? gc2 : gc,
-                           iX - iXDelta, iY - iYDelta, &(pL[i1]), 1);
+            int iLen;
+            const char *p1 = WBGetMBCharPtr(pL, i1, &iLen);
+
+            if(p1 && iLen > 0)
+            {
+              if(iLen > 1)
+              {
+                WB_ERROR_PRINT("TEMPORARY:  %s - iLen=%d, %d, %d, p1 = %02xH,%02xH\n", __FUNCTION__,
+                               iLen, iX - iXDelta, iY - iYDelta, (unsigned char)p1[0], (unsigned char)p1[1]);
+              }
+
+              WB_DRAW_STRING(pDisplay, pxTemp ? pxTemp : wID, fSet,
+                             gc2 != None ? gc2 : gc,
+                             iX - iXDelta, iY - iYDelta, p1, iLen);
+            }
           }
         }
         else if(i1 > pThis->iCol)
@@ -4412,11 +4485,7 @@ GC gc2 = None;
           XCopyArea(pDisplay, pxTemp, wID, gc, // this time use GC to do the copy
                     iX0, iY0, iW0, iH0, iX, iY);
         }
-#if 0
-                  0, 0, iPX, iPY,
-                  pThis->rctWinView.left - MIN_BORDER_SPACING,
-                  pThis->rctWinView.top - MIN_BORDER_SPACING);
-#endif // 0
+
         XFreePixmap(pDisplay, pxTemp);
       }
     }
@@ -4428,7 +4497,7 @@ GC gc2 = None;
 
 
 
-
+//      POOBAH
 
 
       WB_ERROR_PRINT("TEMPORARY:  %s - MULTI-LINE NOT IMPLEMENTED\n", __FUNCTION__);
@@ -4472,6 +4541,525 @@ static void __internal_cursor_blink(struct _text_object_ *pThis, int bHasFocus)
       __internal_invalidate_cursor(pThis, pThis->iBlinkState == 0 || pThis->iBlinkState == 1);
     }
   }
+}
+
+
+// ----------------------------
+// MBCS UTF-8 UTILITY FUNCTIONS
+// ----------------------------
+
+// see RFC3629 and https://en.wikipedia.org/wiki/UTF-8#Codepage_layout
+
+static int internal_IsMBCharValid(const char *pChar, int *piLen)
+{
+const unsigned char *p1;
+int iRval;
+
+
+  if((unsigned char)*pChar < 0x80) // normal ASCII (including '0' byte)
+  {
+    if(piLen)
+    {
+      if(*pChar)
+      {
+        *piLen = 1;
+      }
+      else
+      {
+        *piLen = 0;
+      }
+    }
+
+    return 1; // valid char
+  }
+
+  p1 = (const unsigned char *)pChar;
+  iRval = 0; // initially, call it 'invalid'
+
+  // 80-BF - values 0-3F 'continuation' bytes for mbcs [sequence will not start with this]
+  // C0-DF - 2-byte character
+  //         (C0=0, C1=40H, C2=80H, up to 7C0H for DF; values C0 and C1 are actually 'not valid' as it's pointless)
+  // E0-EF - 3-byte character
+  //         (E0 adds 800H; E1 adds 1000H; E2 2000H; etc. up to F000H for EF.  not all E0 sequences are valid)
+  // F0-FF - 4+byte character
+  //         (F0 is 10000H; F1 40000H; F2 80000H; F3 C0000H; F4 100000H; values F5 and above are 'not valid'
+  //          Not all F0's are valid, either)
+  //
+  // For invalid sequences, this function will attempt to work around it; however RFC3629 requires them to be error conditions
+  // to avoid security-related problems caused by invalid UTF8 sequences.
+
+  if(*p1 < 0xc2 || // a continuation character? an 'invalid' sequence?
+     *p1 >= 0xf5)  // assume value cannot be > 0xff, right?
+  {
+    p1++;  // invalid; length is 1 (like ASCII)
+  }
+  else if(*p1 < 0xe0) // 2-byte sequence
+  {
+    if((unsigned char)p1[1] >= 0x80 && (unsigned char)p1[1] <= 0xbf) // valid 2-byte sequence
+    {
+      p1 += 2;
+      iRval = 1;
+    }
+    else
+    {
+      p1++;  // invalid; length is 1 (like ASCII)
+    }
+  }
+  else if(*p1 < 0xf0) // 3-byte sequence
+  {            
+    if(p1[1] >= 0x80 && p1[1] <= 0xbf && // valid 3-byte sequence
+       p1[2] >= 0x80 && p1[2] <= 0xbf)
+    {
+      // TODO:  validate E0 sequences
+
+      p1 += 3;
+      iRval = 1;
+    }
+    else // now it gets trickier...
+    {
+      // by convention, treat it like 8-bit ASCII with a length of 1
+      p1++;
+    }
+  }
+  else // if(*p1 < 0xf5)
+  {
+    if(p1[1] >= 0x80 && p1[1] <= 0xbf && // valid 4-byte sequence
+       p1[2] >= 0x80 && p1[2] <= 0xbf &&
+       p1[3] >= 0x80 && p1[3] <= 0xbf)
+    {
+      // TODO:  validate F0 sequences
+
+      p1 += 4;
+      iRval = 1;
+    }
+    else // now it gets trickier...
+    {
+      // by convention, treat it like 8-bit ASCII with a length of 1
+      p1++;
+    }
+  }
+
+  if(piLen)
+  {
+    *piLen = (const char *)p1 - pChar;  // this simplified length indicator helps with copy/pasta [if I need it]
+  }
+
+#ifndef NO_DEBUG
+  if(!iRval || ((const char *)p1 - pChar) > 1)
+  {
+    int iLen = ((const char *)p1 - pChar);
+
+    WBDebugPrint("TEMPORARY:  %s - return=%d  char=%02xH", __FUNCTION__, iRval, (unsigned char)*pChar);
+    while(iLen > 1)
+    {
+      iLen--;
+      pChar++;
+
+      WBDebugPrint(",%02xH", (unsigned char)*pChar);
+    }
+    WBDebugPrint("\n");
+  }
+#endif // NO_DEBUG
+
+  return iRval;
+}
+
+static int internal_MBstrlen(const char *pString)
+{
+const char *p1 = pString;
+int iLen, iRval;
+
+
+  iRval = 0;
+
+  while(*p1)
+  {
+    // step through 1 character at a time until I reach the end of the string, or iCol reaches zero
+
+    if(!internal_IsMBCharValid(p1, &iLen))
+    {
+      p1++; // treat like 8-bit ASCII if it's an invalid UTF-8 sequence
+
+      // NOTE:  may change or render as EF BF BD i.e. U+FFFD (a diamond with question mark)
+    }
+    else
+    {
+      p1 += iLen;
+    }
+
+    iRval++; // we only count blue cars (and multi-byte chars as "1")
+  }
+
+  return iRval;
+}
+
+// return the 'character' index for the 'column' specified by 'iCol' for MBCS
+
+static int internal_MBColIndex(const char *pString, int iCol)
+{
+const char *p1 = pString;
+int iLen;
+
+
+  while(iCol > 0 && *p1)
+  {
+    // step through 1 character at a time until I reach the end of the string, or iCol reaches zero
+
+    if(!internal_IsMBCharValid(p1, &iLen))
+    {
+      p1++; // treat like 8-bit ASCII if it's an invalid UTF-8 sequence
+
+      // NOTE:  may change or render as EF BF BD i.e. U+FFFD (a diamond with question mark)
+    }
+    else
+    {
+      p1 += iLen;
+    }
+
+    iCol--;
+  }
+
+  return (p1 - pString); // NOTE: need to verify length before calling or this could be WRONG
+}
+
+
+char * WBInsertMBChars(char *pString, int iCol, const char *pszMBString, int cbString,
+                       int fTab, int fOverwrite, int *piNewCol, char **ppInserted)
+{
+  if(ppInserted)
+  {
+    *ppInserted = NULL; // initial value
+  }
+  
+  if(piNewCol)
+  {
+    *piNewCol = iCol; // initial value
+  }
+
+
+//  POOBAH
+
+
+  return NULL;
+}
+
+char * WBSplitMBLine(char *pString, int iCol)
+{
+char *p1, *pRval;
+int iLen, i1;
+
+
+  iLen = internal_MBstrlen(pString);
+
+  if(iCol >= iLen) // past end of string?
+  {
+    pRval = WBCopyString(""); // allocated pointer that's a copy of an empty string - it's what I'll start with
+  }
+  else
+  {
+    i1 = internal_MBColIndex(pString, iCol);
+
+    pRval = WBCopyString(pString + i1);
+
+    if(pRval)
+    {
+      pString[i1] = 0; // terminate it here (my 'split')
+    }
+  }
+
+  if(pRval) // if I have a valid return, right-trim the original line
+  {
+    p1 = pString + strlen(pString);
+
+    while(p1 > pString && *(p1 - 1) <= ' ') // right-trim it
+    {
+      *(--p1) = 0; // right-trim the string - make ALL white space GO AWAY
+    }
+  }
+
+  return(pRval);
+}
+
+char * WBJoinMBLine(char *pString, int iCol, const char *pJoin)
+{
+int iLen, iLenNew, iJoin;
+char *pRval, *p1;
+
+
+  iLen = internal_MBstrlen(pString);
+  if(iLen < iCol)
+  {
+    iLenNew = iCol;
+  }
+  else
+  {
+    iLenNew = iLen;
+  }
+
+  iJoin = internal_MBstrlen(pJoin);
+
+  pRval = WBReAlloc(pString, iLenNew + iJoin + 2);
+  if(!pRval)
+  {
+    return NULL;
+  }
+
+  p1 = pRval + strlen(pRval); // regardless of actual length, this works  
+
+  while(iLen < iLenNew)
+  {
+    *(p1++) = ' '; // add white space up to 'iCol'
+    iLen++;
+  }
+
+  strcpy(p1, pJoin);
+
+  return pRval;
+}
+
+int WBDelMBChars(char *pString, int iCol, int nDel, int *piNewCol, char **ppDeleted)
+{
+int iLen, iIndex, i1, iRval = nDel;
+char *pDelChar, *p1;
+
+
+  if(ppDeleted)
+  {
+    *ppDeleted = NULL; // initial value
+  }
+  
+  if(piNewCol)
+  {
+    *piNewCol = iCol; // initial value
+  }
+
+  if(!pString || !nDel || !*pString)
+  {
+    if(piNewCol)
+    {
+      *piNewCol = iCol; // for now, just do this, even if string is blank
+    }
+
+    return nDel; // parameter validation
+  }
+
+  iLen = internal_MBstrlen(pString);
+
+  if(iRval > 0)
+  {
+    if(ppDeleted && iLen > iCol)
+    {
+      pDelChar = WBAlloc(4 // max size of MB char
+                         * (iLen - iCol + 1) // 1 more than # of chars to delete
+                         + 1); // additional storage for zero byte
+
+      *ppDeleted = pDelChar; // NOTE:  caller checks for NULL to determine error state
+
+      if(pDelChar)
+      {
+        *pDelChar = 0; // make sure
+      }
+    }
+    else
+    {
+      pDelChar = NULL;
+    }
+
+    while(iLen > iCol && iRval > 0)
+    {
+      iIndex = internal_MBColIndex(pString, iCol);
+
+      p1 = pString + iIndex; // always
+
+      if(!*p1)
+      {
+        break; // I'm at the end of the string (sanity test)
+      }
+
+      if(!internal_IsMBCharValid(p1, &i1))
+      {
+        // invalid character - truncate the line here!
+
+        *p1 = 0;
+        iRval = 0;  // assume 'end of line' and terminate deleting
+
+        break;
+      }
+
+      if(pDelChar && i1 > 0)
+      {
+        memcpy(pDelChar, p1, i1);
+        pDelChar += i1;
+
+        *pDelChar = 0; // mark the end of the string
+      }
+
+      iRval --; // deleting one character (so remove a 'delete')
+      iLen--; // update the new length
+
+      // i1 is the length of the next character.  slide 'em down! [this is less efficient, but more 'stable']
+      strcpy(p1, p1 + i1); // simplest method
+    }
+  }
+  else
+  {
+    if(ppDeleted && iCol > 0)
+    {
+      pDelChar = WBAlloc(4 // max size of MB char
+                         * (iCol + 1) // 1 more than # of chars to delete
+                         + 1); // additional storage for zero byte
+
+      *ppDeleted = pDelChar; // NOTE:  caller checks for NULL to determine error state
+
+      if(pDelChar)
+      {
+        *pDelChar = 0; // make sure
+      }
+    }
+    else
+    {
+      pDelChar = NULL;
+    }
+
+    // NOW we do backspacing, which preserves the character at 'iCol'.  this is a little trickier.
+    // when we end up at column zero, we return the 'iRval' count.
+
+    while(iCol > 0 && iRval < 0)
+    {
+      if(iCol <= iLen) // I'm NOT past the end
+      {
+        iIndex = internal_MBColIndex(pString, iCol - 1); // PREVIOUS column
+
+        p1 = pString + iIndex; // always
+
+        if(!*p1)
+        {
+          break; // I'm at the end of the string (sanity test, unlikely to happen)
+        }
+
+        if(!internal_IsMBCharValid(p1, &i1))
+        {
+          // invalid character - truncate the line here!
+
+          *p1 = 0;
+          iRval = 0; // assume 'end of line' at this point, and terminate deleting
+
+          break;
+        }
+
+        if(pDelChar && i1 > 0)
+        {
+          // insert this character into the beginning of the 'undo' info string
+          // there are probably BETTER ways to do this, but this is what I'll do.
+
+          memmove(pDelChar + i1, pDelChar, strlen(pDelChar) + 1); // open up space.  make sure ending zero byte is included.
+          memcpy(pDelChar, p1, i1);
+        }
+
+        // i1 is the length of the prev character, so slide 'em down! [this is less efficient, but more 'stable']
+        strcpy(p1, p1 + i1); // simplest method (I could also get the pointer to the 'iCol'th char, but this is more consistent)
+      }
+      else
+      {
+        // since I'm at the end, just delete the last char in the line (effectively) by decrementing the column
+        // so nothing else to do here other than the end of the loop
+      }
+
+      iCol--;
+      iRval++; // because it's NEGATIVE, so we increment it
+    }
+  }
+
+  // it seems in both cases (above) this section remains exactly the same
+  // how amazing that works out!
+
+  if(piNewCol)
+  {
+    *piNewCol = iCol; // 'iCol' will be the NEW column for the cursor
+  }
+
+  return iRval;
+}
+
+int WBGetMBLength(const char *pString)
+{
+  if(!pString)
+  {
+    return 0;
+  }
+
+  return internal_MBstrlen(pString);
+}
+
+char * WBGetMBCharPtr(char *pString, int iCol, int *pcbLen)
+{
+int iIndex;
+
+
+  if(!pString)
+  {
+    return NULL;
+  }
+
+  iIndex = internal_MBColIndex(pString, iCol);
+
+  if(pString[iIndex])  // it's not a 0-byte
+  {
+    if(!internal_IsMBCharValid(pString + iIndex, pcbLen))
+    {
+      return NULL; // character is not valid
+    }
+  }
+  else
+  {
+    if(pcbLen)
+    {
+      *pcbLen = 0;
+    }
+
+    // TODO:  anything else?
+  }
+
+  return pString + iIndex;
+}
+
+int WBGetMBColIndex(const char *pString, const char *pChar)
+{
+const char *p1 = pString;
+int iLen, iRval;
+
+
+  if(pChar <= pString)
+  {
+    return 0;
+  }
+
+  iRval = 0;
+
+  while(*p1 && p1 < pChar)
+  {
+    // step through 1 character at a time until I reach the end of the string, or iCol reaches zero
+
+    if(!internal_IsMBCharValid(p1, &iLen))
+    {
+      p1++; // treat like 8-bit ASCII if it's an invalid UTF-8 sequence
+
+      // NOTE:  may change or render as EF BF BD i.e. U+FFFD (a diamond with question mark)
+    }
+    else
+    {
+      p1 += iLen;
+    }
+
+    iRval++; // we only count blue cars (and multi-byte chars as "1")
+  }
+
+  if(p1 != pChar)
+  {
+    return 0; // this is an error condition
+  }
+
+  return iRval; // returns the actual column index for 'pChar' within the string pointed by 'pString'
 }
 
 

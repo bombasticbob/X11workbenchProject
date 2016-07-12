@@ -67,6 +67,7 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <time.h> // clock_gettime etc.
+#include <locale.h>
 #endif // !WIN32
 
 #include "platform_helper.h" // includes X11 headers as well
@@ -107,11 +108,46 @@ static void __add_to_temp_file_list(const char *szFile);
 
 void WBPlatformOnInit(void)
 {
+char *pEnv;
+int iType;
+
   // NOTE:  main thread needs to do this before spawning any threads.
 
   if(!fInterlockedRWLockInitFlag)
   {
     pthread_rwlock_init(&xInterlockedRWLock, NULL);
+  }
+
+  iType = LC_ALL;
+  pEnv = getenv("LC_ALL"); // check this one first
+
+  if(!pEnv || !*pEnv)
+  {
+    pEnv = getenv("LC_CTYPE"); // then this one
+
+    if(pEnv && *pEnv)
+    {
+      iType = LC_CTYPE; // only adjust LC_CTYPE if I found THIS but no others...
+    }
+    else
+    {
+      pEnv = getenv("LANG"); // overall language setting
+    }
+  }
+
+  if(pEnv && *pEnv)
+  {
+    if(!setlocale(iType, pEnv)) // should pick the correct one when I do this
+    {
+      WB_ERROR_PRINT("ERROR:  %s - cannot set locale \"%s\"\n", __FUNCTION__, pEnv);
+
+      goto default_locale;
+    }
+  }
+  else
+  {
+default_locale:
+    setlocale(LC_ALL, ""); // should pick OS default when I do this
   }
 }
 

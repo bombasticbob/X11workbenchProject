@@ -1156,7 +1156,7 @@ const void * DLGGetControlListData(WBDialogControl *pCtrl, int iIndex);  // retr
 **/
 int DLGInitControlListInfo(WBDialogControl *pCtrl, int nFlags,
                            void *(*pfnAllocator)(const void *,int), void (*pfnDestructor)(void *),
-                           void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *),
+                           void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *, XFontSet),
                            int (*pfnSort)(const void *, const void *));
 
 /** \ingroup dlglist
@@ -1197,7 +1197,7 @@ int DLGInitControlListInfo(WBDialogControl *pCtrl, int nFlags,
 int DLGModifyControlListInfo(WBDialogControl *pCtrl, int bFlags, int nFlags,
                              int bAllocator, void *(*pfnAllocator)(const void *,int),
                              int bDestructor, void (*pfnDestructor)(void *),
-                             int bDisplay, void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *),
+                             int bDisplay, void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *, XFontSet),
                              int bSort, int (*pfnSort)(const void *, const void *));
 
 /** \ingroup dlglist

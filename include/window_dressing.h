@@ -234,7 +234,7 @@ void WBSetHScrollPos(WB_SCROLLINFO *pSI, int iPos);
   * \brief Update the scroll bar geometry within the WB_SCROLLINFO structure
   *
   * \param pSI A pointer to the WB_SCROLLINFO structure
-  * \param pfontReference The reference font for scroll bar size.  Pass NULL to use the 'Default' font.
+  * \param fontSetRef The reference font set for scroll bar size.  Pass None to use the 'Default' font set.
   * \param pgeomClient The geometry of the client area where the scroll bars will be displayed.
   * \param pgeomUsable Returns the resulting 'usable' client area after scroll bar geometry calculations are done.
   *
@@ -243,7 +243,7 @@ void WBSetHScrollPos(WB_SCROLLINFO *pSI, int iPos);
   *
   * Header File:  window_dressing.h
 **/
-void WBUpdateScrollBarGeometry(WB_SCROLLINFO *pSI, XFontStruct *pfontReference,
+void WBUpdateScrollBarGeometry(WB_SCROLLINFO *pSI, XFontSet fontSetRef,
                                WB_GEOM *pgeomClient, WB_GEOM *pgeomUsable);
 
 /** \ingroup window_dressing
@@ -464,8 +464,8 @@ void WBDrawDownArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect,
   * \param lBorderColor1 The upper, left 'Pixel' color to use when drawing the tab
   * \param lBorderColor2 The lower, right 'Pixel' color to use when drawing the tab
   * \param lHighlightColor The 'highlight' 'Pixel' color to use for a tab that has the focus
-  * \param pFont The 'normal' font to render text in
-  * \param pBoldFont The 'bold' font to render text in (this includes the 'x' close button on the tab)
+  * \param fontSet The 'normal' font to render text in
+  * \param fontSetBold The 'bold' font to render text in (this includes the 'x' close button on the tab)
   * \param aGraphic An atom for the current (registered) pixmap graphic, or 'None' for no graphic
   * \param szText A const pointer to a character string containing the descriptive text for the tab
   *
@@ -486,7 +486,7 @@ void WBDraw3DBorderTab(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomOut
                        int fFocus, unsigned long lFGColor, unsigned long lBGColor,
                        unsigned long lBorderColor1, unsigned long lBorderColor2,
                        unsigned long lHighlightColor,
-                       XFontStruct *pFont, XFontStruct *pBoldFont,
+                       XFontSet fontSet, XFontSet fontSetBold,
                        Atom aGraphic, const char *szText);
 
 

@@ -63,34 +63,6 @@
 #include "draw_text.h"
 
 
-// UTF-8 HANDLING
-// X11 has XFree86 extensions with 'Xutf8' versions of a lot of things
-// which is only applicable with the following
-//#ifdef X_HAVE_UTF8_STRING
-//   I use the utf8 version
-// etc.
-//
-// Unfortunately many things that I use don't have that available
-// like XTextWidth for one (maybe I could use Xutf8TextExtents?)
-// Using Xmb and Xwc equivalent methods should work on Interix
-//
-// SEE ALSO:  text_object.c (similar section)
-//
-//#ifdef X_HAVE_UTF8_STRING
-#if 0
-
-#define WB_TEXT_EXTENTS Xutf8TextExtents
-#define WB_TEXT_ESCAPEMENT Xutf8TextEscapement
-#define WB_DRAW_STRING Xutf8DrawString
-
-#else  // X_HAVE_UTF8_STRING
-
-#define WB_TEXT_EXTENTS XmbTextExtents
-#define WB_TEXT_ESCAPEMENT XmbTextEscapement
-#define WB_DRAW_STRING XmbDrawString
-
-#endif // X_HAVE_UTF8_STRING
-
 
 // function prototypes
 
@@ -98,7 +70,8 @@
 /** \ingroup draw_text
   * \brief calculate ideal bounds rectangle for text given a font, tab spacing, tab origin, and alignment
   *
-  * \param pFont A pointer to an XFontStruct (NULL implies system default font)
+  * \param pDisplay the Display associated with the XFontSet
+  * \param fontSet An XFontSet (None implies system default font set)
   * \param pWords The DT_WORDS structure for the text (this function modifies DT_WORD::iX, DT_WORD::iY)
   * \param iTabWidth A positive integer in 'characters', or negative integer in pixels, indicating tab width
   * \param iTabOrigin An unsigned integer indicating the tab origin, using the same units as iTabWidth, corresponding to the first character.
@@ -116,7 +89,7 @@
   * This function is used internally and should not be invoked.  It is declared 'static' and not visible outside of
   * the file it's defined in.
 **/
-static int InternalCalcIdealBounds(XFontStruct *pFont, DT_WORDS *pWords, int iTabWidth, unsigned int iTabOrigin,
+static int InternalCalcIdealBounds(Display *pDisplay, XFontSet fontSet, DT_WORDS *pWords, int iTabWidth, unsigned int iTabOrigin,
                                    const WB_RECT *prcSource, WB_RECT *prcDest, int iAlignment, int iStartLine, int iEndLine);
 
 
@@ -129,7 +102,7 @@ static void InternalDebugDumpWords(DT_WORDS *pWords); ///< \brief internal debug
 // DRAW TEXT UTILITIES
 // *******************
 
-int DTGetTextWidth(XFontStruct *pFont, const char *szUTF8, int nLength)
+int DTGetTextWidth0(XFontStruct *pFont, const char *szUTF8, int nLength)
 {
 //XRectangle rctInk, rctLog;
 XFontSet fSet;
@@ -149,18 +122,37 @@ int iRval;//, iLen;
     return XTextWidth(pFont, szUTF8, nLength);
   }
 
-  iRval = WB_TEXT_ESCAPEMENT(fSet, szUTF8, nLength);
-
-//  if(iRval <= 0)
-//  {
-//    iLen = mblen(szUTF8, nLength); // width estimate
-//    iLen = XTextWidth(pFont, " ", 1) * iLen;
-//
-//    WB_ERROR_PRINT("%s WOULD BE returning %d, NOW returning %d\n", __FUNCTION__, iRval, iLen);
-//    iRval = iLen;
-//  }
+  iRval = DTGetTextWidth(fSet, szUTF8, nLength); // WB_TEXT_ESCAPEMENT(fSet, szUTF8, nLength);
 
   XFreeFontSet(WBGetDefaultDisplay(), fSet);
+
+  return iRval;
+}
+
+int DTGetTextWidth(XFontSet fontSet, const char *szUTF8, int nLength)
+{
+int iRval;
+
+  if(nLength <= 0)
+  {
+    return 0;
+  }
+
+  if(fontSet == None)
+  {
+    fontSet = WBGetDefaultFontSet(WBGetDefaultDisplay());
+
+    if(fontSet == None)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - fSet is None\n", __FUNCTION__);
+
+      return 0;
+    }
+  }
+
+  iRval = WBTextWidth(fontSet, szUTF8, nLength); // WB_TEXT_ESCAPEMENT(fSet, szUTF8, nLength);
+
+  // TODO:  any debug output
 
   return iRval;
 }
@@ -180,6 +172,18 @@ XFontStruct *DTCalcIdealFont(XFontStruct *pRefFont, const char *szText, WB_GEOM 
 
 
   return NULL; // for now
+}
+
+
+XFontSet DTCalcIdealFontSet(Display *pDisplay, XFontSet fontSet, const char *szText, WB_GEOM *geomBounds)
+{
+  if(fontSet == None)
+  {
+    fontSet = WBGetDefaultFontSet(pDisplay);
+  }
+
+
+  return None; // for now
 }
 
 
@@ -257,7 +261,30 @@ DT_WORDS *pRval = *ppWords;
 // However the focus of THIS project is "only implement what is necessary" (and forget the rest).
 
 
-DT_WORDS * DTGetWordsFromText(XFontStruct *pFont, const char *szText, int iAlignment)
+DT_WORDS * DTGetWordsFromText0(XFontStruct *pFont, const char *szText, int iAlignment)
+{
+XFontSet fSet;
+DT_WORDS *pRval = NULL;
+
+
+  fSet = WBFontSetFromFont(WBGetDefaultDisplay(), pFont);
+
+  if(!fSet)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - Unable to get font set!\n", __FUNCTION__);
+
+    return NULL;
+  }
+
+  pRval = DTGetWordsFromText(WBGetDefaultDisplay(), fSet, szText, iAlignment);
+
+  XFreeFontSet(WBGetDefaultDisplay(), fSet);
+
+  return pRval;
+}
+
+
+DT_WORDS * DTGetWordsFromText(Display *pDisplay, XFontSet fontSet, const char *szText, int iAlignment)
 {
   const char *p1, *p2;
 
@@ -400,8 +427,8 @@ DT_WORDS * DTGetWordsFromText(XFontStruct *pFont, const char *szText, int iAlign
         }
 
         // use white space string for width
-        pRval->aWords[pRval->nCount].iWidth = DTGetTextWidth(pFont, p2, pRval->aWords[pRval->nCount].nLength);
-        pRval->aWords[pRval->nCount].iHeight = pFont->ascent + pFont->descent;  // for now just do this
+        pRval->aWords[pRval->nCount].iWidth = DTGetTextWidth(fontSet, p2, pRval->aWords[pRval->nCount].nLength);
+        pRval->aWords[pRval->nCount].iHeight = WBFontSetHeight(pDisplay, fontSet); // total height of font
 
         pRval->nCount++;
       }
@@ -444,7 +471,7 @@ DT_WORDS * DTGetWordsFromText(XFontStruct *pFont, const char *szText, int iAlign
       {
         if(!(iAlignment & DTAlignment_UNDERSCORE) || !iUnderscoreFlag)
         {
-          pRval->aWords[pRval->nCount].iWidth = DTGetTextWidth(pFont, p2, p1 - p2);
+          pRval->aWords[pRval->nCount].iWidth = DTGetTextWidth(fontSet, p2, p1 - p2);
         }
         else
         {
@@ -453,8 +480,8 @@ DT_WORDS * DTGetWordsFromText(XFontStruct *pFont, const char *szText, int iAlign
 
           // TODO:  the hard way?
 
-          pRval->aWords[pRval->nCount].iWidth = DTGetTextWidth(pFont, p2, p1 - p2)
-                                              - iUnderscoreFlag * DTGetTextWidth(pFont, "_", 1);
+          pRval->aWords[pRval->nCount].iWidth = DTGetTextWidth(fontSet, p2, p1 - p2)
+                                              - iUnderscoreFlag * DTGetTextWidth(fontSet, "_", 1);
         }
       }
       else
@@ -462,7 +489,7 @@ DT_WORDS * DTGetWordsFromText(XFontStruct *pFont, const char *szText, int iAlign
         pRval->aWords[pRval->nCount].iWidth = 0;
       }
 
-      pRval->aWords[pRval->nCount].iHeight = pFont->ascent + pFont->descent;  // for now just do this
+      pRval->aWords[pRval->nCount].iHeight = WBFontSetHeight(pDisplay, fontSet);//pFont->ascent + pFont->descent;  // for now just do this
 
       pRval->nCount++;
     }
@@ -471,14 +498,14 @@ DT_WORDS * DTGetWordsFromText(XFontStruct *pFont, const char *szText, int iAlign
   return pRval;
 }
 
-int DTCalcIdealBounds(XFontStruct *pFont, const char *szText, int iTabWidth, unsigned int iTabOrigin,
+int DTCalcIdealBounds(Display *pDisplay, XFontSet fontSet, const char *szText, int iTabWidth, unsigned int iTabOrigin,
                       const WB_RECT *prcSource, WB_RECT *prcDest, int iAlignment)
 {
 int iRval;
 DT_WORDS *pWords;
 
 
-  pWords = DTGetWordsFromText(pFont, szText, iAlignment);
+  pWords = DTGetWordsFromText(pDisplay, fontSet, szText, iAlignment);
 
   if(!pWords)
   {
@@ -490,7 +517,7 @@ DT_WORDS *pWords;
 
 //  InternalDebugDumpWords(pWords);
 
-  iRval = InternalCalcIdealBounds(pFont, pWords, iTabWidth, iTabOrigin, prcSource, prcDest, iAlignment, 0, -1);
+  iRval = InternalCalcIdealBounds(pDisplay, fontSet, pWords, iTabWidth, iTabOrigin, prcSource, prcDest, iAlignment, 0, -1);
 
   WBFree(pWords);
 
@@ -580,10 +607,10 @@ DT_WORD *pW;
 //  * iEndLine A zero-based index for the last line on which to start calculating things (-1 for 'all')
 //  * zero if the text will fit within prcSource, -1 error, or 1 to indicate that prcDest is larger than prcSource
 
-static int InternalCalcIdealBounds(XFontStruct *pFont, DT_WORDS *pWords, int iTabWidth, unsigned int iTabOrigin,
+static int InternalCalcIdealBounds(Display *pDisplay, XFontSet fontSet, DT_WORDS *pWords, int iTabWidth, unsigned int iTabOrigin,
                                    const WB_RECT *prcSource, WB_RECT *prcDest, int iAlignment, int iStartLine, int iEndLine)
 {
-int iFontWidth, iFontHeight, iFontAscent, iLineSpacing;  // average font width/height and line spacing
+int iFontWidth, iFontHeight, iFontAscent, iFontDescent, iLineSpacing;  // average font width/height and line spacing
 int iHPos, iHPos0, iMaxLen, iLines;
 int i1, i2, i3;
 //const char *p1;
@@ -611,12 +638,12 @@ DT_WORD *pW, *pW2;
 
   memcpy(&rctBounds, &rctSource, sizeof(rctBounds)); // make copy of it as 'rctSource' (for now)
 
-  if(!pFont)
+  if(fontSet == None)
   {
-    pFont = WBGetDefaultFont();
-    if(!pFont)
+    fontSet = WBGetDefaultFontSet(pDisplay);
+    if(fontSet == None)
     {
-      WB_ERROR_PRINT("%s - returns ERROR (WBGetDefaultFont returns NULL)\n", __FUNCTION__);
+      WB_ERROR_PRINT("%s - returns ERROR (WBGetDefaultFontSet returns None)\n", __FUNCTION__);
       return -1;
     }
   }
@@ -629,18 +656,19 @@ DT_WORD *pW, *pW2;
 
   // get a few things straight 'round here
 
-  iFontWidth = WBFontAvgCharWidth(WBGetDefaultDisplay(), pFont);
+  iFontWidth = WBFontSetAvgCharWidth(WBGetDefaultDisplay(), fontSet);
 
   if(!iFontWidth)
   {
-    iFontWidth = DTGetTextWidth(pFont, " ", 1);  // width of a single space
+    iFontWidth = DTGetTextWidth(fontSet, " ", 1);  // width of a single space
   }
 
-  iFontHeight = pFont->ascent + pFont->descent;
-  iFontAscent = pFont->ascent; // cache for performance
+  iFontAscent = WBFontSetAscent(pDisplay, fontSet);
+  iFontDescent = WBFontSetDescent(pDisplay, fontSet); 
+  iFontHeight = iFontAscent + iFontDescent; // cache for performance
 
   // for now, line spacing equals 1/2 descent or 2 pixels
-  iLineSpacing = pFont->descent / 2;
+  iLineSpacing = iFontDescent / 2;
   if(iLineSpacing < 2)
   {
     iLineSpacing = 2;
@@ -818,7 +846,7 @@ do_the_tab:
 
   if(rctBounds.top < rctSource.top || rctBounds.bottom > rctSource.bottom)
   {
-    WB_ERROR_PRINT("WARNING:  %d - source rectangle too small, alignment flags may not work\n", __FUNCTION__);
+    WB_ERROR_PRINT("WARNING:  %s - source rectangle too small, alignment flags may not work\n", __FUNCTION__);
   }
 
 #endif // NO_DEBUG
@@ -894,7 +922,7 @@ it_fits:
           break;
 
         case DTAlignment_VCENTERASCENT:  // only works properly with single line
-          i2 = pFont->descent >> 1; // 1/2 ascent is top + a / 2; 1/2 font is top + (a + d) / 2; diff is d / 2
+          i2 = iFontDescent >> 1; // 1/2 ascent is top + a / 2; 1/2 font is top + (a + d) / 2; diff is d / 2
           i1 = ((rctSource.bottom - rctBounds.bottom + 1) >> 1) - 1; // favors being slightly closer to top
           i1 -= i2;
           if(i1 > 0) // subtracting i2 from i1 didn't make it negative
@@ -905,7 +933,7 @@ it_fits:
           break;
 
         case DTAlignment_VCENTERBASELINE:
-          i2 = (pFont->ascent - pFont->descent) >> 1; //  ascent is top + a; 1/2 font is top + (a + d) / 2; diff is (a - d) / 2
+          i2 = (iFontAscent - iFontDescent) >> 1; //  ascent is top + a; 1/2 font is top + (a + d) / 2; diff is (a - d) / 2
           i1 = ((rctSource.bottom - rctBounds.bottom + 1) >> 1) - 1; // favors being slightly closer to top
           i1 += i2;
           if(i1 < rctSource.bottom) // adding i2 won't exceed 'bottom'
@@ -1222,7 +1250,34 @@ will_not_fit:
 
 
 
-void DTDrawSingleLineText(XFontStruct *pFont, const char *szText, Display *pDisplay, GC gc, Drawable dw,
+void DTDrawSingleLineText0(XFontStruct *pFont, const char *szText, Display *pDisplay, GC gc, Drawable dw,
+                           int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment)
+{
+#if 0
+XGCValues xgc;
+int iAvgChar
+
+  iAvgChar = WBFontAvgCharWidth(pDisplay, pFont); // was DTGetTextWidth(pFont, " ", 1);  // width of 1 space for text border (TODO:  RTL text)
+
+  // height pFont->max_bounds.ascent + pFont->max_bounds.descent + 2;
+
+
+            iU1 = DTGetTextWidth(pFont, tbuf, p1 - tbuf);
+
+      WB_DRAW_STRING(pDisplay, wID, fSet, gc, iHPos, iVPos, szText, strlen(szText));
+
+  xgc.font = pOldFont->fid;
+  BEGIN_XCALL_DEBUG_WRAPPER
+  XChangeGC(pDisplay, gc, GCFont, &xgc);
+  END_XCALL_DEBUG_WRAPPER
+#endif // 0
+  // TODO:  implement
+
+  DTDrawMultiLineText0(pFont, szText, pDisplay, gc, dw, iTabWidth, iTabOrigin, prcBounds,
+                       iAlignment | DTAlignment_SINGLELINE | DTAlignment_NO_WORD_WRAP);
+}
+
+void DTDrawSingleLineText(XFontSet fontSet, const char *szText, Display *pDisplay, GC gc, Drawable dw,
                           int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment)
 {
 #if 0
@@ -1245,20 +1300,14 @@ int iAvgChar
 #endif // 0
   // TODO:  implement
 
-  DTDrawMultiLineText(pFont, szText, pDisplay, gc, dw, iTabWidth, iTabOrigin, prcBounds,
+  DTDrawMultiLineText(fontSet, szText, pDisplay, gc, dw, iTabWidth, iTabOrigin, prcBounds,
                       iAlignment | DTAlignment_SINGLELINE | DTAlignment_NO_WORD_WRAP);
 }
 
-void DTDrawMultiLineText(XFontStruct *pFont, const char *szText, Display *pDisplay, GC gc, Drawable dw,
-                         int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment)
+void DTDrawMultiLineText0(XFontStruct *pFont, const char *szText, Display *pDisplay, GC gc, Drawable dw,
+                          int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment)
 {
-int i1, i2, i3, iH, iH2; //, iW2, iFontWidth, iFontHeight;
-DT_WORDS *pWords;
-DT_WORD *pW;
-WB_RECT rcDest;
-XPoint xpt[3];
 XFontSet fSet;
-
 
   if(!pFont)
   {
@@ -1272,11 +1321,6 @@ XFontSet fSet;
     }
   }
 
-  if(iAlignment & DTAlignment_SINGLELINE)
-  {
-    iAlignment |= DTAlignment_NO_WORD_WRAP; // make sure
-  }
-
   fSet = WBFontSetFromFont(pDisplay, pFont);
 
   if(fSet == None)
@@ -1286,20 +1330,50 @@ XFontSet fSet;
     return;
   }
 
+  DTDrawMultiLineText(fSet, szText, pDisplay, gc, dw, iTabWidth, iTabOrigin, prcBounds, iAlignment);
+}
+
+void DTDrawMultiLineText(XFontSet fSet, const char *szText, Display *pDisplay, GC gc, Drawable dw,
+                         int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment)
+{
+int i1, i2, i3, iH, iH2, iFontDescent; //, iW2, iFontWidth, iFontHeight;
+DT_WORDS *pWords;
+DT_WORD *pW;
+WB_RECT rcDest;
+XPoint xpt[3];
+XCharStruct xMaxBounds;
+
+
+  if(fSet == None)
+  {
+    fSet = WBGetDefaultFontSet(pDisplay);
+    if(fSet == None)
+    {
+      WB_ERROR_PRINT("%s - ERROR:  WBGetDefaultFontSet returns None\n",
+                     __FUNCTION__);
+
+      return; // bad
+    }
+  }
+
+  if(iAlignment & DTAlignment_SINGLELINE)
+  {
+    iAlignment |= DTAlignment_NO_WORD_WRAP; // make sure
+  }
+
+
   // get a few things straight 'round here
 
 // NOTE:  iFontWidth and iFontHeight not being used; commented out because of linux gcc warnings
-//  iFontWidth = WBFontAvgCharWidth(pDisplay, pFont); // was DTGetTextWidth(pFont, " ", 1);  // width of a single space
+//  iFontWidth = WBFontSetAvgCharWidth(pDisplay, pFont); // was DTGetTextWidth(pFont, " ", 1);  // width of a single space
 //  iFontHeight = pFont->ascent + pFont->descent;
 
-  pWords = DTGetWordsFromText(pFont, szText, iAlignment);
+  pWords = DTGetWordsFromText(pDisplay, fSet, szText, iAlignment);
 
   if(!pWords)
   {
     WB_ERROR_PRINT("%s - ERROR:  DTGetWordsFromText returns NULL\n",
                    __FUNCTION__);
-
-    XFreeFontSet(pDisplay, fSet);
 
     return; // error
   }
@@ -1309,7 +1383,7 @@ XFontSet fSet;
 //  WB_ERROR_PRINT("%s - TEMPORARY:  bounds rectangle is INITIALLY %d,%d,%d,%d\n",
 //                 __FUNCTION__, rcDest.left, rcDest.top, rcDest.right, rcDest.bottom);
 
-  if(InternalCalcIdealBounds(pFont, pWords, iTabWidth, iTabOrigin, prcBounds, &rcDest,
+  if(InternalCalcIdealBounds(pDisplay, fSet, pWords, iTabWidth, iTabOrigin, prcBounds, &rcDest,
                              iAlignment | DTAlignment_PRINTING, 0, -1)
     < 0)
   {
@@ -1320,10 +1394,11 @@ XFontSet fSet;
     WB_ERROR_PRINT("%s - ERROR:  InternalCalcIdealBounds returns error\n",
                    __FUNCTION__);
 
-    XFreeFontSet(pDisplay, fSet);
-
     return; // bad (error)
   }
+
+  iFontDescent = WBFontSetDescent(pDisplay, fSet);
+  xMaxBounds = WBFontSetMaxBounds(pDisplay, fSet); // font's 'max_bounds' structure member, maximized for all of them
 
 //  InternalDebugDumpWords(pWords);
 
@@ -1383,15 +1458,15 @@ XFontSet fSet;
             if(iH2 >= 0)
             {
               xpt[0].x=iH2;
-              xpt[0].y=rcDest.top + pW->iY + pFont->max_bounds.descent + 1;// + pFont->max_bounds.ascent;
-              xpt[1].x=iH + DTGetTextWidth(pFont, (char *)(pW->pText) + i3, 1); // width of character
+              xpt[0].y=rcDest.top + pW->iY + iFontDescent + 1;// + pFont->max_bounds.ascent;
+              xpt[1].x=iH + DTGetTextWidth(fSet, (char *)(pW->pText) + i3, 1); // width of character
               xpt[1].y=xpt[0].y;
 
               XDrawLines(pDisplay, dw, gc, xpt, 2, CoordModeOrigin);
             }
 
             // advance the pointer
-            iH += DTGetTextWidth(pFont, (char *)(pW->pText) + i3, i2 - i3);
+            iH += DTGetTextWidth(fSet, (char *)(pW->pText) + i3, i2 - i3);
 
             iH2 = iH; // next underscore's position
 
@@ -1414,8 +1489,8 @@ XFontSet fSet;
           if(iH >= 0)
           {
             xpt[0].x=iH;
-            xpt[0].y=rcDest.top + pW->iY + pFont->max_bounds.descent + 1;// + pFont->max_bounds.ascent;
-            xpt[1].x=iH + DTGetTextWidth(pFont, (char *)(pW->pText) + i3, 1); // width of character
+            xpt[0].y=rcDest.top + pW->iY + xMaxBounds.descent + 1;// + pFont->max_bounds.ascent;
+            xpt[1].x=iH + DTGetTextWidth(fSet, (char *)(pW->pText) + i3, 1); // width of character
             xpt[1].y=xpt[0].y;
 
             XDrawLines(pDisplay, dw, gc, xpt, 2, CoordModeOrigin);
@@ -1425,7 +1500,6 @@ XFontSet fSet;
     }
   }
 
-  XFreeFontSet(pDisplay, fSet);
   WBFree(pWords);
 }
 
@@ -1436,21 +1510,21 @@ XFontSet fSet;
 //        (so perhaps these should be deprecated?)
 
 
-void DTPreRender(Display *pDisplay, XFontStruct *pFont, DT_WORDS *pWords, int iTabWidth, int iTabOrigin,
+void DTPreRender(Display *pDisplay, XFontSet fontSet, DT_WORDS *pWords, int iTabWidth, int iTabOrigin,
                  WB_RECT *prcBounds, int iAlignment, int iStartLine, int iEndLine)
 {
 WB_RECT rcDest;
-XFontSet fSet;
+
 
   if(!pDisplay)
   {
     pDisplay = WBGetDefaultDisplay();
   }
 
-  if(!pFont)
+  if(fontSet == None)
   {
-    pFont = WBGetDefaultFont();
-    if(!pFont)
+    fontSet = WBGetDefaultFontSet(pDisplay);
+    if(fontSet)
     {
       WB_ERROR_PRINT("%s - ERROR:  WBGetDefaultFont returns NULL\n",
                      __FUNCTION__);
@@ -1464,18 +1538,9 @@ XFontSet fSet;
     iAlignment |= DTAlignment_NO_WORD_WRAP; // make sure
   }
 
-  fSet = WBFontSetFromFont(pDisplay, pFont);
-
-  if(fSet == None)
-  {
-    WB_ERROR_PRINT("Unable to get font set!\n");
-
-    return;
-  }
-
   memcpy(&rcDest, prcBounds, sizeof(rcDest));
 
-  if(InternalCalcIdealBounds(pFont, pWords, iTabWidth, iTabOrigin, prcBounds, &rcDest,
+  if(InternalCalcIdealBounds(pDisplay, fontSet, pWords, iTabWidth, iTabOrigin, prcBounds, &rcDest,
                              iAlignment | DTAlignment_PRINTING, iStartLine, iEndLine)
     < 0)
   {
@@ -1484,13 +1549,14 @@ XFontSet fSet;
     WB_ERROR_PRINT("%s - ERROR:  InternalCalcIdealBounds returns error\n",
                    __FUNCTION__);
 
-    XFreeFontSet(pDisplay, fSet);
-
     return; // bad (error)
   }
+
+
+  // TODO:  implement
 }
 
-void DTRender(Display *pDisplay, XFontStruct *pFont, const DT_WORDS *pWords, GC gc, Drawable dw,
+void DTRender(Display *pDisplay, XFontSet fontSet, const DT_WORDS *pWords, GC gc, Drawable dw,
               int iHScrollBy, int iVScrollBy, const WB_RECT *prcBounds, const WB_RECT *prcViewport, int iAlignment)
 {
   // TODO:  implement

@@ -286,7 +286,7 @@ typedef struct _text_object_vtable_
 
   /** \brief Call this function to get all text, formatted so that it can be saved to a file
     * \param pThis A pointer to the TEXT_OBJECT structure
-    * \return A 'malloc'd pointer to the selected text.
+    * \return A 'WBAlloc'd pointer to the selected text.
     *
     * This function allocates a buffer, then copies all of the text to the buffer using
     * the specified line endings and other information.
@@ -456,9 +456,9 @@ typedef struct _text_object_vtable_
     *
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param pRct A const pointer to the source WB_RECT containing the selection rectangle.  NULL uses the current selection.
-    * \return A 'malloc'd pointer to the selected text.
+    * \return A 'WBAlloc'd pointer to the selected text.
     *
-    * \details This function returns a 'malloc'd pointer, or NULL on error.  If the returned pointer is not NULL, the caller must free it.\n
+    * \details This function returns a 'WBAlloc'd pointer, or NULL on error.  If the returned pointer is not NULL, the caller must free it.\n
     * If the select mode is 'block', individual lines will always end in &lt;LF&gt;, and tabs will expand to &lt;space&gt; characters except
     * for the 'special case' noted below\n
     * In the special case of *pRct == {0,0,0,0}, all of the text will be copied, regardless of the select mode, in a format
@@ -1010,7 +1010,7 @@ typedef struct _text_buffer_
   *
   * \param pBuf Optional initializer text.  Can be NULL or 'blank', which will pre-allocate space for a default number of lines
   * \param cbBufSize Length of data pointed to by 'pBuf'.  Zero implies zero-byte terminated string
-  * \return A 'malloc'd pointer to a TEXT_BUFFER object.  Use 'WBFreeTextBuffer' to free it safely.
+  * \return A 'WBAlloc'd pointer to a TEXT_BUFFER object.  Use 'WBFreeTextBuffer' to free it safely.
   *
   * Header File:  text_object.h
 **/
@@ -1082,7 +1082,7 @@ void WBTextBufferRefreshCache(TEXT_BUFFER *pBuf);
   * \param szText The text to pre-assign the object with, or NULL
   * \param cbLen The length of 'szText', 0 to indicate zero-byte terminated
   * \param wIDOwner The owner window in which to display the text, or 'None'
-  * \return A 'malloc'd and initialized TEXT_OBJECT pointer - call WBTextObjectDestructor to destroy it
+  * \return A 'WBAlloc'd and initialized TEXT_OBJECT pointer - call WBTextObjectDestructor to destroy it
   *
   * This is being implemented as an object, similar to a C++ class with virtual member functions,
   * for the purpose of being able to re-assign the vtable and thereby overload its functionality.
@@ -1126,14 +1126,17 @@ int WBTextObjectCalculateLineHeight(int iAscent, int iDescent);
 // MBCS-related utilities
 
 /** \ingroup text_object
-  * \brief Insert multi-byte characters into a malloc'd string, at a specified column
+  * \brief Insert multi-byte characters into a WBAlloc'd string, at a specified column
   *
-  * \param pString A pointer to a malloc'd buffer containing a multi-byte character string.  The string must terminate with a zero byte.
+  * \param pString A pointer to a WBAlloc'd buffer containing a multi-byte character string.  The string must terminate with a zero byte.
   * \param iCol A zero-based column at which point to insert the text.
-  * \param pszMBString A pointer to a buffer containing the multi-byte characters to insert
+  * \param pszMBString A pointer to a buffer containing the multi-byte characters to insert.   It must NOT contain any return or line feed characters.  Tabs will be translated as specified.  Other control characters will become spaces (including line feeds, if present)
   * \param cbString The length of the multi-byte character string (in bytes, not characters), or -1 to use a terminating zero byte as 'end of string'
-  * \param bOverwrite Non-zero to 'overwrite' rather than insert the characters.  Overwrite can extend the length of the string.
-  * \return A pointer to a malloc'd string containing the results.  If different from 'pString', the 'pString' pointer value will no longer be valid.  On error, it will return NULL
+  * \param fTab An integer indicating how tabs should be handled.  A value of 0 indicates 'no tabs', '-1' is the 'default' tab, and any other value, the number of spaces that a tab will align with.
+  * \param fOverwrite Non-zero to 'overwrite' rather than insert the characters.  Overwrite can extend the length of the string.
+  * \param piNewCol A pointer to an integer to receive the 0-based 'new' column at which the cursor is pointing after the insert.  See 'WBSplitMBLine()' for a method to insert a line feed at this point.
+  * \param ppInserted An optional pointer to a char * that will be assigned a WBAlloc'd pointer to a string containing the inserted characters.  May be NULL.  The caller must free any non-NULL returned value via WBFree()
+  * \return A pointer to a WBAlloc'd string containing the results.  If different from 'pString', the 'pString' pointer value will no longer be valid.  On error, it will return NULL
   *
   * This function performs the somewhat complicated 'insert a multi-byte character' functionality in a consistent
   * AND column-based manner, so that a string that has multi-byte characters can be edited in the same way as a string
@@ -1143,9 +1146,51 @@ int WBTextObjectCalculateLineHeight(int iAscent, int iDescent);
   * 24-bit Unicode character set.  Having a ridiculously large bit-length for a single character is not much of a consolation,
   * and so this function (and others) will deal with multiple byte characters as they are, in an independent manner.
   *
+  * It is the caller's responsibility to filter out line feed characters, and insert new lines into a line buffer.
+  * 
+  * If a 'ppInserted' pointer value is specified, this function will store the inserted text in a buffer allocated
+  * via WBAlloc().  The caller must free any non-NULL value returned by this function using WBFree().  The data that
+  * is stored in this allocated buffer can be used to support 'undo' and 'redo'.
+  *
   * Header File:  text_object.h
 **/  
-char * WBInsertMBChars(char *pString, int iCol, const char *pszMBString, int cbString, int bOverwrite);
+char * WBInsertMBChars(char *pString, int iCol, const char *pszMBString, int cbString,
+                       int fTab, int fOverwrite, int *piNewCol, char **ppInserted);
+
+
+/** \ingroup text_object
+  * \brief Split a multi-byte characters into a WBAlloc'd string, at a specified column, terminating the original string at that column with a zero byte
+  *
+  * \param pString A pointer to a WBAlloc'd buffer containing a multi-byte character string.  The string must terminate with a zero byte.
+  * \param iCol A zero-based column at which point to split the line.
+  * \return A pointer to a WBAlloc'd string containing the next line to insert.  On error, it will return NULL without any changes being made.
+  *
+  * This function will 'split' a string at a particular column, returning a WBAlloc'd pointer to the 'remainder' of the line,
+  * which is intended to be inserted as a new line.  The new line will NOT be indented, and leading white space will be left 'as-is'.
+  * Trailing white space on the original line, however, will automatically be trimmed.
+  *
+  * The caller is expected to insert the returned string pointer as the 'next' line, following the line split.  The caller is
+  * also responsible for any 'auto indent' functionality that might be needed for a line split.
+**/
+char * WBSplitMBLine(char *pString, int iCol);
+
+
+/** \ingroup text_object
+  * \brief Split a multi-byte characters into a WBAlloc'd string, at a specified column, terminating the original string at that column with a zero byte
+  *
+  * \param pString A pointer to a WBAlloc'd buffer containing a multi-byte character string.  The string must terminate with a zero byte.
+  * \param iCol A 0-based column index value.  If the value is greater than the length of 'pString', then 'pString' will be padded with spaces up to that column before 'joining'.
+  * \param pJoin A (const) poitner to a buffer containing a multi-byte character string, terminated with a zero byte.  This 
+  * \return A pointer to a WBAlloc'd string containing the resulting 'join'ed string.  If different from 'pString', the 'pString' pointer value will no longer be valid.  On error, it will return NULL
+  *
+  * This function will 'join' a 2nd string to an existing (WBAlloc'd) multi-byte character string, optionally at a specified column
+  * (padding it with white space, as needed).  The 'pString' pointer must have been allocated via WBAlloc for this to function properly.
+  * However, the 'pJoin' string can be from any source.
+  *
+  * The caller is expected to remove the subsequent string pointer from being the 'next' line, as needed, following the line join.
+  *
+**/
+char * WBJoinMBLine(char *pString, int iCol, const char *pJoin);
 
 
 /** \ingroup text_object
@@ -1154,6 +1199,8 @@ char * WBInsertMBChars(char *pString, int iCol, const char *pszMBString, int cbS
   * \param pString A pointer to a buffer containing a multi-byte character string.  The string must terminate with a zero byte.
   * \param iCol A zero-based column at which point to delete the text.
   * \param nDel An integer indicating the number of multi-byte characters to delete.  A negative number will delete 'backspace' style, starting with the PREVIOUS character.  Positive deletes beginning with the character at 'iCol'.
+  * \param piNewCol An optional pointer to an integer that receives the new column that the cursor is on after the operation completes.  May be NULL.
+  * \param ppDeleted An optional pointer to a char * that will be assigned a WBAlloc'd pointer to a string containing the deleted characters.  May be NULL.  The caller must free any non-NULL returned value via WBFree()
   * \returns The number of deletions remaining (preserving the sign of 'nDel') after the operation completes.
   *
   * This function performs the somewhat complicated 'delete a multi-byte character' functionality in a consistent
@@ -1164,9 +1211,13 @@ char * WBInsertMBChars(char *pString, int iCol, const char *pszMBString, int cbS
   * they must be handled in a separate call involving the previous or next line's multi-byte character buffer.  The caller
   * is responsible for handlnig this, as well as for collapsing the lines or joining them together.
   *
+  * If a 'ppDeleted' pointer value is specified, this function will store the deleted text in a buffer allocated
+  * via WBAlloc().  The caller must free any non-NULL value returned by this function using WBFree().  The data that
+  * is stored in this allocated buffer can be used to support 'undo' and 'redo'.
+  *
   * Header File:  text_object.h
 **/
-int WBDelMBChars(char *pString, int iCol, int nDel);
+int WBDelMBChars(char *pString, int iCol, int nDel, int *piNewCol, char **ppDeleted);
 
 
 /** \ingroup text_object
@@ -1177,7 +1228,7 @@ int WBDelMBChars(char *pString, int iCol, int nDel);
   *
   * Header File:  text_object.h
 **/  
-int WBGetMBLength(char *pString);
+int WBGetMBLength(const char *pString);
 
 
 /** \ingroup text_object
@@ -1192,7 +1243,16 @@ int WBGetMBLength(char *pString);
 **/  
 char * WBGetMBCharPtr(char *pString, int iCol, int *pcbLen);
 
-
+/** \ingroup text_object
+  * \brief Obtain the column index from a pointer within a multi-byte character string
+  *
+  * \param pString A pointer to a buffer containing a multi-byte character string.  The string must terminate with a zero byte.
+  * \param pChar A (const) pointer to a character within 'pString'.  This must be a pointer to the start of a valid UTF-8 character within 'pString'.
+  * \returns The zero-based column index of the character pointed to by 'pChar' within 'pString.  If 'pChar' is out range, or points to an invalid character, the return value will be zero.
+  *
+  * Header File:  text_object.h
+**/  
+int WBGetMBColIndex(const char *pString, const char *pChar);
 
 
 #ifdef __cplusplus

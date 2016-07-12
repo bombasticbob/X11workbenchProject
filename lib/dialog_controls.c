@@ -85,7 +85,7 @@
 #define DEFAULT_BUTTON_TAB_WIDTH 4 /* for drawing button text */
 
 
-static void FileListControlDisplayProc(WBDialogControl *pList, void *pData, int iSelected, GC gc, WB_GEOM *pGeom);
+static void FileListControlDisplayProc(WBDialogControl *pList, void *pData, int iSelected, GC gc, WB_GEOM *pGeom, XFontSet fontSet);
 
 
 
@@ -917,6 +917,9 @@ IMPLEMENT_CREATE_CONTROL(PUSHBUTTON_CONTROL)
 {
 BEGIN_CREATE_CONTROL(PUSHBUTTON_CONTROL);
 
+XFontSet fsBold;
+
+
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
 //  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
@@ -950,6 +953,16 @@ BEGIN_CREATE_CONTROL(PUSHBUTTON_CONTROL);
     return NULL;
   }
 
+  // assign BOLD font to this one... (TODO:  query owner dialog box? get fonts from that?)
+
+  fsBold = WBCopyModifyFontSet(pDisplay, WBGetDefaultFontSet(pDisplay),
+                               0, WBFontFlag_WT_BOLD); // BOLD version
+
+  if(fsBold != None)
+  {
+    WBSetWindowFontSet(pDialogControl->wID, fsBold);
+  }
+
   // now allow certain kinds of input messages (I should be able to handle messages at this point)
   XSelectInput(pDisplay, pDialogControl->wID,
                WB_STANDARD_INPUT_MASK | WB_MOUSE_INPUT_MASK | WB_KEYBOARD_INPUT_MASK);
@@ -968,6 +981,9 @@ BEGIN_CREATE_CONTROL(PUSHBUTTON_CONTROL);
 IMPLEMENT_CREATE_CONTROL(DEFPUSHBUTTON_CONTROL)
 {
 BEGIN_CREATE_CONTROL(DEFPUSHBUTTON_CONTROL);
+
+XFontSet fsBold;
+
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
@@ -1003,6 +1019,16 @@ BEGIN_CREATE_CONTROL(DEFPUSHBUTTON_CONTROL);
     return NULL;
   }
 
+  // assign BOLD font to this one... (TODO:  query owner dialog box? get fonts from that?)
+
+  fsBold = WBCopyModifyFontSet(pDisplay, WBGetDefaultFontSet(pDisplay),
+                               0, WBFontFlag_WT_BOLD); // BOLD version
+
+  if(fsBold != None)
+  {
+    WBSetWindowFontSet(pDialogControl->wID, fsBold);
+  }
+
   // now allow certain kinds of input messages (I should be able to handle messages at this point)
   XSelectInput(pDisplay, pDialogControl->wID,
                WB_STANDARD_INPUT_MASK | WB_MOUSE_INPUT_MASK | WB_KEYBOARD_INPUT_MASK);
@@ -1021,6 +1047,9 @@ BEGIN_CREATE_CONTROL(DEFPUSHBUTTON_CONTROL);
 IMPLEMENT_CREATE_CONTROL(CANCELBUTTON_CONTROL)
 {
 BEGIN_CREATE_CONTROL(CANCELBUTTON_CONTROL);
+
+XFontSet fsBold;
+
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
@@ -1053,6 +1082,16 @@ BEGIN_CREATE_CONTROL(CANCELBUTTON_CONTROL);
 
     WBFree(pDialogControl);
     return NULL;
+  }
+
+  // assign BOLD font to this one... (TODO:  query owner dialog box? get fonts from that?)
+
+  fsBold = WBCopyModifyFontSet(pDisplay, WBGetDefaultFontSet(pDisplay),
+                               0, WBFontFlag_WT_BOLD); // BOLD version
+
+  if(fsBold != None)
+  {
+    WBSetWindowFontSet(pDialogControl->wID, fsBold);
   }
 
   // now allow certain kinds of input messages (I should be able to handle messages at this point)
@@ -1372,6 +1411,9 @@ BEGIN_CREATE_CONTROL(LIST_CONTROL);
     return NULL;
   }
 
+  ((WBListControl *)pDialogControl)->fsBold = None; // make sure
+
+
   // now allow certain kinds of input messages (I should be able to handle messages at this point)
   XSelectInput(pDisplay, pDialogControl->wID,
                WB_STANDARD_INPUT_MASK | WB_MOUSE_INPUT_MASK | WB_KEYBOARD_INPUT_MASK);
@@ -1554,6 +1596,8 @@ BEGIN_CREATE_CONTROL(TREE_CONTROL);
     WBFree(pDialogControl);
     return NULL;
   }
+
+  ((WBTreeControl *)pDialogControl)->fsBold = None;
 
   // now allow certain kinds of input messages (I should be able to handle messages at this point)
   XSelectInput(pDisplay, pDialogControl->wID,
@@ -2191,6 +2235,14 @@ static int list_callback(Window wID, XEvent *pEvent)
   {
     WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
                    "%s - DestroyNotify\n", __FUNCTION__);
+
+    if(((WBListControl *)pDialogControl)->fsBold == None)
+    {
+      // free up the allocated font set, if there is one
+      XFreeFontSet(pDisplay, ((WBListControl *)pDialogControl)->fsBold);
+
+      ((WBListControl *)pDialogControl)->fsBold = None;
+    }
 
     WBSetWindowData(wID, 0, NULL);
 
@@ -3911,15 +3963,12 @@ int iRval = 0, iACS, iKey, nChar;//, iLen;
 static int StaticDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                                Window wID, WBDialogControl *pSelf)
 {
-  int /*i1, i2,*/ iHPos, iVPos;
-  XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
-  XFontStruct *pOldFont, *pFont;
-  GC gc; // = WBGetWindowDefaultGC(wID);
-  XGCValues xgc;
-  WB_GEOM geomPaint, geomBorder;
-  int iType;
-//  XPoint xpt[3];
-//  char tbuf[128];
+int iHPos, iVPos, iType;
+XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
+XFontSet fontSet;
+XCharStruct xBounds;
+GC gc; // = WBGetWindowDefaultGC(wID);
+WB_GEOM geomPaint, geomBorder;
 
 
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
@@ -3931,14 +3980,18 @@ static int StaticDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
     return 0;
   }
 
-  pFont = pOldFont = WBGetWindowFontStruct(wID);
+  fontSet = WBGetWindowFontSet(wID);
 
-  if(!pFont)
+  if(fontSet == None)
   {
     // TODO:  get font from dialog info
     WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
     return 0;
   }
+
+  iHPos = WBFontSetAvgCharWidth(pDisplay, fontSet);  // average char width for text border (TODO:  RTL text ??)
+  xBounds = WBFontSetMaxBounds(pDisplay, fontSet);
+
 
   // get graphics context copy and begin painting
   gc = WBBeginPaint(wID, pEvent, &geomPaint);
@@ -3950,28 +4003,24 @@ static int StaticDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 
   iType = pSelf->ulFlags & STATIC_TYPEMASK;  // different types paint differently
 
-  // font setup
-  xgc.font = pFont->fid;
-
-  BEGIN_XCALL_DEBUG_WRAPPER
-  XChangeGC(pDisplay, gc, GCFont, &xgc);
+  //------------------
+  // ERASE BACKGROUND
+  //------------------
 
   WBClearWindow(wID, gc);
-//  XClearWindow(pDisplay, wID);  // TODO:  rather than erase background, see if I need to
-
-  iHPos = XTextWidth(pFont, " ", 2);  // width of 1 space for text border (TODO:  RTL text)
-  END_XCALL_DEBUG_WRAPPER
 
   // 3D border
   if(iType == STATIC_Frame)
   {
     geomBorder.x = 0;
-    geomBorder.y = pFont->max_bounds.ascent + pFont->max_bounds.descent + 2;
+    geomBorder.y = xBounds.ascent + xBounds.descent + 2;
     geomBorder.width = xwa.width - geomBorder.x;
     geomBorder.height = xwa.height - geomBorder.y;
 
+    // this text will apear in the upper left corner (sort of) of the border rectangle
+
     iVPos = xwa.border_width;  // top of text at top of window
-    iVPos += pFont->max_bounds.ascent; // do I need to do this?
+    iVPos += xBounds.ascent;   // base of text
   }
   else
   {
@@ -3980,10 +4029,10 @@ static int StaticDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
     geomBorder.width = xwa.width - geomBorder.x;
     geomBorder.height = xwa.height - geomBorder.y;
 
-    // vertically centered text
-    iVPos = pFont->max_bounds.ascent + pFont->max_bounds.descent;  // font height
-    iVPos = (xwa.height - iVPos) >> 1;  // half of the difference - top of text
-    iVPos += pFont->max_bounds.ascent;
+    // vertically centered text (includes if it has a 3D border, below)
+    iVPos = xBounds.ascent + xBounds.descent;  // font height
+    iVPos = (xwa.height - iVPos) >> 1;  // half of the difference, now the top of text
+    iVPos += xBounds.ascent;            // add ascent back (base of text)
   }
 
   if(pSelf->ulFlags & STATIC_3DBorder)
@@ -4052,19 +4101,16 @@ static int StaticDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 
     rctText.left = geomBorder.x + iHPos;
     rctText.right = rctText.left + geomBorder.width - 2 * iHPos;
-    rctText.top = geomBorder.y + pFont->max_bounds.ascent / 2;
-    rctText.bottom = rctText.top + geomBorder.height - pFont->max_bounds.ascent;
+    rctText.top = geomBorder.y + xBounds.ascent / 2;
+    rctText.bottom = rctText.top + geomBorder.height - xBounds.ascent;
 
-    DTDrawMultiLineText(pFont, pSelf->pCaption, pDisplay, gc, wID, DEFAULT_STATIC_TAB_WIDTH, 0,
+    DTDrawMultiLineText(fontSet, pSelf->pCaption, pDisplay, gc, wID, DEFAULT_STATIC_TAB_WIDTH, 0,
                         &rctText, DTAlignment_UNDERSCORE | DTAlignment_VCENTER);
   }
 
   // by convention, restore original objects/state
 
-  xgc.font = pOldFont->fid;
   BEGIN_XCALL_DEBUG_WRAPPER
-  XChangeGC(pDisplay, gc, GCFont, &xgc);
-
   XSetForeground(pDisplay, gc, WBGetWindowFGColor(wID));  // restore it at the end
   END_XCALL_DEBUG_WRAPPER
 
@@ -4078,15 +4124,10 @@ static int EditDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                              Window wID, WBDialogControl *pSelf)
 {
 WBEditControl *pPrivate = (WBEditControl *)pSelf;
-//int /*i1, i2,*/ iHPos, iVPos;
 XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
-XFontStruct *pOldFont, *pFont;
+XFontSet fontSet;
 GC gc; // = WBGetWindowDefaultGC(wID);
-XGCValues xgc;
 WB_GEOM geomPaint, geomBorder;
-//XPoint xpt[3];
-//int iType;
-//char tbuf[128];
 
 
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
@@ -4098,14 +4139,15 @@ WB_GEOM geomPaint, geomBorder;
     return 0;
   }
 
-  pFont = pOldFont = WBGetWindowFontStruct(wID);
+  fontSet = WBGetWindowFontSet(wID);
 
-  if(!pFont)
+  if(fontSet == None)
   {
     // TODO:  get font from dialog info
     WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
     return 0;
   }
+
 
   // get graphics context copy and begin painting
   gc = WBBeginPaint(wID, pEvent, &geomPaint);
@@ -4116,20 +4158,7 @@ WB_GEOM geomPaint, geomBorder;
   }
 
   // font setup
-  xgc.font = pFont->fid;
-
-  BEGIN_XCALL_DEBUG_WRAPPER
-  XChangeGC(pDisplay, gc, GCFont, &xgc);
-
   WBClearWindow(wID, gc);
-// NOTE:  XClearWindow is the equivalent of specifying 0,0,0,0 for x,y,w,h and passing 'False' for 'exposures'
-//  XClearArea(pDisplay, wID, geomPaint.x, geomPaint.y, geomPaint.width, geomPaint.height, False);
-//  XClearWindow(pDisplay, wID);  // TODO:  rather than erase background, see if I need to
-
-// TODO:  uncomment this when iVPos needs to be used - linux gcc warning avoidance
-//  iHPos = XTextWidth(pFont, " ", 2);  // width of 1 space for text border (TODO:  RTL text)
-  END_XCALL_DEBUG_WRAPPER
-
 
   geomBorder.x = 0;
   geomBorder.y = 0;
@@ -4168,7 +4197,7 @@ WB_GEOM geomPaint, geomBorder;
   XSetForeground(pDisplay, gc, pSelf->clrFG.pixel);
 
   pPrivate->xTextObject.vtable->do_expose(&(pPrivate->xTextObject), pDisplay, wID,
-                                          gc, &geomPaint, &geomBorder, None);
+                                          gc, &geomPaint, &geomBorder, fontSet);
 
 
 #if 0
@@ -4242,10 +4271,7 @@ WB_GEOM geomPaint, geomBorder;
 
   // by convention, restore original objects/state
 
-  xgc.font = pOldFont->fid;
   BEGIN_XCALL_DEBUG_WRAPPER
-  XChangeGC(pDisplay, gc, GCFont, &xgc);
-
   XSetForeground(pDisplay, gc, WBGetWindowFGColor(wID));  // restore it at the end
   END_XCALL_DEBUG_WRAPPER
 
@@ -4258,14 +4284,12 @@ WB_GEOM geomPaint, geomBorder;
 static int ButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                                Window wID, WBDialogControl *pSelf)
 {
-  int /*i1,*/ i2, iHPos;//, iVPos;
-  XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
-  XFontStruct *pOldFont, *pFont;
-  GC gc; // = WBGetWindowDefaultGC(wID);
-  XGCValues xgc;
-  WB_GEOM geomPaint, geomBorder;
-//  XPoint xpt[3];
-//  char tbuf[128];
+int i2, iHPos;
+XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
+XFontSet fontSet;
+XCharStruct xBounds;
+GC gc; // = WBGetWindowDefaultGC(wID);
+WB_GEOM geomPaint, geomBorder;
 
 
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
@@ -4277,14 +4301,16 @@ static int ButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
     return 0;
   }
 
-  pFont = pOldFont = WBGetWindowFontStruct(wID);
+  fontSet = WBGetWindowFontSet(wID);
 
-  if(!pFont)
+  if(fontSet == None)
   {
     // TODO:  get font from dialog info
     WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
     return 0;
   }
+
+  xBounds = WBFontSetMaxBounds(pDisplay, fontSet);
 
   // get graphics context copy and begin painting
   gc = WBBeginPaint(wID, pEvent, &geomPaint);
@@ -4294,13 +4320,7 @@ static int ButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
     return 0;
   }
 
-  xgc.font = pFont->fid;
-  BEGIN_XCALL_DEBUG_WRAPPER
-  XChangeGC(pDisplay, gc, GCFont, &xgc);
-
   WBClearWindow(wID, gc);
-//  XClearWindow(pDisplay, wID);  // TODO:  rather than erase background, see if I need to
-  END_XCALL_DEBUG_WRAPPER
 
   // paint the 3D-looking border
 
@@ -4333,8 +4353,7 @@ static int ButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
   }
 
   // painting the window text
-
-  i2 = XTextWidth(pFont, " ", 1);  // width of 1 space for left border (TODO:  RTL text)
+  i2 = WBFontSetAvgCharWidth(pDisplay, fontSet);  // average char width for text border (TODO:  RTL text ??)
   iHPos = xwa.border_width + i2;  // position of beginning of text (left side + space)
 
 #if 0
@@ -4355,20 +4374,17 @@ static int ButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 
     rctText.left = geomBorder.x + iHPos;
     rctText.right = rctText.left + geomBorder.width - 2 * iHPos;
-    rctText.top = geomBorder.y + pFont->max_bounds.ascent / 2
-                - pFont->max_bounds.descent / 2; // better centering
-    rctText.bottom = rctText.top + geomBorder.height - pFont->max_bounds.ascent;
+    rctText.top = geomBorder.y + xBounds.ascent / 2
+                - xBounds.descent / 2; // better centering
+    rctText.bottom = rctText.top + geomBorder.height - xBounds.ascent;
 
-    DTDrawMultiLineText(pFont, szText, pDisplay, gc, wID, DEFAULT_BUTTON_TAB_WIDTH, 0,
+    DTDrawMultiLineText(fontSet, szText, pDisplay, gc, wID, DEFAULT_BUTTON_TAB_WIDTH, 0,
                         &rctText, DTAlignment_UNDERSCORE | DTAlignment_VCENTER | DTAlignment_HCENTER);
   }
 
   // by convention, restore original objects/state
 
-  xgc.font = pOldFont->fid;
   BEGIN_XCALL_DEBUG_WRAPPER
-  XChangeGC(pDisplay, gc, GCFont, &xgc);
-
   XSetForeground(pDisplay, gc, WBGetWindowFGColor(wID));  // restore it at the end
   END_XCALL_DEBUG_WRAPPER
 
@@ -4381,66 +4397,45 @@ static int ButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 static int PushButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                                    Window wID, WBDialogControl *pSelf)
 {
-  int /*i1,*/ i2, iHPos;//, iVPos;
-  XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
-  XFontStruct *pOldFont, *pFont;
-  GC gc; // = WBGetWindowDefaultGC(wID);
-  XGCValues xgc;
-  WB_GEOM geomPaint, geomBorder;
-//  XPoint xpt[3];
-//  char tbuf[128];
+int i2, iHPos;
+XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
+XFontSet fontSet;
+XCharStruct xBounds;
+GC gc; // = WBGetWindowDefaultGC(wID);
+WB_GEOM geomPaint, geomBorder;
 
 
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
                  "%s - Expose %d (%08xH)\n", __FUNCTION__, (int)wID, (int)wID);
 
-  if (XGetWindowAttributes(pDisplay, wID, &xwa) == 0)
+  if(XGetWindowAttributes(pDisplay, wID, &xwa) == 0)
   {
     WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
     return 0;
   }
 
-  pOldFont = WBGetWindowFontStruct(wID);
-  pFont = NULL;
+  fontSet = WBGetWindowFontSet(wID); // I assigned the "bold font" to this on create
 
-  if(pOldFont)
+  if(fontSet == None)
   {
-    pFont = WBLoadModifyFont(pDisplay, pOldFont, 0, WBFontFlag_WT_BOLD);
+    // TODO:  get font from dialog info
+    WB_ERROR_PRINT("%s - NO FONT, line %d\n", __FUNCTION__, __LINE__);
+    return 0;
   }
 
-  if(!pFont)
-  {
-    if(!pOldFont)
-    {
-      // TODO:  get font from dialog info
-      WB_ERROR_PRINT("%s - NO FONT, line %d\n", __FUNCTION__, __LINE__);
-      return 0;
-    }
-
-    pFont = pOldFont; // use it
-  }
+  xBounds = WBFontSetMaxBounds(pDisplay, fontSet);
 
   // get graphics context copy and begin painting
   gc = WBBeginPaint(wID, pEvent, &geomPaint);
+
   if(!gc)
   {
     WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
 
-    if(pFont && pFont != pOldFont)
-    {
-      XFreeFont(pDisplay, pFont);
-    }
-
     return 0;
   }
 
-  xgc.font = pFont->fid;
-  BEGIN_XCALL_DEBUG_WRAPPER
-  XChangeGC(pDisplay, gc, GCFont, &xgc);
-
   WBClearWindow(wID, gc);
-//  XClearWindow(pDisplay, wID);  // TODO:  rather than erase background, see if I need to
-  END_XCALL_DEBUG_WRAPPER
 
   // paint the 3D-looking border
 
@@ -4486,7 +4481,7 @@ static int PushButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 
   // painting the window text
 
-  i2 = XTextWidth(pFont, " ", 1);  // width of 1 space for left border (TODO:  RTL text)
+  i2 = WBFontSetAvgCharWidth(pDisplay, fontSet);  // average char width for text border (TODO:  RTL text ??)
   iHPos = xwa.border_width + i2;  // position of beginning of text (left side + space)
 #if 0
   iVPos = pFont->max_bounds.ascent + pFont->max_bounds.descent;  // font height
@@ -4508,25 +4503,17 @@ static int PushButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 
     rctText.left = geomBorder.x + iHPos;
     rctText.right = rctText.left + geomBorder.width - 2 * iHPos;
-    rctText.top = geomBorder.y + pFont->max_bounds.ascent / 2
-                - pFont->max_bounds.descent / 2; // better centering
-    rctText.bottom = rctText.top + geomBorder.height - pFont->max_bounds.ascent;
+    rctText.top = geomBorder.y + xBounds.ascent / 2
+                - xBounds.descent / 2; // better centering
+    rctText.bottom = rctText.top + geomBorder.height - xBounds.ascent;
 
-    DTDrawMultiLineText(pFont, szText, pDisplay, gc, wID, DEFAULT_BUTTON_TAB_WIDTH, 0, &rctText,
+    DTDrawMultiLineText(fontSet, szText, pDisplay, gc, wID, DEFAULT_BUTTON_TAB_WIDTH, 0, &rctText,
                         DTAlignment_UNDERSCORE | DTAlignment_VCENTER | DTAlignment_HCENTER);
   }
 
   // by convention, restore original objects/state
 
-  xgc.font = pOldFont->fid;
   BEGIN_XCALL_DEBUG_WRAPPER
-  XChangeGC(pDisplay, gc, GCFont, &xgc);
-
-  if(pFont && pFont != pOldFont)
-  {
-    XFreeFont(pDisplay, pFont);
-  }
-
   XSetForeground(pDisplay, gc, WBGetWindowFGColor(wID));  // restore it at the end
   END_XCALL_DEBUG_WRAPPER
 
@@ -4539,19 +4526,18 @@ static int PushButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                              Window wID, WBDialogControl *pSelf)
 {
-  int i1, /*i2, iHPos, iVPos,*/ iVScrollWidth, iHScrollHeight;
-  int /* iType,*/ nHeight, nItemHeight;
-  XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
-  XFontStruct *pOldFont, *pFont;
-  GC gc; // = WBGetWindowDefaultGC(wID);
-  XGCValues xgc;
-  Region rgnTemp;
-  WB_GEOM geomPaint, geomBorder;
-  WB_SCROLLINFO *pScrollInfo;
-  LISTINFO *pListInfo;
-  WB_DIALOG_PROP *pProp;
-//  XPoint xpt[3];
-//  char tbuf[128];
+int i1, iVScrollWidth, iHScrollHeight;
+int nHeight, nItemHeight;
+XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
+XFontSet fontSet;
+XCharStruct xBounds;
+GC gc;
+Region rgnTemp;
+WB_GEOM geomPaint, geomBorder;
+WB_SCROLLINFO *pScrollInfo;
+LISTINFO *pListInfo;
+WB_DIALOG_PROP *pProp;
+
 
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
                  "%s - Expose %d (%08xH)\n", __FUNCTION__, (int)wID, (int)wID);
@@ -4562,14 +4548,16 @@ static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
     return 0;
   }
 
-  pFont = pOldFont = WBGetWindowFontStruct(wID);
+  fontSet = WBGetWindowFontSet(wID);
 
-  if(!pFont)
+  if(fontSet == None)
   {
     // TODO:  get font from dialog info
     WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
     return 0;
   }
+
+  xBounds = WBFontSetMaxBounds(pDisplay, fontSet);
 
   // get graphics context copy and begin painting
   gc = WBBeginPaint(wID, pEvent, &geomPaint);
@@ -4579,10 +4567,6 @@ static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
     return 0;
   }
 
-  // font setup
-  xgc.font = pFont->fid;
-  BEGIN_XCALL_DEBUG_WRAPPER
-  XChangeGC(pDisplay, gc, GCFont, &xgc);
 
   geomBorder.x = 0;
   geomBorder.y = 0;
@@ -4600,7 +4584,6 @@ static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
     WBDrawBorderRect(pDisplay, wID, gc, &geomBorder,
                      pSelf->pOwner ? pSelf->pOwner->clrBG.pixel : pSelf->clrABG.pixel);
   }
-  END_XCALL_DEBUG_WRAPPER
 
   geomBorder.x++;
   geomBorder.y++;
@@ -4608,10 +4591,9 @@ static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
   geomBorder.width -= 2;
 
   // calculate a few things
-// TODO:  uncomment this when iVPos needs to be used - linux gcc warning avoidance
-//  iHPos = XTextWidth(pFont, " ", 1);  // width of 1 space for text border (TODO:  RTL text)
-  iVScrollWidth = XTextWidth(pFont, "X", 1) * 2 + 4;
-  iHScrollHeight = pFont->max_bounds.ascent + pFont->max_bounds.descent + 4;
+
+  iVScrollWidth = WBTextWidth(fontSet, "X", 1) * 2 + 4; // width of vertical scrollbar
+  iHScrollHeight = xBounds.ascent + xBounds.descent + 4;
 
   pProp = (WB_DIALOG_PROP *)WBDialogControlGetDialogProp(pSelf, aDLGC_LISTINFO);
 
@@ -4629,7 +4611,7 @@ static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 
   // border
   WBDraw3DBorderRect(pDisplay, wID, gc, &geomBorder,
-                      pSelf->clrBD2.pixel, pSelf->clrBD3.pixel);
+                     pSelf->clrBD2.pixel, pSelf->clrBD3.pixel);
 
   // again reduce the size of the border rectangle by 1 pixel on all sides
   geomBorder.x++;
@@ -4655,7 +4637,7 @@ static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
   // what is the height of the dialog box in 'items'?  For now an item's height is
   // equal to pFont->max_bounds.ascent + pFont->max_bounds.descent + 6;
 
-  nItemHeight = pFont->max_bounds.ascent + pFont->max_bounds.descent + 6;
+  nItemHeight = xBounds.ascent + xBounds.descent + 6;
   nHeight = (geomBorder.height - 4) / nItemHeight; // assume no horizontal scrollbar
 
   if(!pListInfo || pListInfo->nItems <= nHeight)
@@ -4740,22 +4722,22 @@ static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
       {
         if(pListInfo->pfnDisplay)//  void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, GC gcPaint, WB_GEOM *pGeom);
         {
-          pListInfo->pfnDisplay(pSelf, pListInfo->aItems[i1], i1 == pListInfo->nPos, gc, &geomItem);
+          pListInfo->pfnDisplay(pSelf, pListInfo->aItems[i1], i1 == pListInfo->nPos, gc, &geomItem, fontSet);
         }
         else
         {
-          DLGCDefaultListControlDisplayProc(pSelf, pListInfo->aItems[i1], i1 == pListInfo->nPos, gc, &geomItem);
+          DLGCDefaultListControlDisplayProc(pSelf, pListInfo->aItems[i1], i1 == pListInfo->nPos, gc, &geomItem, fontSet);
         }
       }
       else
       {
         if(pListInfo->pfnDisplay)//  void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, GC gcPaint, WB_GEOM *pGeom);
         {
-          pListInfo->pfnDisplay(pSelf, NULL, 0, gc, &geomItem);
+          pListInfo->pfnDisplay(pSelf, NULL, 0, gc, &geomItem, fontSet);
         }
         else
         {
-          DLGCDefaultListControlDisplayProc(pSelf, NULL, 0, gc, &geomItem);
+          DLGCDefaultListControlDisplayProc(pSelf, NULL, 0, gc, &geomItem, fontSet);
         }
       }
     }
@@ -4763,10 +4745,7 @@ static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 
   // by convention, restore original objects/state
 
-  xgc.font = pOldFont->fid;
   BEGIN_XCALL_DEBUG_WRAPPER
-  XChangeGC(pDisplay, gc, GCFont, &xgc);
-
   XSetForeground(pDisplay, gc, WBGetWindowFGColor(wID));  // restore it at the end
   END_XCALL_DEBUG_WRAPPER
 
@@ -4780,75 +4759,76 @@ static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 
 // supporting functions
 
-static void FileListControlDisplayProc(WBDialogControl *pList, void *pData, int iSelected, GC gc, WB_GEOM *pGeom)
+static void FileListControlDisplayProc(WBDialogControl *pList, void *pData, int iSelected, GC gc, WB_GEOM *pGeom, XFontSet fontSet)
 {
-  int iHPos, iVPos;
-  XFontStruct *pOldFont, *pFont;//, *pFont2;
-  XGCValues xgc;
-  Window wID = pList->wID;
-  Display *pDisplay = WBGetWindowDisplay(wID);
+int iHPos;
+XCharStruct xBounds;
+Window wID = pList->wID;
+Display *pDisplay = WBGetWindowDisplay(wID);
 
 
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
                  "%s - Expose %d (%08xH) pData=%p\n", __FUNCTION__, (int)wID, (int)wID, pData);
 
-  pOldFont = WBGetWindowFontStruct(wID);
-
-  if(!pOldFont)
+  if(fontSet == None)
   {
-    pOldFont = WBGetDefaultFont();
-
-    if(!pOldFont)
+    fontSet = WBGetWindowFontSet(wID);
+    if(fontSet == None)
     {
-      WB_ERROR_PRINT("%s - NO FONT, line %d\n", __FUNCTION__, __LINE__);
-      return;
+      fontSet = WBGetDefaultFontSet(pDisplay);
+      if(fontSet == None)
+      {
+        WB_ERROR_PRINT("%s - NO FONT, line %d\n", __FUNCTION__, __LINE__);
+        return;
+      }
     }
   }
 
   if(pData && *(char *)pData == '@') // it's a directory
   {
-    // create a BOLD version of the same font for directories
+    // get the BOLD version of the same font for directories
 
-    pFont = WBLoadModifyFont(pDisplay, pOldFont, 0, WBFontFlag_WT_BOLD); // BOLD version
-
-    if(!pFont)
+    if(((WBListControl *)pList)->fsBold != None)
     {
-      // TODO:  get font from dialog info
-      WB_ERROR_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
+      fontSet = ((WBListControl *)pList)->fsBold;
+    }
+    else
+    {
+      ((WBListControl *)pList)->fsBold = WBCopyModifyFontSet(pDisplay, fontSet, 0, WBFontFlag_WT_BOLD); // BOLD version
+      if(((WBListControl *)pList)->fsBold == None)
+      {
+        // TODO:  make a copy without the 'bold' ???  (this should already have happened)
+        WB_ERROR_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
 
-      return;
+        return;
+      }
+      else
+      {
+        fontSet = ((WBListControl *)pList)->fsBold;
+      }
     }
   }
-  else
-  {
-    pFont = WBCopyFont(pOldFont);
-    if(!pFont)
-    {
-      pFont = pOldFont; // need something, eh?
-    }
-  }
+
+  xBounds = WBFontSetMaxBounds(pDisplay, fontSet);
+  iHPos = WBFontSetAvgCharWidth(pDisplay, fontSet);  // average character width for hpos
 
   // font setup
-  xgc.font = pFont->fid;
   BEGIN_XCALL_DEBUG_WRAPPER
-  XChangeGC(pDisplay, gc, GCFont, &xgc);
-
 //  XClearWindow(pDisplay, wID);  // TODO:  rather than erase background, see if I need to
   XSetForeground(pDisplay, gc, iSelected ? pList->clrHBG.pixel : pList->clrBG.pixel);
   XFillRectangle(pDisplay, wID, gc, pGeom->x, pGeom->y, pGeom->width, pGeom->height);
+  END_XCALL_DEBUG_WRAPPER
 
   if(iSelected)
   {
     WBDrawDashedRect(pDisplay, wID, gc, pGeom,  pList->clrBD2.pixel);
   }
 
-  iHPos = XTextWidth(pOldFont, " ", 2);  // width of 1 space (using OLD font) for text border (TODO:  RTL text, etc.)
-  END_XCALL_DEBUG_WRAPPER
 
-    // vertically centered text
-  iVPos = pFont->max_bounds.ascent + pFont->max_bounds.descent;  // font height
-  iVPos = (pGeom->height - iVPos) >> 1;  // half of the difference - top of text
-  iVPos += pFont->max_bounds.ascent; // base of the text
+//    // vertically centered text
+//  iVPos = xBounds.ascent + xBounds.descent;  // font height
+//  iVPos = (pGeom->height - iVPos) >> 1;  // half of the difference - top of text
+//  iVPos += xBounds.ascent; // base of the text
 
   // painting the window text
 
@@ -4866,19 +4846,19 @@ static void FileListControlDisplayProc(WBDialogControl *pList, void *pData, int 
       XSetForeground(pDisplay, gc, iSelected ? pList->clrBG.pixel : pList->clrHBG.pixel);
 
       XFillRectangle(pDisplay, wID, gc,
-                     pGeom->x + iHPos + pFont->max_bounds.ascent / 2,
-                     pGeom->y + pGeom->height / 2 - pFont->max_bounds.ascent / 4, // half-way - ascent / 4
-                     iHPos * 2 - pFont->max_bounds.ascent / 2,
-                     pFont->max_bounds.ascent / 2); // half height of text
+                     pGeom->x + iHPos + xBounds.ascent / 2,
+                     pGeom->y + pGeom->height / 2 - xBounds.ascent / 4, // half-way - ascent / 4
+                     iHPos * 2 - xBounds.ascent / 2,
+                     xBounds.ascent / 2); // half height of text
 
       // now make an 'arrow' (TODO: 3D-looking? I would need more colors...)
 
       aPoints[0].x = pGeom->x + iHPos;
       aPoints[0].y = pGeom->y + pGeom->height / 2;
-      aPoints[1].x = aPoints[0].x + pFont->max_bounds.ascent;
-      aPoints[1].y = aPoints[0].y + pFont->max_bounds.ascent * 2 / 3 - 1;
+      aPoints[1].x = aPoints[0].x + xBounds.ascent;
+      aPoints[1].y = aPoints[0].y + xBounds.ascent * 2 / 3 - 1;
       aPoints[2].x = aPoints[1].x;
-      aPoints[2].y = aPoints[0].y - pFont->max_bounds.ascent * 2 / 3 + 1;
+      aPoints[2].y = aPoints[0].y - xBounds.ascent * 2 / 3 + 1;
       aPoints[3].x = aPoints[0].x;
       aPoints[3].y = aPoints[0].y;
 
@@ -4887,15 +4867,15 @@ static void FileListControlDisplayProc(WBDialogControl *pList, void *pData, int 
       // 3D highlights for arrow
       XSetForeground(pDisplay, gc, iSelected ? pList->clrBD3.pixel : pList->clrBD2.pixel);
       XDrawLine(pDisplay, wID, gc, aPoints[0].x, aPoints[0].y, aPoints[1].x - 1, aPoints[1].y);
-      XDrawLine(pDisplay, wID, gc, aPoints[1].x + 1, pGeom->y + pGeom->height / 2 - pFont->max_bounds.ascent / 4,
-                pGeom->x + iHPos * 3, pGeom->y + pGeom->height / 2 - pFont->max_bounds.ascent / 4);
-      XDrawLine(pDisplay, wID, gc, pGeom->x + iHPos * 3, pGeom->y + pGeom->height / 2 - pFont->max_bounds.ascent / 4 + 1,
-                pGeom->x + iHPos * 3, pGeom->y + pGeom->height / 2 + pFont->max_bounds.ascent / 4 - 1);
+      XDrawLine(pDisplay, wID, gc, aPoints[1].x + 1, pGeom->y + pGeom->height / 2 - xBounds.ascent / 4,
+                pGeom->x + iHPos * 3, pGeom->y + pGeom->height / 2 - xBounds.ascent / 4);
+      XDrawLine(pDisplay, wID, gc, pGeom->x + iHPos * 3, pGeom->y + pGeom->height / 2 - xBounds.ascent / 4 + 1,
+                pGeom->x + iHPos * 3, pGeom->y + pGeom->height / 2 + xBounds.ascent / 4 - 1);
 
       XSetForeground(pDisplay, gc, iSelected ? pList->clrBD2.pixel : pList->clrBD3.pixel);
       XDrawLine(pDisplay, wID, gc, aPoints[0].x, aPoints[0].y, aPoints[2].x - 1, aPoints[2].y);
-      XDrawLine(pDisplay, wID, gc, aPoints[1].x + 1, pGeom->y + pGeom->height / 2 + pFont->max_bounds.ascent / 4,
-                pGeom->x + iHPos * 3, pGeom->y + pGeom->height / 2 + pFont->max_bounds.ascent / 4);
+      XDrawLine(pDisplay, wID, gc, aPoints[1].x + 1, pGeom->y + pGeom->height / 2 + xBounds.ascent / 4,
+                pGeom->x + iHPos * 3, pGeom->y + pGeom->height / 2 + xBounds.ascent / 4);
     }
     else
     {
@@ -4914,7 +4894,16 @@ static void FileListControlDisplayProc(WBDialogControl *pList, void *pData, int 
 
       if(*szText)
       {
-        XDrawString(pDisplay, wID, gc, pGeom->x + iHPos, pGeom->y + iVPos, szText, strlen(szText));
+        WB_RECT rctBounds;
+        
+        rctBounds.top = pGeom->y;
+        rctBounds.bottom = pGeom->y + pGeom->height;
+        rctBounds.left = pGeom->x + iHPos;
+        rctBounds.right = pGeom->x + pGeom->width - iHPos;
+
+//        XDrawString(pDisplay, wID, gc, pGeom->x + iHPos, pGeom->y + iVPos, szText, strlen(szText));
+        DTDrawSingleLineText(fontSet, szText, pDisplay, gc, wID, 0, 0, &rctBounds,
+                             DTAlignment_VCENTER | DTAlignment_HLEFT);
       }
 
       if(iSelected)  // selected item
@@ -4927,23 +4916,8 @@ static void FileListControlDisplayProc(WBDialogControl *pList, void *pData, int 
 
   // by convention, restore original objects/state
 
-  xgc.font = pOldFont->fid;
   BEGIN_XCALL_DEBUG_WRAPPER
-  XChangeGC(pDisplay, gc, GCFont, &xgc);
-
   XSetForeground(pDisplay, gc, WBGetWindowFGColor(wID));  // restore it at the end
-
-  if(pFont->fid != pOldFont->fid)
-  {
-    // font setup
-    xgc.font = pOldFont->fid;
-    XChangeGC(pDisplay, gc, GCFont, &xgc);
-  }
-
-  if(pFont != pOldFont)
-  {
-    XFreeFont(pDisplay, pFont);
-  }
   END_XCALL_DEBUG_WRAPPER
 }
 

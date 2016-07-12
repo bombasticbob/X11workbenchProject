@@ -126,6 +126,7 @@ int i_xcall_line = 0;
 /**********************************************************************/
 
 XFontStruct *pDefaultFont = NULL;  // default font
+XFontSet fontsetDefault = None;    // default font set, derived from default font
 Display *pDefaultDisplay = NULL;
 int bQuitFlag = FALSE;             // defined here, used globally
 
@@ -182,7 +183,8 @@ Atom aMENU_COMMAND=None;
   *
   *  For a popup menu:
   *    -1 :  disables the menu
-  *     0 :  enables the menu (default behavior if no handler present)
+  *     1 :  enables the menu (default behavior if no UI handler present, but menu handler IS present)
+  *     0 :  menu item NOT handled (menu item will be greyed)
   *
   *  For a dynamic menu: (preliminary) - popup menu items only (not found in top-level menus)
   *    -1 : disabled the menu
@@ -586,8 +588,7 @@ Atom aNULL=None;             // Atom for 'NULL'
   * their values should neither be directly modified nor relied upon outside
   * of the API's implementation files.
 **/
-
-typedef struct // the structure that identifies the window and what to do with it
+typedef struct  // the structure that identifies the window and what to do with it
 {
   Window wID;                                ///< window to which the structure is mapped
   const char *szClassName;                   ///< window 'class name', mostly for debug and tracing, points to NULL or persistent name string
@@ -597,6 +598,7 @@ typedef struct // the structure that identifies the window and what to do with i
   unsigned long clrFG;                       ///< default foreground color (also assigned to GC)
   unsigned long clrBG;                       ///< default background color (also assigned to GC)
   XFontStruct *pFontStruct;                  ///< Assigned font structure.  NULL implies global 'pDefaultFont'
+  XFontSet fontSet;                          ///< Assigned font set structure.  None implies global 'fontsetDefault'
   XWMHints *pWMHints;                        ///< XWMHints structure (cached)
   Pixmap pxIcon;                             ///< icon pixmap (may be None)
   Pixmap pxMask;                             ///< icon mask pixmap (may be None)
@@ -965,6 +967,8 @@ int WBInitDisplay(Display *pDisplay)
     }
   }
 
+  fontsetDefault = WBFontSetFromFont(pDisplay, pDefaultFont);
+
   // NOTE:  the documentation for 'XInternAtom' does _NOT_ include a provision to
   //        free up unused atoms.  There's no obvious way to get rid of the ones that
   //        are not being used any more.  The docs say the following:
@@ -1120,6 +1124,25 @@ XFontStruct *WBGetDefaultFont(void)
   }
 
   return(pDefaultFont);
+}
+
+XFontSet WBGetDefaultFontSet(Display *pDisplay)
+{
+extern XFontSet fontsetDefault; // TODO:  per-display font sets?
+
+  if(!pDisplay || pDisplay == pDefaultDisplay)
+  {
+    if(fontsetDefault == None)
+    {
+      WB_ERROR_PRINT("%s - fontsetDefault is None\n", __FUNCTION__);
+    }
+
+    return fontsetDefault;
+  }
+
+  WB_ERROR_PRINT("TODO:  %s - support use of non-default Display (returning 'None')\n", __FUNCTION__);
+
+  return None; // for now...
 }
 
 Window WBGetHiddenHelperWindow(void)
@@ -1376,6 +1399,15 @@ int i1;
     WBUnregisterWindowCallback(wID);
 
     XFlush(pDisp);
+  }
+
+// TODO:  cache font sets within the font helper, and manage all of them there.
+//  Font_OnExit(pDefaultDisplay); // call this _BEFORE_ I close the display
+
+  if(fontsetDefault != None)
+  {
+    XFreeFontSet(pDefaultDisplay, fontsetDefault);
+    fontsetDefault = None;
   }
 
   if(pDefaultFont)
@@ -2586,6 +2618,11 @@ static void __WindowEntryRestoreDefaultResources(int iIndex)
   }
 
   BEGIN_XCALL_DEBUG_WRAPPER
+  if(sWBHashEntries[iIndex].fontSet != None && sWBHashEntries[iIndex].fontSet != fontsetDefault)  // must delete it
+  {
+    XFreeFontSet(pDisp, sWBHashEntries[iIndex].fontSet);
+    sWBHashEntries[iIndex].fontSet = None;
+  }
   if(sWBHashEntries[iIndex].pFontStruct && sWBHashEntries[iIndex].pFontStruct != pDefaultFont)  // must delete it
   {
     XFreeFont(pDisp, sWBHashEntries[iIndex].pFontStruct);
@@ -4683,8 +4720,6 @@ int WBWindowDispatch(Window wID, XEvent *pEvent)
                    "%s - client message, pEntry==%pH\n", __FUNCTION__, pEntry);
   }
 
-
-
   if(pEntry)
   {
     // detect resize, mouse, and keystrokes for menu
@@ -4715,10 +4750,18 @@ int WBWindowDispatch(Window wID, XEvent *pEvent)
                pEvent->type == KeyRelease ||
                pEvent->type == ButtonPress ||
                pEvent->type == ButtonRelease ||
-               pEvent->type == MotionNotify) &&
-              (iRval = pMenuEntry->pMenuCallback(pMenuEntry->wID, pEvent)))
+               pEvent->type == MotionNotify ||
+               pEvent->type == ClientMessage))
       {
-        return iRval;
+        // TODO:  do I want to exclude 'Expose' and other event types ???
+        //        [this is the only part that calls the client's callback function]
+
+        iRval = pMenuEntry->pMenuCallback(pMenuEntry->wID, pEvent);
+
+        if(iRval)
+        {
+          return iRval;
+        }
       }
     }
 
@@ -4772,7 +4815,7 @@ int WBWindowDispatch(Window wID, XEvent *pEvent)
         END_XCALL_DEBUG_WRAPPER
       }
 
-      if(iRval)
+      if(iRval) // if my callback 'handled' me properly
       {
         if(pEvent->type != DestroyNotify ||        // not a destroy notification
             pEvent->xdestroywindow.window != wID)  // destroyed window isn't me
@@ -4783,8 +4826,12 @@ int WBWindowDispatch(Window wID, XEvent *pEvent)
                            __FUNCTION__, (int)pEvent->xdestroywindow.window, (int)wID);
           }
 
+          // return NOW - no further processing
+
           return iRval;
         }
+
+        // at this point, I had a DestroyNotify message for THIS window - flow through to next section
       }
     }
     else if(pEvent->type == DestroyNotify)
@@ -4820,6 +4867,8 @@ int WBWindowDispatch(Window wID, XEvent *pEvent)
 
     // handle any DestroyNotify events at this point.  A parent window may send these to child windows, even
     // after the window is actually destroyed and its callback NULL'd
+    //
+    // (NOTE:  if I had a callback, I still handle destroy notifications for ME at this point)
 
     if(pEvent->type == DestroyNotify &&
        pEvent->xdestroywindow.window == wID) // I am being destroyed
@@ -4873,9 +4922,13 @@ int WBWindowDispatch(Window wID, XEvent *pEvent)
   //        and it's either NOT a 'DestroyNotify' or there's no window entry
 
   if(!iRval)
+  {
     iRval = WBDefault(wID, pEvent);
+  }
   else
+  {
     WBDefault(wID, pEvent);  // do it anyway but don't use THAT return value
+  }
 
   return iRval;
 }
@@ -5632,9 +5685,49 @@ void WBSetWindowFontStruct(Window wID, XFontStruct *pFontStruct)
   if(pEntry)
   {
     if(pEntry->pFontStruct && pEntry->pFontStruct != pDefaultFont)  // must delete it
+    {
       XFreeFont(pEntry->pDisplay, pEntry->pFontStruct);
+    }
+
+    if(pEntry->fontSet != None && pEntry->fontSet != fontsetDefault)
+    {
+      XFreeFontSet(pEntry->pDisplay, pEntry->fontSet);
+    }
+
+    pEntry->fontSet = None; // always, before I do the next part
 
     pEntry->pFontStruct = pFontStruct;
+
+    if(pFontStruct)
+    {
+      pEntry->fontSet = WBFontSetFromFont(pEntry->pDisplay, pFontStruct);
+    }
+  }
+}
+
+void WBSetWindowFontSet(Window wID, XFontSet fontSet)
+{
+  _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
+
+  if(pEntry)
+  {
+    if(pEntry->pFontStruct && pEntry->pFontStruct != pDefaultFont)  // must delete it
+    {
+      XFreeFont(pEntry->pDisplay, pEntry->pFontStruct);
+    }
+
+    if(pEntry->fontSet != None && pEntry->fontSet != fontsetDefault)
+    {
+      XFreeFontSet(pEntry->pDisplay, pEntry->fontSet);
+    }
+
+    pEntry->pFontStruct = NULL;
+
+    if(fontSet != None)
+    {
+      pEntry->fontSet = fontSet;
+      pEntry->pFontStruct = WBFontFromFontSet(pEntry->pDisplay, fontSet);
+    }
   }
 }
 
@@ -5648,12 +5741,21 @@ void WBCreateWindowDefaultGC(Window wID, unsigned long clrFG, unsigned long clrB
     return;
 
   if(pEntry->hGC)
+  {
     XFreeGC(pEntry->pDisplay, pEntry->hGC);
+  }
+
+  // the GC's font will be used with regular 'XDrawText' and 'XDrawString' calls
+  // The associated Font Set must be queried separately for calls to XmbXXX or Xutf8XXX functions
 
   if(!pEntry->pFontStruct)
+  {
     gcv.font = pDefaultFont->fid;
+  }
   else
+  {
     gcv.font = pEntry->pFontStruct->fid;
+  }
 
   gcv.foreground = clrFG;
   gcv.background = clrBG;
@@ -5670,7 +5772,9 @@ void WBSetWindowDefaultGC(Window wID, GC hGC)
   if(pEntry)
   {
     if(pEntry->hGC)
+    {
       XFreeGC(pEntry->pDisplay, pEntry->hGC);
+    }
 
     pEntry->hGC = hGC;
   }
@@ -5691,7 +5795,9 @@ GC WBGetWindowDefaultGC(Window wID)
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
   if(pEntry)
+  {
     return(pEntry->hGC);
+  }
 
   return(NULL);
 }
@@ -5702,7 +5808,9 @@ GC WBGetWindowCopyGC(Window wID)
   GC gcRval = 0;
 
   if(!pEntry)
+  {
     return NULL;
+  }
 
   gcRval = XCreateGC(pEntry->pDisplay, wID, 0, NULL);
   if(gcRval)
@@ -5814,7 +5922,9 @@ unsigned long WBGetWindowFGColor(Window wID)
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
   if(pEntry)
+  {
     return(pEntry->clrFG);
+  }
 
   return(0);
 }
@@ -5824,7 +5934,9 @@ unsigned long WBGetWindowBGColor(Window wID)
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
   if(pEntry)
+  {
     return(pEntry->clrBG);
+  }
 
   return(0);
 }
@@ -6159,7 +6271,9 @@ XFontStruct *WBGetWindowFontStruct(Window wID)
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
   if(pEntry && pEntry->pFontStruct)
+  {
     return(pEntry->pFontStruct);
+  }
 
   if(!pDefaultFont)
   {
@@ -6167,6 +6281,23 @@ XFontStruct *WBGetWindowFontStruct(Window wID)
   }
 
   return(pDefaultFont);  // use global font structure
+}
+
+XFontSet WBGetWindowFontSet(Window wID)
+{
+  _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
+
+  if(pEntry && pEntry->fontSet != None)
+  {
+    return(pEntry->fontSet);
+  }
+
+  if(fontsetDefault == None)
+  {
+    WB_ERROR_PRINT("%s - default font is NULL\n", __FUNCTION__);
+  }
+
+  return(fontsetDefault);  // use global font set
 }
 
 void WBSetWindowClassName(Window wID, const char *szClassName)

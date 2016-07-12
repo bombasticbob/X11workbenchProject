@@ -225,7 +225,7 @@ int MBIsMenuValid(const WBMenu *pMenu)
   // For now, we MUST assume that a WBMenu was allocated using MBCreateMenu()
   // or else this next part will not work properly
 
-  if(WBAllocUsableSize(pMenu) < sizeof(WBMenu))
+  if(WBAllocUsableSize((void *)pMenu) < sizeof(WBMenu))
   {
     WB_ERROR_PRINT("ERROR:  %s - invalid WBMenu pointer %p\n", __FUNCTION__, pMenu);
     return 0;
@@ -248,7 +248,7 @@ int MBIsMenuItemValid(const WBMenuItem *pMenuItem)
   // For now, we MUST assume that a WBMenuItem was allocated using MBCreateMenuItem()
   // or else this next part will not work properly
 
-  if(WBAllocUsableSize(pMenuItem) < sizeof(WBMenuItem))
+  if(WBAllocUsableSize((void *)pMenuItem) < sizeof(WBMenuItem))
   {
     WB_ERROR_PRINT("ERROR:  %s - invalid WBMenuItem pointer %p\n", __FUNCTION__, pMenuItem);
     return 0;

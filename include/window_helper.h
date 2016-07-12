@@ -827,6 +827,8 @@ static __inline__ Display * WBGetDefaultDisplay(void)
 /** \ingroup defaults
   * \brief Returns a pointer to the default font's XFontStruct
   *
+  * \returns A pointer to an XFontStruct, or 'NULL' on error
+  *
   * The default XFontStruct is allocated at startup.  This function
   * returns a pointer to this XFontStruct, which can be used in a
   * case where the 'in use' XFontStruct is not known, or when an
@@ -835,6 +837,21 @@ static __inline__ Display * WBGetDefaultDisplay(void)
   * Header File:  window_helper.h
 **/
 XFontStruct *WBGetDefaultFont(void);
+
+/** \ingroup defaults
+  * \brief Returns an XFontSet for the default font
+  *
+  * \param pDisplay A pointer to the Display, or NULL to use the default Display
+  * \returns An XFontSet, or 'None' on error
+  *  
+  * The default XFontSet is allocated at startup from the default XFontStruct.
+  * This function returns this XFontSet, which can be used in a case where the
+  * 'in use' XFontSet is not known, or when an overriding font set has not
+  * been specified.
+  *
+  * Header File:  window_helper.h
+**/
+XFontSet WBGetDefaultFontSet(Display *pDisplay);
 
 /** \ingroup defaults
   * \brief Returns a special 'hidden' window used for information purposes
@@ -1315,11 +1332,21 @@ void WBSetWindowIcon(Window wID, int idIcon);
   * \brief assigns the default XFontStruct to a window
   *
   * \param wID The Window ID from which to return the default cursor
-  * \param pFontStruct A pointer to an XFontStruct that describes the font
+  * \param pFontStruct A pointer to an XFontStruct that describes the font.  This value will be 'owned' by the window.  To use the default font, assign a value of NULL
   *
   * Header File:  window_helper.h
 **/
 void WBSetWindowFontStruct(Window wID, XFontStruct *pFontStruct);
+
+/** \ingroup wcore
+  * \brief assigns the default XFontSet to a window
+  *
+  * \param wID The Window ID from which to return the default cursor
+  * \param fontSet An XFontSet for the window.  This value will be 'owned' by the window.  To use the default font set, assign a value of 'None'
+  *
+  * Header File:  window_helper.h
+**/
+void WBSetWindowFontSet(Window wID, XFontSet fontSet);
 
 /** \ingroup wcore
   * \brief Assigns a default cursor (by ID) to a window
@@ -1487,11 +1514,21 @@ GC WBGetWindowDefaultGC(Window wID);
   * \brief Returns the current XFontStruct pointer assigned to the window (may be NULL)
   *
   * \param wID The Window ID from which to obtain the current XFontStruct pointer
-  * \return A pointer to the assigned XFontStruct, or NULL
+  * \return A pointer to the assigned XFontStruct, or NULL on error
   *
   * Header File:  window_helper.h
 **/
 XFontStruct *WBGetWindowFontStruct(Window wID);
+
+/** \ingroup wcore
+  * \brief Returns the current XFontSet assigned to the window (may be None)
+  *
+  * \param wID The Window ID from which to obtain the current XFontStruct pointer
+  * \return The assigned XFontSet, or 'None' on error
+  *
+  * Header File:  window_helper.h
+**/
+XFontSet WBGetWindowFontSet(Window wID);
 
 /** \ingroup wcore
   * \brief Returns the currently assigned foreground color

@@ -234,6 +234,42 @@ static const char szOKBox[]=
   "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
   "  CONTROL:DefPushButton ID:IDOK TITLE:OK X:80 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "END_DIALOG\n";
+static const char szNoBox[]=
+  "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"OK Box\"\n"
+  "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:DefPushButton ID:IDCANCEL TITLE:No X:80 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "END_DIALOG\n";
+static const char szYesBox[]=
+  "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"OK Box\"\n"
+  "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:DefPushButton ID:IDYES TITLE:Yes X:80 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "END_DIALOG\n";
+static const char szCancelBox[]=
+  "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"OK Box\"\n"
+  "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:DefPushButton ID:IDCANCEL TITLE:Cancel X:80 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "END_DIALOG\n";
+static const char szAbortBox[]=
+  "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"OK Box\"\n"
+  "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:DefPushButton ID:IDABORT TITLE:Abort X:80 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "END_DIALOG\n";
+static const char szRetryBox[]=
+  "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"OK Box\"\n"
+  "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:DefPushButton ID:IDRETRY TITLE:Retry X:80 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "END_DIALOG\n";
+static const char szIgnoreBox[]=
+  "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"OK Box\"\n"
+  "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:DefPushButton ID:IDIGNORE TITLE:Ignore X:80 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "END_DIALOG\n";
 static const char szOKCancelBox[]=
   "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"OK/Cancel Box\"\n"
   "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
@@ -245,8 +281,31 @@ static const char szYesNoBox[]=
   "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"Yes/No Box\"\n"
   "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
   "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
-  "  CONTROL:DefPushButton ID:IDYES TITLE:Yes X:40 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
-  "  CONTROL:CancelButton ID:IDNO TITLE:No X:120 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "  CONTROL:DefPushButton ID:IDYES TITLE:_Yes X:40 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "  CONTROL:CancelButton ID:IDNO TITLE:_No X:120 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "END_DIALOG\n";
+static const char szYesNoCancelBox[]=
+  "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"Yes/No Box\"\n"
+  "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:DefPushButton ID:IDYES TITLE:_Yes X:20 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "  CONTROL:PushButton ID:IDNO TITLE:_No X:80 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "  CONTROL:CancelButton ID:IDCANCEL TITLE:Cancel X:140 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "END_DIALOG\n";
+static const char szAbortRetryBox[]=
+  "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"Yes/No Box\"\n"
+  "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:DefPushButton ID:IDABORT TITLE:_Abort X:40 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "  CONTROL:CancelButton ID:IDRETRY TITLE:_Retry X:120 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "END_DIALOG\n";
+static const char szAbortRetryIgnoreBox[]=
+  "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"Yes/No Box\"\n"
+  "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:DefPushButton ID:IDYES TITLE:_Abort X:20 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "  CONTROL:PushButton ID:IDRETRY TITLE:_Retry X:80 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "  CONTROL:CancelButton ID:IDIGNORE TITLE:_Ignore X:140 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "END_DIALOG\n";
 
 struct _MESSAGE_BOX_ mbox;
@@ -293,6 +352,30 @@ int iRval, iX, iY;
       pRes = szOKBox;
       break;
 
+    case MessageBox_Yes:
+      pRes = szYesBox;
+      break;
+
+    case MessageBox_No:
+      pRes = szNoBox;
+      break;
+
+    case MessageBox_Cancel:
+      pRes = szCancelBox;
+      break;
+
+    case MessageBox_Abort:
+      pRes = szAbortBox;
+      break;
+
+    case MessageBox_Retry:
+      pRes = szRetryBox;
+      break;
+
+    case MessageBox_Ignore:
+      pRes = szIgnoreBox;
+      break;
+
     case MessageBox_OK | MessageBox_Cancel:
       pRes = szOKCancelBox;
       break;
@@ -301,8 +384,31 @@ int iRval, iX, iY;
       pRes = szYesNoBox;
       break;
 
+    case MessageBox_Yes | MessageBox_No | MessageBox_Cancel:
+      pRes = szYesNoCancelBox;
+      break;
+
+    case MessageBox_Abort | MessageBox_Retry:
+      pRes = szAbortRetryBox;
+      break;
+
+    case MessageBox_Abort | MessageBox_Retry | MessageBox_Ignore:
+      pRes = szAbortRetryIgnoreBox;
+      break;
+
     default:
-      pRes = szOKBox;  // for now just do this
+      if((iType & MessageBox_Abort) || (iType & MessageBox_Retry) || (iType & MessageBox_Ignore))
+      {
+        pRes = szAbortRetryIgnoreBox;
+      }
+      else if((iType & MessageBox_Yes) || (iType & MessageBox_No) || (iType & MessageBox_Cancel))
+      {
+        pRes = szYesNoCancelBox;
+      }
+      else
+      {
+        pRes = szOKBox;
+      }
   }
 
 
@@ -935,7 +1041,7 @@ typedef struct _SPLASH_
   int iW, iH; // width/height of bitmap
   int iDepth; // depth, needed to create compatible pixmaps
   int nIter; // total # of iterations thus far
-  XFontStruct *pFont;
+  XFontSet fontSet;//Struct *pFont;
   int nGleam;      // current gleam center position
   WB_GEOM geomBorder;
   XStandardColormap cmap;
@@ -1009,7 +1115,7 @@ unsigned int ai1[3];
   data.clrWhite = WhitePixel(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
   data.iW = xattr.width;
   data.iH = xattr.height;
-  data.pFont = NULL;  // must do this
+  data.fontSet = None;  // must do this
   data.nGleam = 0;
   data.pImage = NULL;
   data.pImageData = NULL;
@@ -1109,9 +1215,9 @@ unsigned int ai1[3];
     data.pixmap2 = None;
   }
 
-  if(data.pFont)
+  if(data.fontSet)
   {
-    XFreeFont(WBGetDefaultDisplay(), data.pFont);
+    XFreeFontSet(WBGetDefaultDisplay(), data.fontSet);
   }
   END_XCALL_DEBUG_WRAPPER
 }
@@ -1172,14 +1278,12 @@ struct _SPLASH_ *pData = (struct _SPLASH_ *)WBGetWindowData(wID, 0);
 static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                                Window wID, struct _SPLASH_ *pData)
 {
-  XFontStruct *pFont;//, *pOldFont;
-//  XPoint xpt[3];
-  GC gc;// = WBGetWindowDefaultGC(wID);
-  Pixmap pxTemp;
-  XGCValues xgcv;
-  WB_GEOM geomText;
-//  XRectangle xrct;
-  int iX, iY, iTimeStart, iTimeEnd;
+XFontSet fontSet;
+GC gc;
+Pixmap pxTemp;
+XGCValues xgcv;
+WB_GEOM geomText;
+int iX, iY, iTimeStart, iTimeEnd;
 
 
   if(!pDisplay)
@@ -1189,26 +1293,28 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 
 //  gc = WBBeginPaint(wID, pEvent, &geomPaint);  // gnome b0rks this - window has absolute coordinates!
 
-  if(!pData->pFont && pData->szCopyright && *(pData->szCopyright))
+  if(pData->fontSet == None && pData->szCopyright && *(pData->szCopyright))
   {
-    pFont = DTCalcIdealFont(NULL, pData->szCopyright, &geomText);
+    fontSet = DTCalcIdealFontSet(WBGetDefaultDisplay(), WBGetDefaultFontSet(WBGetDefaultDisplay()),
+                                 pData->szCopyright, &geomText);
 
-    if(!pFont)
+    if(fontSet == None)
     {
-      pFont = WBGetDefaultFont();
+      fontSet = WBFontSetFromFont(WBGetDefaultDisplay(), WBGetDefaultFont()); // makes a copy of the font set, basically
     }
 
-    pData->pFont = WBCopyFont(pFont);
+    pData->fontSet = fontSet;
   }
 
-  pFont = pData->pFont; // cache it
+  fontSet = pData->fontSet; // cache it for later
+
 
   bzero(&xgcv, sizeof(xgcv));
-  if(pFont)
-  {
-    xgcv.font = pData->pFont->fid;
-    xgcv.fill_style = FillSolid;
-  }
+//  if(pFont)
+//  {
+//    xgcv.font = pData->pFont->fid;
+//    xgcv.fill_style = FillSolid;
+//  }
   xgcv.foreground = pData->clrText;
   xgcv.background = pData->clrWhite;
   xgcv.line_width = 1;
@@ -1216,7 +1322,7 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
   xgcv.cap_style = CapProjecting;
 
   gc = XCreateGC(pDisplay, wID,
-                 ((xgcv.font ? GCFont | GCFillStyle : 0) | GCForeground | GCBackground | GCCapStyle | GCFunction | GCLineWidth),
+                 (/*(xgcv.font ? GCFont | GCFillStyle : 0) | */GCForeground | GCBackground | GCCapStyle | GCFunction | GCLineWidth),
                  &xgcv);
 
   if(!gc)
@@ -1326,7 +1432,7 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 
     // copyright string is 1 or 2 lines, for now use whatever font I end up with and draw lines separately
 
-    if(pFont)
+    if(fontSet != None)
     {
       WB_RECT rctBounds;
       rctBounds.left = geomText.x;
@@ -1334,7 +1440,7 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
       rctBounds.right = rctBounds.left + geomText.width;
       rctBounds.bottom = rctBounds.top + geomText.height;
 
-      DTDrawMultiLineText(pFont, pData->szCopyright, pDisplay, gc, pData->pixmap,
+      DTDrawMultiLineText(fontSet, pData->szCopyright, pDisplay, gc, pData->pixmap,
                           -8, 0, &rctBounds, DTAlignment_VCENTER | DTAlignment_HCENTER);
 #if 0
       p1 = pData->szCopyright;

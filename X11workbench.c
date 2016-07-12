@@ -116,6 +116,8 @@ static int TabMoveLeftHandler(XClientMessageEvent *);
 static int TabMoveRightHandler(XClientMessageEvent *);
 static int TabUIHandler(WBMenu *, WBMenuItem *);
 
+static int ToolBoxHandler(XClientMessageEvent *pEvent);
+static int ToolBoxUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem);
 
 
 int main(int argc, char *argv0[], char *envp0[])
@@ -184,6 +186,7 @@ static char szAppMenu[]="1\n"
                         "_About X11workbench\tIDM_HELP_ABOUT\tAbout X11workbench\tAlt+F1\n"
                         "\n"
                         "5\n"
+                        "_Toolbox\tIDM_TOOLBOX\tDisplay (or hide) the Toolbox\n"
                         "_Options\tIDM_TOOLS_OPTIONS\tDisplay Options Editor\n"
                         "\n";
 
@@ -226,6 +229,7 @@ static char szEditMenu[]="1\n"
                         "Select _All\tIDM_EDIT_SELECT_ALL\tSelect All in context\tCtrl+A\n"
                         "\n"
                         "5\n"
+                        "_Toolbox\tIDM_TOOLBOX\tDisplay (or hide) the Toolbox\n"
                         "_Options\tIDM_TOOLS_OPTIONS\tDisplay Options Editor\n"
                         "\n"
                         "6\n"
@@ -251,6 +255,8 @@ FW_MENU_HANDLER_BEGIN(main_menu_handlers)
   FW_MENU_HANDLER_ENTRY("IDM_FILE_SAVE_ALL",FileSaveAllHandler,FileSaveAllUIHandler)
 
   FW_MENU_HANDLER_ENTRY("IDM_FILE_CLOSE",FileCloseHandler,NULL) // TODO:  do a UI handler?
+
+  FW_MENU_HANDLER_ENTRY("IDM_TOOLBOX",ToolBoxHandler,ToolBoxUIHandler)
 
   FW_MENU_HANDLER_ENTRY("IDM_TAB_LEFT",TabLeftHandler, TabUIHandler)
   FW_MENU_HANDLER_ENTRY("IDM_TAB_RIGHT",TabRightHandler, TabUIHandler)
@@ -943,8 +949,27 @@ static int TabMoveRightHandler(XClientMessageEvent *pEvent)
 
 static int TabUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem)
 {
+  if(FWGetContainedWindowByIndex(pMainFrame, 1) != NULL)
+  {
+    return 1; // enabled (more than one tab)
+  }
+
+  return -1; // disabled (zero or one child frames)
+}
+
+static int ToolBoxHandler(XClientMessageEvent *pEvent)
+{
+  DLGMessageBox(MessageBox_WTF | MessageBox_No, None, "X11workbench - Unimplemented",
+                "ToolBox Handler not (yet) implemented");
+
+  return 1; // "handled"
+}
+
+static int ToolBoxUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem)
+{
   return 1; // enabled  (TODO:  check # of tabs, etc.)
 }
+
 
 
 static int HelpContentsHandler(XClientMessageEvent *pEvent)

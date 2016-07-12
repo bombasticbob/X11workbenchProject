@@ -483,55 +483,11 @@ void MBDestroyMenuPopupWindow(WBMenuPopupWindow *pMenuPopupWindow)
 }
 
 
-static void MBMenuPopupHandleMenuItem(Display *pDisplay, Window wID, WBMenuPopupWindow *pSelf, WBMenu *pMenu, WBMenuItem *pItem)
-{
-  if(pItem->iAction & WBMENU_POPUP_HIGH_BIT)
-  {
-    XClientMessageEvent evt;
-
-    // post a high-priority message to myself to display the menu
-
-    bzero(&evt, sizeof(evt));
-    evt.type = ClientMessage;
-    evt.display = pDisplay;
-    evt.window = wID;
-    evt.message_type = aMENU_DISPLAY_POPUP;
-    evt.format = 32;
-    evt.data.l[0] = pItem->iAction & WBMENU_POPUP_MASK;
-    evt.data.l[1] = pItem->iPosition;
-
-    WBPostPriorityEvent(wID, (XEvent *)&evt);
-  }
-  else // regular menu item.  do a 'menu command'
-  {
-    XClientMessageEvent evt;
-
-    bzero(&evt, sizeof(evt));
-    evt.type = ClientMessage;
-
-    evt.display = pDisplay;
-    evt.window = pSelf->wOwner;
-    evt.message_type = aMENU_COMMAND;
-    evt.format = 32;  // always
-    evt.data.l[0] = pItem->iAction;  // menu command message ID
-#warning potentially dangerous code.  this should be re-written to NOT use a 'pMenu' pointer in an event
-    evt.data.l[1] = (long)pMenu;     // pointer to menu object
-    evt.data.l[2] = wID;             // window ID of menu bar
-
-    WBPostEvent(pSelf->wOwner, (XEvent *)&evt);
-
-    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Menu,
-                    "%s - Post Event: %08xH %08xH %pH %08xH\n",
-                    __FUNCTION__, (int)aMENU_COMMAND, (int)pItem->iAction,
-                    pMenu, (int)wID);
-
-    WBEndModal(wID, pItem->iAction);
-  }
-}
-
 static int MBMenuPopupHandleMenuItemUI(Display *pDisplay, WBMenuPopupWindow *pSelf, WBMenu *pMenu, WBMenuItem *pItem)
 {
-  XClientMessageEvent evt;
+XClientMessageEvent evt;
+int iRval;
+
 
   bzero(&evt, sizeof(evt));
   evt.type = ClientMessage;
@@ -567,7 +523,74 @@ static int MBMenuPopupHandleMenuItemUI(Display *pDisplay, WBMenuPopupWindow *pSe
   // TODO:  handle things differently for a DYNAMIC menu UI handler?
   ////////////////////////////////////////////////////////////////////
 
-  return WBWindowDispatch(pSelf->wOwner, (XEvent *)&evt); // 'send event'
+  iRval = WBWindowDispatch(pSelf->wOwner, (XEvent *)&evt); // 'send event'
+
+
+//  if(iRval < 1)
+//  {
+//    WB_ERROR_PRINT("TEMPORARY:  %s - \"%s\" returning %d\n", __FUNCTION__,
+//                   (const char *)(pItem->data + pItem->iMenuItemText), iRval);
+//  }
+
+  return iRval;
+}
+
+
+// NOTE:  this function will NOT invoke the handler because it sends a MENU_UI_COMMAND before posting the handler event
+
+static void MBMenuPopupHandleMenuItem(Display *pDisplay, Window wID, WBMenuPopupWindow *pSelf, WBMenu *pMenu, WBMenuItem *pItem)
+{
+  if(pItem->iAction & WBMENU_POPUP_HIGH_BIT)
+  {
+    XClientMessageEvent evt;
+
+    // post a high-priority message to myself to display the menu
+
+    bzero(&evt, sizeof(evt));
+    evt.type = ClientMessage;
+    evt.display = pDisplay;
+    evt.window = wID;
+    evt.message_type = aMENU_DISPLAY_POPUP;
+    evt.format = 32;
+    evt.data.l[0] = pItem->iAction & WBMENU_POPUP_MASK;
+    evt.data.l[1] = pItem->iPosition;
+
+    WBPostPriorityEvent(wID, (XEvent *)&evt);
+  }
+  else // regular menu item.  do a 'menu command'
+  {
+    int iUIState = MBMenuPopupHandleMenuItemUI(pDisplay, pSelf, pMenu, pItem);
+
+    if(iUIState > 0) // a handler exists AND the menu is NOT disabled
+    {
+      XClientMessageEvent evt;
+
+      bzero(&evt, sizeof(evt));
+      evt.type = ClientMessage;
+
+      evt.display = pDisplay;
+      evt.window = pSelf->wOwner;
+      evt.message_type = aMENU_COMMAND;
+      evt.format = 32;  // always
+      evt.data.l[0] = pItem->iAction;  // menu command message ID
+#warning potentially dangerous code.  this should be re-written to NOT use a 'pMenu' pointer in an event
+      evt.data.l[1] = (long)pMenu;     // pointer to menu object
+      evt.data.l[2] = wID;             // window ID of menu bar
+
+      WBPostEvent(pSelf->wOwner, (XEvent *)&evt);
+
+      WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Menu,
+                      "%s - Post Event: %08xH %08xH %pH %08xH\n",
+                      __FUNCTION__, (int)aMENU_COMMAND, (int)pItem->iAction,
+                      pMenu, (int)wID);
+    }
+    else
+    {
+      XBell(pDisplay, -100); // indicate that the menu is disabled so I know I didn't activate it
+    }
+
+    WBEndModal(wID, pItem->iAction);
+  }
 }
 
 static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
@@ -656,10 +679,14 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
     int iUIState = 0;
 
     if(!pItem)
+    {
       continue;
+    }
 
     if(pItem->iPosition < 0)
+    {
       pItem->iPosition = iVPos;  // also needed for mousie/clickie
+    }
 
     if(pItem->iAction == WBMENU_SEPARATOR) // separator
     {
@@ -688,8 +715,10 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
     }
 
     iUIState = MBMenuPopupHandleMenuItemUI(pDisplay, pSelf, pMenu, pItem);
-      // this will return 0 to handle normally, or something OTHER than zero to modify the menu
-      // in this case, -1 disables the menu item
+      // iUIState is 0 if menu NOT handled (default action, disable it)
+      // iUIState is < 0 to disable, > 0 to enable.  See aMENU_UI_ITEM docs for more info
+
+    // TODO:  do I cache the state so I don't allow activation?
 
     if(i1 == pSelf->iSelected)  // selected item
     {
@@ -702,8 +731,9 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
                      xwa.border_width + 2, pItem->iPosition - 1,
                      xwa.width-4-2*xwa.border_width, iItemHeight - 1);
 
-      if(!iUIState)
+      if(iUIState > 0)
       {
+        // TODO:  'checked' state
         XSetForeground(pDisplay, gc, clrMenuActiveFG.pixel);
       }
       else
@@ -713,8 +743,9 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
     }
     else
     {
-      if(!iUIState)
+      if(iUIState > 0)
       {
+        // TODO:  'checked' state
         XSetForeground(pDisplay, gc, clrMenuFG.pixel);
       }
       else
@@ -729,8 +760,10 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
     {
       // locate the first (only the first) underscore
       char *p1;
+
       strcpy(tbuf, szText);
       p1 = tbuf + pItem->iUnderscore - pItem->iMenuItemText; // position of underscore
+
       if(*p1 == '_') // TODO:  allow multiple underscores?  Not much value in it (could loop)
       {
         *p1 = 0;
@@ -752,21 +785,29 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
       }
       else
       {
-          WB_ERROR_PRINT("%s - ERROR:  cannot locate underscore\n", __FUNCTION__);
+        WB_ERROR_PRINT("%s - ERROR:  cannot locate underscore\n", __FUNCTION__);
       }
 
       szText = tbuf; // modified text without '_' in it
     }
 
     if(pItem->iTextWidth < 0)
+    {
       pItem->iTextWidth = XTextWidth(pFont, szText, strlen(szText));
+    }
+
+    //***************************************************************//
+    // TODO:  handle 'checked' menu items, both enabled AND disabled //
+    //***************************************************************//
 
     // TODO:  change string into a series of XTextItem structures and
     //        then call XDrawText to draw the array of 'XTextItem's
     if(*szText)
+    {
       XDrawString(pDisplay, wID, gc, iHPos,
                   pItem->iPosition + pFont->max_bounds.ascent,
                   szText, strlen(szText));
+    }
 
     // next I want to indicate what the hotkey is.  This text must be right-justified
     if(pItem->iHotKey >= 0)
@@ -777,6 +818,7 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
         int iLen = strlen(p2);
         int iWidth = XTextWidth(pFont, p2, iLen)
                    + XTextWidth(pFont, " ", 1) * 2; // white space on right side
+
         XDrawString(pDisplay, wID, gc,
                     xwa.width + xwa.border_width - 2 - iWidth,
                     pItem->iPosition + pFont->max_bounds.ascent,
@@ -835,12 +877,18 @@ WB_GEOM geom;
     WBMenuItem *pItem = pMenu->ppItems[i1];
 
     if(!pItem)
+    {
       continue;
+    }
 
     if((i1 + 1) < pMenu->nItems)
+    {
       iMaxY = pMenu->ppItems[i1 + 1]->iPosition - 1;
+    }
     else
+    {
       iMaxY = pSelf->iY + pSelf->iHeight;
+    }
 
     if(pItem->iPosition <= iY && iMaxY >= iY)  // between them
     {
@@ -852,8 +900,11 @@ WB_GEOM geom;
         return pItem;  // just return (nothing else to do)
       }
 
-      if(pItem->iAction == WBMENU_SEPARATOR ||
-         0 != MBMenuPopupHandleMenuItemUI(WBGetWindowDisplay(wID), pSelf, pMenu, pItem))
+      // WBMenuPopupHandleMenuItemiUI returns 0 if menu NOT handled (default action, disable it)
+      // it returns < 0 to disable, > 0 to enable.  See aMENU_UI_ITEM docs for more info
+
+      if(pItem->iAction == WBMENU_SEPARATOR)// ||
+//         0 >= MBMenuPopupHandleMenuItemUI(WBGetWindowDisplay(wID), pSelf, pMenu, pItem)) // not handled or 'disable'
       {
         if(pSelf->iSelected >= 0 && pSelf->iSelected < pMenu->nItems)
         {
@@ -1251,6 +1302,8 @@ static int MBMenuPopupEvent(Window wID, XEvent *pEvent)
         pItem = pMenu->ppItems[iMenuItemIndex];
         if((unsigned long)pItem == (unsigned long)(((XClientMessageEvent *)pEvent)->data.l[0]))
         {
+          // NOTE:  this will NOT invoke the handler because it sends a MENU_UI_COMMAND before
+          //        posting the handler event
           MBMenuPopupHandleMenuItem(pDisplay, wID, pSelf, pMenu, pItem);
 
           return 1;  // handled

@@ -718,6 +718,19 @@ int nChar = sizeof(tbuf);
     iRval = pC->pUserCallback(wID, pEvent);
   }  
 
+
+  // TODO:  menu and menu UI handler?  For now, no.  rely on frame window.
+
+  if(pEvent->type == ClientMessage &&
+     (pEvent->xclient.message_type == aMENU_COMMAND ||
+      pEvent->xclient.message_type == aMENU_UI_COMMAND))
+  {
+    // TODO:  special handling?
+
+    return iRval;  // default behavior for these
+  }
+
+
   // regardless, for a 'DestroyNotify, assign wID to 'None' in the ChildFrame class
 
   if(!iRval)

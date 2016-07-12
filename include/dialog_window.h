@@ -634,7 +634,15 @@ Display *pDisplay = WBGetWindowDisplay(pDLG->wID);
   * \brief Message Box flag enumeration
   *
   * Use these bit-flags and masks for calls to DLGMessageBox()\n
-  * You should 'or' one or more of the 'Button Bits' constants with one of the 'Icon' constants
+  * You should 'or' one or more of the 'Button Bits' constants with one of the 'Icon' constants.
+  *
+  * Legal combinations of 'or'd button bits include only the following:\n
+  * \li MessageBox_OKCancel : MessageBox_OK | MessageBox_Cancel
+  * \li MessageBox_YesNo : MessageBox_Yes | MessageBox_No
+  * \li MessageBox_YesNoCancel : MessageBox_Yes | MessageBox_No | MessageBox_Cancel
+  * \li MessageBox_AbortRetry : MessageBox_Abort | MessageBox_Retry
+  * \li MessageBox_AbortRetryIgnore : MessageBox_Abort | MessageBox_Retry | MessageBox_Ignore
+  *
 **/
 enum MessageBoxEnum
 {
@@ -661,6 +669,8 @@ enum MessageBoxEnum
     // 'or' with one or more button types (none implies 'ok' by itself)
     // NOTE: left-right ordering by numeric value (lowest is left-most)
 
+    MessageBox_Default     = 0,      ///< Button Bits - default button (currently 'OK')
+
     MessageBox_OK          = 0x20,   ///< Button Bits - OK button
     MessageBox_Yes         = 0x40,   ///< Button Bits - Yes button
     MessageBox_No          = 0x80,   ///< Button Bits - No button
@@ -668,6 +678,13 @@ enum MessageBoxEnum
     MessageBox_Retry       = 0x200,  ///< Button Bits - Retry button
     MessageBox_Ignore      = 0x400,  ///< Button Bits - Ignore button
     MessageBox_Cancel      = 0x800,  ///< Button Bits - Cancel button
+
+    // legal multi-bit combinations
+    MessageBox_OKCancel         = 0x820,  ///< Button Bits - OK button plus Cancel button
+    MessageBox_YesNo            = 0xc0,   ///< Button Bits - Yes button plus No button
+    MessageBox_YesNoCancel      = 0x8c0,  ///< Button Bits - Yes button plus No button and Cancel button
+    MessageBox_AbortRetry       = 0x500,  ///< Button Bits - Abort button plus Retry button
+    MessageBox_AbortRetryIgnore = 0x700,  ///< Button Bits - Abort button plus Retry button and Ignore button
 
     MessageBox_BUTTON_MASK = 0xfe0   ///< mask for button bits
 };

@@ -115,8 +115,6 @@ typedef struct __FRAME_WINDOW__
   char *szTitle;                     // title bar string (WBAlloc'd)
   char *szStatus;                    // status bar string (WBAlloc'd)
 
-  int nAvgCharWidth;                 // average character width for the specified font
-
   int nStatusBarTabs;                // # of tab entries.  can be negative if pStatusBarTabs is NULL
   int *pStatusBarTabs;               // status bar tab values (WBAlloc'd).  may be NULL.
 
@@ -128,6 +126,15 @@ typedef struct __FRAME_WINDOW__
   WB_RECT rctLastTabBarRect;         // cached value of tab bar rectangle
   int nTabBarTabWidth;               // cached calculated width of a tab on the tab bar
   int nTabBarButtonFlags;            // button flags for tab bar ('pressed')
+
+  // fonts and font sets and metrics
+  XFontStruct *pFont;                // cached font for regular font
+  XFontStruct *pBoldFont;            // cached font for bold font
+  XFontSet fontSet, fontSetBold;     // cached font sets for standard and bold font
+  int nAvgCharWidth;                 // cached average character width for the specified font
+  int nFontHeight;                   // cached font height for fonts
+  int nFontAscent;                   // cached font ascent
+  int nFontDescent;                  // cached font descent
 
   struct __FRAME_WINDOW__ *pNext;    // next in chain (internal use)
 
@@ -192,7 +199,10 @@ static void __internal_destroy_frame_window(FRAME_WINDOW *pTemp)
 int i1;
 Window wIDMenu;
 WBMenuBarWindow *pMB;
+Display *pDisplay;
 
+
+  pDisplay = WBGetWindowDisplay(pTemp->wbFW.wID);
 
   if(pTemp->ppChildFrames)
   {
@@ -262,6 +272,30 @@ WBMenuBarWindow *pMB;
   {
     WBFree(pTemp->pDefaultMenuResource);
     pTemp->pDefaultMenuResource = NULL;
+  }
+
+  if(pTemp->pFont)
+  {
+    XFreeFont(pDisplay, pTemp->pFont);
+    pTemp->pFont = NULL;
+  }
+
+  if(pTemp->pBoldFont)
+  {
+    XFreeFont(pDisplay, pTemp->pBoldFont);
+    pTemp->pBoldFont = NULL;
+  }
+
+  if(pTemp->fontSet != None)
+  {
+    XFreeFontSet(pDisplay, pTemp->fontSet);
+    pTemp->fontSet = None;
+  }
+
+  if(pTemp->fontSetBold != None)
+  {
+    XFreeFontSet(pDisplay, pTemp->fontSetBold);
+    pTemp->fontSetBold = None;
   }
 }
 
@@ -449,7 +483,6 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
   pNew->nStatusBarTabs = 0; // DEFAULT_STATUS_BAR_TAB;
   pNew->pStatusBarTabs = NULL;
 
-  pNew->nAvgCharWidth = -1;         // mostly for status bar, marks that it needs to be re-calc'd
   pNew->bTabBarRectAntiRecurse = 0; // must do this too (anti-recurse flag for tab bar)
   pNew->nTabBarButtonFlags = 0;     // must do this as well (tab bar button bit flags)
   pNew->nCloseTab = -1;             // mark that I'm NOT closing a tab (make sure
@@ -458,11 +491,49 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
 
   pNew->szStatus = NULL;
 
+  // fonts, font sets, and related info
+
+  pNew->pFont = WBCopyFont(WBGetDefaultFont()); // make copy of default font
+
+  if(pNew->pFont)
+  {
+    pNew->fontSet = WBFontSetFromFont(pDisplay, pNew->pFont);
+
+    pNew->pBoldFont = WBLoadModifyFont(pDisplay, WBGetDefaultFont(), 0, WBFontFlag_WT_BOLD);
+
+    if(pNew->pBoldFont)
+    {
+      pNew->fontSetBold = WBFontSetFromFont(pDisplay, pNew->pBoldFont);
+    }
+  }
+
+  if(!pNew->pFont || !pNew->pBoldFont ||
+     pNew->fontSet == None || pNew->fontSetBold == None)
+  {
+    WB_ERROR_PRINT("ERROR: %s - unable to create frame window (font functions failed)\r\n", __FUNCTION__);
+
+    FWDestroyFrameWindow2((WBFrameWindow *)pNew);
+
+    return NULL;
+  }
+
+  // cache font metrics.  use 'fontSet'
+
+  pNew->nAvgCharWidth = WBFontSetAvgCharWidth(pDisplay, pNew->fontSet);
+  pNew->nFontAscent = WBFontSetAscent(pDisplay, pNew->fontSet);
+  pNew->nFontDescent = WBFontSetDescent(pDisplay, pNew->fontSet);
+  pNew->nFontHeight = pNew->nFontAscent + pNew->nFontDescent; // TODO:  use 'max bounds' info??
+
+
+  // -------------------------------
+  // INTERNAL LIST OF FRAME WINDOWS
+  // -------------------------------
 
   // add struct to beginning of linked list 'cause it's faster that way
 
   pNew->pNext = pFrames;
   pFrames = pNew;
+
 
   // NOW I get to create the actual window with its GC and callback proc
 
@@ -754,14 +825,9 @@ XFontStruct *pFont;
 
   WBGetClientRect(pFrameWindow->wbFW.wID, pRect); // get the rectangle for the client area
 
-  pFont = WBGetDefaultFont();
+  pFont = pFrameWindow->pFont; //WBGetDefaultFont();
 
-  if(pFrameWindow->nAvgCharWidth <= 0)
-  {
-    pFrameWindow->nAvgCharWidth = WBFontAvgCharWidth(WBGetDefaultDisplay(), pFont);
-  }
-
-  iBarHeight = pFont->ascent + pFont->descent + 8; // 8 pixels more than overall font height
+  iBarHeight = pFrameWindow->nFontHeight + 8; // 8 pixels more than overall font height
 
   if(iBarHeight < STATUS_BAR_HEIGHT) // the minimum value
   {
@@ -804,14 +870,9 @@ XFontStruct *pFont;
     return;
   }
 
-  pFont = WBGetDefaultFont();
+  pFont = pFrameWindow->pFont;
 
-  if(pFrameWindow->nAvgCharWidth <= 0)
-  {
-    pFrameWindow->nAvgCharWidth = WBFontAvgCharWidth(WBGetDefaultDisplay(), pFont);
-  }
-
-  iBarHeight = pFont->ascent + pFont->descent + 14; // 14 pixels more than overall font height
+  iBarHeight = pFrameWindow->nFontHeight + 14; // 14 pixels more than overall font height
 
   if(iBarHeight < TAB_BAR_HEIGHT) // the minimum value
   {
@@ -1926,14 +1987,12 @@ int i1;
 
         if(WBPointInRect(pEvent->xbutton.x, pEvent->xbutton.y, rctTemp))
         {
-          XFontStruct *pFont = WBGetDefaultFont();
-          
           // did I click on the 'x' button in the upper right corner?
           // form a ~square that represents the button using font height.  See 
           rctTemp.right -= 6;                                                // 6 from the right edge
-          rctTemp.left = rctTemp.right - pFont->ascent + pFont->descent + 2; // font width + 2 from right
+          rctTemp.left = rctTemp.right - (pFrameWindow->nFontHeight + 2);    // font width + 2 from right
           rctTemp.top += 2;                                                  // 2 pixels from top
-          rctTemp.bottom = rctTemp.top + pFont->ascent + pFont->descent;     // height is font height
+          rctTemp.bottom = rctTemp.top + pFrameWindow->nFontHeight;          // x height is font height
 
           // TODO:  do I really want to post/send message or should i wait until mouse release?  In the
           //        case of tab delete, I might query for "are you sure" like if the file has not been saved
@@ -2091,7 +2150,6 @@ static void InternalPaintTabBar(FRAME_WINDOW *pFrameWindow, XExposeEvent *pEvent
 WB_RECT rct0, rctExpose;
 WB_GEOM geom0;
 GC gc0;
-XFontStruct *fontBold = NULL;
 
 
   if(WBFrameWindow_NO_TABS & pFrameWindow->wbFW.iFlags) // window has no tab bar?
@@ -2342,12 +2400,8 @@ XFontStruct *fontBold = NULL;
     rctTemp.right = g2.x + g2.width;
     rctTemp.bottom = g2.y + g2.height;
 
-    // NEXT, load a BOLD version of the default font to display the '+'
-
-    fontBold = WBLoadModifyFont(pDisplay, WBGetDefaultFont(), 0, WBFontFlag_WT_BOLD);
-
-    // put a 'splat' in the middle of this button
-    DTDrawSingleLineText(fontBold ? fontBold : WBGetDefaultFont(),
+    // put a 'splat' in the middle of this button using the 'bold' font
+    DTDrawSingleLineText(pFrameWindow->fontSetBold,
                          "+", pDisplay, gc, dw, 0, 0, &rctTemp,
                          DTAlignment_HCENTER | DTAlignment_VCENTER);
 
@@ -2395,7 +2449,7 @@ XFontStruct *fontBold = NULL;
                             pFrameWindow->nCloseTab == i1 ? -2 : 0,  // -2 if I'm deleting the tab (no focus)
                             clrFG.pixel, clrBG.pixel,
                             clrBD2.pixel, clrBD3.pixel, clrABG.pixel,
-                            WBGetDefaultFont(), fontBold,
+                            pFrameWindow->fontSet, pFrameWindow->fontSetBold,
                             pC->aImageAtom, pC->szDisplayName);
         }
       }
@@ -2416,7 +2470,7 @@ XFontStruct *fontBold = NULL;
                             pFrameWindow->nCloseTab == i1 ? -1 : 1,  // -1 if I'm deleting the tab, positive otherwise
                             clrFG.pixel, clrBG.pixel,
                             clrBD2.pixel, clrBD3.pixel, clrABG.pixel,
-                            WBGetDefaultFont(), fontBold,
+                            pFrameWindow->fontSet, pFrameWindow->fontSetBold,
                             pC->aImageAtom, pC->szDisplayName);
         }
       }
@@ -2437,13 +2491,6 @@ XFontStruct *fontBold = NULL;
     // RESOURCE CLEANUP
 
     BEGIN_XCALL_DEBUG_WRAPPER
-    if(fontBold)
-    {
-      XFreeFont(pDisplay, fontBold);
-
-      fontBold = NULL; // avoid re-use
-    }
-
     if(gc != gc0)
     {
       XFreeGC(pDisplay, gc);
@@ -2549,7 +2596,7 @@ const char *pszStatus;
   }
   else
   {
-    XFontStruct *pFont = WBGetDefaultFont(); // for now, use the default font
+    XFontStruct *pFont = pFrameWindow->pFont;
     Display *pDisplay = WBGetWindowDisplay(pFrameWindow->wbFW.wID);
     XPoint xpt[3];
 
@@ -2598,7 +2645,7 @@ const char *pszStatus;
           iFixedTab = DEFAULT_STATUS_BAR_TAB;
         }
 
-        iFixedTab *= pFrameWindow->nAvgCharWidth; //WBFontAvgCharWidth(pDisplay, pFont);
+        iFixedTab *= pFrameWindow->nAvgCharWidth;
 
         pszStatus = pFrameWindow->szStatus;
 
@@ -2607,7 +2654,7 @@ const char *pszStatus;
           pszStatus = DEFAULT_STATUS_STRING; // default status text when none defined
         }
 
-        DTDrawSingleLineText(pFont,
+        DTDrawSingleLineText(pFrameWindow->fontSet,
                              pszStatus, pDisplay,
                              gc, pFrameWindow->wbFW.wID,
                              iFixedTab, 0, // fixed tab widths
@@ -2631,7 +2678,7 @@ const char *pszStatus;
             rctTemp.left = pTabs[i1].left;
             rctTemp.right = pTabs[i1].right;
 
-            DTDrawSingleLineText(pFont, ppCols[i1],
+            DTDrawSingleLineText(pFrameWindow->fontSet, ppCols[i1],
                                  pDisplay, gc, pFrameWindow->wbFW.wID,
                                  0, 0, // no tabs (won't be any)
                                  &rctTemp, DTAlignment_VCENTER | pTabs[i1].align);
@@ -3063,6 +3110,8 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 
             if(iRet) // non-zero return
             {
+              WB_ERROR_PRINT("TEMPORARY:  %s - child frame handles the menu\n", __FUNCTION__);
+
               return iRet; // the handler MUST return non-zero if the message should NOT be processed by the frame!
             }
           }
@@ -3103,6 +3152,8 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
               pHandler++;
             }
           }
+
+          // flow through, likely returning 0
         }
         else if(pEvent->xclient.message_type == aMENU_UI_COMMAND)
         {
@@ -3119,11 +3170,14 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
           // it off to the frame window's handler
 
           WBChildFrame *pFocus = FWGetFocusWindow(&(pFrameWindow->wbFW));
+
           if(pFocus)
           {
             int iRet = WBWindowDispatch(pFocus->wID, pEvent);
-            if(iRet >= 0)
+
+            if(iRet != 0)
             {
+              WB_ERROR_PRINT("TEMPORARY:  %s - child frame handles the menu UI thingy\n", __FUNCTION__);
               return iRet;
             }
 
@@ -3185,14 +3239,14 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
                   return pHandler->UIcallback(pMenu, pItem);
                 }
 
-                return 0; // NO UI handler so return '0' [aka 'normal']
+                return 1; // NO UI handler so return '1' [aka 'enable']
               }
 
               pHandler++;
             }
           }
 
-          return -1; // if there's no handler and no UI handler, always return 'disabled'
+          return 0; // if there's no handler and no UI handler, always return 0 (not handled)
         }
 #ifndef NO_DEBUG
         else

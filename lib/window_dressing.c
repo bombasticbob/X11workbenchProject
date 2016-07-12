@@ -884,7 +884,7 @@ void WBDraw3DBorderTab(Display *pDisplay, Drawable dw, GC gc, WB_GEOM *pgeomOutl
                        int fFocus, unsigned long lFGColor, unsigned long lBGColor,
                        unsigned long lBorderColor1, unsigned long lBorderColor2,
                        unsigned long lHighlightColor,
-                       XFontStruct *pFont, XFontStruct *pBoldFont,
+                       XFontSet fontSet, XFontSet fontSetBold,
                        Atom aGraphic, const char *szText)
 {
 XPoint xpt[13];
@@ -896,17 +896,17 @@ GC gc2;
 WB_RECT rctTemp;
 
 
-  if(!pFont)
+  if(fontSet == None)
   {
-    pFont = WBGetDefaultFont();
+    fontSet = WBGetDefaultFontSet(pDisplay);
   }
 
-  if(!pBoldFont)
+  if(fontSetBold == None)
   {
-    pBoldFont = WBGetDefaultFont();
+    fontSetBold = WBGetDefaultFontSet(pDisplay);
   }
 
-  iFontHeight = pFont->ascent + pFont->descent;
+  iFontHeight = WBFontSetHeight(pDisplay, fontSet);
 
 
   // begin by creating a region that consists of my 'rounded rect' polygon
@@ -1161,7 +1161,7 @@ WB_RECT rctTemp;
   XSetForeground(pDisplay, gc2, lFGColor);
 
   // for now just do centered text
-  DTDrawSingleLineText(pFont, szText, pDisplay, gc2, dw, 0, 0, &rctTemp,
+  DTDrawSingleLineText(fontSet, szText, pDisplay, gc2, dw, 0, 0, &rctTemp,
                        DTAlignment_HCENTER | DTAlignment_VCENTER);
 
 
@@ -1203,7 +1203,7 @@ WB_RECT rctTemp;
   rctTemp.top -= 2;
   rctTemp.bottom += 2; // big enough to 'center' properly
 
-  DTDrawSingleLineText(pBoldFont, "x", pDisplay, gc2, dw, 0, 0, &rctTemp,
+  DTDrawSingleLineText(fontSetBold, "x", pDisplay, gc2, dw, 0, 0, &rctTemp,
                        DTAlignment_HCENTER | DTAlignment_VCENTER);
 
 

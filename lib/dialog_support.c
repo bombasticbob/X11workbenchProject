@@ -1105,7 +1105,7 @@ void * DLGCDefaultListInfoAllocator(const void *pData, int cbData)
 
 int DLGInitControlListInfo(WBDialogControl *pCtrl, int nFlags,
                            void *(*pfnAllocator)(const void *,int), void (*pfnDestructor)(void *),
-                           void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *),
+                           void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *, XFontSet),
                            int (*pfnSort)(const void *, const void *))
 {
 WB_DIALOG_PROP propTemp;
@@ -1141,7 +1141,7 @@ int i1;
 int DLGModifyControlListInfo(WBDialogControl *pCtrl, int bFlags, int nFlags,
                              int bAllocator, void *(*pfnAllocator)(const void *,int),
                              int bDestructor, void (*pfnDestructor)(void *),
-                             int bDisplay, void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *),
+                             int bDisplay, void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *, XFontSet),
                              int bSort, int (*pfnSort)(const void *, const void *))
 {
 WB_DIALOG_PROP propTemp;
@@ -1219,7 +1219,7 @@ LISTINFO *pLI;
 
 LISTINFO *DLGCListInfoConstructor(Window wOwner, int nMax, int nFlags,
                                   void *(*pfnAllocator)(const void *,int), void (*pfnDestructor)(void *),
-                                  void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *),
+                                  void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *, XFontSet),
                                   int (*pfnSort)(const void *, const void *))
 {
 LISTINFO *pRval = WBAlloc(sizeof(*pRval) + nMax * sizeof(const void *));
@@ -1717,60 +1717,74 @@ int iSel = DLGGetControlListSelection(pCtrl);
 // the default list control display proc
 ////////////////////////////////////////
 
-void DLGCDefaultListControlDisplayProc(WBDialogControl *pList, void *pData, int iSelected, GC gc, WB_GEOM *pGeom)
+void DLGCDefaultListControlDisplayProc(WBDialogControl *pList, void *pData, int iSelected, GC gc, WB_GEOM *pGeom, XFontSet fontSet)
 {
-  int /*i1, i2,*/ iHPos, iVPos;
-  XFontStruct *pOldFont, *pFont;
-  XGCValues xgc;
-  Window wID = pList->wID;
-  Display *pDisplay = WBGetWindowDisplay(wID);
+int iHPos;
+Window wID = pList->wID;
+Display *pDisplay = WBGetWindowDisplay(wID);
 
 
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
                  "%s - Expose %d (%08xH) pData=%p\n", __FUNCTION__, (int)wID, (int)wID, pData);
 
-  pFont = pOldFont = WBGetWindowFontStruct(wID);
+  if(fontSet == None)
+  {
+    fontSet = WBGetWindowFontSet(wID);
 
-  if(!pFont)
+    if(fontSet == None)
+    {
+      fontSet = WBGetDefaultFontSet(pDisplay);
+    }
+  }
+
+  if(fontSet == None)
   {
     // TODO:  get font from dialog info
     WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
     return;
   }
 
-  // font setup
-  xgc.font = pFont->fid;
-  BEGIN_XCALL_DEBUG_WRAPPER
-  XChangeGC(pDisplay, gc, GCFont, &xgc);
+  iHPos = WBFontSetAvgCharWidth(pDisplay, fontSet);  // average character width is new horiz pos
 
+  // font setup
+  BEGIN_XCALL_DEBUG_WRAPPER
 //  XClearWindow(pDisplay, wID);  // TODO:  rather than erase background, see if I need to
   XSetForeground(pDisplay, gc, iSelected ? pList->clrHBG.pixel : pList->clrBG.pixel);
   XFillRectangle(pDisplay, wID, gc, pGeom->x, pGeom->y, pGeom->width, pGeom->height);
+  END_XCALL_DEBUG_WRAPPER
 
   if(iSelected)
   {
     WBDrawDashedRect(pDisplay, wID, gc, pGeom,  pList->clrBD2.pixel);
   }
 
-  iHPos = XTextWidth(pFont, " ", 2);  // width of 1 space for text border (TODO:  RTL text)
-  END_XCALL_DEBUG_WRAPPER
 
     // vertically centered text
-  iVPos = pFont->max_bounds.ascent + pFont->max_bounds.descent;  // font height
-  iVPos = (pGeom->height - iVPos) >> 1;  // half of the difference - top of text
-  iVPos += pFont->max_bounds.ascent;
+//  iVPos = pFont->max_bounds.ascent + pFont->max_bounds.descent;  // font height
+//  iVPos = (pGeom->height - iVPos) >> 1;  // half of the difference - top of text
+//  iVPos += pFont->max_bounds.ascent;
 
   // painting the window text
 
   if(pData)
   {
-    const char *szText = pData;
+    const char *szText = (const char *)pData;
+    WB_RECT rctBounds;
+
+    rctBounds.left = pGeom->x + iHPos;
+    rctBounds.right = pGeom->x + pGeom->width - iHPos; // equal border on right side, too
+    rctBounds.top = pGeom->y;
+    rctBounds.bottom = pGeom->y + pGeom->height;
+    
 
     XSetForeground(pDisplay, gc, iSelected ? pList->clrHFG.pixel : pList->clrFG.pixel);
     XSetBackground(pDisplay, gc, iSelected ? pList->clrHBG.pixel : pList->clrBG.pixel);
 
     if(*szText)
-      XDrawString(pDisplay, wID, gc, pGeom->x + iHPos, pGeom->y + iVPos, szText, strlen(szText));
+    {
+      DTDrawSingleLineText(fontSet, szText, pDisplay, gc, wID, 0, 0, &rctBounds,
+                           DTAlignment_VCENTER | DTAlignment_HLEFT);
+    }
 
     if(iSelected)  // selected item
     {
@@ -1781,10 +1795,7 @@ void DLGCDefaultListControlDisplayProc(WBDialogControl *pList, void *pData, int 
 
   // by convention, restore original objects/state
 
-  xgc.font = pOldFont->fid;
   BEGIN_XCALL_DEBUG_WRAPPER
-  XChangeGC(pDisplay, gc, GCFont, &xgc);
-
   XSetForeground(pDisplay, gc, WBGetWindowFGColor(wID));  // restore it at the end
   END_XCALL_DEBUG_WRAPPER
 }

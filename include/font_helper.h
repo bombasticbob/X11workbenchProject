@@ -52,6 +52,12 @@
   * Fonts under X11 (core) are generally difficult to deal with.  These utility
   * functions allow you to more easily select a font based on an existing
   * font or a general description of a font, with 'fuzzy' matching.
+  *
+  * The font_helper uses the 'classic' X11 fonts.  If you need true-type fonts,
+  * you will need to use the Xft interface from the 'FreeType' library to load
+  * and render them.  Xft uses a completely different font set than the ones
+  * provided by the 'classic' font interface.
+  *
 */
 
 
@@ -64,6 +70,46 @@ extern "C" {
 
 
 /** \ingroup font
+  * @{
+**/
+// UTF-8 HANDLING
+// X11 has XFree86 extensions with 'Xutf8' versions of a lot of things
+// which is only applicable with the following
+//#ifdef X_HAVE_UTF8_STRING
+//   I use the utf8 version
+// etc.
+//
+// Unfortunately many things that I use don't have that available
+// like XTextWidth for one (maybe I could use Xutf8TextExtents?)
+// Using Xmb and Xwc equivalent methods should work on Interix
+//
+#if defined(X_HAVE_UTF8_STRING) || defined(__DOXYGEN__)
+
+#define WB_TEXT_EXTENTS Xutf8TextExtents        /**< abstraction for Xutf8TextExtents or XmbTextEscapement **/
+#define WB_TEXT_ESCAPEMENT Xutf8TextEscapement  /**< abstraction for Xutf8TextEscapement or XmbTextEscapement **/
+#define WB_DRAW_STRING Xutf8DrawString          /**< abstraction for Xutf8DrawString or XmbDrawString **/
+#define WB_DRAW_TEXT Xutf8DrawText              /**< abstraction for Xutf8DrawText or XmbDrawText **/
+#define WB_LOOKUP_STRING Xutf8LookupString      /**< abstraction for Xutf8LookupString or XmbLookupString **/
+
+#else  // X_HAVE_UTF8_STRING
+
+#warning UTF8 not supported, using 'MB' equivalents
+
+#define WB_TEXT_EXTENTS XmbTextExtents          /**< abstraction for Xutf8TextExtents or XmbTextEscapement **/
+#define WB_TEXT_ESCAPEMENT XmbTextEscapement    /**< abstraction for Xutf8TextEscapement or XmbTextEscapement **/
+#define WB_DRAW_STRING XmbDrawString            /**< abstraction for Xutf8DrawString or XmbDrawString **/
+#define WB_DRAW_TEXT XmbDrawText                /**< abstraction for Xutf8DrawText or XmbDrawText **/
+#define WB_LOOKUP_STRING XmbLookupString        /**< abstraction for Xutf8LookupString or XmbLookupString **/
+
+#endif // X_HAVE_UTF8_STRING
+
+/**
+  * @}
+**/
+
+
+
+/** \ingroup font
   * \brief make a copy of an existing font (best when assigning to a window)
   *
   * \param pFont The original font to be copied
@@ -72,6 +118,9 @@ extern "C" {
   * use this function to make a copy of an existing XFontStruct.
   *
   * On error this function returns NULL. The caller must free non-NULL return values via XFreeFont()
+  *
+  * Header File:  font_helper.h
+  *
 **/
 XFontStruct *WBCopyFont(XFontStruct *pFont);
 
@@ -93,6 +142,9 @@ XFontStruct *WBCopyFont(XFontStruct *pFont);
   * font measurement.\n
   *
   * On error this function returns NULL. The caller must free non-NULL return values via XFreeFont()
+  *
+  * Header File:  font_helper.h
+  *
 **/
 XFontStruct *WBLoadFont(Display *pDisplay, const char *szFontName,
                         int iFontSize, int iFlags);
@@ -115,9 +167,37 @@ XFontStruct *WBLoadFont(Display *pDisplay, const char *szFontName,
   * font will be returned.  Typical use is to 'bold' or 'italicize' an existing font.\n
   *
   * On error this function returns NULL. The caller must free non-NULL return values via XFreeFont()
+  *
+  * Header File:  font_helper.h
+  *
 **/
 XFontStruct *WBLoadModifyFont(Display *pDisplay, const XFontStruct *pOriginal,
                               int iFontSize, int iFlags);
+
+
+/** \ingroup font
+  * \brief copy and modify a font set according to the specified size and flags
+  *
+  * \param pDisplay A pointer to the display
+  * \param fsOrig The original font set on which to base the new font set
+  * \param iFontSize The font size (see \ref WBLoadFont() for more details)\n
+  * For a non-zero value, the font size is based on the WBFontFlag_SIZE_xxx flag specified in 'iFlags'
+  * An 'iFontSize' value of ZERO copies the font size from the original font specified in 'pOriginal'.
+  * \param iFlags Various \ref WBFontFlags that specify font characteristics.  The existing font
+  * is modified according to these flags.  If the font size is zero, flags that modify the font size
+  * will be ignored.
+  * \return An XFontStruct pointer for the desired font, or None on error  The returned value (if not NOne) must be free'd using XFreeFontSet()
+  *
+  * use this function to select a similar font that differs only by whatever is specified
+  * in 'iFontSize' or 'iFlags'.  If a matching font is NOT available, a copy of the original
+  * font will be returned.  Typical use is to 'bold' or 'italicize' an existing font.\n
+  *
+  * The returned value (if not None) will need to be free'd using XFreeFontSet()
+  *
+  * Header File:  font_helper.h
+  *
+**/
+XFontSet WBCopyModifyFontSet(Display *pDisplay, XFontSet fsOrig, int iFontSize, int iFlags);
 
 
 /** \ingroup font
@@ -134,19 +214,147 @@ int WBFontAvgCharWidth(Display *pDisplay, const XFontStruct *pFont);
 
 
 /** \ingroup font
+  * \brief Get the maximum character descent from a font set
+  *
+  * \param pDisplay A pointer to the Display ( NULL uses \ref WBGetDefaultDisplay() )
+  * \param fontSet The Font Set to query ( None implies the system default font set)
+  * \returns The average width of a character for this font
+  *
+  * Use this function to query an XFontSet about its maximum descent.  This will
+  * typically be derived from all of the individual fonts in the font set.
+  *
+**/
+int WBFontSetDescent(Display *pDisplay, XFontSet fontSet);
+
+
+/** \ingroup font
+  * \brief Get the maximum character ascent from a font set
+  *
+  * \param pDisplay A pointer to the Display ( NULL uses \ref WBGetDefaultDisplay() )
+  * \param fontSet The Font Set to query ( None implies the system default font set)
+  * \returns The average width of a character for this font
+  *
+  * Use this function to query an XFontSet about its maximum ascent.  This will
+  * typically be derived from all of the individual fonts in the font set.
+  *
+**/
+int WBFontSetAscent(Display *pDisplay, XFontSet fontSet);
+
+
+/** \ingroup font
+  * \brief Get the maximum character height from a font set
+  *
+  * \param pDisplay A pointer to the Display ( NULL uses \ref WBGetDefaultDisplay() )
+  * \param fontSet The Font Set to query ( None implies the system default font set)
+  * \returns The average width of a character for this font
+  *
+  * Use this function to query an XFontSet about its maximum height.  This will
+  * typically be derived from all of the individual fonts in the font set.
+  *
+**/
+int WBFontSetHeight(Display *pDisplay, XFontSet fontSet);
+
+
+/** \ingroup font
+  * \brief Get the average character width for a font set
+  *
+  * \param pDisplay A pointer to the Display ( NULL uses \ref WBGetDefaultDisplay() )
+  * \param fontSet The Font Set to query ( None implies the system default font set)
+  * \returns The average width of a character for this font
+  *
+  * Use this function to query an XFontSet about its average character width.  This will
+  * typically be derived from all of the individual fonts in the font set.
+  *
+**/
+int WBFontSetAvgCharWidth(Display *pDisplay, XFontSet fontSet);
+
+
+/** \ingroup font
+  * \brief Get a 'maximized' copy of the 'max_bounds' member for the font set
+  *
+  * \param pDisplay A pointer to the Display ( NULL uses \ref WBGetDefaultDisplay() )
+  * \param fontSet The Font Set to query ( None implies the system default font set)
+  * \returns A copy of a 'maximized' XCharStruct where all members are 'maximum' values of the entire font set
+  *
+  * Use this function to query an XFontSet about its maximum bounds.  This will
+  * typically be derived from all of the individual fonts in the font set.
+  *
+**/
+XCharStruct WBFontSetMaxBounds(Display *pDisplay, XFontSet fontSet);
+
+
+/** \ingroup font
   * \brief Creates an 'XFontSet' from an XFontStruct for a given display
   *
   * \param pDisplay A pointer to the Display ( NULL uses \ref WBGetDefaultDisplay() )
   * \param pFont A pointer to an XFontStruct
-  * \returns An XFontSet appropriate to the XFontStruct, or NULL on error.
+  * \returns An XFontSet appropriate to the XFontStruct, or None on error.  The returned value (if not None) will need to be free'd using XFreeFontSet()
   *
   * This function helps to support internationalization through use of the 'Xmb'
   * 'Xwc' and 'Xutf8' versions of the X11 'core' text rendering API functions
   * by creating an 'XFontSet' that matches all of the available character sets for
   * a supplied font specification.\n
-  * The returned value (if not NULL) will need to be free'd using XFreeFontSet()
+  * The returned value (if not None) will need to be free'd using XFreeFontSet()
+  *
+  * Header File:  font_helper.h
+  *
 **/
 XFontSet WBFontSetFromFont(Display *pDisplay, const XFontStruct *pFont);
+
+
+/** \ingroup font
+  * \brief Creates an 'XFontStruct' from the first font assigned to a Font Set
+  *
+  * \param pDisplay A pointer to the Display ( NULL uses \ref WBGetDefaultDisplay() )
+  * \param fontSet An XFontSet (may not be 'None')
+  * \returns An XFontStruct pointer or NULL on error.  The caller must free the XFontStruct using XFreeFontStruct() if not NULL.
+  *
+  * This function helps to 
+  * The returned value (if not NULL) will need to be free'd using XFreeFont()
+  *
+  * Header File:  font_helper.h
+  *
+**/
+XFontStruct * WBFontFromFontSet(Display *pDisplay, XFontSet fontSet);
+
+
+/** \ingroup font
+  * \brief Creates an 'XFontSet' from an XFontStruct for a given display, with only a single font in the set
+  *
+  * \param pDisplay A pointer to the Display ( NULL uses \ref WBGetDefaultDisplay() )
+  * \param pFont A pointer to an XFontStruct
+  * \returns An XFontSet appropriate to the XFontStruct, or NULL on error.The returned value (if not None) will need to be free'd using XFreeFontSet()
+  *
+  * This function helps to support internationalization through use of the 'Xmb'
+  * 'Xwc' and 'Xutf8' versions of the X11 'core' text rendering API functions
+  * by creating an 'XFontSet' that matches all of the available character sets for
+  * a supplied font specification.\n
+  *
+  * This function differs from WBFontSetFromFont() in that it only adds a SINGLE font
+  * to the font set, without any wildcard substitutions, and with a locale of "C".
+  *
+  * The returned value (if not None) will need to be free'd using XFreeFontSet()
+  *
+  * Header File:  font_helper.h
+  *
+**/
+XFontSet WBFontSetFromFontSingle(Display *pDisplay, const XFontStruct *pFont);
+
+
+/** \ingroup font
+  * \brief Obtain the pixel width of specified text for a specified XFontSet
+  *
+  * \param fontSet An XFontSet, as returned by WBFontSetFromFont (or similar)
+  * \param szText A (const) pointer to a Multi-Byte (or UTF8 string) string
+  * \param cbText The total length of the text pointed to by szText (negative value to use a zero-byte terminator)
+  * \returns The width of the specified text, in pixels (similar to XTextWidth but for MB and/or UTF8 characters using a font set)
+  *
+  * Use this function to determine the correct 'display' width of a UTF8 or Multi-Byte character string.
+  *
+  * Header File:  font_helper.h
+  *
+**/
+int WBTextWidth(XFontSet fontSet, const char *szText, int cbText);
 
 
 /** \ingroup debug
@@ -156,9 +364,11 @@ XFontSet WBFontSetFromFont(Display *pDisplay, const XFontStruct *pFont);
   *
   * Use this function to gain insight into the available fonts.  Output is dumped to stderr
   * using the debug output functions.
+  *
+  * Header File:  font_helper.h
+  *
 **/
 void WBDumpFontInfo(const char *pSpec);  // debugging function - dumps a list of fonts and info
-
 
 
 /** \ingroup font

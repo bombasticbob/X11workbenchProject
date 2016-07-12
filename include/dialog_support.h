@@ -90,7 +90,7 @@ extern "C" {
                                         // typically this will point to 'WBFree'
                                         // if NULL, the caller-supplied pointer is ignored
 
-    void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, GC gcPaint, WB_GEOM *pGeom);
+    void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, GC gcPaint, WB_GEOM *pGeom, XFontSet fontSet);
                                         // generic function to display contents of item within 'pGeom' using GC
                                         // typically one of the listbox 'display item' functions
 
@@ -132,7 +132,7 @@ typedef struct __LISTINFO__
     * WBDialogControl, the list entry's data pointer, and a boolean 'selection' flag, respectively.\n
     * Typically this will be on of the listbox 'DisplayItem' API functions.
   **/
-  void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, GC gcPaint, WB_GEOM *pGeom);
+  void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, GC gcPaint, WB_GEOM *pGeom, XFontSet fontSet);
 
   /** \brief Optional sort comparison function.  NULL implies 'strcmp' */
   int (*pfnSort)(const void *, const void *); // sort proc (NULL implies strcmp)
@@ -277,6 +277,7 @@ typedef struct _WB_LIST_CURSEL_
     WBListCurSel sel;          // selection state, must follow wbDLGCtrl
     int *pSelBitmap;           // bitmap of selections (when applicable) (use 'WBAlloc/WBFree')
     int cbBitmap;              // size of bitmap (in bytes, granular at sizeof(int))
+    XFontSet fsBold;           // bold font set - assigned on the fly, struct creator must free if not 'None'
   } WBListControl;
 
   * \endcode
@@ -289,6 +290,7 @@ typedef struct _WB_LIST_CONTROL_
   WBListCurSel sel;          ///< selection state, must follow wbDLGCtrl
   int *pSelBitmap;           ///< bitmap of selections (when applicable) (use 'WBAlloc/WBFree')
   int cbBitmap;              ///< size of bitmap (in bytes, granular at sizeof(int))
+  XFontSet fsBold;           ///< bold font set - assigned on the fly, struct creator must free if not 'None'
 } WBListControl;
 
 
@@ -335,6 +337,7 @@ typedef struct _WB_COMBO_CONTROL_
   {
     WBDialogControl wbDLGCtrl; // Standard dialog control members
     WBListCurSel sel;          // must follow wbDLGCtrl
+    XFontSet fsBold;           // bold font set - assigned on the fly, struct creator must free if not 'None'
   } WBTreeControl;
 
   * \endcode
@@ -345,6 +348,7 @@ typedef struct _WB_TREE_CONTROL_
 {
   WBDialogControl wbDLGCtrl; ///< Standard dialog control members
   WBListCurSel sel;          ///< must follow wbDLGCtrl
+  XFontSet fsBold;           ///< bold font set - assigned on the fly, struct creator must free if not 'None'
 } WBTreeControl;
 
 
@@ -381,7 +385,7 @@ void DLGCDestroyProperties(WBDialogPropList *pPropList);
 **/
 LISTINFO *DLGCListInfoConstructor(Window wOwner, int nMax, int nFlags,
                                   void *(*pfnAllocator)(const void *,int), void (*pfnDestructor)(void *),
-                                  void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *),
+                                  void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *, XFontSet),
                                   int (*pfnSort)(const void *, const void *));
 
 /** \ingroup dlgctrl
@@ -405,6 +409,7 @@ void DLGCListInfoDestructor(LISTINFO *pListInfo);
   * \param iSelected A flag indicating whether the item has been selected (1 = selected, 0 = not selected)
   * \param gc The graphics context for displaying the data
   * \param pGeom a WB_GEOM representing the rectangular area to draw the item in.
+  * \param fontSet An XFontSet to use when displaying the text. May be 'None', which will use the default font set for the display
   * \returns void
   *
   * Pass this function's address as 'pfnDisplay' when calling DLGCListInfoConstructor to get a default
@@ -412,7 +417,7 @@ void DLGCListInfoDestructor(LISTINFO *pListInfo);
   *
   * Header File:  dialog_support.h
 **/
-void DLGCDefaultListControlDisplayProc(WBDialogControl *pList, void *pData, int iSelected, GC gc, WB_GEOM *pGeom);
+void DLGCDefaultListControlDisplayProc(WBDialogControl *pList, void *pData, int iSelected, GC gc, WB_GEOM *pGeom, XFontSet fontSet);
 
 
 
