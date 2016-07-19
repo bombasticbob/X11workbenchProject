@@ -485,7 +485,7 @@ int FWEditWindowEvent(Window wID, XEvent *pEvent)
 {
 WBEditWindow *pE;
 GC gc;
-WB_GEOM geom, geom2;
+WB_GEOM geom;//, geom2;
 Display *pDisplay = WBGetWindowDisplay(wID);
 XFontSet xFontSet;
 
@@ -508,23 +508,27 @@ XFontSet xFontSet;
       // TEMPORARY - just erase the background, for now...
       gc = WBBeginPaintGeom(wID, &geom);
 
-      XSetForeground(pDisplay, gc, clrBG.pixel);
       XSetBackground(pDisplay, gc, clrBG.pixel);
 
-      WBGetWindowGeom(wID, &geom2);
+//      WBGetWindowGeom(wID, &geom2);
+//
+//      // this is client geometry, not window geometry, so fix it
+//      geom2.x = 1;       // 1-pixel border
+//      geom2.y = 1;
+//      geom2.width -= 2; // 1 pixel border on BOTH sides
+//      geom2.height -= 2;
+//
+// NOTE:  for some reason this un-does what happens later in do_expose() ... maybe XSync after?
+//      XSetForeground(pDisplay, gc, clrBG.pixel);
+//      XFillRectangle(pDisplay, wID, gc, geom2.x, geom2.y, geom2.width, geom2.height);
 
-      geom2.x ++;       // 1-pixel border
-      geom2.y ++;
-      geom2.width -= 2; // 1 pixel border on BOTH sides
-      geom2.height -= 2;
-
-      XFillRectangle(pDisplay, wID, gc, geom.x, geom.y, geom.width, geom.height);
+      XSetForeground(pDisplay, gc, clrFG.pixel);
 
       xFontSet = WBFontSetFromFont(pDisplay, pE->childframe.pFont);
 
       pE->xTextObject.vtable->do_expose(&(pE->xTextObject), pDisplay, wID, gc,
                                         &geom, // the GEOM to 'paint to'
-                                        &geom2, // the GEOM bordering the window's viewport (NULL for ALL)
+                                        NULL,//&geom2, // the GEOM bordering the window's viewport (NULL for ALL)
                                         xFontSet);
       WBEndPaint(wID, gc);
 
@@ -722,7 +726,7 @@ char *pBuf;
   nChar = pEvent->data.l[2];
   pBuf = (char *)&(pEvent->data.l[3]);
 
-  if(iACS)
+  if(iACS && (iACS & WB_KEYEVENT_ACSMASK) != WB_KEYEVENT_SHIFT) // only SHIFT can be used here
   {
     // TODO:  handle non-printing chars
 
@@ -742,16 +746,16 @@ char *pBuf;
     internal_notify_change(pC, 0);
   }
 
-  {
-    char *p1 = pE->xTextObject.vtable->get_text(&(pE->xTextObject));
-
-    WB_ERROR_PRINT("TEMPORARY:  %s - new text \"%s\"\n", __FUNCTION__, p1);
-
-    if(p1)
-    {
-      WBFree(p1);
-    }
-  }
+//  {
+//    char *p1 = pE->xTextObject.vtable->get_text(&(pE->xTextObject));
+//
+//    WB_ERROR_PRINT("TEMPORARY:  %s - new text \"%s\"\n", __FUNCTION__, p1);
+//
+//    if(p1)
+//    {
+//      WBFree(p1);
+//    }
+//  }
 
   internal_new_cursor_pos((WBEditWindow *)pC);
 }
@@ -797,8 +801,11 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
   else
   {
+    pE->xTextObject.vtable->del_chars(&(pE->xTextObject), -1);
+    internal_notify_change(pC, 0);
   }
 
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_del(WBChildFrame *pC, int iACS)
@@ -851,6 +858,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     internal_notify_change(pC, 0);
   }
 
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_tab(WBChildFrame *pC, int iACS)
@@ -867,6 +875,19 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+  // if there's a selection, indent it??
+
+  if(iACS) // not handling ctrl, shift, or alt with tab.  yet.
+  {
+    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+  }
+  else
+  {
+    pE->xTextObject.vtable->ins_chars(&(pE->xTextObject), "\t", 1);
+    internal_notify_change(pC, 0);
+  }
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_enter(WBChildFrame *pC, int iACS)
@@ -883,6 +904,17 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+  if(iACS) // not handling ctrl, shift, or alt with 'enter'.  yet.
+  {
+    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+  }
+  else
+  {
+    pE->xTextObject.vtable->ins_chars(&(pE->xTextObject), "\n", 1);
+    internal_notify_change(pC, 0);
+  }
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_uparrow(WBChildFrame *pC, int iACS)

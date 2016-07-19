@@ -1217,7 +1217,7 @@ int iRval = 0;
 
         iRval = 1;
       }
-      else if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_CTRL | WB_KEYEVENT_SHIFT)) // shift, no alt
+      else if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_CTRL | WB_KEYEVENT_SHIFT)) // ctrl+shift, no alt
       {
         if(pUI->can_redo && pUI->redo && pUI->can_redo(pC))
         {
