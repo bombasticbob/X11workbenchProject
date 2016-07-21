@@ -321,10 +321,19 @@ struct __malloc_header__ *pMH;
     if(pMH->pPrev == PMALLOC_FLAG &&
        pMH->pNext == PMALLOC_FLAG)
     {
+      // assign header values that invalidate re-freeing the same memory
+
+      pMH->iTag = 0; // make sure it's no longer valid (so I don't try to re-free)
+      pMH->pPrev = NULL; // same with these values
+      pMH->pNext = NULL;
+      pMH->cbSize = 0;
+
       free(pMH);
     }
     else
     {
+      // TODO:  make sure it's not "already free" somehow since re-freeing free memory is *BAD*
+
       WB_ERROR_PRINT("TODO:  %s unimplemented - NOT freeing memory %p\n", __FUNCTION__, pBuf);
     }
   }

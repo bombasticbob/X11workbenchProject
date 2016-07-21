@@ -795,7 +795,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-  if(iACS) // not handling ctrl, shift, or alt with backspace.  yet.
+  if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl, shift, or alt with backspace.  yet.
   {
     XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
   }
@@ -877,7 +877,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
 
   // if there's a selection, indent it??
 
-  if(iACS) // not handling ctrl, shift, or alt with tab.  yet.
+  if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl, shift, or alt with tab.  yet.
   {
     XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
   }
@@ -904,7 +904,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-  if(iACS) // not handling ctrl, shift, or alt with 'enter'.  yet.
+  if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl, shift, or alt with 'enter'.  yet.
   {
     XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
   }
@@ -931,6 +931,16 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+  if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl, shift, or alt with 'up'.  yet.
+  {
+    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+  }
+  else
+  {
+    pE->xTextObject.vtable->cursor_up(&(pE->xTextObject));
+  }
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_downarrow(WBChildFrame *pC, int iACS)
@@ -947,6 +957,16 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+  if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl, shift, or alt with 'down'.  yet.
+  {
+    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+  }
+  else
+  {
+    pE->xTextObject.vtable->cursor_down(&(pE->xTextObject));
+  }
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_leftarrow(WBChildFrame *pC, int iACS)
@@ -963,6 +983,18 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+  if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl, shift, or alt with 'left'.  yet.
+  {
+    WB_ERROR_PRINT("TEMPORARY:  %s - iACS=%d (%08xH)\n", __FUNCTION__, iACS, iACS);
+
+    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+  }
+  else
+  {
+    pE->xTextObject.vtable->cursor_left(&(pE->xTextObject));
+  }
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_rightarrow(WBChildFrame *pC, int iACS)
@@ -979,6 +1011,18 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+  if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl, shift, or alt with 'right'.  yet.
+  {
+    WB_ERROR_PRINT("TEMPORARY:  %s - iACS=%d (%08xH)\n", __FUNCTION__, iACS, iACS);
+
+    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+  }
+  else
+  {
+    pE->xTextObject.vtable->cursor_right(&(pE->xTextObject));
+  }
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_home(WBChildFrame *pC, int iACS)
@@ -995,6 +1039,22 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+  if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_CTRL) // control+end
+  {
+    pE->xTextObject.vtable->cursor_top(&(pE->xTextObject));
+  }
+  else if(iACS & WB_KEYEVENT_ACSMASK) // not handling shift, or alt with 'home'.  yet.
+  {
+    WB_ERROR_PRINT("TEMPORARY:  %s - iACS=%d (%08xH)\n", __FUNCTION__, iACS, iACS);
+
+    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+  }
+  else
+  {
+    pE->xTextObject.vtable->cursor_home(&(pE->xTextObject));
+  }
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_end(WBChildFrame *pC, int iACS)
@@ -1011,6 +1071,22 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+  if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_CTRL) // control+end
+  {
+    pE->xTextObject.vtable->cursor_bottom(&(pE->xTextObject));
+  }
+  else if(iACS & WB_KEYEVENT_ACSMASK) // not handling shift, or alt with 'end'.  yet.
+  {
+    WB_ERROR_PRINT("TEMPORARY:  %s - iACS=%d (%08xH)\n", __FUNCTION__, iACS, iACS);
+
+    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+  }
+  else
+  {
+    pE->xTextObject.vtable->cursor_end(&(pE->xTextObject));
+  }
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_pgup(WBChildFrame *pC, int iACS)
@@ -1027,6 +1103,16 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+  if(iACS) // not handling ctrl, shift, or alt with 'enter'.  yet.
+  {
+    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+  }
+  else
+  {
+    pE->xTextObject.vtable->page_up(&(pE->xTextObject));
+  }
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_pgdown(WBChildFrame *pC, int iACS)
@@ -1043,6 +1129,16 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+  if(iACS) // not handling ctrl, shift, or alt with 'enter'.  yet.
+  {
+    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+  }
+  else
+  {
+    pE->xTextObject.vtable->page_down(&(pE->xTextObject));
+  }
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_pgleft(WBChildFrame *pC, int iACS)
@@ -1059,6 +1155,16 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+//  if(iACS) // not handling ctrl, shift, or alt with 'enter'.  yet.
+//  {
+//    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+//  }
+//  else
+  {
+    pE->xTextObject.vtable->page_left(&(pE->xTextObject));
+  }
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_pgright(WBChildFrame *pC, int iACS)
@@ -1075,6 +1181,16 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+//  if(iACS) // not handling ctrl, shift, or alt with 'enter'.  yet.
+//  {
+//    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+//  }
+//  else
+  {
+    pE->xTextObject.vtable->page_right(&(pE->xTextObject));
+  }
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_help(WBChildFrame *pC, int iACS)
@@ -1160,6 +1276,7 @@ int iInsMode;
   iInsMode = pE->xTextObject.vtable->get_insmode(&(pE->xTextObject));
   pE->xTextObject.vtable->set_insmode(&(pE->xTextObject), !iInsMode);
 
+  internal_new_cursor_pos((WBEditWindow *)pC);
   internal_update_status_text(pE);
 }
 
@@ -1251,6 +1368,7 @@ char *p1;
 
         WBFree(p1);
         p1 = pNew;
+        nData = strlen(p1);
       }
       else
       {

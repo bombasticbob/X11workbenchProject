@@ -1478,7 +1478,7 @@ TEXT_BUFFER *pBuf;
         pRect->right = pThis->iFontWidth * (iEndCol - iStartCol + 1);
       }
 
-      pRect->top = pThis->rctWinView.top;
+      pRect->top = pThis->rctWinView.top; // already calculated from earlier
       pRect->bottom = pRect->top + iFontHeight; // always
     }
     else // multiple rows implies including the entire line unless ending column is 0 [in which case last line is excluded]
@@ -1502,6 +1502,9 @@ TEXT_BUFFER *pBuf;
         pRect->bottom = pThis->rctWinView.top
                        + iFontHeight * (iEndRow - pThis->rctView.top);
       }
+
+//      WB_ERROR_PRINT("TEMPORARY:  %s - merged rect %d,%d,%d,%d\n", __FUNCTION__,
+//                     pRect->left, pRect->top, pRect->right, pRect->bottom);
     }
   }
 }
@@ -1767,6 +1770,7 @@ static int __internal_get_tab(const struct _text_object_ *pThis)
   {
     return pThis->iTab;
   }
+
   return 0; // for now
 }
 static void __internal_set_tab(struct _text_object_ *pThis, int iTab)
@@ -2296,14 +2300,19 @@ WB_RECT rctInvalid;
   __internal_invalidate_cursor(pThis, 0);
   pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
 
-  if(nChar > 0 || pThis->iCol == 0)
+  if(nChar > 0 || (pThis->iCol == 0 && pThis->iLineFeed == LineFeed_NONE))
   {
     __internal_calc_rect(pThis, &rctInvalid, pThis->iRow, pThis->iCol, pThis->iRow, pThis->iCol + 1);
   }
-  else if(pThis->iCol > 0)
+  else if(pThis->iCol > 0) // backspace, don't merge lines
   {
     __internal_calc_rect(pThis, &rctInvalid, pThis->iRow, pThis->iCol - 1, pThis->iRow, pThis->iCol);
   }
+  else if(pThis->iLineFeed != LineFeed_NONE)
+  {
+    __internal_calc_rect(pThis, &rctInvalid, pThis->iRow - 1, 0, -1, -1);
+  }
+
 
   pBuf = (TEXT_BUFFER *)(pThis->pText);
 
@@ -2317,28 +2326,28 @@ WB_RECT rctInvalid;
   {
     // if I hit a limit and 'nChar' is still non-zero, break out and return anyway
 
-    if(pThis->iRow >= pBuf->nEntries || pThis->iRow < 0)
+    if(pThis->iRow > pBuf->nEntries || pThis->iRow < 0)  // allow row == nEntries
     {
       return; // empty
     }
 
     pL = pBuf->aLines[pThis->iRow];
-    if(!pL)
-    {
-      return; // do nothing (TODO:  error message?)
-    }
 
     iLen = WBGetMBLength(pL);
 
     if(nChar < 0 && pThis->iCol == 0 && // backspace prior to beginning of line
        (pThis->iRow <= 0 || pThis->iLineFeed == LineFeed_NONE)) // single line and backspace past begin of column
     {
+      WB_ERROR_PRINT("TEMPORARY:  %s - backspace while I'm at start of file\n", __FUNCTION__);
       return; // exit
     }
 
     if(nChar > 0 && pThis->iCol >= iLen && // delete past end of line
-       (pThis->iRow >= pBuf->nEntries || pThis->iLineFeed == LineFeed_NONE)) // single line and backspace past begin of column
+       (pThis->iRow >= pBuf->nEntries ||
+        pThis->iLineFeed == LineFeed_NONE))              // single line and backspace past begin of column
     {
+      WB_ERROR_PRINT("TEMPORARY:  %s - delete while I'm past end of file\n", __FUNCTION__);
+
       return; // exit
     }
 
@@ -2350,36 +2359,62 @@ WB_RECT rctInvalid;
       if(!pL2)
       {
         pThis->iCol = 0; // a kind of 'fallback' - put column cursor at zero
+
+        pBuf->aLines[pThis->iRow - 1] = pL;  // move line to THIS position
+        pBuf->aLines[pThis->iRow] = NULL; // pre-emptive, avoid sharing pointers
+
+        pL = NULL;
       }
       else
       {
-        i2 = WBGetMBLength(pL2); // now THIS is the new column position
-
-        pL2 = WBJoinMBLine(pL, i2, pBuf->aLines[pThis->iRow + 1]);
-
-        if(!pL2)
+        if(pL) // can be NULL, which is a blank line
         {
-          return; // do nothing (TODO:  error message?)
+          i2 = WBGetMBLength(pL2); // now THIS is the new column position
+
+          pL2 = WBJoinMBLine(pL2, i2, pL);
+
+          if(!pL2)
+          {
+            WB_ERROR_PRINT("ERROR:  %s - not enough memory to join lines\n", __FUNCTION__);
+
+            return; // do nothing (TODO:  error message?)
+          }
+
+          pBuf->aLines[pThis->iRow - 1] = pL2; // the new pointer
         }
 
-        WBFree(pL);
-
-        pBuf->aLines[pThis->iRow - 1] = pL2; // the new pointer
+        pBuf->aLines[pThis->iRow] = NULL; // pre-emptive, avoid sharing pointers
 
         pThis->iCol = i2; // the new position (end of previous line)
+
+        WBFree(pL);
+        pL = NULL; // pre-emptive, avoid shared pointers
       }
 
-      for(i1=pThis->iRow; i1 < pBuf->nEntries; i1++)
+      // if I hit backspace while on row==nEntries, just move the cursor to the end
+      // of the previous line.  I'm not really deleting anything.
+      if(pThis->iRow >= pBuf->nEntries)
       {
-        pBuf->aLines[i1 - 1] = pBuf->aLines[i1]; // pack them up by one line
+        pThis->iRow--;
+        if(pBuf->aLines[pThis->iRow])
+        {
+          pThis->iCol = WBGetMBLength(pBuf->aLines[pThis->iRow]);
+        }
       }
+      else
+      {
+        // at this point, 'iRow - 1' is the 'replaced' row, so I need to move rows such that
+        // I start with 'iRow + 1' and assign to 'i1 - 1'.  this works.
+        for(i1=pThis->iRow + 1; i1 < pBuf->nEntries; i1++)
+        {
+          pBuf->aLines[i1 - 1] = pBuf->aLines[i1]; // pack them up by one line
+        }
 
-      pBuf->nEntries--;
-      pBuf->aLines[pBuf->nEntries] = NULL; // so that pointers aren't accidentally re-used
+        pBuf->nEntries--;
+        pBuf->aLines[pBuf->nEntries] = NULL; // so that pointers aren't accidentally re-used
 
-      WBFree(pL); // free up memory for old line
-
-      pThis->iRow--; // since I moved up
+        pThis->iRow--; // since I moved up
+      }
 
       nChar++; // backspacing, so increment
 
@@ -2393,23 +2428,32 @@ WB_RECT rctInvalid;
     else if(pThis->iCol >= iLen && nChar > 0 && pThis->iRow < (pBuf->nEntries - 1))
     {
       pL2 = pBuf->aLines[pThis->iRow + 1];
+
       if(pL2)
       {
-        pL = WBJoinMBLine(pL, pThis->iCol, pBuf->aLines[pThis->iRow + 1]);
-
-        if(!pL)
+        if(*pL2)
         {
-          return; // do nothing (TODO:  error message?)
+          WB_ERROR_PRINT("TEMPORARY:  %s - joining \"%s\" at %d with \"%s\"\n", __FUNCTION__,
+                         pL, pThis->iCol, pL2);
+
+          pL = WBJoinMBLine(pL, pThis->iCol, pL2);
+
+          if(!pL)
+          {
+            WB_ERROR_PRINT("ERROR:  %s - not enough memory to join\n", __FUNCTION__);
+
+            return; // do nothing ELSE
+          }
+
+          pBuf->aLines[pThis->iRow] = pL; // the new pointer
         }
 
         WBFree(pL2);
-
-        pBuf->aLines[pThis->iRow] = pL; // the new pointer
       }
 
       pBuf->nEntries--;
 
-      // merge UP the lines
+      // merge UP the lines, starting with 'iRow + 1' getting 'iRow + 2'
       for(i1=pThis->iRow + 1; i1 < pBuf->nEntries; i1++)
       {
         pBuf->aLines[i1] = pBuf->aLines[i1 + 1];
@@ -2417,83 +2461,96 @@ WB_RECT rctInvalid;
 
       pBuf->aLines[pBuf->nEntries] = NULL; // so that pointers aren't accidentally re-used
 
-      nChar--;
+      nChar--; // deleting, so decrement
 
       __internal_add_undo(pThis, UNDO_DELETE, pThis->iSelMode,
                           pThis->iRow, iLen, &(pThis->rctSel),
                           "\n", 1,
                           pThis->iRow + 1, 0, NULL, NULL, 0);
 
-      __internal_merge_rect(pThis, &rctInvalid, pThis->iRow, 0, -1, -1); // invalidate entire row and those that follow
+//      __internal_merge_rect(pThis, &rctInvalid, pThis->iRow, 0, -1, -1); // invalidate entire row and those that follow
+
+      // bug workaround, mark everything 'invalid'
+      __internal_merge_rect(pThis, &rctInvalid, 0, 0, -1, -1);
     }
-
-    // OK now that _THAT_ is done, delete "up to the end of the string if needed"
-    // on either end, depending upon which direction we must travel
-
-    pL = pBuf->aLines[pThis->iRow];
-
-    if(!pL)
+    else
     {
-      return; // do nothing (TODO:  error message?)
-    }
+      // OK now that _THAT_ is done, delete "up to the end of the string if needed"
+      // on either end, depending upon which direction we must travel
 
-    // TODO:  use WBDelMBChars
+      pL = pBuf->aLines[pThis->iRow];
 
-    if(nChar < 0 && pThis->iCol > 0)
-    {
-      // TODO:  handle hard tab translation?  For now "leave it"
+//      if(!pL)
+//      {
+//        WB_ERROR_PRINT("UNEXPECTED:  %s - NULL pointer at row %d\n", __FUNCTION__, pThis->iRow);
+//
+//        return; // do nothing (TODO:  error message?)
+//      }
 
-      i2 = -nChar;
-      if(i2 > pThis->iCol)
+      // TODO:  use WBDelMBChars
+
+      if(nChar < 0 && pThis->iCol > 0)
       {
-        i2 = pThis->iCol;
+        // TODO:  handle hard tab translation?  For now "leave it"
+
+        i2 = -nChar;
+        if(i2 > pThis->iCol)
+        {
+          i2 = pThis->iCol;
+        }
+
+        if(pL) // could be NULL
+        {
+          // position to which I delete
+          pL2 = WBGetMBCharPtr(pL, pThis->iCol - i2, NULL);  // column to which I delete (backspace)
+          pL3 = WBGetMBCharPtr(pL, pThis->iCol, NULL);  // position FROM where I delete/backspace
+
+
+          // create undo record first, before I actually delete things
+          __internal_add_undo(pThis, UNDO_DELETE, pThis->iSelMode,
+                              pThis->iRow, pThis->iCol + nChar, &(pThis->rctSel),
+                              pL2, pL3 - pL2, // text pointer AND 'true length' in bytes
+                              pThis->iRow, pThis->iCol, NULL, NULL, 0);
+
+          strcpy(pL2, pL3); // delete things down
+        }
+
+        pThis->iCol -= i2;
+        nChar += i2; // # of characters actually deleted (added 'cause nChar is negative)
+
+        __internal_merge_rect(pThis, &rctInvalid, pThis->iRow, pThis->iCol, pThis->iRow, -1); // invalidate remainder of row
       }
-
-      // position to which I delete
-      pL2 = WBGetMBCharPtr(pL, pThis->iCol - i2, NULL);  // column to which I delete (backspace)
-      pL3 = WBGetMBCharPtr(pL, pThis->iCol, NULL);  // position FROM where I delete/backspace
-
-
-      // create undo record first, before I actually delete things
-      __internal_add_undo(pThis, UNDO_DELETE, pThis->iSelMode,
-                          pThis->iRow, pThis->iCol + nChar, &(pThis->rctSel),
-                          pL2, pL3 - pL2, // text pointer AND 'true length' in bytes
-                          pThis->iRow, pThis->iCol, NULL, NULL, 0);
-
-      strcpy(pL2, pL3); // delete things down
-
-      pThis->iCol -= i2;
-      nChar += i2; // # of characters actually deleted (added 'cause nChar is negative)
-
-      __internal_merge_rect(pThis, &rctInvalid, pThis->iRow, pThis->iCol, pThis->iRow, -1); // invalidate remainder of row
-    }
-    else if(nChar > 0 && iLen > pThis->iCol)
-    {
-      // TODO:  handle hard tab translation?  For now "leave it"
-
-      i2 = nChar;
-
-      if(i2 > iLen - pThis->iCol)
+      else if(nChar > 0 && iLen > pThis->iCol)
       {
-        i2 = iLen - pThis->iCol;
+        // TODO:  handle hard tab translation?  For now "leave it"
+
+        i2 = nChar;
+
+        if(i2 > iLen - pThis->iCol)
+        {
+          i2 = iLen - pThis->iCol;
+        }
+
+        if(pL)
+        {
+          // position to which I delete
+          pL2 = WBGetMBCharPtr(pL, pThis->iCol + i2, NULL);  // column to which I delete
+          pL3 = WBGetMBCharPtr(pL, pThis->iCol, NULL);  // position FROM where I delete/backspace
+
+          // create undo record first, before I actually delete things
+          __internal_add_undo(pThis, UNDO_DELETE, pThis->iSelMode,
+                              pThis->iRow, pThis->iCol, &(pThis->rctSel),
+                              pL3, pL2 - pL3, // text pointer AND 'true length' in bytes
+                              pThis->iRow, pThis->iCol + nChar, NULL, NULL, 0);
+
+          strcpy(pL3, pL2); // delete things down
+        }
+
+        nChar -= i2;
+
+        // NOTE:  column does not change
+        __internal_merge_rect(pThis, &rctInvalid, pThis->iRow, pThis->iCol, pThis->iRow, -1); // invalidate remainder of row
       }
-
-      // position to which I delete
-      pL2 = WBGetMBCharPtr(pL, pThis->iCol + i2, NULL);  // column to which I delete
-      pL3 = WBGetMBCharPtr(pL, pThis->iCol, NULL);  // position FROM where I delete/backspace
-
-      // create undo record first, before I actually delete things
-      __internal_add_undo(pThis, UNDO_DELETE, pThis->iSelMode,
-                          pThis->iRow, pThis->iCol, &(pThis->rctSel),
-                          pL3, pL2 - pL3, // text pointer AND 'true length' in bytes
-                          pThis->iRow, pThis->iCol + nChar, NULL, NULL, 0);
-
-      strcpy(pL3, pL2); // delete things down
-
-      nChar -= i2;
-
-      // NOTE:  column does not change
-      __internal_merge_rect(pThis, &rctInvalid, pThis->iRow, pThis->iCol, pThis->iRow, -1); // invalidate remainder of row
     }
 
     // implement auto-hscroll while deleting
@@ -2527,12 +2584,17 @@ WB_RECT rctInvalid;
       }
       else
       {
-        __internal_invalidate_rect(pThis, &rctInvalid, 1); // invalidate bounding rectangle
+        // for now, always do this
+        __internal_invalidate_rect(pThis, NULL, 1); // scrolling, so invalidate everything
+//        __internal_invalidate_rect(pThis, &rctInvalid, 1); // invalidate bounding rectangle
       }
     }
     else
     {
-      __internal_invalidate_rect(pThis, &rctInvalid, 1); // invalidate bounding rectangle
+      // for now, always do this
+        __internal_invalidate_rect(pThis, NULL, 1); // scrolling, so invalidate everything
+
+//      __internal_invalidate_rect(pThis, &rctInvalid, 1); // invalidate bounding rectangle
     }
   }
 }
@@ -2771,10 +2833,7 @@ WB_RECT rctInvalid;
         const char *p3 = pChar + nChar; // p3 is 'end of text' marker now
         p2 = pChar;               // also marks 'end of line' for insertion
 
-//POOBAH convert all this shit to use line buffers as proper MBCS entries, with row/col being non-linear to char length
-//POOBAH that means an API that gets you an MBCS char based on col, gets the lenth of the string in cols, handles hard/soft tabs,
-//POOBAH and lets you insert/overwrite a string, automatically re-allocating the buffer, and things like that.
-        
+       
         while(p2 < p3)
         {
           int nTabs = 0;
@@ -2819,7 +2878,9 @@ WB_RECT rctInvalid;
               pBuf->nEntries = 1; // single-line, always this, but not verifying for now
             }
 
-            pL = pBuf->aLines[0] = WBAlloc(pThis->iCol + p2 - p1 + 2);
+            pL = pBuf->aLines[0] = WBAlloc(pThis->iCol + (p2 - p1)
+                                           + nTabs * pThis->iTab // extra space for tabs
+                                           +  2); // 2 additional spaces
 
             if(pL)
             {
@@ -2858,7 +2919,9 @@ WB_RECT rctInvalid;
               i1 += p2 - p1; // extending string length
             }
 
-            pL = WBReAlloc(pTemp, i1 + 2); // re-allocate to fit (plus 2 extra chars)
+            pL = WBReAlloc(pTemp, i1
+                                  + nTabs * pThis->iTab // extra space for tabs
+                                  +  2); // re-allocate to fit (plus 2 extra chars)
 
             if(pL)
             {
@@ -2930,7 +2993,7 @@ WB_RECT rctInvalid;
 
               // insert a new row after this one.  But first, does pBuf have enough space?
 
-              if(WBCheckReAllocTextBuffer(&pBuf, 1))
+              if(WBCheckReAllocTextBuffer(&pBuf, 1) || !pBuf)
               {
                 WB_ERROR_PRINT("ERROR:  %s - not enough memory to add line\n", __FUNCTION__);
 
@@ -2938,7 +3001,10 @@ WB_RECT rctInvalid;
               }
               else
               {
-                pThis->pText = pBuf; // re-assign if new ptr
+                pThis->pText = pBuf; // re-assign in case there's a new ptr
+
+                WB_ERROR_PRINT("TEMPORARY:  %s - split line, %d, %d, %d\n", __FUNCTION__,
+                               pThis->iRow, pThis->iCol, (int)pBuf->nEntries);
                 
                 for(i1=pBuf->nEntries; i1 > (pThis->iRow + 1); i1--)
                 {
@@ -2947,12 +3013,21 @@ WB_RECT rctInvalid;
 
                 pBuf->nEntries++;
 
+                // TODO:  if insert blank line, do I just leave it 'NULL' and not make a copy?
+
                 pTemp = WBGetMBCharPtr(pL, pThis->iCol, NULL); // point at which I insert the newline
+
                 pBuf->aLines[pThis->iRow + 1] = WBCopyString(pTemp); // make a copy of previous at "that point"
                 *pTemp = 0; // terminate line at "that point" (TODO: trim right?)
 
+                WB_ERROR_PRINT("TEMPORARY:  %s - split line into \"%s\", \"%s\"\n", __FUNCTION__,
+                               pBuf->aLines[pThis->iRow],
+                               pBuf->aLines[pThis->iRow + 1]);
+
+
                 pThis->iRow++; // advance row position
                 pThis->iCol = 0; // newline forces column 0, always
+
               }
             }
           }
@@ -3007,6 +3082,7 @@ static void __internal_indent(struct _text_object_ *pThis, int nCol)
 {
   if(WBIsValidTextObject(pThis))
   {
+    WB_ERROR_PRINT("TODO:  %s - implement 'indent'\n", __FUNCTION__);
   }
 }
 static int __internal_can_undo(struct _text_object_ *pThis)
@@ -3020,6 +3096,7 @@ static void __internal_undo(struct _text_object_ *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
+    WB_ERROR_PRINT("TODO:  %s - implement 'undo'\n", __FUNCTION__);
   }
 }
 static int __internal_can_redo(struct _text_object_ *pThis)
@@ -3033,6 +3110,7 @@ static void __internal_redo(struct _text_object_ *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
+    WB_ERROR_PRINT("TODO:  %s - implement 'redo'\n", __FUNCTION__);
   }
 }
 static void __internal_get_view(const struct _text_object_ *pThis, WB_RECT *pRct)
@@ -3213,7 +3291,11 @@ TEXT_BUFFER *pBuf;
 int iPageHeight;
 
 
-  if(WBIsValidTextObject(pThis))
+  if(!WBIsValidTextObject(pThis))
+  {
+    WB_ERROR_PRINT("ERROR:  %p - invalid text object %p\n", __FUNCTION__, pThis);
+  }
+  else
   {
     int iOldRow = pThis->iRow;
 
@@ -3223,6 +3305,8 @@ int iPageHeight;
     {
       return; // do nothing
     }
+
+    WB_ERROR_PRINT("TEMPORARY:  %s - here I am at line %d\n", __FUNCTION__, __LINE__);
 
     __internal_invalidate_cursor(pThis, 0); // invalidate current cursor rectangle
 
@@ -3314,7 +3398,11 @@ TEXT_BUFFER *pBuf;
 int iPageHeight;
 
 
-  if(WBIsValidTextObject(pThis))
+  if(!WBIsValidTextObject(pThis))
+  {
+    WB_ERROR_PRINT("ERROR:  %p - invalid text object %p\n", __FUNCTION__, pThis);
+  }
+  else
   {
     int iOldRow = pThis->iRow;
 
@@ -3324,6 +3412,8 @@ int iPageHeight;
     {
       return; // do nothing
     }
+
+    WB_ERROR_PRINT("TEMPORARY:  %s - here I am at line %d\n", __FUNCTION__, __LINE__);
 
     __internal_invalidate_cursor(pThis, 0); // invalidate current cursor rectangle
 
@@ -3410,7 +3500,11 @@ static void __internal_cursor_left(struct _text_object_ *pThis)
 TEXT_BUFFER *pBuf;
 
 
-  if(WBIsValidTextObject(pThis))
+  if(!WBIsValidTextObject(pThis))
+  {
+    WB_ERROR_PRINT("ERROR:  %p - invalid text object %p\n", __FUNCTION__, pThis);
+  }
+  else
   {
     int iOldCol = pThis->iCol;
 
@@ -3501,7 +3595,11 @@ static void __internal_cursor_right(struct _text_object_ *pThis)
 TEXT_BUFFER *pBuf;
 
 
-  if(WBIsValidTextObject(pThis))
+  if(!WBIsValidTextObject(pThis))
+  {
+    WB_ERROR_PRINT("ERROR:  %p - invalid text object %p\n", __FUNCTION__, pThis);
+  }
+  else
   {
     int iOldCol = pThis->iCol;
 
@@ -3619,7 +3717,11 @@ TEXT_BUFFER *pBuf;
 }
 static void __internal_page_up(struct _text_object_ *pThis)
 {
-  if(WBIsValidTextObject(pThis))
+  if(!WBIsValidTextObject(pThis))
+  {
+    WB_ERROR_PRINT("ERROR:  %p - invalid text object %p\n", __FUNCTION__, pThis);
+  }
+  else
   {
     pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
 
@@ -3629,7 +3731,11 @@ static void __internal_page_up(struct _text_object_ *pThis)
 }
 static void __internal_page_down(struct _text_object_ *pThis)
 {
-  if(WBIsValidTextObject(pThis))
+  if(!WBIsValidTextObject(pThis))
+  {
+    WB_ERROR_PRINT("ERROR:  %p - invalid text object %p\n", __FUNCTION__, pThis);
+  }
+  else
   {
     pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
 
@@ -3639,7 +3745,11 @@ static void __internal_page_down(struct _text_object_ *pThis)
 }
 static void __internal_page_left(struct _text_object_ *pThis)
 {
-  if(WBIsValidTextObject(pThis))
+  if(!WBIsValidTextObject(pThis))
+  {
+    WB_ERROR_PRINT("ERROR:  %p - invalid text object %p\n", __FUNCTION__, pThis);
+  }
+  else
   {
     pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
 
@@ -3649,7 +3759,11 @@ static void __internal_page_left(struct _text_object_ *pThis)
 }
 static void __internal_page_right(struct _text_object_ *pThis)
 {
-  if(WBIsValidTextObject(pThis))
+  if(!WBIsValidTextObject(pThis))
+  {
+    WB_ERROR_PRINT("ERROR:  %p - invalid text object %p\n", __FUNCTION__, pThis);
+  }
+  else
   {
     pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
 
@@ -3664,7 +3778,11 @@ const char *pL, *p2;
 TEXT_BUFFER *pBuf;
 
 
-  if(WBIsValidTextObject(pThis))
+  if(!WBIsValidTextObject(pThis))
+  {
+    WB_ERROR_PRINT("ERROR:  %p - invalid text object %p\n", __FUNCTION__, pThis);
+  }
+  else
   {
     int iOldCol = pThis->iCol;
 
@@ -3769,7 +3887,11 @@ const char *pL;
 TEXT_BUFFER *pBuf;
 
 
-  if(WBIsValidTextObject(pThis))
+  if(!WBIsValidTextObject(pThis))
+  {
+    WB_ERROR_PRINT("ERROR:  %p - invalid text object %p\n", __FUNCTION__, pThis);
+  }
+  else
   {
     int iOldCol = pThis->iCol;
 
@@ -3864,7 +3986,11 @@ static void __internal_cursor_top(struct _text_object_ *pThis)
 {
 int iPageHeight;
 
-  if(WBIsValidTextObject(pThis))
+  if(!WBIsValidTextObject(pThis))
+  {
+    WB_ERROR_PRINT("ERROR:  %p - invalid text object %p\n", __FUNCTION__, pThis);
+  }
+  else
   {
     int iOldRow = pThis->iRow;
 
@@ -3921,7 +4047,11 @@ static void __internal_cursor_bottom(struct _text_object_ *pThis)
 TEXT_BUFFER *pBuf;
 int iPageHeight;
 
-  if(WBIsValidTextObject(pThis))
+  if(!WBIsValidTextObject(pThis))
+  {
+    WB_ERROR_PRINT("ERROR:  %p - invalid text object %p\n", __FUNCTION__, pThis);
+  }
+  else
   {
     int iOldRow = pThis->iRow;
 
@@ -4578,7 +4708,7 @@ WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
 
       pThis->iCursorX = pThis->iCursorY = pThis->iCursorHeight = 0; // to indicate "not drawn"
 
-      for(iCurRow=pThis->rctView.top; iCurRow < pBuf->nEntries && iCurRow <= pThis->rctView.bottom; iCurRow++)
+      for(iCurRow=pThis->rctView.top; iCurRow <= pBuf->nEntries && iCurRow <= pThis->rctView.bottom; iCurRow++)
       {
         int bHighlight = 0;
 
@@ -4589,13 +4719,23 @@ WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
 
         iX = geomV.x;
 
-        pL = pBuf->aLines[iCurRow];
-        if(!pL)
+        if(iCurRow < pBuf->nEntries)
         {
-          continue; // for now, do this, but it's seriously a bad error
+          pL = pBuf->aLines[iCurRow];
+        }
+        else
+        {
+          pL = NULL;
         }
 
-        iLen = WBGetMBLength(pL); // length in "characters"
+        if(pL)
+        {
+          iLen = WBGetMBLength(pL); // length in "characters"
+        }
+        else
+        {
+          iLen = 0;
+        }
 
         // if the row might be highlighted, it will be within 'rctSel', which can
         // span multiple lines.  It identifies the starting and ending row/col combo, but in pixels.
@@ -4619,7 +4759,7 @@ WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
             int iLen2;
             const char *p1;
             
-            if(i1 < iLen)
+            if(pL && i1 < iLen)
             {
               p1 = WBGetMBCharPtr(pL, i1, &iLen2);
             }
@@ -4728,7 +4868,7 @@ WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
             }
           }
         }
-        else // current row is NOT cursor row
+        else if(pL) // current row is NOT cursor row (and line is not blank)
         {
           const char *p1 = WBGetMBCharPtr(pL, pThis->rctView.left, NULL);
           const char *p2 = WBGetMBCharPtr(pL, pThis->rctView.right, NULL);
