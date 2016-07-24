@@ -19,6 +19,11 @@ The two license choices are:
   b) BSD-style LICENSE
 
 
+THIS SOFTWARE IS BEING PROVIDED AS-IS, WITH NO WARRANTY WHATSOEVER.  USE IT AT
+YOUR OWN RISK.  S.F.T. INC. CLAIMS NO RESPONSIBILITY FOR ANY ACTIONS OR CONSE-
+QUENCES THAT MAY ARISE FROM THE USE, ABUSE, OR DISTRIBUTION OF THIS SOFTWARE.
+
+
                                         
 ==================== STANDARD GPL or LGPL LICENSE =====================
 
@@ -45,6 +50,7 @@ in mind, if you choose to create a shared library, please change the
 project name so that there are no conflicts (thank you).
 
 
+
 ========================== BSD-style LICENSE ==========================
 
 The second is a simple BSD-like license, as stated in the 'README.md' file.
@@ -57,7 +63,9 @@ Copyright (c) 2010-2016 by Bob Frazier (aka 'Big Bad Bombastic Bob')
 all rights reserved
 
 DISCLAIMER:  The X11workbench application and toolkit software are supplied
-             'as-is', with no waranties, either implied or explicit.
+             'as-is', with no warranties, either implied or explicit.
+             Any claims to alleged functionality or features should be
+             considered 'preliminary', and might not function as advertised.
 
 There is no restriction as to what you can do with this software, so long
 as you include the above copyright notice and DISCLAIMER for any distributed
