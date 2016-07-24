@@ -259,6 +259,10 @@ unsigned int nAllocSize, nNewSize, nLimit;
 
   if(pRval)
   {
+#ifdef HAVE_MALLOC_USABLE_SIZE
+    void *pActual = pRval;
+#endif // HAVE_MALLOC_USABLE_SIZE
+
     pMH = (struct __malloc_header__ *)pRval;
 
     pRval += sizeof(*pMH);
@@ -268,7 +272,7 @@ unsigned int nAllocSize, nNewSize, nLimit;
     pMH->iTag = WB_ALLOC_TAG;
 
 #ifdef HAVE_MALLOC_USABLE_SIZE
-    nLimit = malloc_usable_size(pRval); // the ACTUAL SIZE of the memory block
+    nLimit = malloc_usable_size(pActual); // the ACTUAL SIZE of the memory block
     if(nLimit > nNewSize)
     {
       nNewSize = nLimit;

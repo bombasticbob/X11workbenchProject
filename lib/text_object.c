@@ -2590,6 +2590,16 @@ WB_RECT rctInvalid;
         // NOTE:  column does not change
         __internal_merge_rect(pThis, &rctInvalid, pThis->iRow, pThis->iCol, pThis->iRow, -1); // invalidate remainder of row
       }
+      else
+      {
+        // this is a condition that might infinite loop since it doesn't inc/dec nChar
+        // it was SUPPOSED to be tested for, but wasn't.
+
+        WB_ERROR_PRINT("UNEXPECTED:  %s - nChar=%d, iCol=%d, iRow=%d   nEntries=%d\n",
+                       __FUNCTION__, nChar, pThis->iCol, pThis->iRow, (int)pBuf->nEntries);
+
+        break;
+      }
     }
 
     // implement auto-hscroll while deleting
