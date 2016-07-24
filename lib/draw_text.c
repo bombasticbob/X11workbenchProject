@@ -17,7 +17,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -664,7 +666,7 @@ DT_WORD *pW, *pW2;
   }
 
   iFontAscent = WBFontSetAscent(pDisplay, fontSet);
-  iFontDescent = WBFontSetDescent(pDisplay, fontSet); 
+  iFontDescent = WBFontSetDescent(pDisplay, fontSet);
   iFontHeight = iFontAscent + iFontDescent; // cache for performance
 
   // for now, line spacing equals 1/2 descent or 2 pixels

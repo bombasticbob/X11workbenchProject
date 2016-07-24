@@ -17,7 +17,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -916,7 +918,7 @@ void * WBGetPointerFromHash(WB_UINT32 uiHash);
   * \param pDisplay The display to search for a matching X11 Atom
   * \param szAtomName The text 'Atom name' to search (and optionally create) for an Atom
   * \returns An Atom representing the specified szAtomName.  For values less than WB_INTERNAL_ATOM_MIN_VAL, it will be an X11 Atom.  Otherwise, the value will be 'internal only'
-  * 
+  *
   * This function will lookup and/or allocate an internal Atom based on the specified Atom name.  If the Atom
   * name exists as an X11 Atom, or already exists as an internal atom, the function will return that value.
   * Otherwise, this function will return an allocated Atom with a value >= WB_INTERNAL_ATOM_MIN_VAL.
@@ -943,7 +945,7 @@ Atom WBGetAtom(Display *pDisplay, const char *szAtomName);
   * \returns An Atom representing the specified szAtomName.  For values less than WB_INTERNAL_ATOM_MIN_VAL, it will be an X11 Atom.  Otherwise, the value will be 'internal only'
   *
   * If an atom is not found, this function will return 'None'.  It does not allocate a new atom.
-  * 
+  *
   * This function will lookup an internal (or X11) Atom based on the specified Atom name.  If the Atom
   * name exists as an X11 Atom, or already exists as an internal atom, the function will return that value.
   * Otherwise, this function will return 'None'.
@@ -970,7 +972,7 @@ Atom WBLookupAtom(Display *pDisplay, const char *szAtomName);
   * \param pDisplay The display to search for a matching X11 Atom
   * \param aAtom The Atom to return the text for
   * \returns An allocated pointer containing the 'Atom name' text string.  This pointer will need to be free'd using WBFree() (it is created via 'WBCopyString()')
-  * 
+  *
   * This function returns the Atom name (as an allocated character string) associate with the specified Atom,
   * whether the Atom is an X11 Atom or an internal 'X11 workbench toolkit' Atom.
   *
@@ -1226,7 +1228,7 @@ WB_MODULE WBLoadLibrary(const char *szModuleName); // load a library module (sha
   *
   * Header File:  platform_helper.h
 **/
-void WBFreeLibrary(WB_MODULE hModule);                 
+void WBFreeLibrary(WB_MODULE hModule);
 
 /** \ingroup process
   * \brief Loads a shared library, DLL, module, or whatever you call it on your operating system

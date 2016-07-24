@@ -17,7 +17,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -44,10 +46,13 @@
 
 ******************************************************************************/
 
+#include "X11workbench.h"
+#include "refactor.h"
 
-#ifdef STAND_ALONE
 
-#else // STAND_ALONE
-
-#endif // STAND_ALONE
+//#ifdef STAND_ALONE
+//
+//#else // STAND_ALONE
+//
+//#endif // STAND_ALONE
 

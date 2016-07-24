@@ -17,7 +17,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -666,7 +668,7 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
   {
 //    WB_ERROR_PRINT("TEMPORARY:  %s - setting %u (%08xH) as application window\n",
 //                   __FUNCTION__, (int)pNew->wbFW.wID, (int)pNew->wbFW.wID);
-    
+
     WBSetApplicationWindow(pNew->wbFW.wID);
   }
 
@@ -924,7 +926,7 @@ XFontStruct *pFont;
     pFrameWindow->nLastTab = -1;
     pFrameWindow->nLeftTab = 0;
     pFrameWindow->nRightTab = 0;
-    
+
     return;
   }
 
@@ -1292,7 +1294,7 @@ no_memory:
       goto no_memory;
     }
 
-    pFrameWindow->ppChildFrames = (WBChildFrame **)pTemp; // re-assign new pointer    
+    pFrameWindow->ppChildFrames = (WBChildFrame **)pTemp; // re-assign new pointer
 
     pFrameWindow->nMaxChildFrames += 128;
   }
@@ -1310,7 +1312,7 @@ no_memory:
 
   FWRecalcLayout(pFW->wID);       // recalc layout for frame window, first (in case it needs it)
   FWChildFrameRecalcLayout(pNew); // make sure I recalculate the child frame layout based on the owner
-  
+
   FWSetFocusWindowIndex(pFW, iRval); // set focus to it
 
   return iRval;
@@ -1391,6 +1393,8 @@ int iIndex, i2;
           }
         }
 
+        pFrameWindow->pMenuHandler = pFrameWindow->pDefMenuHandler; // default menu handler (must assign, so no free'd pointer usage)
+
         pFrameWindow->nChildFrames = 0; // make sure
 
         FWSetStatusText(pFW, NULL); // remove status text
@@ -1421,7 +1425,7 @@ int iIndex, i2;
         FWRecalcLayout(pFW->wID); // recalculate layout (this also updates the frame window and whatnot)
         FWSetFocusWindowIndex(pFW, pFrameWindow->nFocusTab); // re-assign focus to same, fixes certain problems
       }
-      
+
       return;
     }
   }
@@ -1610,6 +1614,15 @@ WBMenuBarWindow *pMBW;
     }
   }
 
+  if(pC->pMenuHandler)
+  {
+    pFrameWindow->pMenuHandler = pC->pMenuHandler; // use child frame's menu handler
+  }
+  else
+  {
+    pFrameWindow->pMenuHandler = pFrameWindow->pDefMenuHandler;
+  }
+
   WBUpdateWindow(pFW->wID);  // update these windows now
   WBUpdateWindow(pC->wID);
 }
@@ -1769,9 +1782,9 @@ WBChildFrame *pC = NULL;
     // make sure I re-paint the focus window
 
     pC = pFrameWindow->ppChildFrames[pFrameWindow->nFocusTab];
-  
+
     if(pC)
-    {  
+    {
       WBUpdateWindow(pC->wID);
     }
   }
@@ -1849,7 +1862,7 @@ FRAME_WINDOW *pFrameWindow;
     }
 
     memcpy(pFrameWindow->pStatusBarTabs, pTabs, sizeof(int) * nTabs);
-    pFrameWindow->pStatusBarTabs[nTabs] = 0;  // always end in a zero, for now    
+    pFrameWindow->pStatusBarTabs[nTabs] = 0;  // always end in a zero, for now
   }
 
   InternalCalcTabBarRect(pFrameWindow, &rct);
@@ -1879,7 +1892,7 @@ static void Internal_CalcTabRect(FRAME_WINDOW *pFrameWindow, int iIndex, WB_RECT
   {
     prctTab->left = prctTab->right = prctTab->top = prctTab->bottom = 0;
     return;
-  }   
+  }
 
   prctTab->top = pFrameWindow->rctLastTabBarRect.top + 2;
   prctTab->bottom = pFrameWindow->rctLastTabBarRect.bottom;
@@ -1895,7 +1908,7 @@ static void Internal_CalcTabGeom(FRAME_WINDOW *pFrameWindow, int iIndex, WB_GEOM
   {
     pgTab->x = pgTab->y = pgTab->width = pgTab->height = 0;
     return;
-  }   
+  }
 
   pgTab->y = pFrameWindow->rctLastTabBarRect.top + 2;
   pgTab->height = pFrameWindow->rctLastTabBarRect.bottom - pgTab->y;
@@ -1988,7 +2001,7 @@ int i1;
         if(WBPointInRect(pEvent->xbutton.x, pEvent->xbutton.y, rctTemp))
         {
           // did I click on the 'x' button in the upper right corner?
-          // form a ~square that represents the button using font height.  See 
+          // form a ~square that represents the button using font height.  See
           rctTemp.right -= 6;                                                // 6 from the right edge
           rctTemp.left = rctTemp.right - (pFrameWindow->nFontHeight + 2);    // font width + 2 from right
           rctTemp.top += 2;                                                  // 2 pixels from top
@@ -2037,7 +2050,7 @@ int i1;
 
     // if I get here, I'll do this to make sure the UI is consistent
     pFrameWindow->nCloseTab = -1;  // NOT closing a tab (make sure)
-    
+
     return 1; // for now assume "I handled it" since the mousie was grabbed
   }
   else if(pEvent->type == ButtonRelease)
@@ -2162,7 +2175,7 @@ GC gc0;
   memcpy(&rct0, &(pFrameWindow->rctLastTabBarRect), sizeof(rct0));
 
   // cache the tab bar rectangle for mouse hit tests.  not the same rect as rctLastTabBarRect
-  
+
   pFrameWindow->rctTabBar.left   = rct0.left + 1;   // add 1 pixel for border
   pFrameWindow->rctTabBar.top    = rct0.top + 1;
   pFrameWindow->rctTabBar.right  = rct0.right - 1;  // subtract 1 pixel for border
@@ -2390,7 +2403,7 @@ GC gc0;
     PXM_RGBToPixel(NULL, &clr);
 //    WB_ERROR_PRINT("TEMPORARY:  red=%d, green=%d, blue=%d, pixel=%d\n",
 //                   clr.red, clr.green, clr.blue, clr.pixel);
-    
+
     BEGIN_XCALL_DEBUG_WRAPPER
     XSetForeground(pDisplay, gc, clr.pixel/*clrFG.pixel*/); // for now use foreground color; later, ??
     END_XCALL_DEBUG_WRAPPER
@@ -2639,7 +2652,7 @@ const char *pszStatus;
       if(!pFrameWindow->pStatusBarTabs || !pFrameWindow->nStatusBarTabs) // fixed tab width (or no tabs)
       {
         int iFixedTab = pFrameWindow->nStatusBarTabs;
-        
+
         if(!iFixedTab)
         {
           iFixedTab = DEFAULT_STATUS_BAR_TAB;
@@ -2668,7 +2681,7 @@ const char *pszStatus;
         int nCol;
 
         // create the tab and column list using a utility (to simplify THIS code)
-        
+
         if(!__internal_do_status_tab_cols(pFrameWindow, &rctTemp, &ppCols, &pData, &pTabs, &nCol))
         {
           memcpy(&rctPrev, &rctTemp, sizeof(rctTemp));
@@ -2693,7 +2706,7 @@ const char *pszStatus;
           WBFree(pTabs);
         }
       }
-    }                         
+    }
 
     WBEndPaint(pFrameWindow->wbFW.wID, gc);  // and that's it!
   }
@@ -2805,7 +2818,7 @@ error_return2:
     WBFree(*pppCols);
     *pppCols = NULL;
 
-    goto error_return2;    
+    goto error_return2;
   }
 
   // time to build up 'pppCols'
@@ -2839,7 +2852,7 @@ error_return2:
     }
     else
     {
-      (*ppTabs)[iTab].left = prct->left 
+      (*ppTabs)[iTab].left = prct->left
                            + (i2 & WBStatusTabInfo_MASK) * pFrameWindow->nAvgCharWidth;
       (*ppTabs)[iTab].right = -1;
       (*ppTabs)[iTab].align = i2 & WBStatusTabInfo_JUSTIFY_MASK;
@@ -2852,7 +2865,7 @@ error_return2:
 
 
   // NOW, go through this list and determine how wide each column should be
-  // 
+  //
 
   for(i1=0; i1 < iTab; i1++)
   {
@@ -3037,8 +3050,8 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
           evt.data.l[4] = pEvent->xconfigure.border_width; // RESERVED (for now, just do it)
 
           WBPostEvent(wID, (XEvent *)&evt); // NOTE:  if too slow, post 'priority' instead
-        }  
-        
+        }
+
         break;
 
 
@@ -3429,7 +3442,7 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
             evt.message_type = aQUERY_CLOSE; // QUERY_CLOSE request
             evt.format = 32;
             evt.data.l[0] = 0; // "do not close yourself yet"
-            
+
             if((int)WBWindowDispatch(evt.window, (XEvent *)&evt) > 0) // TODO:  handle errors
             {
               WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Event | DebugSubSystem_Frame,

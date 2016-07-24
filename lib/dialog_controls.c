@@ -19,7 +19,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -2117,7 +2119,7 @@ static int button_callback(Window wID, XEvent *pEvent)
         if(pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_PRESSED)
         {
           pDialogControl->pDlgControlEntry->iFlags &= ~WBDialogEntry_PRESSED; // flip the bit back off
-          
+
           WBInvalidateRect(wID, NULL, 0);
           WBUpdateWindowImmediately(wID); // make sure I paint it NOW
         }
@@ -2185,7 +2187,7 @@ static int button_callback(Window wID, XEvent *pEvent)
         if(pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_PRESSED)
         {
           pDialogControl->pDlgControlEntry->iFlags &= ~WBDialogEntry_PRESSED; // flip the bit back off
-          
+
           WBInvalidateRect(wID, NULL, 0);
           WBUpdateWindowImmediately(wID); // make sure I paint it NOW
         }
@@ -3187,7 +3189,7 @@ WB_RECT rctTemp;
             {
               XBell(pDisplay, -100);
               WB_ERROR_PRINT("TEMPORARY - %s - clipboard format %d, can't 'PASTE'\n", __FUNCTION__, iFormat);
-              
+
               WBFree(pData);
               pData = NULL;
             }
@@ -3632,7 +3634,7 @@ WB_RECT rctTemp;
               {
                 XBell(pDisplay, -100);
                 WB_ERROR_PRINT("TEMPORARY - %s - clipboard format %d, can't 'PASTE'\n", __FUNCTION__, iFormat);
-                
+
                 WBFree(pData);
                 pData = NULL;
               }
@@ -4895,7 +4897,7 @@ Display *pDisplay = WBGetWindowDisplay(wID);
       if(*szText)
       {
         WB_RECT rctBounds;
-        
+
         rctBounds.top = pGeom->y;
         rctBounds.bottom = pGeom->y + pGeom->height;
         rctBounds.left = pGeom->x + iHPos;

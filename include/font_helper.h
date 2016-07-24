@@ -16,7 +16,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -309,7 +311,7 @@ XFontSet WBFontSetFromFont(Display *pDisplay, const XFontStruct *pFont);
   * \param fontSet An XFontSet (may not be 'None')
   * \returns An XFontStruct pointer or NULL on error.  The caller must free the XFontStruct using XFreeFontStruct() if not NULL.
   *
-  * This function helps to 
+  * This function helps to
   * The returned value (if not NULL) will need to be free'd using XFreeFont()
   *
   * Header File:  font_helper.h

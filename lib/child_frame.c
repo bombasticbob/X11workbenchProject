@@ -19,7 +19,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -57,6 +59,41 @@
 #include "font_helper.h"
 #include "child_frame.h"
 #include "draw_text.h"
+#include "menu_popup.h"
+
+
+static int ChildFrameEditCutHandler(XClientMessageEvent *);
+static int ChildFrameEditCopyHandler(XClientMessageEvent *);
+static int ChildFrameEditPasteHandler(XClientMessageEvent *);
+static int ChildFrameEditDeleteHandler(XClientMessageEvent *);
+static int ChildFrameEditSelectAllHandler(XClientMessageEvent *);
+static int ChildFrameEditSelectNoneHandler(XClientMessageEvent *);
+static int ChildFrameEditCutUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem);
+static int ChildFrameEditCopyUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem);
+static int ChildFrameEditPasteUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem);
+static int ChildFrameEditDeleteUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem);
+static int ChildFrameEditSelectAllUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem);
+static int ChildFrameEditSelectNoneUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem);
+
+/** \ingroup child_window
+  * \variable aChildFrameMenuHandler
+  * \brief Automatic menu handler for Child Frame windows
+  *
+  * whenever you declare a menu for a Child Frame window, the standard 'Edit Menu' items
+  * are automatically handled.  If the menu you specify contains these items, the default menu
+  * handler can process them for you.  If you override them in your own menu handler structure,
+  * the override versions will be used instead.
+**/
+FW_MENU_HANDLER_BEGIN(aChildFrameMenuHandler)
+
+  FW_MENU_HANDLER_ENTRY(FW_EDIT_CUT_MENU, ChildFrameEditCutHandler, ChildFrameEditCutUIHandler)
+  FW_MENU_HANDLER_ENTRY(FW_EDIT_COPY_MENU, ChildFrameEditCopyHandler, ChildFrameEditCopyUIHandler)
+  FW_MENU_HANDLER_ENTRY(FW_EDIT_PASTE_MENU, ChildFrameEditPasteHandler, ChildFrameEditPasteUIHandler)
+  FW_MENU_HANDLER_ENTRY(FW_EDIT_DELETE_MENU, ChildFrameEditDeleteHandler, ChildFrameEditDeleteUIHandler)
+  FW_MENU_HANDLER_ENTRY(FW_EDIT_SELECT_ALL_MENU, ChildFrameEditSelectAllHandler, ChildFrameEditSelectAllUIHandler)
+  FW_MENU_HANDLER_ENTRY(FW_EDIT_SELECT_NONE_MENU, ChildFrameEditSelectNoneHandler, ChildFrameEditSelectNoneUIHandler)
+
+FW_MENU_HANDLER_END
 
 
 
@@ -69,7 +106,7 @@ static int ChildFrameDoCharEvent(XClientMessageEvent *pEvent, Display *pDisplay,
 static WBChildFrame *pChildFrames = NULL;  // pointer to linked list of 'Child Frame' windows
 
 
-int FWInitChildFrame(WBChildFrame *pChildFrame, WBFrameWindow *pOwner, XFontStruct *pFont,
+int FWInitChildFrame(WBChildFrame *pChildFrame, WBFrameWindow *pOwner, XFontSet rFontSet,
                      const char *szFocusMenu, const WBFWMenuHandler *pHandlerArray,
                      WBWinEvent pUserCallback, int fFlags)
 {
@@ -81,7 +118,7 @@ int iRval = -1;
 
   if(!pChildFrame || !pOwner || pOwner->wID == None)
   {
-    // TODO:  validate 'pOwner' as a valid WBFrameWindow ??  
+    // TODO:  validate 'pOwner' as a valid WBFrameWindow ??
 
     WB_ERROR_PRINT("%s - invalid pointers or owner window does not exist\n", __FUNCTION__);
 
@@ -152,13 +189,13 @@ int iRval = -1;
   pChildFrame->ulTag = CHILD_FRAME_TAG;
   pChildFrame->destructor = NULL; // make sure
 
-  if(!pFont)
+  if(rFontSet == None)
   {
-    pChildFrame->pFont = NULL;
+    pChildFrame->rFontSet = None;
   }
   else
   {
-    pChildFrame->pFont = WBCopyFont(pFont);
+    pChildFrame->rFontSet = WBCopyModifyFontSet(pDisplay, rFontSet, 0, 0);
   }
 
   if(szFocusMenu)
@@ -179,22 +216,34 @@ int iRval = -1;
   if(pHandlerArray)
   {
     const WBFWMenuHandler *pH;
-    int i1;
+    int iN;
 
     // count the number of entries in the menu handler
-    for(i1=0, pH = pHandlerArray; pH->lMenuID || pH->callback || pH->UIcallback; i1++, pH++)
+    for(iN=0, pH = pHandlerArray; pH->lMenuID || pH->callback || pH->UIcallback; iN++, pH++)
     {
       // NOTHING inside the loop.  just count.
     }
 
     // allocate space and make a copy
 
-    pChildFrame->pMenuHandler = (WBFWMenuHandler *)WBAlloc(sizeof(WBFWMenuHandler) * (i1 + 2));
+    pChildFrame->pMenuHandler = (WBFWMenuHandler *)WBAlloc(sizeof(WBFWMenuHandler)
+                                                           * (iN + 1
+                                                              + sizeof(aChildFrameMenuHandler)
+                                                                / sizeof(aChildFrameMenuHandler[0])
+                                                              )
+                                                           );
 
     if(pChildFrame->pMenuHandler)
     {
-      memcpy(pChildFrame->pMenuHandler, pHandlerArray,
-             sizeof(WBFWMenuHandler) * (i1 + 1));
+      if(iN > 0)
+      {
+        memcpy(pChildFrame->pMenuHandler, pHandlerArray,
+               sizeof(WBFWMenuHandler) * iN);
+      }
+
+      memcpy(pChildFrame->pMenuHandler + iN,
+             aChildFrameMenuHandler,
+             sizeof(aChildFrameMenuHandler)); // this includes the NULL entry at the end
     }
     else
     {
@@ -291,10 +340,10 @@ Window wID;
     pChildFrame->szDisplayName = NULL;
   }
 
-  if(pChildFrame->pFont)
+  if(pChildFrame->rFontSet)
   {
-    XFreeFont(WBGetDefaultDisplay(), pChildFrame->pFont);
-    pChildFrame->pFont = NULL;
+    XFreeFontSet(WBGetDefaultDisplay(), pChildFrame->rFontSet);
+    pChildFrame->rFontSet = None;
   }
 
   if(pChildFrame->pMenuHandler)
@@ -360,7 +409,7 @@ Window wID;
   pChildFrame->pNext = NULL; // make sure it's not a pointer someplace that can cause problems
 
   // if the 'superclass' destructor was specified, call it NOW.
-  
+
   if(pChildFrame->destructor)
   {
     // at this point, we ALWAYS destroy the callback function.
@@ -445,22 +494,37 @@ void FWSetChildFrameMenuHandlers(WBChildFrame *pChildFrame, const WBFWMenuHandle
   if(pHandlerArray)
   {
     const WBFWMenuHandler *pH;
-    int i1;
+    int iN;
 
     // count the number of entries in the menu handler
-    for(i1=0, pH = pHandlerArray; pH->lMenuID || pH->callback || pH->UIcallback; i1++, pH++)
+    for(iN=0, pH = pHandlerArray; pH->lMenuID || pH->callback || pH->UIcallback; iN++, pH++)
     {
       // NOTHING inside the loop.  just count.
     }
 
     // allocate space and make a copy
 
-    pChildFrame->pMenuHandler = (WBFWMenuHandler *)WBAlloc(sizeof(WBFWMenuHandler) * (i1 + 2));
+    pChildFrame->pMenuHandler = (WBFWMenuHandler *)WBAlloc(sizeof(WBFWMenuHandler)
+                                                           * (iN + 1
+                                                              + sizeof(aChildFrameMenuHandler)
+                                                                / sizeof(aChildFrameMenuHandler[0])
+                                                              )
+                                                           );
 
     if(pChildFrame->pMenuHandler)
     {
-      memcpy(pChildFrame->pMenuHandler, pHandlerArray,
-             sizeof(WBFWMenuHandler) * (i1 + 1));
+      if(iN > 0)
+      {
+        memcpy(pChildFrame->pMenuHandler, pHandlerArray,
+               sizeof(WBFWMenuHandler) * iN);
+      }
+
+      // this adds MY menu default handlers to the end of the list
+      // so it's possible to override them, if the owner wants to
+
+      memcpy(pChildFrame->pMenuHandler + iN,
+             aChildFrameMenuHandler,
+             sizeof(aChildFrameMenuHandler)); // this includes the NULL entry at the end
     }
   }
   else
@@ -539,7 +603,7 @@ void FWSetChildFrameScrollInfo(WBChildFrame *pChildFrame, int iRow, int iMaxRow,
                  pChildFrame, (int)pChildFrame->wID, (int)pChildFrame->wID,
                  iRow, iMaxRow, iCol, iMaxCol, iRowHeight, iColWidth);
 
-}                               
+}
 
 
 void FWChildFrameRecalcLayout(WBChildFrame *pChildFrame)
@@ -596,10 +660,10 @@ int iL, iT, iW, iH;
 
 
 //  pChildFrame->iLeft = iL converted to correct units and scrolled;
-//  pChildFrame->iTop = iT converted to correct units and scrolled;  
+//  pChildFrame->iTop = iT converted to correct units and scrolled;
 //  pChildRrame->iWidth = iW converted to correct units;
 //  pChildFrame->iHeight = iH converted to correct units;
-    
+
 
 
   // NOW, tell the user callback function (if any) what's happening.
@@ -626,7 +690,7 @@ int iL, iT, iW, iH;
 
     // required implementation.  superclass must process this and fix up scroll info
     pChildFrame->pUserCallback(evt.window, (XEvent *)&evt);
-  }  
+  }
 
 
   // TODO:  fix the scrollbars and invalidate rectangles
@@ -716,7 +780,7 @@ int nChar = sizeof(tbuf);
   if(pC->pUserCallback)
   {
     iRval = pC->pUserCallback(wID, pEvent);
-  }  
+  }
 
 
   // TODO:  menu and menu UI handler?  For now, no.  rely on frame window.
@@ -1580,4 +1644,439 @@ int iRval = 0;
   return 0; // "not handled"
 }
 
+
+
+static int ChildFrameEditCutHandler(XClientMessageEvent *pEvent)
+{
+WBChildFrame *pChildFrame;
+
+  if(!pEvent || pEvent->window == None)
+  {
+    return -1; // an error
+  }
+
+  pChildFrame = FWGetChildFrameStruct(pEvent->window);
+
+  if(!pChildFrame)
+  {
+    return -1; // an error
+  }
+
+  if(pChildFrame->pUI && pChildFrame->pUI->has_selection && pChildFrame->pUI->cut_to_cb)
+  {
+    if(pChildFrame->pUI->has_selection(pChildFrame))
+    {
+      pChildFrame->pUI->cut_to_cb(pChildFrame);
+
+      return 1; // HANDLED
+    }
+  }
+
+  return 0; // NOT handled (but not an error)
+}
+
+static int ChildFrameEditCopyHandler(XClientMessageEvent *pEvent)
+{
+WBChildFrame *pChildFrame;
+
+  if(!pEvent || pEvent->window == None)
+  {
+    return -1; // an error
+  }
+
+  pChildFrame = FWGetChildFrameStruct(pEvent->window);
+
+  if(!pChildFrame)
+  {
+    return -1; // an error
+  }
+
+  if(pChildFrame->pUI && pChildFrame->pUI->has_selection && pChildFrame->pUI->copy_to_cb)
+  {
+    if(pChildFrame->pUI->has_selection(pChildFrame))
+    {
+      pChildFrame->pUI->copy_to_cb(pChildFrame);
+
+      return 1; // HANDLED
+    }
+  }
+
+  return 0; // NOT handled (but not an error)
+}
+
+static int ChildFrameEditPasteHandler(XClientMessageEvent *pEvent)
+{
+WBChildFrame *pChildFrame;
+
+  if(!pEvent || pEvent->window == None)
+  {
+    return -1; // an error
+  }
+
+  pChildFrame = FWGetChildFrameStruct(pEvent->window);
+
+  if(!pChildFrame)
+  {
+    return -1; // an error
+  }
+
+  if(pChildFrame->pUI && pChildFrame->pUI->paste_from_cb)
+  {
+    // TODO:  check for valid clipboard contents first??  or assume 'NULL' is ok?
+
+    pChildFrame->pUI->paste_from_cb(pChildFrame);
+
+    return 1; // HANDLED
+  }
+
+  return 0; // NOT handled (but not an error)
+}
+
+static int ChildFrameEditDeleteHandler(XClientMessageEvent *pEvent)
+{
+WBChildFrame *pChildFrame;
+
+  if(!pEvent || pEvent->window == None)
+  {
+    return -1; // an error
+  }
+
+  pChildFrame = FWGetChildFrameStruct(pEvent->window);
+
+  if(!pChildFrame)
+  {
+    return -1; // an error
+  }
+
+  if(pChildFrame->pUI && pChildFrame->pUI->has_selection && pChildFrame->pUI->delete_sel)
+  {
+    if(pChildFrame->pUI->has_selection(pChildFrame))
+    {
+      pChildFrame->pUI->delete_sel(pChildFrame);
+
+      return 1; // HANDLED
+    }
+  }
+
+  return 0; // NOT handled (but not an error)
+}
+
+static int ChildFrameEditSelectAllHandler(XClientMessageEvent *pEvent)
+{
+WBChildFrame *pChildFrame;
+
+  if(!pEvent || pEvent->window == None)
+  {
+    return -1; // an error
+  }
+
+  pChildFrame = FWGetChildFrameStruct(pEvent->window);
+  if(!pChildFrame)
+  {
+    return -1; // an error
+  }
+
+  if(pChildFrame->pUI && pChildFrame->pUI->select_all)
+  {
+    pChildFrame->pUI->select_all(pChildFrame);
+
+    return 1; // HANDLED
+  }
+
+  return 0; // NOT handled (but not an error)
+}
+
+static int ChildFrameEditSelectNoneHandler(XClientMessageEvent *pEvent)
+{
+WBChildFrame *pChildFrame;
+
+  if(!pEvent || pEvent->window == None)
+  {
+    return -1; // an error
+  }
+
+  pChildFrame = FWGetChildFrameStruct(pEvent->window);
+  if(!pChildFrame)
+  {
+    return -1; // an error
+  }
+
+  if(pChildFrame->pUI && pChildFrame->pUI->select_none)
+  {
+    pChildFrame->pUI->select_none(pChildFrame);
+
+    return 1; // HANDLED
+  }
+
+  return 0; // NOT handled (but not an error)
+}
+
+static int ChildFrameEditCutUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem)
+{
+Window wID;
+WBChildFrame *pChildFrame;
+WBFrameWindow *pFrame;
+WBMenuPopupWindow *pPopup;
+
+
+  // pMenu essentially belongs to the frame window.  determine which tab has focus, and whether
+  // or not there's anything selected.  if there is something selected, enable the menu.
+  //
+  // NOTE:  this is called by the popup menu window itself, and so the pointer will not
+  //        be asynchronously destroyed when I call MBFindMenuPopupWindow(), nor will
+  //        the owning frame window be destroyed, either (unless someone seriously
+  //        violated the way these things are supposed to work).
+
+  pPopup = MBFindMenuPopupWindow(pMenu);
+
+  if(pPopup)
+  {
+    wID = pPopup->wOwner;
+
+    if(wID != None)
+    {
+      pFrame = FWGetFrameWindowStruct(wID);
+
+      if(pFrame)
+      {
+        pChildFrame = FWGetContainedWindowByIndex(pFrame, -1); // current focus window
+
+        if(pChildFrame && pChildFrame->pUI && pChildFrame->pUI->has_selection)
+        {
+          if(pChildFrame->pUI->has_selection(pChildFrame))
+          {
+            return 1; // select this
+          }
+        }
+      }
+    }
+  }
+
+  return -1; // disable this menu
+}
+
+static int ChildFrameEditCopyUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem)
+{
+Window wID;
+WBChildFrame *pChildFrame;
+WBFrameWindow *pFrame;
+WBMenuPopupWindow *pPopup;
+
+
+  // pMenu essentially belongs to the frame window.  determine which tab has focus, and whether
+  // or not there's anything selected.  if there is something selected, enable the menu.
+  //
+  // NOTE:  this is called by the popup menu window itself, and so the pointer will not
+  //        be asynchronously destroyed when I call MBFindMenuPopupWindow(), nor will
+  //        the owning frame window be destroyed, either (unless someone seriously
+  //        violated the way these things are supposed to work).
+
+  pPopup = MBFindMenuPopupWindow(pMenu);
+
+  if(pPopup)
+  {
+    wID = pPopup->wOwner;
+
+    if(wID != None)
+    {
+      pFrame = FWGetFrameWindowStruct(wID);
+
+      if(pFrame)
+      {
+        pChildFrame = FWGetContainedWindowByIndex(pFrame, -1); // current focus window
+
+        if(pChildFrame && pChildFrame->pUI && pChildFrame->pUI->has_selection)
+        {
+          if(pChildFrame->pUI->has_selection(pChildFrame))
+          {
+            return 1; // select this
+          }
+        }
+      }
+    }
+  }
+
+  return -1; // disable this menu
+}
+
+static int ChildFrameEditPasteUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem)
+{
+Window wID;
+WBChildFrame *pChildFrame;
+WBFrameWindow *pFrame;
+WBMenuPopupWindow *pPopup;
+Display *pDisplay;
+
+  // pMenu essentially belongs to the frame window.  determine which tab has focus
+  // THEN, determine if there's a clipboard owner, and enable if so.  Disable if there
+  // are no child frames with the focus or clipboard owners
+  //
+  // NOTE:  this is called by the popup menu window itself, and so the pointer will not
+  //        be asynchronously destroyed when I call MBFindMenuPopupWindow(), nor will
+  //        the owning frame window be destroyed, either (unless someone seriously
+  //        violated the way these things are supposed to work).
+
+  pPopup = MBFindMenuPopupWindow(pMenu);
+
+  if(pPopup)
+  {
+    wID = pPopup->wOwner;
+
+    if(wID != None)
+    {
+      pDisplay = WBGetWindowDisplay(wID);
+      pFrame = FWGetFrameWindowStruct(wID);
+
+      if(pFrame)
+      {
+        pChildFrame = FWGetContainedWindowByIndex(pFrame, -1); // current focus window
+
+        if(pChildFrame && pChildFrame->pUI)
+        {
+          if(XGetSelectionOwner(pDisplay, aCLIPBOARD) != None ||
+             XGetSelectionOwner(pDisplay, aPRIMARY) != None)
+          {
+            return 1; // there's a clipboard selection out there, waiting to be pasted
+          }
+        }
+      }
+    }
+  }
+
+  return -1; // disable this menu
+
+}
+
+static int ChildFrameEditDeleteUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem)
+{
+Window wID;
+WBChildFrame *pChildFrame;
+WBFrameWindow *pFrame;
+WBMenuPopupWindow *pPopup;
+
+
+  // pMenu essentially belongs to the frame window.  determine which tab has focus, and whether
+  // or not there's anything selected.  if there is something selected, enable the menu.
+  //
+  // NOTE:  this is called by the popup menu window itself, and so the pointer will not
+  //        be asynchronously destroyed when I call MBFindMenuPopupWindow(), nor will
+  //        the owning frame window be destroyed, either (unless someone seriously
+  //        violated the way these things are supposed to work).
+
+  pPopup = MBFindMenuPopupWindow(pMenu);
+
+  if(pPopup)
+  {
+    wID = pPopup->wOwner;
+
+    if(wID != None)
+    {
+      pFrame = FWGetFrameWindowStruct(wID);
+
+      if(pFrame)
+      {
+        pChildFrame = FWGetContainedWindowByIndex(pFrame, -1); // current focus window
+
+        if(pChildFrame && pChildFrame->pUI && pChildFrame->pUI->has_selection)
+        {
+          if(pChildFrame->pUI->has_selection(pChildFrame))
+          {
+            return 1; // select this
+          }
+        }
+      }
+    }
+  }
+
+  return -1; // disable this menu
+}
+
+static int ChildFrameEditSelectAllUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem)
+{
+Window wID;
+WBChildFrame *pChildFrame;
+WBFrameWindow *pFrame;
+WBMenuPopupWindow *pPopup;
+
+
+  // pMenu essentially belongs to the frame window.  determine which tab has focus, and whether
+  // or not there's anything there.  if there is something that CAN be selected, enable the menu.
+  //
+  // NOTE:  this is called by the popup menu window itself, and so the pointer will not
+  //        be asynchronously destroyed when I call MBFindMenuPopupWindow(), nor will
+  //        the owning frame window be destroyed, either (unless someone seriously
+  //        violated the way these things are supposed to work).
+
+  pPopup = MBFindMenuPopupWindow(pMenu);
+
+  if(pPopup)
+  {
+    wID = pPopup->wOwner;
+
+    if(wID != None)
+    {
+      pFrame = FWGetFrameWindowStruct(wID);
+
+      if(pFrame)
+      {
+        pChildFrame = FWGetContainedWindowByIndex(pFrame, -1); // current focus window
+
+        if(pChildFrame && pChildFrame->pUI)
+        {
+          if((pChildFrame->pUI->has_selection && pChildFrame->pUI->has_selection(pChildFrame)) ||
+             (pChildFrame->pUI->is_empty && !pChildFrame->pUI->is_empty(pChildFrame)))
+          {
+            return 1; // select this
+          }
+        }
+      }
+    }
+  }
+
+  return -1; // disable this menu
+}
+
+static int ChildFrameEditSelectNoneUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem)
+{
+Window wID;
+WBChildFrame *pChildFrame;
+WBFrameWindow *pFrame;
+WBMenuPopupWindow *pPopup;
+
+
+  // pMenu essentially belongs to the frame window.  determine which tab has focus, and whether
+  // or not there's anything selected.  if there is something selected, enable the menu.
+  //
+  // NOTE:  this is called by the popup menu window itself, and so the pointer will not
+  //        be asynchronously destroyed when I call MBFindMenuPopupWindow(), nor will
+  //        the owning frame window be destroyed, either (unless someone seriously
+  //        violated the way these things are supposed to work).
+
+  pPopup = MBFindMenuPopupWindow(pMenu);
+
+  if(pPopup)
+  {
+    wID = pPopup->wOwner;
+
+    if(wID != None)
+    {
+      pFrame = FWGetFrameWindowStruct(wID);
+
+      if(pFrame)
+      {
+        pChildFrame = FWGetContainedWindowByIndex(pFrame, -1); // current focus window
+
+        if(pChildFrame && pChildFrame->pUI && pChildFrame->pUI->has_selection)
+        {
+          if(pChildFrame->pUI->has_selection(pChildFrame))
+          {
+            return 1; // select this
+          }
+        }
+      }
+    }
+  }
+
+  return -1; // disable this menu
+}
 

@@ -18,7 +18,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -183,7 +185,7 @@ extern "C" {
   * \copydoc WBFWMenuHandler
 **/
 /** \typedef WBFWMenuHandler
-  * \ingroup frame_menu  
+  * \ingroup frame_menu
   * \brief structure for managing menu callbacks
   *
   * The WBFWMenuHandler structure is designed to be initialized via macros, so
@@ -301,7 +303,7 @@ enum WBStatusTabInfo_FLAGS
   WBStatusTabInfo_MASK          = 0x0fffffff, ///< mask for the actual tab value
   WBStatusTabInfo_BREAK         = 0x10000000, ///< represents a 'break' (marks end of a column)
   WBStatusTabInfo_JUSTIFY_MASK  = 0x6fffffff, ///< mask for the 'justification' value
-  WBStatusTabInfo_JUSTIFY_LEFT  = 0x00000000, ///< left-justify text within the column (default)  
+  WBStatusTabInfo_JUSTIFY_LEFT  = 0x00000000, ///< left-justify text within the column (default)
   WBStatusTabInfo_JUSTIFY_CENTER= 0x20000000, ///< center text within the column
   WBStatusTabInfo_JUSTIFY_RIGHT = 0x40000000, ///< right justify text within the column
   WBStatusTabInfo_JUSTIFY_res6  = 0x60000000, ///< reserved: unspecified new justification method
@@ -337,10 +339,10 @@ struct __WBChildFrameUI__; // forward declaration
       // window identifier for the 'Child Frame' window.  may contain 'None' while being destroyed
     WBFrameWindow *pOwner;
       // a pointer to the WBFrameWindow owner
-    XFontStruct *pFont;
-      // default font for the window
+    XFontSet rFontSet;
+      // default font set for the window
 
-    WB_GEOM geom;                     
+    WB_GEOM geom;
       // client-area geometry (excludes scroll bars)
 
     int iTop;
@@ -407,7 +409,7 @@ typedef struct __WBChildFrame__
   unsigned int ulTag;               ///< tag indicating I'm a 'Child Frame' window
   Window wID;                       ///< window identifier for the 'Child Frame' window.  may contain 'None' while being destroyed
   WBFrameWindow *pOwner;            ///< a pointer to the WBFrameWindow owner
-  XFontStruct *pFont;               ///< default font for the window
+  XFontSet rFontSet;                ///< default font for the window
 
   WB_GEOM geom;                     ///< client-area geometry (excludes scroll bars)
 
@@ -608,7 +610,7 @@ typedef struct __WBChildFrame__
       // Both are 1-based values (<= 0 is 'error' or 'NA')
 
     int (*has_selection)(WBChildFrame *);
-      // returns non-zero value if there is a selection                                                              
+      // returns non-zero value if there is a selection
 
     void (*undo)(WBChildFrame *);
       // perform an undo
@@ -621,6 +623,9 @@ typedef struct __WBChildFrame__
 
     int (*can_redo)(WBChildFrame *);
       // returns non-zero value if 'can redo'
+
+    int (*is_empty)(WBChildFrame *);
+      // returns non-zero value if contents are 'empty' (cannot select anything)
 
   } WBChildFrameUI;
 
@@ -707,6 +712,8 @@ typedef struct __WBChildFrameUI__
   void (*redo)(WBChildFrame *);                             ///< perform a re-do \details Use 'can_redo()' to determine whether a re-do is possible
   int (*can_undo)(WBChildFrame *);                          ///< returns non-zero value if 'can undo' \details Interfaces/Objects that support 'undo' AND have a non-empty undo buffer will return non-zero.
   int (*can_redo)(WBChildFrame *);                          ///< returns non-zero value if 'can redo' \details Interfaces/Objects that support 're-do' AND have a non-empty re-do buffer will return non-zero.
+  int (*is_empty)(WBChildFrame *);                          ///< returns non-zero value if contents are 'empty' \details If the contents are such that a selection cannot be made, this function will return a non-zero value
+
 } WBChildFrameUI;
 
 
@@ -717,7 +724,7 @@ typedef struct __WBChildFrameUI__
   * \brief enumeration for 'fFlags' member of WBChildFrame
   *
 **/
-enum WBChildFrame_FLAGS 
+enum WBChildFrame_FLAGS
 {
   WBChildFrame_NO_TAB = 1,        ///< does not use MDI tabs [intended for SDI interface]
   WBChildFrame_PIXELS = 2,        ///< use PIXELS instead of characters and lines to define the viewport

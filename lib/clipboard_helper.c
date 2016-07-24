@@ -18,7 +18,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -177,7 +179,7 @@ char *pDisplayName;
 
   // TODO:  check if clipboard thread already started?
 
-  bClipboardQuitFlag = 1; // initial value.  when it's zero, I'm started.  If < 0, error  
+  bClipboardQuitFlag = 1; // initial value.  when it's zero, I'm started.  If < 0, error
 
   pCBTHead = NULL;
   pCBDHead = NULL; // make sure in both cases
@@ -281,7 +283,7 @@ void WBExitClipboardSystem(Display *pDisplay)
   {
     WBMutexFree(&xClipboardMutex);
   }
-  
+
   WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Init, "INFO:  %s - Clipboard Thread ended\n",__FUNCTION__);
 }
 
@@ -549,9 +551,9 @@ Atom aUTF8_STRING;
       /////////////////////////////////////////////////////////////////
       // PROCESS RUN LIST - CHECK 'CANCEL STATE' FIRST
       /////////////////////////////////////////////////////////////////
-     
+
       // check 'fState' - if it's negative, the task has been canceled or was an error I didn't catch before
-      
+
       if((int)WBInterlockedRead((unsigned int *)&(pT->fState)) < 0) // error state - these will be moved to 'done list'
       {
         bDoneAndSignal = 1; // if marked 'error' the request was canceled and it needs to be deleted
@@ -570,7 +572,7 @@ Atom aUTF8_STRING;
         {
           Window wOwn;
           Atom aSelection;
-          
+
           aSelection = pT->aSelection;
           if(aSelection == None)
           {
@@ -620,7 +622,7 @@ Atom aUTF8_STRING;
             // re-acquire the mutex
 
             if(!WBMutexLock(&xClipboardMutex, 100000L)) // re-lock, up to 0.1 seconds
-            {            
+            {
               // walk the data chain looking for a match
               pD = pCBDHead;
 
@@ -739,7 +741,7 @@ null_data_me_own:
                               pT->aProp,
                               wWindow, CurrentTime);
 
-            // NOTE:  the function return does not indicate success/fail                              
+            // NOTE:  the function return does not indicate success/fail
 
 //            WB_ERROR_PRINT("TEMPORARY: %s line %d - XConvertSelection, fState set to 1\n", __FUNCTION__, __LINE__);
 
@@ -760,7 +762,7 @@ null_data_me_own:
         }
 
         /////////////////////////////////////////////////////////////////
-      }    
+      }
       else if(pT->fType == 1) // assign clipboard
       {
         /////////////////////////////////////////////////////////////////
@@ -850,8 +852,8 @@ null_data_me_own:
               XSetSelectionOwner(pDisplay, pT->aSelection, None, CurrentTime);
             }
           }
-   
-//          WB_ERROR_PRINT("TEMPORARY:  %s - empty clipboard assignment\n", __FUNCTION__);          
+
+//          WB_ERROR_PRINT("TEMPORARY:  %s - empty clipboard assignment\n", __FUNCTION__);
         }
         else
         {
@@ -988,7 +990,7 @@ null_data_me_own:
         bDoneAndSignal = 1;
 
         /////////////////////////////////////////////////////////////////
-      }        
+      }
 
       // flush and synchronize so that any events that "the above"
       // might have created will be read to be processed right away
@@ -1137,7 +1139,7 @@ null_data_me_own:
       // (this is typically done using 'XConvertSelection')
       // once retrieved, set appropriate flag in work unit, get next one [if any]
       // if I'm the clipboard owner, just copy the data as-is and mark 'success'
-    
+
       // get data type in this order:
       // XA_CLIPBOARD(pDisplay) i.e. the atom 'CLIPBOARD' for the given display
       // XA_PRIMARY  (this is the default for 'xclip')
@@ -1251,7 +1253,7 @@ null_data_me_own:
         if(evt.xselectionrequest.target == aTARGETS) // special target
         {
           Atom aT[2];
-          
+
           aT[0] = aTARGETS;
           aT[1] = pD ? pD->aType : XA_STRING; // just do this for now
 
@@ -1262,7 +1264,7 @@ null_data_me_own:
 
           WB_ERROR_PRINT("TEMPORARY:  %s - sending TARGETS XChangeProperty\n", __FUNCTION__);
         }
-        else if(pD && 
+        else if(pD &&
                 (evt.xselectionrequest.target == pD->aType ||
                  (evt.xselectionrequest.target == XA_STRING && pD->aType == aUTF8_STRING) ||
                  (evt.xselectionrequest.target == aUTF8_STRING && pD->aType == XA_STRING)))
@@ -1371,7 +1373,7 @@ null_data_me_own:
                                   pT->aProp,
                                   wWindow, CurrentTime);
               }
-              else              
+              else
 #endif // X_HAVE_UTF8_STRING
               {
                 // assume this is an error condition
@@ -1403,7 +1405,7 @@ null_data_me_own:
                   // begin incremental process by deleting the property
                   XDeleteProperty(pDisplay, wWindow, pT->aProp);
                   XFlush(pDisplay);
-                  
+
                   // assign state 2, which will pick it up again as incremental
                   pT->fState = 2;
                 }
@@ -1423,7 +1425,7 @@ null_data_me_own:
                   {
                     pT->cbLength = cbLeft;
                   }
-                
+
                   if(!XGetWindowProperty(pDisplay, wWindow, pT->aProp, 0, pT->cbLength, False,
                                          AnyPropertyType, &aType, &iFormat, &nItems, &cbLeft, &pBuf) &&
                      pBuf)
@@ -1494,7 +1496,7 @@ null_data_me_own:
               pT->fState = -1; // an error
 
               bDoneAndSignal = 1;
-            }             
+            }
 
             if(pBuf)
             {
@@ -1707,7 +1709,7 @@ null_data_me_own:
 
     if(pDisplay && wWindow != None)
     {
-      if(pD->aSelection != None && 
+      if(pD->aSelection != None &&
          XGetSelectionOwner(pDisplay, pD->aSelection) == wWindow)
       {
         XSetSelectionOwner(pDisplay, pD->aSelection, None, CurrentTime);
@@ -1728,7 +1730,7 @@ null_data_me_own:
     WBFree(pD); // this one is very simple
   }
 
-  // OK no longer owning the clipboard, so now it's time to 
+  // OK no longer owning the clipboard, so now it's time to
 
   if(pDisplay)
   {
@@ -1833,7 +1835,7 @@ int iErr;
 
     goto exit_point0;
   }
-  
+
   // own the global mutex and add this to the linked list. then wait on it.
 
   if(WBMutexLock(&xClipboardMutex, 200000L)) // 0.2 seconds
@@ -1871,11 +1873,11 @@ int iErr;
 
     pRval = pTask->pData;  // always for 'get'
     pTask->pData = NULL;   // so I don't accidentally free it, evar [assume WBAlloc from other thread is OK]
-    
+
     if(paType)
     {
       *paType = pTask->aType;
-    }  
+    }
 
     if(piFormat)
     {
@@ -1912,7 +1914,7 @@ int iErr;
   else
   {
     // some kind of error - unhook it from the chain.  mutex is owned.
-    
+
     WB_ERROR_PRINT("%s - %s error waiting on cond,mutex for completion\n", __FUNCTION__,
                    (const char *)(iErr > 0 ? "timeout" : "unknown"));
 
@@ -2019,7 +2021,7 @@ volatile CLIPBOARD_TASK *pT, *pTask;
     iRval = -2;
     goto exit_point0;
   }
-  
+
   // own the global mutex and add this to the linked list. then wait on it.
 
   if(WBMutexLock(&xClipboardMutex, 200000L)) // up to 0.2 second for locking
@@ -2072,7 +2074,7 @@ volatile CLIPBOARD_TASK *pT, *pTask;
 
     iRval = -4;
   }
-  
+
   // at this point 'xClipboardMutex' is assumed to be LOCKED
 
   if(!WBInterlockedDecrement((unsigned int *)&(pTask->nRefCount))) // flags a delete when ref count is zero

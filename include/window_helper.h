@@ -23,7 +23,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -146,7 +148,7 @@ extern int i_xcall_line;
   * \def BEGIN_XCALL_DEBUG_WRAPPER()
   * \brief wrapper macro for calls into the X11 library.  This macro precedes the call(s)
 **/
-#define BEGIN_XCALL_DEBUG_WRAPPER { const char *__szOldXCallFunc__ = sz_xcall_func; int __iOldXCallLine__ = i_xcall_line; sz_xcall_func = __FUNCTION__;  i_xcall_line = __LINE__; { 
+#define BEGIN_XCALL_DEBUG_WRAPPER { const char *__szOldXCallFunc__ = sz_xcall_func; int __iOldXCallLine__ = i_xcall_line; sz_xcall_func = __FUNCTION__;  i_xcall_line = __LINE__; {
 /** \ingroup debug
   * \def END_XCALL_DEBUG_WRAPPER()
   * \brief wrapper macro for calls into the X11 library.  This macro follows the call(s)
@@ -843,7 +845,7 @@ XFontStruct *WBGetDefaultFont(void);
   *
   * \param pDisplay A pointer to the Display, or NULL to use the default Display
   * \returns An XFontSet, or 'None' on error
-  *  
+  *
   * The default XFontSet is allocated at startup from the default XFontStruct.
   * This function returns this XFontSet, which can be used in a case where the
   * 'in use' XFontSet is not known, or when an overriding font set has not
@@ -888,6 +890,7 @@ extern const Atom aDESTROY_NOTIFY;   // notify parent that child is being destro
 extern const Atom aCONTROL_NOTIFY;   // dialog control and child window notification messages
                                      // l[0] contains control ID or -1, l[1] is notify code, l[2] is window ID
 extern const Atom aQUERY_CLOSE;      // command sent by Client Message - return 0 if ok to close, 1 if not ok to close, -1 on error
+extern const Atom aRECALC_LAYOUT;    // notify window that it should re-calculate things like scrollbars and viewports
 
 extern const Atom aDLG_FOCUS;        // dialog focus messages: l[0] is <,0,> for prev, 'set to', next.  For 'set to' l[1] is control ID
 extern const Atom aSET_FOCUS;        // 'set focus' messages (send/post to application)
@@ -2427,7 +2430,7 @@ void WBMouseCancel(Display *pDisplay, Window wID);
 
 /** \defgroup clipboard Clipboard and Selections
   * \ingroup core
-  * 
+  *
   * Clipboard and generic 'Selection' helper functions.  Use these
   * to copy data to/from the clipboard or other 'selection'.  They
   * will process the requests asynchronously in a thread, returning
@@ -2824,7 +2827,7 @@ void WBEndPaint(Window wID, GC gc);  // frees the 'paint GC' and also resets the
   * \brief 'Paint' helper, erases background by painting the background color within the clipping region
   *
   * \param wID Window ID associated with the Expose event
-  * \param gc The GC (graphics context) returned by WBBeginPaint().  
+  * \param gc The GC (graphics context) returned by WBBeginPaint().
   *
   * Call this function, following a call to WBBeginPaint(), if you want to erase the
   * background of the window.  Call this in lieu of XClearWindow() or XClearArea()

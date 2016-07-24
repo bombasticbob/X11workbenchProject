@@ -17,7 +17,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -926,7 +928,7 @@ WB_RECT rctTemp;
   xpt[2].x = xpt[1].x + 1;
   xpt[2].y = xpt[1].y - 1; // 45 degrees
   xpt[3].x = xpt[2].x + 1;
-  xpt[3].y = xpt[2].y - 1; // again  
+  xpt[3].y = xpt[2].y - 1; // again
   xpt[4].x = xpt[3].x + 1;
   xpt[4].y = xpt[3].y - 1; // now we're "on point"
 
@@ -954,7 +956,7 @@ WB_RECT rctTemp;
   {
     WB_ERROR_PRINT("ERROR:  %s - unable to create polygon region\n", __FUNCTION__);
     return;
-  }  
+  }
 
   // create GC copy and select the clipping region
 
@@ -1025,7 +1027,7 @@ WB_RECT rctTemp;
 
       clrTemp.red = (iR << 8) + 128;
       clrTemp.green = (iG << 8) + 128;
-      clrTemp.blue = (iB << 8) + 128;      
+      clrTemp.blue = (iB << 8) + 128;
       clrTemp.flags = DoRed | DoGreen | DoBlue;
 
       PXM_RGBToPixel(NULL, &clrTemp);
@@ -1133,7 +1135,7 @@ WB_RECT rctTemp;
   }
 
   XDrawLines(pDisplay, dw, gc2, xpt + 9, 2, CoordModeOrigin); // the bottom line
- 
+
   // paint pixels 6 and 7 with the 'average' color
   XSetForeground(pDisplay, gc2, clrAvg.pixel);
   XDrawPoints(pDisplay, dw, gc2, xpt + 6, 2, CoordModeOrigin);

@@ -17,7 +17,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -99,7 +101,7 @@
     struct __DIALOG_WINDOW__ *pNext; // internal use only, pointer to next entry in chain (linked list)
 
   } DIALOG_WINDOW;
-  
+
   * \endcode
   *
   * Dialog 'owner' window structure, kept internally as part of a link list.
@@ -1774,7 +1776,7 @@ char tbuf[256];
         {
           int iNewSize;
           void *p0;
-          
+
           iNewSize = (nKids + 128) * sizeof(*pKids);
           p0 = WBReAlloc(pKids, iNewSize);
 

@@ -17,7 +17,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -1147,13 +1149,13 @@ int WBTextObjectCalculateLineHeight(int iAscent, int iDescent);
   * and so this function (and others) will deal with multiple byte characters as they are, in an independent manner.
   *
   * It is the caller's responsibility to filter out line feed characters, and insert new lines into a line buffer.
-  * 
+  *
   * If a 'ppInserted' pointer value is specified, this function will store the inserted text in a buffer allocated
   * via WBAlloc().  The caller must free any non-NULL value returned by this function using WBFree().  The data that
   * is stored in this allocated buffer can be used to support 'undo' and 'redo'.
   *
   * Header File:  text_object.h
-**/  
+**/
 char * WBInsertMBChars(char *pString, int iCol, const char *pszMBString, int cbString,
                        int fTab, int fOverwrite, int *piNewCol, char **ppInserted);
 
@@ -1180,7 +1182,7 @@ char * WBSplitMBLine(char *pString, int iCol);
   *
   * \param pString A pointer to a WBAlloc'd buffer containing a multi-byte character string.  The string must terminate with a zero byte.
   * \param iCol A 0-based column index value.  If the value is greater than the length of 'pString', then 'pString' will be padded with spaces up to that column before 'joining'.
-  * \param pJoin A (const) poitner to a buffer containing a multi-byte character string, terminated with a zero byte.  This 
+  * \param pJoin A (const) poitner to a buffer containing a multi-byte character string, terminated with a zero byte.  This
   * \return A pointer to a WBAlloc'd string containing the resulting 'join'ed string.  If different from 'pString', the 'pString' pointer value will no longer be valid.  On error, it will return NULL
   *
   * This function will 'join' a 2nd string to an existing (WBAlloc'd) multi-byte character string, optionally at a specified column
@@ -1227,7 +1229,7 @@ int WBDelMBChars(char *pString, int iCol, int nDel, int *piNewCol, char **ppDele
   * \returns The length of the multi-byte character string in 'characters'
   *
   * Header File:  text_object.h
-**/  
+**/
 int WBGetMBLength(const char *pString);
 
 
@@ -1240,7 +1242,7 @@ int WBGetMBLength(const char *pString);
   * \returns A pointer to the multi-byte character located at the 'iCol' position within the string.  If 'iCol' is out range, the return value will point to the terminating zero byte.  On error, the return value will be NULL.
   *
   * Header File:  text_object.h
-**/  
+**/
 char * WBGetMBCharPtr(char *pString, int iCol, int *pcbLen);
 
 /** \ingroup text_object
@@ -1251,7 +1253,7 @@ char * WBGetMBCharPtr(char *pString, int iCol, int *pcbLen);
   * \returns The zero-based column index of the character pointed to by 'pChar' within 'pString.  If 'pChar' is out range, or points to an invalid character, the return value will be zero.
   *
   * Header File:  text_object.h
-**/  
+**/
 int WBGetMBColIndex(const char *pString, const char *pChar);
 
 

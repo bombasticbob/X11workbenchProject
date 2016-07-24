@@ -17,7 +17,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -215,7 +217,7 @@ struct __malloc_header__
   unsigned int cbSize;                      ///< size used for last malloc/realloc
 };
 
-static struct __malloc_header__ mallocFlagMalloc; // pointers to THIS indicate "I am a 
+static struct __malloc_header__ mallocFlagMalloc; // pointers to THIS indicate "I am a
 
 //static struct __malloc_header__ *pMallocList = NULL, *pMallocListEnd = NULL;
 // TODO:  when I go to implement this, uncomment the above line
@@ -917,7 +919,7 @@ WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros
       if(iFreeIndex < 0) // no free index yet?  remember it
       {
         iFreeIndex = i1;
-      }      
+      }
     }
   }
 
@@ -953,11 +955,11 @@ WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros
     {
       break;
     }
-    
+
     dwTick -= 113; // decrement it by a prime number so I can test for it
                    // being there again, but with a different hash value
   }
-  
+
   pPointerHashes[i1].uiHash = uiRval;
 
 
@@ -1187,7 +1189,7 @@ exit_point:
 //    WB_ERROR_PRINT("TEMPORARY:  %s - allocating new atom %u for %s\n", __FUNCTION__, (unsigned int)aRval, szAtomName);
 //  }
 
-  return aRval;  
+  return aRval;
 //  aRval = XInternAtom(pDisplay, szAtomName, False); // temporarily, just do this
 }
 
@@ -1231,7 +1233,7 @@ unsigned int i1;
         aRval = (Atom)(i1 + WB_INTERNAL_ATOM_MIN_VAL);
         break;
       }
-    }  
+    }
   }
 
   WBInterlockedExchange(&lInternalAtomSpinner, 0);  // I'm done with it now
@@ -2013,10 +2015,10 @@ void TestFunc1(Display *pDisplay, GC gc, Window wID, int iX, int iY)
 #define gray_x_hot 8
 #define gray_y_hot 8
 static char gray_bits0[] = { // this failed
-	  0xf8, 0x1f, 0xe3, 0xc7, 0xcf, 0xf3, 0x9f, 0xf9, 0xbf,
-	  0xfd, 0x33, 0xcc, 0x7f, 0xfe, 0x7f, 0xfe, 0x7e, 0x7e,
-	  0x7f, 0xfe, 0x37, 0xec, 0xbb, 0xdd, 0x9c, 0x39, 0xcf,
-	  0xf3, 0xe3, 0xc7, 0xf8, 0x1f};
+    0xf8, 0x1f, 0xe3, 0xc7, 0xcf, 0xf3, 0x9f, 0xf9, 0xbf,
+    0xfd, 0x33, 0xcc, 0x7f, 0xfe, 0x7f, 0xfe, 0x7e, 0x7e,
+    0x7f, 0xfe, 0x37, 0xec, 0xbb, 0xdd, 0x9c, 0x39, 0xcf,
+    0xf3, 0xe3, 0xc7, 0xf8, 0x1f};
 
 static char gray_bits[] = // this worked (MSB byte-level)
 {
@@ -3331,7 +3333,7 @@ WB_PROCADDRESS WBGetProcAddress(WB_MODULE hModule, const char *szProcName)
   return((WB_PROCADDRESS)dlfunc(hModule, szProcName));
 #else // other POSIX systems - TODO, check for 'dlfunc' instead of the OS
   return((WB_PROCADDRESS)dlsym(hModule, szProcName));
-#endif // 'dlfunc' check  
+#endif // 'dlfunc' check
 }
 
 #endif // POSIX, WIN32
@@ -3419,7 +3421,7 @@ struct __WB_THREAD_PARM__
 
 volatile unsigned int dwThreadParmSpinLock = 0; // spinlock on THIS using WBInterlockedExchange
 
-struct __WB_THREAD_PARM__ aTP[16] = 
+struct __WB_THREAD_PARM__ aTP[16] =
 {
   { &(aTP[1]), NULL, 0 }, // this initializer creates a 'chain'
   { &(aTP[2]), NULL, 0 },
@@ -3789,13 +3791,13 @@ int iRval = -1;
       clock_gettime(CLOCK_REALTIME, &tsNow);
 
       if(tsNow.tv_sec > ts.tv_sec ||
-         (tsNow.tv_sec == ts.tv_sec && 
+         (tsNow.tv_sec == ts.tv_sec &&
           tsNow.tv_nsec > ts.tv_nsec))
       {
         iRval = ETIMEDOUT; // timeout error
         break;
       }
-      
+
       usleep(37 + tsNow.tv_nsec % 29); // a slightly random ~0.05 msec delay
     }
   }

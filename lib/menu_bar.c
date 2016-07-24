@@ -17,7 +17,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -509,7 +511,7 @@ WBMenu *pMenu;
   }
 
   pMenuBar->pMenu = pMenu;
-  
+
   pMenuBar->iSelected = -1;
   pMenuBar->iPrevSel = -1;
 
@@ -865,7 +867,7 @@ let_parent_process_it:
          ((XClientMessageEvent *)pEvent)->data.l[0]) // prev/next or 'absolute' indicator - *NOT* equal to 'NULL'
       {
         // select the menu item specified by the index in data.l[1]
-      
+
         if(pSelf->iSelected != iMenuItemIndex &&
            pSelf->iSelected >= 0 && pSelf->iSelected < pMenu->nItems)
         {
@@ -1042,7 +1044,7 @@ let_parent_process_it:
                            "%s - Displaying popup menu id %d\n", __FUNCTION__, iMenuItem);
 
 #ifndef NO_DEBUG
-            i2 = 
+            i2 =
 #endif // NO_DEBUG
             MBMenuDoModal(pPopup);
 

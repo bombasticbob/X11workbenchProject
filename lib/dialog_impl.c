@@ -17,7 +17,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -1405,7 +1407,7 @@ int iX, iY, iTimeStart, iTimeEnd;
     if(pData->pixmap != None)  // just in case, test for it
     {
       XFreePixmap(WBGetDefaultDisplay(), pData->pixmap);
-    }    
+    }
 
     pData->pixmap = pData->pixmap2; // NOW, ref pixmap (with image and border) goes into 'pixmap'
     pData->pixmap2 = pxTemp;        // and the 'working' copy into 'pixmap2' (which is also 'pxTemp')
@@ -1555,7 +1557,7 @@ int iX, iY, iTimeStart, iTimeEnd;
 
 //        WB_ERROR_PRINT("TEMPORARY:  %s - bytes_per_line=%d, height=%d, depth=%d\n", __FUNCTION__,
 //                       pI->bytes_per_line, pI->height, pI->depth);
-        
+
         pData->cbImageData = PXM_GetImageDataLength(pI);
         pData->pImageData = WBAlloc(pData->cbImageData + 4);
 
@@ -1589,7 +1591,7 @@ int iX, iY, iTimeStart, iTimeEnd;
         // NOW I get the fun of directly manipulating my image.  W00T!
 
         // effectively I do this:  XDrawLine(pDisplay, pxTemp, gc, -2, iY, iX, -2) and it's 19 pixels wide
-        
+
         // So the line has a width of '2*GLEAM_WIDTH + 1' pixels.  The pixels represent a white reflection
         // centering at the coordinates I specified above, that is the line from -2, iY to iX, -2 .  This
         // actually SHOULD be offset by 2 pixels so that it does not affect the border, but that's less iomportant
@@ -1654,10 +1656,10 @@ int iX, iY, iTimeStart, iTimeEnd;
 
                   XPutPixel(pI, iX1 + 2, iY0 + 2, clrTemp.pixel);
                 }
-              }            
+              }
             }
           }
-        }        
+        }
 
         // TODO:  assign clipping region to gc
 

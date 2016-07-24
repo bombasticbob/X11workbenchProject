@@ -18,7 +18,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -63,7 +65,7 @@
 
 #include "draw_text.h"
 #include "text_object.h"
-
+#include "conf_help.h"
 
 
 // INTERNAL STRUCTURES
@@ -742,7 +744,7 @@ int WBTextObjectCalculateLineHeight(int iAscent, int iDescent)  // consistently 
 int iFontHeight;
 
   iFontHeight = iAscent + iDescent;
-  
+
   // adjust font height to include line spacing (I'll use this to position the lines)
   if(iDescent > MIN_LINE_SPACING / 2)
   {
@@ -1353,6 +1355,20 @@ WB_RECT rctInvalid;
 
   if(WBIsValidTextObject(pThis) && pThis->wIDOwner != None)
   {
+    // TODO:  determine if scroll area changed.  if not, don't do this next part
+    {
+      XClientMessageEvent evt;
+
+      bzero(&evt, sizeof(evt));
+      evt.type = ClientMessage;
+      evt.display = WBGetWindowDisplay(pThis->wIDOwner);
+      evt.window = pThis->wIDOwner;
+      evt.message_type = aRECALC_LAYOUT;
+      evt.format = 32;
+
+      WBPostPriorityEvent(pThis->wIDOwner, (XEvent *)&evt); // asynch (for now)
+    }
+
     if(!pRect)
     {
       WB_ERROR_PRINT("TEMPORARY:  %s - invalidate entire window %u (%08xH)\n",
@@ -1590,6 +1606,25 @@ static void __internal_init(struct _text_object_ *pThis)
   pThis->pText = NULL;
   pThis->pUndo = NULL;
   pThis->pRedo = NULL;
+
+  // get initial default highlight colors
+
+  {
+    char szHFG[16], szHBG[16];
+    Colormap colormap = DefaultColormap(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
+
+#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
+
+    LOAD_COLOR("selected_bg_color", szHBG, "#0040FF"); // a slightly greenish blue for the 'selected' BG color
+    LOAD_COLOR("selected_fg_color", szHFG, "white");   // white FG when selected
+
+#undef LOAD_COLOR
+
+    XParseColor(WBGetDefaultDisplay(), colormap, szHFG, &(pThis->clrHFG));
+    XAllocColor(WBGetDefaultDisplay(), colormap, &(pThis->clrHFG)); // TODO:  calculate missing pieces myself?
+    XParseColor(WBGetDefaultDisplay(), colormap, szHBG, &(pThis->clrHBG));
+    XAllocColor(WBGetDefaultDisplay(), colormap, &(pThis->clrHBG)); // TODO:  calculate missing pieces myself?
+  }
 
   // TODO:  do I re-initialize the owner-maintained values?  for now, NO!
 }
@@ -2382,6 +2417,10 @@ WB_RECT rctInvalid;
 
           pBuf->aLines[pThis->iRow - 1] = pL2; // the new pointer
         }
+        else
+        {
+          i2 = 0;
+        }
 
         pBuf->aLines[pThis->iRow] = NULL; // pre-emptive, avoid sharing pointers
 
@@ -2768,7 +2807,7 @@ WB_RECT rctInvalid;
             pTempL = pL + strlen(pL); // will always be this
 
             memset(pTempL, ' ', pThis->iCol - iLen); // pad with spaces
-            
+
             pTempL += pThis->iCol - iLen; // advance the pointer to where 'iCol' is
             *pTempL = 0;                  // make sure it ends in a zero byte
           }
@@ -2833,7 +2872,7 @@ WB_RECT rctInvalid;
         const char *p3 = pChar + nChar; // p3 is 'end of text' marker now
         p2 = pChar;               // also marks 'end of line' for insertion
 
-       
+
         while(p2 < p3)
         {
           int nTabs = 0;
@@ -2870,7 +2909,7 @@ WB_RECT rctInvalid;
 
           // TODO:  use WBSplitMBLine() if there's a linefeed
           //        otherwise, WBInsertMBChars()
-        
+
           if(pBuf->nEntries <= 0 || !pBuf->aLines[0])
           {
             if(pBuf->nEntries <= 0)
@@ -3005,7 +3044,7 @@ WB_RECT rctInvalid;
 
                 WB_ERROR_PRINT("TEMPORARY:  %s - split line, %d, %d, %d\n", __FUNCTION__,
                                pThis->iRow, pThis->iCol, (int)pBuf->nEntries);
-                
+
                 for(i1=pBuf->nEntries; i1 > (pThis->iRow + 1); i1--)
                 {
                   pBuf->aLines[i1] = pBuf->aLines[i1 - 1]; // make room for new line
@@ -4758,7 +4797,7 @@ WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
             WB_RECT rctCursor;
             int iLen2;
             const char *p1;
-            
+
             if(pL && i1 < iLen)
             {
               p1 = WBGetMBCharPtr(pL, i1, &iLen2);
@@ -4776,31 +4815,32 @@ WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
                  (i1 < pThis->rctSel.right || iCurRow != pThis->rctSel.bottom)) ||
                 (iCurRow == pThis->rctSel.bottom && i1 < pThis->rctSel.right)))
             {
-              // fill the rectangle for this character with the background color.
+              int iY0 = iY - iAsc; // NOTE:  iY is the BASE of the font, so I need to font ascent to get top of rect
+
+              // fill the rectangle for this character with the correct background color.
 
               if(pxTemp != None)
               {
                 XSetForeground(pDisplay, gc2, clrHBG); // highlight background color
+                XSetBackground(pDisplay, gc2, clrHBG);
 
                 XFillRectangle(pDisplay, pxTemp, gc2,
-                               iX - iXDelta, iY - iYDelta,
-                               iX + iFontWidth - iXDelta,
-                               iY + iFontHeight - iYDelta);
+                               iX - iXDelta, iY0 - iYDelta,
+                               iFontWidth, iFontHeight);
 
-                XSetForeground(pDisplay, gc2, clrFG);
+                XSetForeground(pDisplay, gc2, clrHFG);
               }
               else // FALLBACK, if no pixmap, go to window directly
               {
                 XSetForeground(pDisplay, gc, clrHBG); // highlight background color
+                XSetBackground(pDisplay, gc, clrHBG);
 
                 XFillRectangle(pDisplay, wID, gc,
-                               iX, iY, iX + iFontWidth, iY + iFontHeight);
+                               iX, iY0,
+                               iFontWidth, iFontHeight);
 
-                XSetForeground(pDisplay, gc, clrFG);
+                XSetForeground(pDisplay, gc, clrHFG);
               }
-
-              XSetForeground(pDisplay, gc2 != None ? gc2 : gc, clrHFG);
-              XSetBackground(pDisplay, gc2 != None ? gc2 : gc, clrHBG);
             }
             else // non-highlighted character
             {
@@ -4875,29 +4915,30 @@ WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
 
           if(bHighlight)
           {
+            int iY0 = iY - iAsc; // NOTE:  iY is the BASE of the font, so I need to font ascent to get top of rect
+
             if(pxTemp != None)
             {
               XSetForeground(pDisplay, gc2, clrHBG); // highlight background color
+              XSetBackground(pDisplay, gc2, clrHBG);
 
               XFillRectangle(pDisplay, pxTemp, gc2,
-                             iX - iXDelta, iY - iYDelta,
-                             iX + geomV.width - iXDelta,  // entire line
-                             iY + iFontHeight - iYDelta);
+                             iX - iXDelta, iY0 - iYDelta,
+                             geomV.width, iFontHeight);  // entire line
 
-              XSetForeground(pDisplay, gc2, clrFG);
+              XSetForeground(pDisplay, gc2, clrHFG);
             }
             else // FALLBACK, if no pixmap, go to window directly
             {
               XSetForeground(pDisplay, gc, clrHBG); // highlight background color
+              XSetBackground(pDisplay, gc, clrHBG);
 
               XFillRectangle(pDisplay, wID, gc,
-                             iX, iY, iX + geomV.width, iY + iFontHeight); // entire line
+                             iX, iY0,
+                             geomV.width, iFontHeight);  // entire line
 
-              XSetForeground(pDisplay, gc, clrFG);
+              XSetForeground(pDisplay, gc, clrHFG);
             }
-
-            XSetForeground(pDisplay, gc2 != None ? gc2 : gc, clrHFG);
-            XSetBackground(pDisplay, gc2 != None ? gc2 : gc, clrHBG);
           }
           else
           {
@@ -5072,7 +5113,7 @@ int iRval;
     }
   }
   else if(*p1 < 0xf0) // 3-byte sequence
-  {            
+  {
     if(p1[1] >= 0x80 && p1[1] <= 0xbf && // valid 3-byte sequence
        p1[2] >= 0x80 && p1[2] <= 0xbf)
     {
@@ -5196,7 +5237,7 @@ char * WBInsertMBChars(char *pString, int iCol, const char *pszMBString, int cbS
   {
     *ppInserted = NULL; // initial value
   }
-  
+
   if(piNewCol)
   {
     *piNewCol = iCol; // initial value
@@ -5270,7 +5311,7 @@ char *pRval, *p1;
     return NULL;
   }
 
-  p1 = pRval + strlen(pRval); // regardless of actual length, this works  
+  p1 = pRval + strlen(pRval); // regardless of actual length, this works
 
   while(iLen < iLenNew)
   {
@@ -5293,7 +5334,7 @@ char *pDelChar, *p1;
   {
     *ppDeleted = NULL; // initial value
   }
-  
+
   if(piNewCol)
   {
     *piNewCol = iCol; // initial value

@@ -16,7 +16,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -56,7 +58,13 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
+// project includes
 #include "X11workbench.h"
+#include "gizzard.h"
+#include "gdb_helper.h"
+#include "refactor.h"
+
+// X11workbench toolkit library includes
 #include "window_helper.h"
 #include "pixmap_helper.h"  // pixmap helpers, including pre-defined icons
 #include "frame_window.h"
@@ -201,13 +209,13 @@ static char szEditMenu[]="1\n"
                         "_Help\tpopup\t3\n"
                         "\n"
                         "2\n"
-                        "_New File\tIDM_FILE_NEW\tNew File\tCtrl+N\n"
-                        "_Open File\tIDM_FILE_OPEN\tOpen File\tCtrl+O\n"
-                        "_Save File\tIDM_FILE_SAVE\tSave File\tCtrl+S\n"
-                        "Save _As\tIDM_FILE_SAVE_AS\tSave As\n"
-                        "Save A_ll\tIDM_FILE_SAVE_ALL\tSave All\n"
+                        "_New File\t" FW_FILE_NEW_MENU "\tNew File\t" FW_FILE_NEW_ACCEL "\n"
+                        "_Open File\t" FW_FILE_OPEN_MENU "\tOpen File\t" FW_FILE_OPEN_ACCEL "\n"
+                        "_Save File\t" FW_FILE_SAVE_MENU "\tSave File\t" FW_FILE_SAVE_ACCEL "\n"
+                        "Save _As\t" FW_FILE_SAVE_AS_MENU "\tSave As\t" FW_FILE_SAVE_AS_ACCEL "\n"
+                        "Save A_ll\t" FW_FILE_SAVE_ALL_MENU "\tSave All\t" FW_FILE_SAVE_ALL_ACCEL "\n"
                         "\tseparator\n"
-                        "_Close File\tIDM_FILE_CLOSE\tClose File\tCtrl+F4\n"
+                        "_Close File\t" FW_FILE_CLOSE_MENU "\tClose File\tCtrl+F4\n"
                         "\tseparator\n"
                         "E_xit\tIDM_FILE_EXIT\tClose Application\tAlt+F4\n"
                         "\n"
@@ -221,12 +229,18 @@ static char szEditMenu[]="1\n"
                         "_Undo\tIDM_EDIT_UNDO\tUn-do last action\tCtrl+Z\n"
                         "_Redo\tIDM_EDIT_REDO\tRe-do last action\tShift+Ctrl+Z\n"
                         "\tseparator\n"
-                        "Cu_t\tIDM_EDIT_CUT\tCut to Clipboard\tCtrl+X\n"
-                        "_Copy\tIDM_EDIT_COPY\tCopy to Clipboard\tCtrl+C\n"
-                        "_Paste\tIDM_EDIT_CUT\tPaste from Clipboard\tCtrl+V\n"
-                        "_Delete\tIDM_EDIT_CUT\tDelete selection\n"
+                        "Cu_t\t" FW_EDIT_CUT_MENU "\tCut to Clipboard\t" FW_EDIT_CUT_ACCEL "\n"
+                        "_Copy\t" FW_EDIT_COPY_MENU "\tCopy to Clipboard\t" FW_EDIT_COPY_ACCEL "\n"
+                        "_Paste\t" FW_EDIT_PASTE_MENU "\tPaste from Clipboard\t" FW_EDIT_PASTE_ACCEL "\n"
+                        "_Delete\t" FW_EDIT_DELETE_MENU "\tDelete selection\n"
                         "\tseparator\n"
-                        "Select _All\tIDM_EDIT_SELECT_ALL\tSelect All in context\tCtrl+A\n"
+                        "Select _All\t" FW_EDIT_SELECT_ALL_MENU "\tSelect All in context\t" FW_EDIT_SELECT_ALL_ACCEL "\n"
+                        "Select _None\t" FW_EDIT_SELECT_NONE_MENU "\tSelect None in context\t" FW_EDIT_SELECT_NONE_ACCEL "\n"
+                        "\tseparator\n"
+                        "_Find\tIDM_EDIT_FIND\tFind within Document\tCtrl+F\n"
+                        "Find Ne_xt\tIDM_EDIT_FIND_NEXT\tFind next occurence within Document\tCtrl+G\n"
+                        "_Project Find\tIDM_EDIT_PROJ_FIND\tFind within entire project\tCtrl+Shift+F\n"
+                        "Pro_ject Find Next\tIDM_EDIT_PROJ_FIND_NEXT\tFind next occurrence within entire project\tCtrl+Shift+G\n"
                         "\n"
                         "5\n"
                         "_Toolbox\tIDM_TOOLBOX\tDisplay (or hide) the Toolbox\n"
@@ -266,6 +280,16 @@ FW_MENU_HANDLER_BEGIN(main_menu_handlers)
   FW_MENU_HANDLER_ENTRY("IDM_HELP_ABOUT",HelpAboutHandler,NULL)
   FW_MENU_HANDLER_ENTRY("IDM_HELP_CONTEXT",HelpContextHandler,NULL)
   FW_MENU_HANDLER_ENTRY("IDM_HELP_CONTENTS",HelpContentsHandler,NULL)
+
+#if 0
+  // additional EDIT MENU HANDLERS
+
+  FW_MENU_HANDLER_ENTRY("IDM_EDIT_FIND",EditFindHandler,EditFindUIHandler)
+  FW_MENU_HANDLER_ENTRY("IDM_EDIT_FIND_NEXT",EditFindNextHandler,EditFindNextUIHandler)
+  FW_MENU_HANDLER_ENTRY("IDM_EDIT_PROJ_FIND",EditProjFindHandler,EditProjFindUIHandler)
+  FW_MENU_HANDLER_ENTRY("IDM_EDIT_PROJ_FIND_NEXT",EditProjFindNextHandler,EditProjFindNextUIHandler)
+#endif // 0
+
 FW_MENU_HANDLER_END
 
 
@@ -490,11 +514,11 @@ next_argument:
     return 2;
   }
 
-  {
-    const char *pNothing = szEditMenu; // to avoid certain warnings - remove later
-    
-    pNothing = pNothing;
-  }
+//  {
+//    const char *pNothing = szEditMenu; // to avoid certain warnings - remove later
+//
+//    pNothing = pNothing;
+//  }
 
   // assign menu handlers to the frame window (this does the callback functions for me)
   // this is part of the frame window functionality for the DEFAULT menu
@@ -532,7 +556,7 @@ next_argument:
 
 #endif // HAVE_NANOSLEEP
       }
-      
+
       continue; // skip the 'WBDispatch' since there was no event
     }
 
@@ -753,7 +777,7 @@ WBEditWindow *pEW;
 
   // 1st, create a new 'WBEditWindow', attaching it to the frame
 
-  pEW = WBCreateEditWindow(pMainFrame, NULL, szEditMenu,main_menu_handlers, 0);
+  pEW = WBCreateEditWindow(pMainFrame, NULL, szEditMenu, main_menu_handlers, 0);
 
   if(!pEW)
   {
@@ -852,7 +876,7 @@ static int FileCloseHandler(XClientMessageEvent *pEvent)
   {
     return 0;
   }
-    
+
   pC = FWGetFocusWindow(pMainFrame);
 
   if(pC)
@@ -875,7 +899,7 @@ int iIndex;
   {
     return 0;
   }
-    
+
   iIndex = FWGetChildFrameIndex(pMainFrame, NULL);
 
   WB_ERROR_PRINT("TEMPORARY:  %s - move left %d\n", __FUNCTION__, iIndex);
@@ -896,7 +920,7 @@ int iIndex;
   {
     return 0;
   }
-    
+
   iIndex = FWGetChildFrameIndex(pMainFrame, NULL);
 
   WB_ERROR_PRINT("TEMPORARY:  %s - move right %d\n", __FUNCTION__, iIndex);
@@ -917,7 +941,7 @@ static int TabMoveLeftHandler(XClientMessageEvent *pEvent)
   {
     return 0;
   }
-    
+
   pC = FWGetFocusWindow(pMainFrame);
 
   if(pC)
@@ -936,7 +960,7 @@ static int TabMoveRightHandler(XClientMessageEvent *pEvent)
   {
     return 0;
   }
-    
+
   pC = FWGetFocusWindow(pMainFrame);
 
   if(pC)

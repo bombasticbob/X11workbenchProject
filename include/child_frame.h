@@ -20,7 +20,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -97,11 +99,49 @@ extern "C" {
 #define CHILD_FRAME_UI_TAG ((WB_UINT32)'F' | ((WB_UINT32)'W' << 8) | ((WB_UINT32)'C' << 16) | ((WB_UINT32)'U' << 24)) /* FWCU */
 
 /** \ingroup child_frame
+  * @{
+**/
+
+#define FW_FILE_NEW_MENU          "IDM_FILE_NEW"         /**< standard menu item identifier for 'File New' functionality **/
+#define FW_FILE_CLOSE_MENU        "IDM_FILE_CLOSE"       /**< standard menu item identifier for 'File Close' functionality **/
+#define FW_FILE_OPEN_MENU         "IDM_FILE_OPEN"        /**< standard menu item identifier for 'File Open' functionality **/
+#define FW_FILE_SAVE_MENU         "IDM_FILE_SAVE"        /**< standard menu item identifier for 'File Save' functionality **/
+#define FW_FILE_SAVE_AS_MENU      "IDM_FILE_SAVE_AS"     /**< standard menu item identifier for 'File Save As' functionality **/
+#define FW_FILE_SAVE_ALL_MENU     "IDM_FILE_SAVE_ALL"    /**< standard menu item identifier for 'File Save All' functionality **/
+
+#define FW_EDIT_CUT_MENU          "IDM_EDIT_CUT"         /**< standard menu item identifier for 'Edit Cut' functionality **/
+#define FW_EDIT_COPY_MENU         "IDM_EDIT_COPY"        /**< standard menu item identifier for 'Edit Copy' functionality **/
+#define FW_EDIT_PASTE_MENU        "IDM_EDIT_PASTE"       /**< standard menu item identifier for 'Edit Paste' functionality **/
+#define FW_EDIT_DELETE_MENU       "IDM_EDIT_DELETE"      /**< standard menu item identifier for 'Edit Delete' functionality **/
+#define FW_EDIT_SELECT_ALL_MENU   "IDM_EDIT_SELECT_ALL"  /**< standard menu item identifier for 'Edit Select All' functionality **/
+#define FW_EDIT_SELECT_NONE_MENU  "IDM_EDIT_SELECT_NONE" /**< standard menu item identifier for 'Edit Select None' functionality **/
+
+#define FW_FILE_NEW_ACCEL         "Ctrl+N"               /**< standard menu accelerator key for 'File New' functionality **/
+#define FW_FILE_CLOSE_ACCEL       "Ctrl+F4"              /**< standard menu accelerator key for 'File Close' functionality **/
+#define FW_FILE_OPEN_ACCEL        "Ctrl+O"               /**< standard menu accelerator key for 'File Open' functionality **/
+#define FW_FILE_SAVE_ACCEL        "Ctrl+S"               /**< standard menu accelerator key for 'File Save' functionality **/
+#define FW_FILE_SAVE_AS_ACCEL     "Ctrl+Shift+S"         /**< standard menu accelerator key for 'File Save As' functionality **/
+#define FW_FILE_SAVE_ALL_ACCEL    "Ctrl+Shift+L"         /**< standard menu accelerator key for 'File Save All' functionality **/
+
+#define FW_EDIT_CUT_ACCEL         "Ctrl+X"               /**< standard menu accelerator key for 'Edit Cut' functionality **/
+#define FW_EDIT_COPY_ACCEL        "Ctrl+C"               /**< standard menu accelerator key for 'Edit Copy' functionality **/
+#define FW_EDIT_PASTE_ACCEL       "Ctrl+V"               /**< standard menu accelerator key for 'Edit Paste' functionality **/
+#define FW_EDIT_SELECT_ALL_ACCEL  "Ctrl+A"               /**< standard menu item identifier for 'Edit Select All' functionality **/
+#define FW_EDIT_SELECT_NONE_ACCEL "Ctrl+Shift+A"         /**< standard menu item identifier for 'Edit Select None' functionality **/
+
+
+/**
+  * @}
+**/
+
+
+
+/** \ingroup child_frame
   * \brief Initialize a child frame (assumed to be a base 'class' for the window)
   *
   * \param pChildFrame a pointer to the WBChildFrame associated with the window.  Can not be NULL.
   * \param pOwner A pointer to the owning WBFrameWindow.  Can not be NULL.
-  * \param pFont The desired font, or NULL to use the default
+  * \param rFontSet The desired font set, or 'None' to use the default
   * \param szFocusMenu A const pointer to a text-based menu resource describing the menu that should appear when the Child Frame's tab has the focus.  Can be NULL if none.
   * \param pHandlerArray A const pointer to an array of WBFWMenuHandler structures for the 'focus' menu handler.  Can be NULL if none.
   * \param pUserCallback A pointer to the callback function that handles messages (Return 0 for default handling, != 0 if handled).  Can be NULL.
@@ -127,7 +167,7 @@ extern "C" {
   *
   * Header File:  child_frame.h
 **/
-int FWInitChildFrame(WBChildFrame *pChildFrame, WBFrameWindow *pOwner, XFontStruct *pFont,
+int FWInitChildFrame(WBChildFrame *pChildFrame, WBFrameWindow *pOwner, XFontSet rFontSet,
                      const char *szFocusMenu, const WBFWMenuHandler *pHandlerArray,
                      WBWinEvent pUserCallback, int fFlags);
 

@@ -17,7 +17,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -263,8 +265,30 @@ Atom aCONTROL_NOTIFY=None;
   *
   * If the callback returns a non-zero value, it should not destroy any of its own private data.  The
   * sender will assume that it's not ok to close the window and will try to leave everything 'as-is'.
+  *
+  * Generally, you should return 0 if ok to close the window, 1 if NOT ok to close, and '-1' on error.
+  *
 **/
-Atom aQUERY_CLOSE=None;      ///< command sent by Client Message to .  Return 0 if ok to close 1 if NOT ok to close, '-1' on error
+Atom aQUERY_CLOSE=None;
+
+/** \ingroup xatoms
+  * \hideinitializer
+  * \brief notify window that it should re-calculate things like scrollbars and viewports
+  *
+  * CONTROL_NOTIFY message format (relative to XEvent.xclient)\n
+  * type == ClientMessage\n
+  * message_type == aRECALC_LAYOUT\n
+  * format == 32 (always)\n
+  *
+  * A window that has a viewport and scrollbars, using a text object or other construct that
+  * supports this ClientMessage atom, should check for this message and recalculate viewports and
+  * scrollbar positions whenever it is received.  If scroll positions have changed, you should invalidate
+  * the entire window rectangle so that it can be re-painted.  However, you should not paint the window
+  * synchronously.  You should rely on asynchronous processing of Expose events.
+  *
+**/
+Atom aRECALC_LAYOUT=None;
+
 
 /** \ingroup xatoms
   * \hideinitializer
@@ -713,7 +737,7 @@ typedef struct __EVENT_ENTRY__
     *
     * TODO:  this may not be necessary
   **/
-  char padding[256 - sizeof(Display *) - sizeof(Window) - sizeof(int) - sizeof(XEvent)]; 
+  char padding[256 - sizeof(Display *) - sizeof(Window) - sizeof(int) - sizeof(XEvent)];
 
 } EVENT_ENTRY;
 
@@ -982,6 +1006,7 @@ int WBInitDisplay(Display *pDisplay)
   aRESIZE_NOTIFY    = WBGetAtom(pDisplay, "RESIZE_NOTIFY");//XInternAtom(pDisplay, "RESIZE_NOTIFY", False);
   aCONTROL_NOTIFY   = WBGetAtom(pDisplay, "CONTROL_NOTIFY");//XInternAtom(pDisplay, "CONTROL_NOTIFY", False);
   aQUERY_CLOSE      = WBGetAtom(pDisplay, "QUERY_CLOSE");//XInternAtom(pDisplay, "QUERY_CLOSE", False);
+  aRECALC_LAYOUT    = WBGetAtom(pDisplay, "RECALC_LAYOUT");//XInternAtom(pDisplay, "QUERY_CLOSE", False);
   aDESTROY_NOTIFY   = WBGetAtom(pDisplay, "DESTROY_NOTIFY");//XInternAtom(pDisplay, "DESTROY_NOTIFY", False);
   aDLG_FOCUS        = WBGetAtom(pDisplay, "DLG_FOCUS");//XInternAtom(pDisplay, "DLG_FOCUS", False);
   aSET_FOCUS        = WBGetAtom(pDisplay, "SET_FOCUS");//XInternAtom(pDisplay, "SET_FOCUS", False);
@@ -1108,7 +1133,7 @@ int WBInitDisplay(Display *pDisplay)
 
     return 2;
   }
-  
+
   CHSettingsRefresh(pDisplay); // must init clipboard system *FIRST*
 
   return 0;  // success
@@ -2307,7 +2332,7 @@ void WBDestroyWindow(Window wID)
   BEGIN_XCALL_DEBUG_WRAPPER
   XSync(pDisplay, FALSE);  // force a sync first
   END_XCALL_DEBUG_WRAPPER
-  
+
   while(XCheckWindowEvent(pDisplay, wID, EVENT_ALL_MASK, &event))
   {
 //      usleep(1000);  // force sleep during loop?
@@ -3076,7 +3101,7 @@ void WBUnregisterWindowCallback(Window wID)
 
   // free resources, mark the 'last activity' time, and
   // mark this entry as "to be destroyed"
-  
+
   // NOTE:  used to NOT actually change the callback address (TODO:  change name of function?)
   //        but in this case I'm going to NULL it.  I don't want window callbacks being called
 
@@ -3623,7 +3648,7 @@ static void __DeleteDelayedEvent(DELAYED_EVENT_ENTRY *pPrev, DELAYED_EVENT_ENTRY
   }
 }
 
-static int __attribute__((noinline)) __CheckDelayedEvents(Display *pDisplay, XEvent *pEvent) 
+static int __attribute__((noinline)) __CheckDelayedEvents(Display *pDisplay, XEvent *pEvent)
 {
 DELAYED_EVENT_ENTRY *pCur, *pPrev;
 WB_UINT64 lTime = WBGetTimeIndex();
@@ -3861,7 +3886,7 @@ static unsigned long long ullLastTime = 0;
             XCheckIfEvent(pDisplay, pEvent, __WBCheckIfEventPredicate0, NULL);
 
     if(!iRval)
-    {            
+    {
       if(WB_UNLIKELY(0 != (iRval = __CheckDelayedEvents(pDisplay, pEvent)))) // delayed events first
       {
         break;
@@ -5249,15 +5274,15 @@ int WBDefault(Window wID, XEvent *pEvent)
     if(p1)
     {
       WBFree(p1);
-    }                   
+    }
     if(p2)
     {
       WBFree(p2);
-    }                   
+    }
     if(p3)
     {
       WBFree(p3);
-    }                   
+    }
 #endif // NO_DEBUG
 
     // the default rejects the request.  Send a 'SelectionNotify' to indicate the failure
@@ -5297,7 +5322,7 @@ int WBDefault(Window wID, XEvent *pEvent)
     if(p1)
     {
       WBFree(p1);
-    }                   
+    }
 #endif // NO_DEBUG
 
     // the default rejects the request.  No need to send a 'SelectionNotify'
@@ -5325,11 +5350,11 @@ int WBDefault(Window wID, XEvent *pEvent)
     if(p2)
     {
       WBFree(p2);
-    }                   
+    }
     if(p3)
     {
       WBFree(p3);
-    }                   
+    }
 #endif // NO_DEBUG
   }
 //#ifndef NO_DEBUG    // uncomment this block to dump every event NOT handled
@@ -6693,7 +6718,7 @@ void WBGetWindowGeom2(Window wID, WB_GEOM *pGeom)
   }
 //  else if(!WB_IS_WINDOW_MAPPED(*pEntry))
 //  {
-//    WB_ERROR_PRINT("TEMPORARY:  %s - unmapped window, no 'absolute' GEOM available\n", __FUNCTION__);  
+//    WB_ERROR_PRINT("TEMPORARY:  %s - unmapped window, no 'absolute' GEOM available\n", __FUNCTION__);
 //  }
 
 
@@ -7735,7 +7760,7 @@ GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // GC will get the 'invalid' 
     else
     {
 //      WBDebugDumpRegion(pEntry->rgnClip, 1);
-      
+
       WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Expose,
                      "%s - (WARNING) empty clip region - bounds = %d,%d,%d,%d\n",
                      __FUNCTION__, pgBounds->x, pgBounds->y, pgBounds->width, pgBounds->height);
@@ -9088,7 +9113,7 @@ char *p1;
       p1 = XGetAtomName(pEvent->xany.display, pEvent->xselectionrequest.property);
       WBDebugPrint("    property:    %s\n", p1);
       XFree(p1);
-    
+
       WBDebugPrint("    time:        %ld\n", (unsigned long)pEvent->xselectionrequest.time);
       break;
 
@@ -9122,7 +9147,7 @@ int iW, iH;
     iW = xrct.x;
     xrct.x = xrct.y;
     xrct.y = iW;
-    
+
     iW = xrct.width;
     xrct.width = xrct.height;
     xrct.height = iW;

@@ -17,7 +17,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -78,7 +80,7 @@
 
 
 #ifdef NO_DEBUG
-#define DEBUG_DUMP_XPM_ATTRIBUTES(X) 
+#define DEBUG_DUMP_XPM_ATTRIBUTES(X)
 #define DEBUG_DUMP_COLORMAP(X)
 #else
 static void DebugDumpXpmAttributes(const char *szFunction, int nLine, XPM_ATTRIBUTES *pAttr);
@@ -190,7 +192,7 @@ XStandardColormap map;
 
   if(!pMap)
   {
-    WBDefaultStandardColormap(WBGetDefaultDisplay(), &map); 
+    WBDefaultStandardColormap(WBGetDefaultDisplay(), &map);
     pMap = &map;
 
 //    DEBUG_DUMP_COLORMAP(pMap);
@@ -378,7 +380,7 @@ XStandardColormap map;
 
       pColor->green = l2;
     }
-  }          
+  }
   else if(pMap->green_mult >= pMap->red_mult &&
           pMap->green_mult >= pMap->blue_mult)
   {
@@ -673,7 +675,7 @@ XStandardColormap map;
 
   if(!pMap)
   {
-    WBDefaultStandardColormap(WBGetDefaultDisplay(), &map); 
+    WBDefaultStandardColormap(WBGetDefaultDisplay(), &map);
     pMap = &map;
 
 //    DEBUG_DUMP_COLORMAP(pMap);

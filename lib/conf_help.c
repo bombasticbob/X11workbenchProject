@@ -17,7 +17,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -489,9 +491,9 @@ int iRval = -1;//, iFormat;
   if(WB_LIKELY(pXSettings))
   {
     const CHXSetting *pXS;
-    
+
     // mapping the string accordingly
-    
+
     pXS = CHGetXSetting(pXSettings->pDisplay, szIdentifier); // exact match.
 
     if(!pXS)
@@ -499,7 +501,7 @@ int iRval = -1;//, iFormat;
       // color schemes are stored hierarchically - look in Gtk/ColorScheme for now
 
       const char *pTemp = TranslateColorRequest(szIdentifier);
-      
+
       if(pTemp && *pTemp)
       {
 //        WB_ERROR_PRINT("TEMPORARY:  %s - found color %s from %s\n", __FUNCTION__, pTemp, szIdentifier);
@@ -517,7 +519,7 @@ int iRval = -1;//, iFormat;
             const char *p2 = p1;
 
             p1 = p2;
-            
+
             while(*p1 && *p1 != '\n')
             {
               p1++;
@@ -548,8 +550,8 @@ int iRval = -1;//, iFormat;
               p1++;
             }
           }
-        }        
-      
+        }
+
         pXS = NULL; // not found if it gets here
       }
     }
@@ -1836,7 +1838,7 @@ char tbuf[256];
     WB_ERROR_PRINT("%s:%d - %s unable to retrieve XSETTINGS data (XSETTINGS_SETTINGS)(b)\n",
                    __FILE__, __LINE__, __FUNCTION__);
     return;
-  }                        
+  }
 
   XUngrabServer(pDisplay); // MUST do this or else bad things happen
 

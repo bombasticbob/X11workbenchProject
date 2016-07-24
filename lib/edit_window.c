@@ -17,7 +17,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -123,6 +125,7 @@ static void internal_undo(WBChildFrame *);                             // perfor
 static void internal_redo(WBChildFrame *);                             // perform a re-do
 static int internal_can_undo(WBChildFrame *);                          // returns non-zero value if 'can undo'
 static int internal_can_redo(WBChildFrame *);                          // returns non-zero value if 'can redo'
+static int internal_is_empty(WBChildFrame *);                          // returns non-zero value if 'empty'
 
 
 static void internal_update_status_text(WBEditWindow *); // called whenever status text should change
@@ -133,7 +136,7 @@ static XColor clrFG, clrBG, clrAFG, clrABG;
 static int iInitColorFlag = 0;
 
 
-static WBChildFrameUI internal_CFUI = 
+static WBChildFrameUI internal_CFUI =
 {
   CHILD_FRAME_UI_TAG,
   internal_do_char,         internal_scancode,     internal_bkspace,        internal_del,
@@ -146,7 +149,7 @@ static WBChildFrameUI internal_CFUI =
   internal_get_file_name,   internal_mouse_click,  internal_mouse_dblclick, internal_mouse_drag,
   internal_mouse_drop,      internal_mouse_move,   internal_mouse_scrollup, internal_mouse_scrolldown,
   internal_mouse_cancel,    internal_get_row_col,  internal_has_selection,  internal_undo,
-  internal_redo,            internal_can_undo,     internal_can_redo
+  internal_redo,            internal_can_undo,     internal_can_redo,       internal_is_empty
 };
 
 
@@ -248,9 +251,20 @@ WBEditWindow *WBCreateEditWindow(WBFrameWindow *pOwner, XFontStruct *pFont,
                                  int fFlags)
 {
 WBEditWindow *pRval;
+XFontSet rFontSet;
+Display *pDisplay;
+int iRet;
 
 
   InternalCheckEWColorsAndAtoms();
+
+
+  if(!pOwner)
+  {
+    return NULL;
+  }
+
+  pDisplay = WBGetWindowDisplay(pOwner->wID);
 
   pRval = (WBEditWindow *)WBAlloc(sizeof(*pRval));
 
@@ -268,7 +282,11 @@ WBEditWindow *pRval;
 
   if(!pFont)
   {
-    pFont = WBGetDefaultFont();
+    rFontSet = None;//WBGetDefaultFontSet();
+  }
+  else
+  {
+    rFontSet = WBFontSetFromFont(pDisplay, pFont);
   }
 
   WBInitializeInPlaceTextObject(&(pRval->xTextObject), None);
@@ -279,16 +297,25 @@ WBEditWindow *pRval;
 
   // create the actual window.
 
-  if(0 > FWInitChildFrame(&(pRval->childframe), pOwner, pFont, // NOTE:  a copy of pFont will be in 'childframe.pFont'
+  iRet = FWInitChildFrame(&(pRval->childframe), pOwner, rFontSet, // NOTE:  a copy of rFontSet will be in 'childframe.rFontSet'
                           szFocusMenu, pHandlerArray,
-                          FWEditWindowEvent, fFlags))
+                          FWEditWindowEvent, fFlags);
+
+  if(rFontSet != None)
+  {
+    XFreeFontSet(pDisplay, rFontSet);
+    rFontSet = None;
+  }
+
+  if(iRet < 0)
   {
     WB_ERROR_PRINT("ERROR:  %s - unable to initialize child frame\n", __FUNCTION__);
 
     WBFree(pRval);
 
     return NULL;
-  }                    
+  }
+
 
   pRval->xTextObject.wIDOwner = pRval->childframe.wID; // TODO:  make assigning this an API function?
 
@@ -339,10 +366,10 @@ static void InternalEditWindowDestructor(WBChildFrame *pC)
 //  WB_ERROR_PRINT("TEMPORARY:  %s - destroying edit window %p\n", __FUNCTION__, pEW);
 
   InternalEditWindowDestroy(pEW);
-  
+
   bzero(pEW, sizeof(*pEW)); // in case anything else 'stale' is there
 
-  WBFree(pEW);  
+  WBFree(pEW);
 
 //  WB_ERROR_PRINT("TEMPORARY:  %s - destroyed edit window %p\n", __FUNCTION__, pEW);
 }
@@ -353,7 +380,7 @@ void WBDestroyEditWindow(WBEditWindow *pEditWindow)
   {
     WB_ERROR_PRINT("ERROR:  %s - invalid Edit Window pointer %p\n", __FUNCTION__, pEditWindow);
     return;
-  }  
+  }
 
   if(pEditWindow->pUserCallback)
   {
@@ -487,7 +514,7 @@ WBEditWindow *pE;
 GC gc;
 WB_GEOM geom;//, geom2;
 Display *pDisplay = WBGetWindowDisplay(wID);
-XFontSet xFontSet;
+//XFontSet xFontSet;
 
 
   pE = WBEditWindowFromWindowID(wID);
@@ -524,19 +551,19 @@ XFontSet xFontSet;
 
       XSetForeground(pDisplay, gc, clrFG.pixel);
 
-      xFontSet = WBFontSetFromFont(pDisplay, pE->childframe.pFont);
+//      xFontSet = pE->childframe.rFontSet;
 
       pE->xTextObject.vtable->do_expose(&(pE->xTextObject), pDisplay, wID, gc,
                                         &geom, // the GEOM to 'paint to'
                                         NULL,//&geom2, // the GEOM bordering the window's viewport (NULL for ALL)
-                                        xFontSet);
+                                        pE->childframe.rFontSet);
       WBEndPaint(wID, gc);
 
-      if(xFontSet)
-      {
-        XFreeFontSet(pDisplay, xFontSet);
-      }
-      
+//      if(xFontSet)
+//      {
+//        XFreeFontSet(pDisplay, xFontSet);
+//      }
+
       return 1; // "handled"
 
     case DestroyNotify:
@@ -548,25 +575,27 @@ XFontSet xFontSet;
         pE->childframe.wID = None; // assign 'none' as the window ID, since I already destroyed it.  don't re-destroy it.
 
         WBDestroyEditWindow(pE);  // this should fix everything else.
-        
+
         return 1; // handled
       }
 
       break;
 
     case ClientMessage:
-      if(pEvent->xclient.message_type == aRESIZE_NOTIFY)
+      if(pEvent->xclient.message_type == aRESIZE_NOTIFY ||
+         pEvent->xclient.message_type == aRECALC_LAYOUT)
       {
         // TODO:  process re-calculation of the extents, etc.
-
 
         FWSetChildFrameScrollInfo(&(pE->childframe),
                                   pE->xTextObject.vtable->get_row(&(pE->xTextObject)),
                                   pE->xTextObject.vtable->get_rows(&(pE->xTextObject)),
                                   pE->xTextObject.vtable->get_col(&(pE->xTextObject)),
                                   pE->xTextObject.vtable->get_cols(&(pE->xTextObject)),
-                                  pE->childframe.pFont->ascent + pE->childframe.pFont->ascent + EDIT_WINDOW_LINE_SPACING,
-                                  WBFontAvgCharWidth(pDisplay, pE->childframe.pFont));
+                                  WBTextObjectCalculateLineHeight(WBFontSetAscent(pDisplay, pE->childframe.rFontSet),
+                                                                  WBFontSetDescent(pDisplay, pE->childframe.rFontSet)),
+                                  WBFontSetAvgCharWidth(pDisplay, pE->childframe.rFontSet));
+//                                  pE->childframe.pFont->ascent + pE->childframe.pFont->ascent + EDIT_WINDOW_LINE_SPACING,
       }
       else if(pEvent->xclient.message_type == aWM_TIMER)
       {
@@ -596,7 +625,7 @@ XFontSet xFontSet;
         return 0; // for now, just return 'ok to close' whether I've saved or not
       }
   }
-  
+
   return 0; // "not handled"
 }
 
@@ -642,13 +671,14 @@ char tbuf[1024];
           iC,
           pE->xTextObject.vtable->get_rows(&(pE->xTextObject)),
           pE->xTextObject.vtable->get_cols(&(pE->xTextObject)),
-          (const char *)(pE->xTextObject.vtable->get_insmode(&(pE->xTextObject)) ? "INS" : "OVR"));
+          (const char *)(pE->xTextObject.vtable->get_insmode(&(pE->xTextObject)) == InsertMode_INSERT ? "INS" :
+          (const char *)(pE->xTextObject.vtable->get_insmode(&(pE->xTextObject)) == InsertMode_OVERWRITE ? "OVR" : "???")));
 
   pC->szStatusText = WBCopyString(tbuf);
 
   if(!pC->szStatusText)
   {
-    WB_ERROR_PRINT("ERROR:  %s - not enough memory to display status\n", __FUNCTION__);      
+    WB_ERROR_PRINT("ERROR:  %s - not enough memory to display status\n", __FUNCTION__);
   }
 
   FWChildFrameStatusChanged(pC);
@@ -1255,7 +1285,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return -1;
   }
 
-  return pE->xTextObject.vtable->get_insmode(&(pE->xTextObject));
+  return pE->xTextObject.vtable->get_insmode(&(pE->xTextObject)) == InsertMode_INSERT;
 }
 
 static void internal_toggle_ins_mode(WBChildFrame *pC)
@@ -1273,8 +1303,8 @@ int iInsMode;
     return;
   }
 
-  iInsMode = pE->xTextObject.vtable->get_insmode(&(pE->xTextObject));
-  pE->xTextObject.vtable->set_insmode(&(pE->xTextObject), !iInsMode);
+  iInsMode = pE->xTextObject.vtable->get_insmode(&(pE->xTextObject)) == InsertMode_INSERT;
+  pE->xTextObject.vtable->set_insmode(&(pE->xTextObject), iInsMode ? InsertMode_OVERWRITE : InsertMode_INSERT);
 
   internal_new_cursor_pos((WBEditWindow *)pC);
   internal_update_status_text(pE);
@@ -1374,7 +1404,7 @@ char *p1;
       {
         XBell(WBGetWindowDisplay(pC->wID), -100);
         WB_ERROR_PRINT("TEMPORARY - %s - clipboard format %d, can't 'PASTE'\n", __FUNCTION__, iFormat);
-        
+
         WBFree(p1);
         p1 = NULL; // by convention - also, checked in next section
       }
@@ -1686,7 +1716,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   {
     *piC = pE->xTextObject.vtable->get_col(&(pE->xTextObject));
   }
-  
+
   if(piR)
   {
     *piR = pE->xTextObject.vtable->get_row(&(pE->xTextObject));
@@ -1779,4 +1809,28 @@ WBEditWindow *pE = (WBEditWindow *)pC;
 }
 
 
+static int internal_is_empty(WBChildFrame *pC)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return -1; // return '-1' on error
+  }
+
+  // if the contents are NOT NULL, it's not 'empty'
+
+  if((pE->xTextObject.vtable->get_rows && pE->xTextObject.vtable->get_rows(&(pE->xTextObject)) > 0) ||
+     (pE->xTextObject.vtable->get_cols && pE->xTextObject.vtable->get_cols(&(pE->xTextObject)) > 0))
+  {
+    return 0; // NOT empty
+  }
+
+  return 0; // empty (for now; later, do I dive directly into xTextObject ???  new API for vtable?)
+}
 

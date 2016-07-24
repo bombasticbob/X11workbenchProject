@@ -16,7 +16,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -707,9 +709,9 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
     }
     else if(pItem->iAction & WBMENU_DYNAMIC_HIGH_BIT)
     {
-      ////////////////////////////////    
+      ////////////////////////////////
       // TODO:  HANDLE DYNAMIC MENU
-      ////////////////////////////////    
+      ////////////////////////////////
 
       WB_ERROR_PRINT("TODO:  %s - handle dynamic menu\n", __FUNCTION__);
     }

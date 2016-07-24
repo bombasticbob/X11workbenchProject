@@ -20,7 +20,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -1775,7 +1777,7 @@ Display *pDisplay = WBGetWindowDisplay(wID);
     rctBounds.right = pGeom->x + pGeom->width - iHPos; // equal border on right side, too
     rctBounds.top = pGeom->y;
     rctBounds.bottom = pGeom->y + pGeom->height;
-    
+
 
     XSetForeground(pDisplay, gc, iSelected ? pList->clrHFG.pixel : pList->clrFG.pixel);
     XSetBackground(pDisplay, gc, iSelected ? pList->clrHBG.pixel : pList->clrBG.pixel);

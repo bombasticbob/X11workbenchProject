@@ -16,7 +16,9 @@
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
-               'as-is', with no waranties, either implied or explicit.
+               'as-is', with no warranties, either implied or explicit.
+               Any claims to alleged functionality or features should be
+               considered 'preliminary', and might not function as advertised.
 
   BSD-like license:
 
@@ -1124,7 +1126,7 @@ int i1, i2, iN, iMax;
     {
       iMax = i2;
     }
-    
+
 //    WBDebugPrint("TEMPORARY:  %s - %4d: %2d  %s\n", __FUNCTION__, i1, i2, ppFontNames[i1]);
   }
 
@@ -1166,7 +1168,7 @@ int i1, i2, iN, iMax;
     {
       iMax = i2;
     }
-    
+
 //    WBDebugPrint("TEMPORARY:  %s - %4d: %2d  %s\n", __FUNCTION__, i1, i2, ppFontNames[i1]);
   }
 
@@ -1203,7 +1205,7 @@ int i1, i2, iN, iMaxD, iMaxH;
     }
 
     i2 = ppFontStruct[i1]->descent;
-    
+
     if(i2 > iMaxD)
     {
       iMaxD = i2;
@@ -1215,7 +1217,7 @@ int i1, i2, iN, iMaxD, iMaxH;
     {
       iMaxH = i2;
     }
-    
+
 //    WBDebugPrint("TEMPORARY:  %s - %4d: %2d  %s\n", __FUNCTION__, i1, i2, ppFontNames[i1]);
   }
 
@@ -1251,7 +1253,7 @@ int i1, i2, iN, iTotal, iMax, iCount;
       continue;
     }
 
-    iCount++;    
+    iCount++;
 
     i2 = WBFontAvgCharWidth(pDisplay, ppFontStruct[i1]);
 
@@ -1264,7 +1266,7 @@ int i1, i2, iN, iTotal, iMax, iCount;
         iMax = i2;
       }
     }
-    
+
 //    WBDebugPrint("TEMPORARY:  %s - %4d: %2d  %s\n", __FUNCTION__, i1, i2, ppFontNames[i1]);
   }
 
@@ -1277,7 +1279,7 @@ int i1, i2, iN, iTotal, iMax, iCount;
   if(iTotal > iMax)
   {
     iTotal = iMax; // sort of a safety valve, should not be a problem
-  }  
+  }
 
   return iTotal;
 }
@@ -1338,7 +1340,7 @@ int i1, iN, iMax;
     {
       rVal.descent = ppFontStruct[i1]->max_bounds.descent;
     }
-    
+
 //    WBDebugPrint("TEMPORARY:  %s - %4d: %2d  %s\n", __FUNCTION__, i1, i2, ppFontNames[i1]);
   }
 
@@ -1470,7 +1472,7 @@ char tbuf[512];
   {
     WB_ERROR_PRINT("ERROR:  %s - no memory for copying base name\n", __FUNCTION__);
     return None;
-  }  
+  }
 
   p1 = strchr(pName, ','); // is there a comma?
   if(p1)
@@ -1523,7 +1525,7 @@ char tbuf[512];
   // at this point pName is assumed to be a properly formatted font string
   // this is the same (more or less) as what WBLoadFont will grab, except that I'm
   // using what I had before.
-  
+
   // TODO:  If I get "no font set" as my return, I'll need to attempt the original font set in its place
 
   if(iFlags || iFontSize) // specifying zero for both of these gives me a direct copy
@@ -1728,7 +1730,7 @@ static const char szUTF8[]=".UTF-8";
         pNewLocale = NULL; // as a flag
       }
     }
-    
+
     if(pNewLocale) // this is also a flag to say that I successfully changed the locale
     {
       WBFree(pNewLocale);
