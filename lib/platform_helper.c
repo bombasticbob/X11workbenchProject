@@ -417,11 +417,15 @@ unsigned int nAllocSize, nNewNewSize, nLimit;
     pRval = realloc(pMH, nNewNewSize); // for now...
     if(pRval)
     {
+#ifdef HAVE_MALLOC_USABLE_SIZE
+    void *pActual = pRval;
+#endif // HAVE_MALLOC_USABLE_SIZE
+
       pMH = (struct __malloc_header__ *)pRval;
       pRval += sizeof(*pMH);
 
 #ifdef HAVE_MALLOC_USABLE_SIZE
-      nLimit = malloc_usable_size(pRval); // the ACTUAL SIZE of the memory block
+      nLimit = malloc_usable_size(pActual); // the ACTUAL SIZE of the memory block
       if(nLimit > nNewSize)
       {
         nNewSize = nLimit;
@@ -528,9 +532,7 @@ const char *p1;
 void WBCatString(char **ppDest, const char *pSrc)  // concatenate onto WBAlloc'd string
 {
 int iLen, iLen2;
-//#ifdef HAVE_MALLOC_USABLE_SIZE
 int iMaxLen;
-//#endif // HAVE_MALLOC_USABLE_SIZE
 char *p1, *p2;
 
   if(!ppDest || !pSrc || !*pSrc)
@@ -542,19 +544,15 @@ char *p1, *p2;
   {
     p1 = p2 = *ppDest;
 
-//#ifdef HAVE_MALLOC_USABLE_SIZE
     iMaxLen = WBAllocUsableSize(p1);
 
     if(iMaxLen <= 0) // an error
     {
       return;
     }
-//#endif // HAVE_MALLOC_USABLE_SIZE
 
     while(*p2
-//#ifdef HAVE_MALLOC_USABLE_SIZE
           && (p2 - p1) < iMaxLen
-//#endif // HAVE_MALLOC_USABLE_SIZE
          )
     {
       p2++;
@@ -563,9 +561,7 @@ char *p1, *p2;
     iLen2 = strlen(pSrc);
     iLen = iLen2 + (p2 - p1);
 
-//#ifdef HAVE_MALLOC_USABLE_SIZE
     if((iLen + 1) > iMaxLen)
-//#endif // HAVE_MALLOC_USABLE_SIZE
     {
       *ppDest = WBReAlloc(p1, iLen + 1);
       if(!*ppDest)
@@ -589,9 +585,7 @@ char *p1, *p2;
 void WBCatStringN(char **ppDest, const char *pSrc, unsigned int nMaxChars)
 {
 int iLen, iLen2;
-//#ifdef HAVE_MALLOC_USABLE_SIZE
 int iMaxLen;
-//#endif // HAVE_MALLOC_USABLE_SIZE
 char *p1, *p2;
 const char *p3;
 
@@ -605,20 +599,16 @@ const char *p3;
   {
     p1 = p2 = *ppDest;
 
-//#ifdef HAVE_MALLOC_USABLE_SIZE
     iMaxLen = WBAllocUsableSize(p1);
 
     if(iMaxLen <= 0)
     {
       return;
     }
-//#endif // HAVE_MALLOC_USABLE_SIZE
 
 
     while(*p2
-//#ifdef HAVE_MALLOC_USABLE_SIZE
           && (p2 - p1) < iMaxLen
-//#endif // HAVE_MALLOC_USABLE_SIZE
          )
     {
       p2++;
@@ -629,9 +619,7 @@ const char *p3;
 
     iLen = iLen2 + (p2 - p1);
 
-//#ifdef HAVE_MALLOC_USABLE_SIZE
     if((iLen + 1) > iMaxLen)
-//#endif // HAVE_MALLOC_USABLE_SIZE
     {
       *ppDest = WBReAlloc(p1, iLen + 1);
       if(!*ppDest)
