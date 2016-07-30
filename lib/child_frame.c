@@ -567,6 +567,43 @@ void FWSetChildFrameImageAtom(WBChildFrame *pChildFrame, Atom aImage)
   pChildFrame->aImageAtom = aImage;
 }
 
+static void InternalSetChildFrameScrollInfo(WBChildFrame *pChildFrame, int iRow, int iMaxRow, int iCol, int iMaxCol,
+                                            int iRowHeight, int iColWidth)
+{
+
+// NOTE:  iTop, iHeight, etc. are "cached" values.  use scroll [, iSplit, and scrollSplit] as "official" values
+
+//    int iTop;
+//      // cached 0-based position of the top of the current viewport (in lines or pixels)
+//    int iHeight;
+//      // cached 0-based height of the current viewport (in lines or pixels)
+//    int iLeft;
+//      // cached 0-based position of the left of the current viewport (in characters or pixels)
+//    int iWidth;
+//      // cached 0-based width of the current viewport (in characters or pixels)
+//
+//    int iXExtent;
+//      // cached X extent for the display surface (determines scrolling behavior)
+//    int iYExtent;
+//      // cached Y extent for the display surface (determines scrolling behavior)
+//
+//    WB_SCROLLINFO scroll;
+//      // 'scroll info' (horizontal and vertical min/max/pos and other details)
+//
+//    int iSplit;
+//      // reserved - position for 'split' (-1 for 'no split')
+//
+//    WB_SCROLLINFO scrollSplit;
+//      // reserved - 'scroll info' for 'split' area (implementation-defined)
+//
+
+// So, if the window/viewport is too small for the document extents, then I need scrollbars
+
+
+
+
+}
+
 void FWSetChildFrameExtent(WBChildFrame *pChildFrame, int iXExtent, int iYExtent)
 {
   if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
@@ -579,7 +616,7 @@ void FWSetChildFrameExtent(WBChildFrame *pChildFrame, int iXExtent, int iYExtent
 
 
 
-  // NOTE:  see (and maybe call) FWChildFrameRecalcLayout, below
+  // NOTE:  see (and maybe call something *like* it) FWChildFrameRecalcLayout, below
 
   FWChildFrameRecalcLayout(pChildFrame); // for now, do it [later change mind?]
 }
@@ -1649,16 +1686,28 @@ int iRval = 0;
 static int ChildFrameEditCutHandler(XClientMessageEvent *pEvent)
 {
 WBChildFrame *pChildFrame;
+WBFrameWindow *pFrame;
+
 
   if(!pEvent || pEvent->window == None)
   {
+    WB_ERROR_PRINT("ERROR:  %s bad window or event\n", __FUNCTION__);
     return -1; // an error
   }
 
-  pChildFrame = FWGetChildFrameStruct(pEvent->window);
+  pFrame = FWGetFrameWindowStruct(pEvent->window);
+
+  if(!pFrame)
+  {
+    WB_ERROR_PRINT("ERROR:  %s bad window (not frame window)\n", __FUNCTION__);
+    return -1; // an error
+  }
+
+  pChildFrame = FWGetContainedWindowByIndex(pFrame, -1); // current focus window
 
   if(!pChildFrame)
   {
+    WB_ERROR_PRINT("ERROR:  %s - no child frame has focus\n", __FUNCTION__);
     return -1; // an error
   }
 
@@ -1678,16 +1727,28 @@ WBChildFrame *pChildFrame;
 static int ChildFrameEditCopyHandler(XClientMessageEvent *pEvent)
 {
 WBChildFrame *pChildFrame;
+WBFrameWindow *pFrame;
+
 
   if(!pEvent || pEvent->window == None)
   {
+    WB_ERROR_PRINT("ERROR:  %s bad window or event\n", __FUNCTION__);
     return -1; // an error
   }
 
-  pChildFrame = FWGetChildFrameStruct(pEvent->window);
+  pFrame = FWGetFrameWindowStruct(pEvent->window);
+
+  if(!pFrame)
+  {
+    WB_ERROR_PRINT("ERROR:  %s bad window (not frame window)\n", __FUNCTION__);
+    return -1; // an error
+  }
+
+  pChildFrame = FWGetContainedWindowByIndex(pFrame, -1); // current focus window
 
   if(!pChildFrame)
   {
+    WB_ERROR_PRINT("ERROR:  %s - no child frame has focus\n", __FUNCTION__);
     return -1; // an error
   }
 
@@ -1707,16 +1768,28 @@ WBChildFrame *pChildFrame;
 static int ChildFrameEditPasteHandler(XClientMessageEvent *pEvent)
 {
 WBChildFrame *pChildFrame;
+WBFrameWindow *pFrame;
+
 
   if(!pEvent || pEvent->window == None)
   {
+    WB_ERROR_PRINT("ERROR:  %s bad window or event\n", __FUNCTION__);
     return -1; // an error
   }
 
-  pChildFrame = FWGetChildFrameStruct(pEvent->window);
+  pFrame = FWGetFrameWindowStruct(pEvent->window);
+
+  if(!pFrame)
+  {
+    WB_ERROR_PRINT("ERROR:  %s bad window (not frame window)\n", __FUNCTION__);
+    return -1; // an error
+  }
+
+  pChildFrame = FWGetContainedWindowByIndex(pFrame, -1); // current focus window
 
   if(!pChildFrame)
   {
+    WB_ERROR_PRINT("ERROR:  %s - no child frame has focus\n", __FUNCTION__);
     return -1; // an error
   }
 
@@ -1735,16 +1808,28 @@ WBChildFrame *pChildFrame;
 static int ChildFrameEditDeleteHandler(XClientMessageEvent *pEvent)
 {
 WBChildFrame *pChildFrame;
+WBFrameWindow *pFrame;
+
 
   if(!pEvent || pEvent->window == None)
   {
+    WB_ERROR_PRINT("ERROR:  %s bad window or event\n", __FUNCTION__);
     return -1; // an error
   }
 
-  pChildFrame = FWGetChildFrameStruct(pEvent->window);
+  pFrame = FWGetFrameWindowStruct(pEvent->window);
+
+  if(!pFrame)
+  {
+    WB_ERROR_PRINT("ERROR:  %s bad window (not frame window)\n", __FUNCTION__);
+    return -1; // an error
+  }
+
+  pChildFrame = FWGetContainedWindowByIndex(pFrame, -1); // current focus window
 
   if(!pChildFrame)
   {
+    WB_ERROR_PRINT("ERROR:  %s - no child frame has focus\n", __FUNCTION__);
     return -1; // an error
   }
 
@@ -1764,15 +1849,28 @@ WBChildFrame *pChildFrame;
 static int ChildFrameEditSelectAllHandler(XClientMessageEvent *pEvent)
 {
 WBChildFrame *pChildFrame;
+WBFrameWindow *pFrame;
+
 
   if(!pEvent || pEvent->window == None)
   {
+    WB_ERROR_PRINT("ERROR:  %s bad window or event\n", __FUNCTION__);
     return -1; // an error
   }
 
-  pChildFrame = FWGetChildFrameStruct(pEvent->window);
+  pFrame = FWGetFrameWindowStruct(pEvent->window);
+
+  if(!pFrame)
+  {
+    WB_ERROR_PRINT("ERROR:  %s bad window (not frame window)\n", __FUNCTION__);
+    return -1; // an error
+  }
+
+  pChildFrame = FWGetContainedWindowByIndex(pFrame, -1); // current focus window
+
   if(!pChildFrame)
   {
+    WB_ERROR_PRINT("ERROR:  %s - no child frame has focus\n", __FUNCTION__);
     return -1; // an error
   }
 
@@ -1789,15 +1887,28 @@ WBChildFrame *pChildFrame;
 static int ChildFrameEditSelectNoneHandler(XClientMessageEvent *pEvent)
 {
 WBChildFrame *pChildFrame;
+WBFrameWindow *pFrame;
+
 
   if(!pEvent || pEvent->window == None)
   {
+    WB_ERROR_PRINT("ERROR:  %s bad window or event\n", __FUNCTION__);
     return -1; // an error
   }
 
-  pChildFrame = FWGetChildFrameStruct(pEvent->window);
+  pFrame = FWGetFrameWindowStruct(pEvent->window);
+
+  if(!pFrame)
+  {
+    WB_ERROR_PRINT("ERROR:  %s bad window (not frame window)\n", __FUNCTION__);
+    return -1; // an error
+  }
+
+  pChildFrame = FWGetContainedWindowByIndex(pFrame, -1); // current focus window
+
   if(!pChildFrame)
   {
+    WB_ERROR_PRINT("ERROR:  %s - no child frame has focus\n", __FUNCTION__);
     return -1; // an error
   }
 
@@ -2009,19 +2120,36 @@ WBMenuPopupWindow *pPopup;
 
   pPopup = MBFindMenuPopupWindow(pMenu);
 
-  if(pPopup)
+  if(!pPopup)
+  {
+    WB_ERROR_PRINT("ERROR:  %s no popup for menu %p\n", __FUNCTION__, pMenu);
+  }
+  else
   {
     wID = pPopup->wOwner;
 
-    if(wID != None)
+    if(wID == None)
+    {
+      WB_ERROR_PRINT("ERROR:  %s no owner for popup menu %p\n", __FUNCTION__, pPopup);
+    }
+    else
     {
       pFrame = FWGetFrameWindowStruct(wID);
 
-      if(pFrame)
+      if(!pFrame)
+      {
+        WB_ERROR_PRINT("ERROR:  %s no frame for window %u (%08xH)\n", __FUNCTION__, (unsigned int)wID, (unsigned int)wID);
+      }
+      else
       {
         pChildFrame = FWGetContainedWindowByIndex(pFrame, -1); // current focus window
 
-        if(pChildFrame && pChildFrame->pUI)
+        if(!pChildFrame || !pChildFrame->pUI)
+        {
+          WB_ERROR_PRINT("ERROR:  %s no child frame %p or UI %p\n", __FUNCTION__,
+                         pChildFrame, pChildFrame ? pChildFrame->pUI : NULL);
+        }
+        else
         {
           if((pChildFrame->pUI->has_selection && pChildFrame->pUI->has_selection(pChildFrame)) ||
              (pChildFrame->pUI->is_empty && !pChildFrame->pUI->is_empty(pChildFrame)))

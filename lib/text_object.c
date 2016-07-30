@@ -1782,6 +1782,10 @@ static void __internal_set_insmode(struct _text_object_ *pThis, int iInsMode)
   if(WBIsValidTextObject(pThis))
   {
     pThis->iInsMode = iInsMode;
+
+    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+
+    __internal_invalidate_cursor(pThis, 1);  // invalidate the cursor immediately
   }
 }
 static int __internal_get_selmode(const struct _text_object_ *pThis)
@@ -4869,23 +4873,35 @@ WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
 
               if(pThis->iInsMode == InsertMode_OVERWRITE)  // NOTE:  horizontal cursor for overwrite
               {
-                pThis->iCursorY = iY + iDesc + 1;
+                int iY0 = iY + iDesc + 1;
+
+                // there WAS a bizarre compile error here, optimizing sub-expressions incorrectly, maybe
+
+                pThis->iCursorY = iY0;
                 pThis->iCursorHeight = 1;
 
                 rctCursor.left = pThis->iCursorX - iXDelta;
-                rctCursor.top = pThis->iCursorY - iYDelta;
+                rctCursor.top = iY0 - iYDelta;
                 rctCursor.right = pThis->iCursorX + iFontWidth - iXDelta;
-                rctCursor.bottom = pThis->iCursorY - iYDelta;
+                rctCursor.bottom = rctCursor.top;
+
+//                WB_ERROR_PRINT("TEMPORARY:  %s - iX=%d, iY=%d A=%d,D=%d dX=%d, dY=%d  cursor %d,%d  %d,%d,%d,%d\n", __FUNCTION__,
+//                               iX, iY, iAsc, iDesc, iXDelta, iYDelta,
+//                               pThis->iCursorX, pThis->iCursorY,
+//                               rctCursor.left, rctCursor.top, rctCursor.right, rctCursor.bottom);
               }
-              else // INSERT mode cursor
+              else // INSERT mode cursor (normally will be this)
               {
-                pThis->iCursorY = iY - iAsc - 1;
-                pThis->iCursorHeight = iY + iDesc + 1 - pThis->iCursorY;
+                int iY0 = iY - iAsc - 1;
+                int iY1 = iY + iDesc + 1;
+
+                pThis->iCursorY = iY0;
+                pThis->iCursorHeight = iY1 - iY0;
 
                 rctCursor.left = pThis->iCursorX - iXDelta;
-                rctCursor.top = pThis->iCursorY - iYDelta;
-                rctCursor.right = pThis->iCursorX - iXDelta;
-                rctCursor.bottom = pThis->iCursorY + pThis->iCursorHeight - iYDelta;
+                rctCursor.top = iY0 - iYDelta;
+                rctCursor.right = rctCursor.left;
+                rctCursor.bottom = iY1 - iYDelta;
               }
 
               if(pThis->iBlinkState != 0)

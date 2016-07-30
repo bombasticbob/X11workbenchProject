@@ -160,8 +160,11 @@ int iStartupMinMax = 0; // main window open min/max/normal flag
   * message_type == aMENU_COMMAND\n
   * format == 32 (always)\n
   * data.l[0] Menu command message ID (aka 'action')\n
-  * data.l[1] (truncated) pointer to the WBMenu object (cast to 'long', truncated to 32 bits)\n
+  * data.l[1] secure hash for WBMenu object pointer - see  WBCreatePointerHash()\n
   * data.l[2] Window ID of the menu bar\n
+  *
+  * Whenever this message is received, you should NOT call WBDestroyPointerHash() for the WBMenu object
+  * pointer.  This will be done automatically by the message framework.
   *
 **/
 Atom aMENU_COMMAND=None;
@@ -175,10 +178,10 @@ Atom aMENU_COMMAND=None;
   * message_type == aMENU_UI_COMMAND\n
   * format == 32 (always)\n
   * data.l[0] Menu command message ID (aka 'action')\n
-  * data.l[1] low 32-bits of WBMenu object pointer\n
-  * data.l[2] high 32-bits of WBMenu object pointer\n
-  * data.l[3] low 32-bits of WBMenuItem object pointer\n
-  * data.l[4] high 32-bits of WBMenuItem object pointer\n
+  * data.l[1] secure hash for WBMenu object pointer - see  WBCreatePointerHash()\n
+  * data.l[2] secure hash for WBMenuItem object pointer - see  WBCreatePointerHash()\n
+  * data.l[3] the value '0' (reserved)\n
+  * data.l[4] the value '0' (reserved)\n
   *
   * A Frame Window returns '0' to indicate that the menu should be displayed normally (same as 'not handled')\n
   * Other return values alter the display of the menu.
@@ -197,8 +200,8 @@ Atom aMENU_COMMAND=None;
   *         PRELIMINARY:  the text will be 'menu text\\tAtom Name' - no hotkeys, no tooltip text.  The menu
   *                       text can include underscores which will only work when the popup is available
   *
-  * TODO:  change this to be 'less dangerous' with respect to getting invalid pointers jammed into the queue.  It
-  * is theoretically possible for a different application to post Client Message events using faked values.
+  * Whenever this message is received, you should NOT call WBDestroyPointerHash() for the WBMenu object
+  * pointer, nor for the WBMenuItem object pointer.  This will be done automatically by the message framework.
   *
 **/
 Atom aMENU_UI_COMMAND=None;
@@ -4765,7 +4768,7 @@ int WBWindowDispatch(Window wID, XEvent *pEvent)
         WB_WARN_PRINT("%s:%d - %d (%08xH) NOT mapped\n",
                       __FUNCTION__, __LINE__, (int)wID, (int)wID);
 
-        return 0; // NOT handled (should I change this?)
+        goto exit_point; // NOT handled (should I change this?)
       }
       else if(pMenuEntry->pMenuCallback &&
               (pEvent->type == ConfigureNotify ||   // resize, reposition
@@ -4785,7 +4788,7 @@ int WBWindowDispatch(Window wID, XEvent *pEvent)
 
         if(iRval)
         {
-          return iRval;
+          goto exit_point; // handled
         }
       }
     }
@@ -4801,7 +4804,7 @@ int WBWindowDispatch(Window wID, XEvent *pEvent)
         WB_WARN_PRINT("%s:%d - %d (%08xH) NOT mapped\n",
                       __FUNCTION__, __LINE__, (int)wID, (int)wID);
 
-        return 0; // NOT handled (should I change this?)
+        goto exit_point; // NOT handled (should I change this?)
       }
 
       WBGetWindowGeom(wID, &geom);
@@ -4853,7 +4856,7 @@ int WBWindowDispatch(Window wID, XEvent *pEvent)
 
           // return NOW - no further processing
 
-          return iRval;
+          goto exit_point; // handled
         }
 
         // at this point, I had a DestroyNotify message for THIS window - flow through to next section
@@ -4928,7 +4931,7 @@ int WBWindowDispatch(Window wID, XEvent *pEvent)
 
         WBUnregisterWindowCallback(wID); // NOTE:  this assigns 'wIDApplication' to None if this was the application window
 
-        return iRval;
+        goto exit_point; // handled
       }
       else
       {
@@ -4954,6 +4957,10 @@ int WBWindowDispatch(Window wID, XEvent *pEvent)
   {
     WBDefault(wID, pEvent);  // do it anyway but don't use THAT return value
   }
+
+exit_point:
+
+  // TODO: any "always do this" stuff belongs here
 
   return iRval;
 }
@@ -9131,8 +9138,8 @@ int iW, iH;
   XClipBox(hRgn, &xrct);
 
   WBDebugPrint("REGION %u (%08xH):  clip rect: %d, %d, %d, %d  bRotate=%d\n",
-               (unsigned int)(unsigned long long)hRgn,
-               (unsigned int)(unsigned long long)hRgn,
+               (unsigned int)(WB_UINTPTR)hRgn,
+               (unsigned int)(WB_UINTPTR)hRgn,
                xrct.x, xrct.y, xrct.width + xrct.x, xrct.height + xrct.y,
                bRotate);
 

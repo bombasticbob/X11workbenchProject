@@ -504,22 +504,10 @@ int iRval;
 
   evt.data.l[0] = pItem->iAction;  // menu command message ID (needed to identify menu)
 
-#warning potentially dangerous code.  this should be re-written to NOT use a 'pMenu' or 'pItem' pointer in an event
-
-#if !defined(__SIZEOF_POINTER__) // TODO find a better way
-#define __SIZEOF_POINTER_ 0
-#endif
-#if __SIZEOF_POINTER__ == 4 /* to avoid warnings in 32-bit linux */
-  evt.data.l[1] = (long)pMenu;
-  evt.data.l[2] = 0;
-  evt.data.l[3] = (long)pItem;
+  evt.data.l[1] = WBCreatePointerHash(pMenu);
+  evt.data.l[2] = WBCreatePointerHash(pItem);
+  evt.data.l[3] = 0; // this is a sort of 'flag' saying I'm using a pointer hash
   evt.data.l[4] = 0;
-#else
-  evt.data.l[1] = (long)((unsigned long long)pMenu & 0xffffffffL);
-  evt.data.l[2] = (long)(((unsigned long long)pMenu >> 32) & 0xffffffffL);
-  evt.data.l[3] = (long)((unsigned long long)pItem & 0xffffffffL);
-  evt.data.l[4] = (long)(((unsigned long long)pItem >> 32) & 0xffffffffL);
-#endif
 
   ////////////////////////////////////////////////////////////////////
   // TODO:  handle things differently for a DYNAMIC menu UI handler?
@@ -527,12 +515,14 @@ int iRval;
 
   iRval = WBWindowDispatch(pSelf->wOwner, (XEvent *)&evt); // 'send event'
 
-
 //  if(iRval < 1)
 //  {
 //    WB_ERROR_PRINT("TEMPORARY:  %s - \"%s\" returning %d\n", __FUNCTION__,
 //                   (const char *)(pItem->data + pItem->iMenuItemText), iRval);
 //  }
+
+  WBDestroyPointerHash(pMenu);
+  WBDestroyPointerHash(pItem); // clean them up as I'm done with them now
 
   return iRval;
 }
@@ -575,8 +565,7 @@ static void MBMenuPopupHandleMenuItem(Display *pDisplay, Window wID, WBMenuPopup
       evt.message_type = aMENU_COMMAND;
       evt.format = 32;  // always
       evt.data.l[0] = pItem->iAction;  // menu command message ID
-#warning potentially dangerous code.  this should be re-written to NOT use a 'pMenu' pointer in an event
-      evt.data.l[1] = (long)pMenu;     // pointer to menu object
+      evt.data.l[1] = WBCreatePointerHash(pMenu);  // pointer to menu object
       evt.data.l[2] = wID;             // window ID of menu bar
 
       WBPostEvent(pSelf->wOwner, (XEvent *)&evt);

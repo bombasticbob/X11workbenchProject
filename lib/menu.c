@@ -71,6 +71,7 @@
 #endif // XK_Delete
 
 #include "window_helper.h"
+#include "platform_helper.h"
 #include "pixmap_helper.h"  // pixmap helpers, including pre-defined icons
 #include "frame_window.h"
 #include "menu.h"
@@ -212,6 +213,8 @@ int i1;
     }
   }
 
+  WBDestroyPointerHashPtr(pMenu); // in case it was in use
+
   WBFree(pMenu);
 }
 
@@ -268,6 +271,8 @@ void MBDestroyMenuItem(WBMenuItem *pMenuItem)
     WB_ERROR_PRINT("ERROR:  %s - invalid menu item pointer %p\n", __FUNCTION__, pMenuItem);
     return;
   }
+
+  WBDestroyPointerHashPtr(pMenuItem); // in case it was in use
 
   WBFree(pMenuItem);
 }
@@ -1447,11 +1452,12 @@ WBMenuItem *pItem;
     evt.message_type = aMENU_COMMAND;
     evt.format = 32;  // always
     evt.data.l[0] = pItem->iAction;  // menu command message ID
-#warning this is potentially unsafe code - consider a BETTER way of passing a 'pMenu' pointer
-    evt.data.l[1] = (long)pMenu;     // pointer to menu object
+    evt.data.l[1] = WBCreatePointerHash(pMenu);  // hash of pointer to menu object
     evt.data.l[2] = wIDBar;          // window ID of menu bar
 
     WBPostEvent(wIDOwner, (XEvent *)&evt);
+       // since I post the event, the framework should delete the pointer hash (but doesn't).
+       // So, for now I'll allow it to time out instead.  This would rarely be a problem.
 
     WB_DEBUG_PRINT(DebugLevel_WARN | DebugSubSystem_Menu | DebugSubSystem_Event,
                   "%s - Post Event: %08xH %08xH %pH %08xH\n", __FUNCTION__,

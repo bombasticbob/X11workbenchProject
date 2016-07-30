@@ -587,7 +587,7 @@ Window wID = pSelf->wSelf;
     evt.message_type = aMENU_COMMAND;
     evt.format = 32;  // always
     evt.data.l[0] = pItem->iAction;  // menu command message ID
-    evt.data.l[1] = (long)pMenu;     // pointer to menu object
+    evt.data.l[1] = WBCreatePointerHash(pMenu); // hash of pointer to menu object
     evt.data.l[2] = wID;             // window ID of menu bar
 
     WBPostEvent(pSelf->wOwner, (XEvent *)&evt);
@@ -607,6 +607,7 @@ Window wID = pSelf->wSelf;
 static int MBMenuHandleMenuItemUI(Display *pDisplay, WBMenuBarWindow *pSelf, WBMenu *pMenu, WBMenuItem *pItem)
 {
   XClientMessageEvent evt;
+  int iRval;
 
   bzero(&evt, sizeof(evt));
   evt.type = ClientMessage;
@@ -620,22 +621,18 @@ static int MBMenuHandleMenuItemUI(Display *pDisplay, WBMenuBarWindow *pSelf, WBM
   // worry about async causing pointers to become invalid
 
   evt.data.l[0] = pItem->iAction;  // menu command message ID (needed to identify menu)
-#if !defined(__SIZEOF_POINTER__) // TODO find a better way
-#define __SIZEOF_POINTER_ 0
-#endif
-#if __SIZEOF_POINTER__ == 4 /* to avoid warnings in 32-bit linux */
-  evt.data.l[1] = (long)pMenu;
-  evt.data.l[2] = 0;
-  evt.data.l[3] = (long)pItem;
-  evt.data.l[4] = 0;
-#else
-  evt.data.l[1] = (long)((unsigned long long)pMenu & 0xffffffffL);
-  evt.data.l[2] = (long)(((unsigned long long)pMenu >> 32) & 0xffffffffL);
-  evt.data.l[3] = (long)((unsigned long long)pItem & 0xffffffffL);
-  evt.data.l[4] = (long)(((unsigned long long)pItem >> 32) & 0xffffffffL);
-#endif
 
-  return WBWindowDispatch(pSelf->wOwner, (XEvent *)&evt); // 'send event'
+  evt.data.l[1] = WBCreatePointerHash(pMenu);
+  evt.data.l[2] = WBCreatePointerHash(pItem);
+  evt.data.l[3] = 0; // this is a sort of 'flag' saying I'm using a pointer hash
+  evt.data.l[4] = 0;
+
+  iRval = WBWindowDispatch(pSelf->wOwner, (XEvent *)&evt); // 'send event'
+
+  WBDestroyPointerHash(pMenu);
+  WBDestroyPointerHash(pItem); // clean them up as I'm done with them now
+
+  return iRval;
 }
 #endif // 0
 

@@ -346,13 +346,13 @@ struct __WBChildFrameUI__; // forward declaration
       // client-area geometry (excludes scroll bars)
 
     int iTop;
-      // 0-based position of the top of the current viewport (in lines or pixels)
+      // cached 0-based position of the top of the current viewport (in lines or pixels)
     int iHeight;
-      // 0-based height of the current viewport (in lines or pixels)
+      // cached 0-based height of the current viewport (in lines or pixels)
     int iLeft;
-      // 0-based position of the left of the current viewport (in characters or pixels)
+      // cached 0-based position of the left of the current viewport (in characters or pixels)
     int iWidth;
-      // 0-based width of the current viewport (in characters or pixels)
+      // cached 0-based width of the current viewport (in characters or pixels)
 
     int iXExtent;
       // cached X extent for the display surface (determines scrolling behavior)
@@ -366,7 +366,7 @@ struct __WBChildFrameUI__; // forward declaration
       // reserved - position for 'split' (-1 for 'no split')
 
     WB_SCROLLINFO scrollSplit;
-      // 'scroll info' for 'split' area (implementation-defined)
+      // reserved - 'scroll info' for 'split' area (implementation-defined)
 
     int fFlags;
       // various bitflags defining features.
@@ -413,10 +413,10 @@ typedef struct __WBChildFrame__
 
   WB_GEOM geom;                     ///< client-area geometry (excludes scroll bars)
 
-  int iTop;                         ///< 0-based position of the top of the current viewport (in lines or pixels)
-  int iHeight;                      ///< 0-based height of the current viewport (in lines or pixels)
-  int iLeft;                        ///< 0-based position of the left of the current viewport (in characters or pixels)
-  int iWidth;                       ///< 0-based width of the current viewport (in characters or pixels)
+  int iTop;                         ///< cached 0-based position of the top of the current viewport (in lines or pixels)
+  int iHeight;                      ///< cached 0-based height of the current viewport (in lines or pixels)
+  int iLeft;                        ///< cached 0-based position of the left of the current viewport (in characters or pixels)
+  int iWidth;                       ///< cached 0-based width of the current viewport (in characters or pixels)
 
   int iXExtent;                     ///< cached X extent for the display surface (determines scrolling behavior)
   int iYExtent;                     ///< cached Y extent for the display surface (determines scrolling behavior)
@@ -425,7 +425,7 @@ typedef struct __WBChildFrame__
 
   int iSplit;                       ///< reserved - position for 'split' (-1 for 'no split')
 
-  WB_SCROLLINFO scrollSplit;        ///< 'scroll info' for 'split' area (implementation-defined)
+  WB_SCROLLINFO scrollSplit;        ///< reserved - 'scroll info' for 'split' area (implementation-defined)
 
   int fFlags;                       ///< various bitflags defining features.  See WBChildFrame_FLAGS enum.
 

@@ -117,16 +117,87 @@ DISTCLEANFILES = ../include/X11workbenchToolkit_install_config.h
 	@echo "#ifndef _X11WORKBENCH_TOOLKIT_CONFIG_H_DEFINED_" >>$@
 	@echo "#define _X11WORKBENCH_TOOLKIT_CONFIG_H_DEFINED_" >>$@
 	@echo "" >>$@
-	@grep HAVE_NANOSLEEP ../include/X11workbenchToolkit_config.h >>$@
-	@echo "" >>$@
+	@echo "// X11workbench-specific option defines" >>$@
 	@grep QSORT_R_BSD ../include/X11workbenchToolkit_config.h >>$@
 	@echo "" >>$@
 	@grep QSORT_R_GNUC ../include/X11workbenchToolkit_config.h >>$@
 	@echo "" >>$@
 	@grep X11WORKBENCH_TOOLKIT_HAVE_XPM ../include/X11workbenchToolkit_config.h >>$@
 	@echo "" >>$@
+	@echo "// function-specific defines, recommended by autoscan" >>$@
+	@grep HAVE_ALARM ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_BZERO ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_CHOWN ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_CLOCK_GETTIME ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_DUP2 ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_FORK ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_FTRUNCATE ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_GETCWD ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_GETTIMEOFDAY ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_LONGLONG ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep "HAVE_MALLOC " ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_MALLOC_USABLE_SIZE ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_MBLEN ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_MEMCHR ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_MEMMOVE ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_MEMSET ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_MKDIR ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_NANOSLEEP ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_PRINTF ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_QSORT_R ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_REALLOC ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_SELECT ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_SETLOCALE ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_STRCASECMP ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_STRCHR ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_STRNCASECMP ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_STRRCHR ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_STRSTR ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_VFORK ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_WORKING_FORK ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE_WORKING_VFORK ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep HAVE__BOOL ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep LSTAT_FOLLOWS_SLASHED_SYMLINK ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@echo "" >>$@
 	@echo "#endif // _X11WORKBENCH_TOOLKIT_CONFIG_H_DEFINED_" >>$@
 	@echo "" >>$@
-	echo Created 'X11workbenchToolkit_install_config.h'
+	@echo "=============================================="
+	@echo ""
+	@echo "Created 'X11workbenchToolkit_install_config.h'"
+	@echo ""
+	@echo "=============================================="
 
 

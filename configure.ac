@@ -10,7 +10,12 @@ AM_INIT_AUTOMAKE
 # prereq autoconf 2.53 or later
 AC_PREREQ(2.53)
 # FYI assuming automake >= 15
+
 AC_PROG_CC
+# AM_PROG_CC_C_O required based on a warning on a linux box for per-target
+# flags on pixmap_helper.c with automake 1.11, and AFTER AC_PROG_CC
+AM_PROG_CC_C_O
+
 AC_PROG_RANLIB
 AC_PATH_X
 AC_PATH_XTRA
@@ -94,6 +99,48 @@ AC_CHECK_HEADER([X11/Xlib.h],[],AC_MSG_ERROR([missing Xlib.h]))
 AC_CHECK_HEADER([X11/Xmd.h],[],AC_MSG_ERROR([missing Xmd.h]))
 AC_CHECK_HEADER([X11/Xutil.h],[],AC_MSG_ERROR([missing Xutil.h]))
 AC_CHECK_HEADER([X11/Xatom.h],[],AC_MSG_ERROR([missing Xatom.h]))
+
+#autoscan recommends
+AC_CHECK_HEADERS([fcntl.h])
+AC_CHECK_HEADERS([limits.h])
+AC_CHECK_HEADERS([locale.h])
+AC_CHECK_HEADERS([malloc.h])
+AC_CHECK_HEADERS([netinet/in.h])
+AC_CHECK_HEADERS([sys/param.h])
+AC_CHECK_HEADERS([sys/time.h])
+
+#autoscan recommends
+AC_CHECK_HEADER_STDBOOL
+
+#autoscan recommends
+AC_C_INLINE
+AC_FUNC_CHOWN
+AC_FUNC_ERROR_AT_LINE
+AC_FUNC_FORK
+AC_FUNC_LSTAT_FOLLOWS_SLASHED_SYMLINK
+AC_FUNC_MALLOC
+AC_FUNC_REALLOC
+AC_TYPE_PID_T
+AC_TYPE_SIZE_T
+AC_TYPE_UINT32_T
+
+#autoscan recommends
+AC_CHECK_FUNCS([bzero])
+AC_CHECK_FUNCS([dup2])
+AC_CHECK_FUNCS([ftruncate])
+AC_CHECK_FUNCS([getcwd])
+AC_CHECK_FUNCS([gettimeofday])
+AC_CHECK_FUNCS([mblen])
+AC_CHECK_FUNCS([memchr])
+AC_CHECK_FUNCS([memmove])
+AC_CHECK_FUNCS([mkdir])
+AC_CHECK_FUNCS([select])
+AC_CHECK_FUNCS([setlocale])
+AC_CHECK_FUNCS([strcasecmp])
+AC_CHECK_FUNCS([strchr])
+AC_CHECK_FUNCS([strncasecmp])
+AC_CHECK_FUNCS([strrchr])
+AC_CHECK_FUNCS([strstr])
 
 
 # This is where I check for the presence of libXpm - if the configure script uses the

@@ -1,27 +1,71 @@
-.TH Xbench 1 "08 April 2006" 1.0 Xbench \" -*- nroff -*-
+.TH X11workbench 1 "28 July 2016" 1.0 X11workbench \" -*- nroff -*-
 .SH NAME
-Xbench \- A simple programmer\'s work bench application for X11
+X11workbench \- A simple programmer\'s IDE application for X11
 
 .SH SYNOPSIS
-Xbench is a simple launching and editing platform for creating
-applications under the X11 environment.
+
+X11workbench is a simple launching and editing platform for
+creating applications under the X11 environment.
 
 .SH DESCRIPTION
-Xbench does what no other editor in X11 seems to get right.  It
-lets you move the line cursor up and down without horizontally
-bouncing around like a frog on a hot plate.  It also provides a
-simple \(yet powerful\) environment from which you can develop
-your applications.  The intent is to make this an X11
-open source replacement for commercial development software.
 
-Additionally this package ONLY uses X11 and Motif as run
-dependencies.  This is by design.  Additional dependencies
-may be the result of add-on features by third parties, but
-the intent is to make the core application as simple as possible.
+X11workbench does what no other editor in X11 seems to get right.
+It lets you move the line cursor up and down without horizontally
+bouncing around like a frog on a hot plate, automatically trims
+all of the extraneous white space from the ends of lines, and
+enforces hard and soft tab indents.  It also provides a simple
+(yet powerful) environment from which you can develop and debug
+your applications.  The intent is to make this an X11 open source
+replacement for commercial development 'IDE' software.
+
+Additionally, this package ONLY uses X11 and the C runtime library
+as dependencies.  This is by design.  Additional dependencies
+can result from the use of specific configuration features, or by
+modification from third parties, but the intent is to make the
+core application as simple as possible, and for all X11 platforms.
 
 .SH USAGE
-Xbench filename
 
-Actions depend upon the type of file that \'filename\' represents.
+X11workbench [options] [filename]
+  where      filename is one or more optional file names
+   and       \'options\' is one or more 'switches' preceded by \'-\'
+
+Actions taken depend upon the type(s) of file(s) that \'filename\'
+represents.
+
+The 'Options' that are supported are:
+
+  \-h          display a help message describing these options
+  \-d          dump settings on startup
+  \-\-nosplash  Skip the 'splash' screen on startup
+
+X11workbench Toolkit options (these should precede other options)
+  \-\-debug n       debug level (default 0, errors only)
+                  1 = minimal, 7 is maximum debug level
+  \-\-subsys xx     subsystem to debug (implies --debug 7 if not
+                  specified)
+                  'xx' is a subsystem name or bit value
+                  (see window_helper.h for more information)
+                  A bit value of 1 is equivalent to the lowest
+                  subsystem bit
+                  NOTE:  this option can be specified multiple times
+  \-\-display xx    X11 display to use (default is DISPLAY env variable)
+  \-\-minimize      show minimized window on startup
+  \-\-maximize      show maximized window on startup
+  \-\-geometry geom specify window geometry on startup
+                  geometry spec as per X specification
+                  (see X man page)
+                  typical value might be 800x600+100+50
+                  (default centers window with reasonable size)
+
+
+.SH SEE ALSO
+
+For more information, see the doxygen generated documentation,
+which can be viewed online:
+
+  http://bombasticbob.github.io/X11workbench
+
+You can also install this documentation locally, when available.
 
 

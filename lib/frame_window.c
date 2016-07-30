@@ -1246,6 +1246,9 @@ const FRAME_WINDOW *pFrameWindow;
   if(iIndex < 0 || // still test for this in case 'nFocusTab' is negative (but unlikely)
      !pFrameWindow->ppChildFrames || iIndex >= pFrameWindow->nChildFrames)
   {
+    WB_ERROR_PRINT("ERROR:  %s - bad index %d - %d frames, array=%p\n",
+                   __FUNCTION__, iIndex, pFrameWindow->nChildFrames, pFrameWindow->ppChildFrames);
+
     return NULL;
   }
 
@@ -3140,7 +3143,7 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 
               if(pHandler->lMenuID >= 0x10000L) // TODO:  this isn't compatible with the WBGetAtom paradigm...
               {
-#warning this is potentially dangerous code.  find a better way of managing this
+#warning this is potentially dangerous code.  find a better way of managing this (lMenuID as const char *)
                 lID = WBGetAtom(WBGetDefaultDisplay(), (const char *)lID);
 
                 if(!lID)
@@ -3208,7 +3211,7 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 
               if(pHandler->lMenuID >= 0x10000L)
               {
-#warning this is potentially dangerous code
+#warning this is potentially dangerous code - find a better way of managing this (lMenuID as const char *)
                 lID = WBGetAtom(WBGetDefaultDisplay(), (const char *)lID);
 
                 if(!lID)
@@ -3231,25 +3234,38 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
                   // per pointer to pass the information via the message structure.  otherwise it gets
                   // complicated and I really don't like complicated.  it causes mistakes, errors, crashes...
 
-#if !defined(__SIZEOF_POINTER__) // TODO find a better way to deal with pointer size
-#define __SIZEOF_POINTER__ 0
-#endif
-#if __SIZEOF_POINTER__ == 4 /* to avoid warnings in 32-bit linux */
-                  pMenu = (WBMenu *)pEvent->xclient.data.l[1];
-                  pItem = (WBMenuItem *)pEvent->xclient.data.l[3];
-#else // assume 64-bit pointers here, and if they truncate, should NOT get any warnings... well that's the idea
-                  pMenu = (WBMenu *)((unsigned long long)pEvent->xclient.data.l[1] | ((unsigned long long)pEvent->xclient.data.l[2] << 32));
-                  pItem = (WBMenuItem *)((unsigned long long)pEvent->xclient.data.l[3] | ((unsigned long long)pEvent->xclient.data.l[4] << 32));
-#endif
-                  // TODO:  validate pointers, otherwise a posted message might crash me (like a vulnerability)
+//#if !defined(__SIZEOF_POINTER__) // TODO find a better way to deal with pointer size
+//#define __SIZEOF_POINTER__ 0
+//#endif
+//#if __SIZEOF_POINTER__ == 4 /* to avoid warnings in 32-bit linux */
+//                  pMenu = (WBMenu *)pEvent->xclient.data.l[1];
+//                  pItem = (WBMenuItem *)pEvent->xclient.data.l[3];
+//#else // assume 64-bit pointers here, and if they truncate, should NOT get any warnings... well that's the idea
+//                  pMenu = (WBMenu *)((unsigned long long)pEvent->xclient.data.l[1] | ((unsigned long long)pEvent->xclient.data.l[2] << 32));
+//                  pItem = (WBMenuItem *)((unsigned long long)pEvent->xclient.data.l[3] | ((unsigned long long)pEvent->xclient.data.l[4] << 32));
+//#endif
+//                  // TODO:  validate pointers, otherwise a posted message might crash me (like a vulnerability)
+//
+//#ifndef NO_DEBUG /* warning off for release build */
+//#warning this code potentially has a vulnerability in it - 'pMenu' and 'pItem' could be bad pointers
+//#endif // !NO_DEBUG
 
-#ifndef NO_DEBUG /* warning off for release build */
-#warning this code potentially has a vulnerability in it - 'pMenu' and 'pItem' could be bad pointers
-#endif // !NO_DEBUG
+                  pMenu = (WBMenu *)(pEvent->xclient.data.l[1] ? WBGetPointerFromHash(pEvent->xclient.data.l[1]) : NULL);
+                  pItem = (WBMenuItem *)(pEvent->xclient.data.l[2] ? WBGetPointerFromHash(pEvent->xclient.data.l[2]) : NULL);
 
-                  // if(!WBIsValidMenu(pMenu) || !WBIsValidMenuItem(pItem)) { do not do it }
-
-                  return pHandler->UIcallback(pMenu, pItem);
+                  if(!pMenu || !pItem)
+                  {
+                    WB_ERROR_PRINT("** ERROR:  %s - window=%08xH pMenu=%p, pItem=%p\n", __FUNCTION__, (int)wID, pMenu, pItem);
+//                    WBDebugDumpEvent(pEvent);
+                  }
+//                  if(!WBIsValidMenu(pMenu) || !WBIsValidMenuItem(pItem))
+//                  {
+//                    WB_ERROR_PRINT("ERROR:  %s - invalid pMenu=%p or pItem=%p\n", __FUNCTION__, pMenu, pItem);
+//                  }
+                  else
+                  {
+                    return pHandler->UIcallback(pMenu, pItem);
+                  }
                 }
 
                 return 1; // NO UI handler so return '1' [aka 'enable']
@@ -3325,8 +3341,8 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
         evt.message_type = aMENU_COMMAND;
         evt.format = 32;  // always
 
-#warning potentially incompatible code, hard-coding a menu resource identifier
-        evt.data.l[0] = WBGetAtom(pDisplay, "IDM_FILE_NEW"); // TODO:  make this a #define someplace, or register it?
+        evt.data.l[0] = WBGetAtom(pDisplay, FW_FILE_NEW_MENU); // post a 'FILE NEW' menu event so handlers can manage it
+        evt.data.l[1] = 0; // no hashed pointer this time
 
         WBPostEvent(wID, (XEvent *)&evt);
       }

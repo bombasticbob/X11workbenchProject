@@ -88,6 +88,44 @@
 
 #endif // X11WORKBENCH_PROJECT_BUILD
 
+// TESTING THE CONFIGURATION - TODO:  for some, provide alternates?
+
+#if !defined( HAVE_ALARM ) || !defined( HAVE_CHOWN ) || \
+    !defined( HAVE_CLOCK_GETTIME ) || !defined( HAVE_DUP2 ) || !defined( HAVE_FORK ) || \
+    !defined( HAVE_FTRUNCATE ) || !defined( HAVE_GETCWD ) || !defined( HAVE_GETTIMEOFDAY ) || \
+    !defined( HAVE_MALLOC ) || !defined( HAVE_MBLEN ) || !defined( HAVE_MEMCHR ) || \
+    !defined( HAVE_MEMMOVE ) || !defined( HAVE_MEMSET ) || !defined( HAVE_MKDIR ) || \
+    !defined( HAVE_PRINTF ) || !defined( HAVE_REALLOC ) || \
+    !defined( HAVE_SELECT ) || !defined( HAVE_SETLOCALE ) || !defined( HAVE_STRCASECMP ) || \
+    !defined( HAVE_STRCHR ) || !defined( HAVE_STRNCASECMP ) || !defined( HAVE_STRRCHR ) || \
+    !defined( HAVE_STRSTR ) || !defined( HAVE_VFORK ) || !defined( HAVE_WORKING_FORK ) || \
+    !defined( HAVE_WORKING_VFORK ) || !defined( HAVE__BOOL ) || !defined( LSTAT_FOLLOWS_SLASHED_SYMLINK )
+#error
+#error configure script feature check 1 fail
+#error critical features missing
+#error
+#else
+#if !( HAVE_ALARM ) || !( HAVE_CHOWN ) || \
+    !( HAVE_CLOCK_GETTIME ) || !( HAVE_DUP2 ) || !( HAVE_FORK ) || \
+    !( HAVE_FTRUNCATE ) || !( HAVE_GETCWD ) || !( HAVE_GETTIMEOFDAY ) || \
+    !( HAVE_MALLOC ) || !( HAVE_MBLEN ) || !( HAVE_MEMCHR ) || \
+    !( HAVE_MEMMOVE ) || !( HAVE_MEMSET ) || !( HAVE_MKDIR ) || \
+    !( HAVE_PRINTF ) || !( HAVE_REALLOC ) || \
+    !( HAVE_SELECT ) || !( HAVE_SETLOCALE ) || !( HAVE_STRCASECMP ) || \
+    !( HAVE_STRCHR ) || !( HAVE_STRNCASECMP ) || !( HAVE_STRRCHR ) || \
+    !( HAVE_STRSTR ) || !( HAVE_VFORK ) || !( HAVE_WORKING_FORK ) || \
+    !( HAVE_WORKING_VFORK ) || !( HAVE__BOOL ) || !( LSTAT_FOLLOWS_SLASHED_SYMLINK )
+#error
+#error configure script feature check 2 fail
+#error critical features missing
+#error
+#endif // all that stuff
+#endif // all that prior stuff
+
+#ifndef HAVE_BZERO
+#define bzero(X,Y) memset((X),0,(Y))
+#endif // !HAVE_BZERO
+
 
 // DEBUG vs RELEASE code
 
@@ -187,6 +225,24 @@ typedef struct __WB_INT64__ { WB_UINT32 dw2; WB_INT32 dw1; } WB_INT64;    // not
 typedef struct __WB_UINT64__ { WB_UINT32 dw2; WB_UINT32 dw1; } WB_UINT64;
 
 #endif // _LONGLONG
+
+// pointer to integer conversion without those irritating truncation warnings
+
+#if !defined(__SIZEOF_POINTER__) // TODO find a better way to deal with pointer size if this isn't defined
+#define __SIZEOF_POINTER__ 0
+#endif
+
+#if !defined(__DOXYGEN__) && __SIZEOF_POINTER__ == 4
+typedef unsigned long WB_UINTPTR;
+#else // assume 8-byte 64-bit pointer
+/** \ingroup platform
+  * \brief Platform abstract unsigned integer that matches pointer size
+  *
+  * Definition for an integer equivalent of a pointer for platform-independent type casting without warnings
+**/
+typedef unsigned long long WB_UINTPTR;
+#endif // __SIZEOF_POINTER__ == 4, 8
+
 
 
 #define WB_C99_INITIALIZERS /* allow C99-style initializers */
@@ -882,10 +938,30 @@ WB_UINT32 WBCreatePointerHash(void *pPointer);
   *        correctly can result in memory leaks, but that is preferable to security vulnerabilities
   *
   * You should call this function immediately, once you have completed using the 'secure' pointer hash.
+  * In some cases, this will be done for you (such as via WBWindowDispatch() with certain ClientMessage
+  * events).  In other cases, you will have to explicitly do this yourself.
   *
   * Header File:  platform_helper.h
 **/
 void WBDestroyPointerHash(WB_UINT32 uiHash);
+
+/** \ingroup platform
+  * \brief Destroy a 32-bit 'secure' hash for a pointer regardless of reference count
+  *
+  * \param pPointer A pointer for which a hash may exist
+  *
+  * This function will destroy a 'secure' hash for a pointer that was created by WBCreatePointerHash(),
+  * regardless of the reference count.  The hash will remain valid for up to WB_SECURE_HASH_TIMEOUT
+  * milliseconds, but will have a value of 'NULL'.  This helps to mitigate possible pointer re-use.
+  *
+  * You should call this function immediately before you free a pointer that might be referenced by a
+  * secure pointer hash, to prevent 'use after free' problems.  This will NOT solve problems where the
+  * hash is being used across threads, however.  You may need to provide a different method of
+  * synchronizing hashes under such a condition, such as thread-safe reference counting.
+  *
+  * Header File:  platform_helper.h
+**/
+void WBDestroyPointerHashPtr(void *pPointer);
 
 /** \ingroup platform
   * \brief Obtain a pointer from a 32-bit 'secure' pointer hash value
@@ -894,9 +970,11 @@ void WBDestroyPointerHash(WB_UINT32 uiHash);
   * \returns An allocated 'hash' to the pointer, or NULL if not valid.  The hash should be destroyed immediately after use.
   *
   * This function will create a 'secure' hash for a pointer.  The hash can be used asynchronously
-  * for up to WB_SECURE_HASH_TIMEOUT milliseconds, after which it the reference automatically be free'd.
+  * for up to WB_SECURE_HASH_TIMEOUT milliseconds, after which it the referenced pointer will
+  * automatically be free'd.
+  *
   * In this way, an asynchronous message can contain references to pointers that are difficult to
-  * 'fake' if another application were to attempt to inject Events into the queue.
+  * 'fake' if another application were to attempt to inject XEvents into the queue.
   *
   * NOTE:  automatically freeing the reference does NOT free the pointer.  Failure to handle these
   *        correctly can result in memory leaks, but that is preferable to security vulnerabilities

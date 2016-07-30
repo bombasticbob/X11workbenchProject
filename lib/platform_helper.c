@@ -819,9 +819,10 @@ int nMaxChars;
 
 typedef struct __pointer_hash__
 {
-  WB_UINT32 uiHash;
-  void *pValue;         // NULL if unused entry (making this simple)
-  WB_UINT32 dwTick; // millis count when I last created/referenced this hash
+  WB_UINT32 uiHash;     // hash value, must be zero for 'free' entry
+  void *pValue;         // NULL if unused entry, else the pointer value
+  WB_UINT32 dwTick;     // millis count when I last created/referenced this hash
+  WB_UINT32 dwRefCount; // reference count (deleted on '0')
 } POINTER_HASH;
 
 static POINTER_HASH *pPointerHashes = NULL; // WBAlloc'd array
@@ -852,7 +853,7 @@ WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros
 
   if(!pPointer)
   {
-    return 0;
+    return 0; // not valid, just return zero
   }
 
   while(WBInterlockedExchange(&uiPointerHashSpinlock, 1))
@@ -883,6 +884,8 @@ WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros
 
     pPointerHashes = (POINTER_HASH *)pTemp; // new, re-alloc'd pointer
     nMaxPointerHash += 256;
+
+//    WB_ERROR_PRINT("TEMPORARY:  %s - new # of hashes %d\n", __FUNCTION__, nMaxPointerHash);
   }
 
   // first, check for a match, and the first 'free' index
@@ -894,19 +897,39 @@ WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros
       {
         WB_ERROR_PRINT("ERROR:  %s - matching 'pPointer' %p for multiple hash entries\n", __FUNCTION__, pPointer);
       }
-      else
+      else // NOTE:  if this entry WAS too old, I'll still re-use it and reset the tick
       {
         uiRval = pPointerHashes[i1].uiHash;
         pPointerHashes[i1].dwTick = dwTick; // new timestamp
+        pPointerHashes[i1].dwRefCount++; // increase ref count
+
+        // NOTE:  I will only use this one.  but I'll check the rest for timeout by continuing
       }
     }
-    else if((dwTick - pPointerHashes[i1].dwTick) > WB_SECURE_HASH_TIMEOUT)
+    else if(!pPointerHashes[i1].pValue &&
+            !pPointerHashes[i1].uiHash) // a free entry
     {
+      if(iFreeIndex < 0)               // no free index found (yet)
+      {
+        iFreeIndex = i1; // first free entry found
+      }
+    }
+    else if((dwTick - pPointerHashes[i1].dwTick) > WB_SECURE_HASH_TIMEOUT) // auto cleanup part
+    {
+      // checking for timeout, and erasing things if timed out
+
+//      WB_ERROR_PRINT("TEMPORARY:  %s - deleting 'aged' entry, timeout = %u\n", __FUNCTION__,
+//                     (dwTick - pPointerHashes[i1].dwTick));
+//      WB_ERROR_PRINT("   %2d : %08xH %10u %4u %p\n",
+//                     i1, pPointerHashes[i1].uiHash, pPointerHashes[i1].dwTick,
+//                     pPointerHashes[i1].dwRefCount, pPointerHashes[i1].pValue);
+
       // too old - erase it, freeing up the location
 
-      pPointerHashes[i1].uiHash = 0;
+      pPointerHashes[i1].uiHash = 0; // also needed to mark it 'free'
       pPointerHashes[i1].dwTick = 0;
       pPointerHashes[i1].pValue = NULL; // thus marking it 'free'
+      pPointerHashes[i1].dwRefCount = 0; // regardless of ref count, remove it
 
       if(iFreeIndex < 0) // no free index yet?  remember it
       {
@@ -915,13 +938,22 @@ WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros
     }
   }
 
+  if(uiRval) // found one??
+  {
+    goto return_point;
+  }
+
+
+  // at this point, did NOT find a match, so I need to create it
+
   if(iFreeIndex < 0) // not re-using an entry?
   {
     iFreeIndex = nPointerHash++; // increment total count, use last entry
   }
 
-  pPointerHashes[iFreeIndex].dwTick = dwTick;
   pPointerHashes[iFreeIndex].pValue = pPointer;
+  pPointerHashes[iFreeIndex].dwTick = dwTick;
+  pPointerHashes[iFreeIndex].dwRefCount = 1;
 
   // see if there's a 'crash' between two identical hashes
   // it's not likely, but it IS possible.  So test for it.
@@ -929,35 +961,41 @@ WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros
   while(1) /* we assume it will bust out eventually */
   {
     uiRval = ((WB_UINT32)((WB_UINT64)pPointer) ^ dwTick) & 0xffffffff;
+    // NOTE:  this should, in theory, work within a very short time
 
-    for(i1=0; i1 < nPointerHash; i1++)
+    if(uiRval) // can't allow a zero (this should be RARE, if ever at all)
     {
-      if(!pPointerHashes[i1].pValue)
+      for(i1=0; i1 < nPointerHash; i1++)
       {
-        continue;
+        if(pPointerHashes[i1].uiHash == uiRval)
+        {
+          break;
+        }
       }
 
-      if(pPointerHashes[i1].uiHash == uiRval)
+      if(i1 >= nPointerHash) // no matching entry found
       {
         break;
       }
-    }
-
-    if(i1 >= nPointerHash) // no matching entry found
-    {
-      break;
     }
 
     dwTick -= 113; // decrement it by a prime number so I can test for it
                    // being there again, but with a different hash value
   }
 
-  pPointerHashes[i1].uiHash = uiRval;
+  pPointerHashes[iFreeIndex].uiHash = uiRval; // save this value where the free index resides
+
+//  WB_ERROR_PRINT("TEMOPRARY:  %s - adding hash %u for %p at %d\n", __FUNCTION__, uiRval, pPointer, iFreeIndex);
 
 
 return_point:
 
   WBInterlockedExchange(&uiPointerHashSpinlock, 0);
+
+//  if(!uiRval)
+//  {
+//    WB_ERROR_PRINT("TEMPORARY:  %s - did NOT create hash for pointer %p\n", __FUNCTION__, pPointer);
+//  }
 
   return uiRval;
 }
@@ -968,6 +1006,11 @@ int i1;
 WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros / 1024
 
 
+  if(!uiHash)
+  {
+    return; // not valid, just return
+  }
+
   while(WBInterlockedExchange(&uiPointerHashSpinlock, 1))
   {
     usleep(100);
@@ -975,14 +1018,104 @@ WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros
 
   for(i1=0; i1 < nPointerHash; i1++)
   {
-    if(pPointerHashes[i1].uiHash == uiHash ||
-       (dwTick - pPointerHashes[i1].dwTick) > WB_SECURE_HASH_TIMEOUT) // check for aging while I'm at it
+    if(!pPointerHashes[i1].pValue &&
+       !pPointerHashes[i1].uiHash) // a free entry
     {
-      // erase it, freeing up the location
+      continue;
+    }
 
-      pPointerHashes[i1].uiHash = 0;
+    // check timeouts first, THEN destroy via decremented ref count
+
+    if((dwTick - pPointerHashes[i1].dwTick) > WB_SECURE_HASH_TIMEOUT) // check for aging while I'm at it
+    {
+//      WB_ERROR_PRINT("TEMPORARY:  %s - deleting 'aged' entry, timeout = %u\n", __FUNCTION__,
+//                     (dwTick - pPointerHashes[i1].dwTick));
+//      WB_ERROR_PRINT("   %2d : %08xH %10u %4u %p\n",
+//                     i1, pPointerHashes[i1].uiHash, pPointerHashes[i1].dwTick,
+//                     pPointerHashes[i1].dwRefCount, pPointerHashes[i1].pValue);
+
+      // erase it, freeing up the location
+erase_it:
+
+      pPointerHashes[i1].uiHash = 0; // this zero, together with 'pValue == NULL' means it's "free"
       pPointerHashes[i1].dwTick = 0;
       pPointerHashes[i1].pValue = NULL; // thus marking it 'free'
+      pPointerHashes[i1].dwRefCount = 0; // regardless of ref count, remove it
+    }
+    else if(pPointerHashes[i1].uiHash == uiHash)
+    {
+//      WB_ERROR_PRINT("TEMPORARY:  %s - ref count prior to decrement = %d for %p (%08xH)\n", __FUNCTION__,
+//                     pPointerHashes[i1].dwRefCount, pPointerHashes[i1].pValue,
+//                     pPointerHashes[i1].uiHash);
+
+      if(pPointerHashes[i1].dwRefCount)
+      {
+        pPointerHashes[i1].dwRefCount --;
+      }
+
+      if(!(pPointerHashes[i1].dwRefCount))
+      {
+//        WB_ERROR_PRINT("TEMPORARY:  %s - deleting matching entry\n", __FUNCTION__);
+//        WB_ERROR_PRINT("   %2d : %08xH %10u %4u %p\n",
+//                       i1, pPointerHashes[i1].uiHash, pPointerHashes[i1].dwTick,
+//                       pPointerHashes[i1].dwRefCount, pPointerHashes[i1].pValue);
+
+        goto erase_it;
+      }
+    }
+  }
+
+  WBInterlockedExchange(&uiPointerHashSpinlock, 0);
+}
+
+void WBDestroyPointerHashPtr(void *pPointer)
+{
+int i1;
+WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros / 1024
+
+
+  if(!pPointer)
+  {
+    return; // not valid, just return
+  }
+
+  while(WBInterlockedExchange(&uiPointerHashSpinlock, 1))
+  {
+    usleep(100);
+  }
+
+  for(i1=0; i1 < nPointerHash; i1++)
+  {
+    if(!pPointerHashes[i1].uiHash && !pPointerHashes[i1].pValue)
+    {
+      continue; // free entry, ignore it
+    }
+
+    if((dwTick - pPointerHashes[i1].dwTick) > WB_SECURE_HASH_TIMEOUT) // check for aging while I'm at it
+    {
+//      WB_ERROR_PRINT("TEMPORARY:  %s - deleting 'aged' entry, timeout = %u\n", __FUNCTION__,
+//                     (dwTick - pPointerHashes[i1].dwTick));
+//      WB_ERROR_PRINT("   %2d : %08xH %10u %4u %p\n",
+//                     i1, pPointerHashes[i1].uiHash, pPointerHashes[i1].dwTick,
+//                     pPointerHashes[i1].dwRefCount, pPointerHashes[i1].pValue);
+
+      // erase it, freeing up the location (hash will be zero)
+
+erase_it:
+      pPointerHashes[i1].uiHash = 0; // this zero, together with 'pValue == NULL' means it's "free"
+      pPointerHashes[i1].dwTick = 0;
+      pPointerHashes[i1].pValue = NULL; // thus marking it 'free'
+      pPointerHashes[i1].dwRefCount = 0; // regardless of ref count, remove it
+
+    }
+    else if(pPointerHashes[i1].pValue == pPointer) // always free it
+    {
+//      WB_ERROR_PRINT("TEMPORARY:  %s - deleting matching entry\n", __FUNCTION__);
+//      WB_ERROR_PRINT("   %2d : %08xH %10u %4u %p\n",
+//                     i1, pPointerHashes[i1].uiHash, pPointerHashes[i1].dwTick,
+//                     pPointerHashes[i1].dwRefCount, pPointerHashes[i1].pValue);
+
+      goto erase_it; // regardless of ref count, remove it (buh-bye)
     }
   }
 
@@ -995,6 +1128,11 @@ int i1;
 void *pRval = NULL;
 
 
+  if(!uiHash)
+  {
+    return NULL; // not valid, just return NULL
+  }
+
   while(WBInterlockedExchange(&uiPointerHashSpinlock, 1))
   {
     usleep(100);
@@ -1002,22 +1140,36 @@ void *pRval = NULL;
 
   for(i1=0; i1 < nPointerHash; i1++)
   {
-    if(!pPointerHashes[i1].pValue)
+    if(!pPointerHashes[i1].pValue || // for now just ignore these
+       pPointerHashes[i1].uiHash != uiHash)
     {
-      continue;
+      continue; // this treats NULL pointers as a 'mismatch'
     }
 
-    if(pPointerHashes[i1].uiHash == uiHash)
-    {
-      pRval = pPointerHashes[i1].pValue;
-      goto exit_point;
-    }
+    // TODO:  check for timeouts?
+
+    pRval = pPointerHashes[i1].pValue;
+    goto exit_point;
   }
 
 
 exit_point:
 
   WBInterlockedExchange(&uiPointerHashSpinlock, 0);
+
+//  if(!pRval)
+//  {
+//    WB_ERROR_PRINT("TEMPORARY:  %s - did NOT find pointer for hash %u (%08xH)\n", __FUNCTION__, uiHash, uiHash);
+//
+//    for(i1=0; i1 < nPointerHash; i1++)
+//    {
+//      WB_ERROR_PRINT("   %2d : %08xH %10u %4u %p\n",
+//                     i1, pPointerHashes[i1].uiHash, pPointerHashes[i1].dwTick,
+//                     pPointerHashes[i1].dwRefCount, pPointerHashes[i1].pValue);
+//    }
+//
+//    WB_ERROR_PRINT("---------------------------------------------------------------------\n\n");
+//  }
 
   return pRval; // NULL if not found
 }

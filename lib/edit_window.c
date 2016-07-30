@@ -1428,6 +1428,7 @@ char *p1;
     }
   }
 
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_cut_to_cb(WBChildFrame *pC)
@@ -1465,6 +1466,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     }
   }
 
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_delete_sel(WBChildFrame *pC)
@@ -1491,6 +1493,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     pE->xTextObject.vtable->del_select(&(pE->xTextObject));
     internal_notify_change(pC, 0);
   }
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_select_all(WBChildFrame *pC)
@@ -1513,6 +1517,8 @@ WB_RECT rct;
   rct.bottom = pE->xTextObject.vtable->get_rows(&(pE->xTextObject));
 
   pE->xTextObject.vtable->set_select(&(pE->xTextObject), &rct); // select 'all'
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_select_none(WBChildFrame *pC)
@@ -1530,6 +1536,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
 
   pE->xTextObject.vtable->set_select(&(pE->xTextObject), NULL);
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_save(WBChildFrame *pC, const char *szFileName)
@@ -1581,6 +1589,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
 
   pE->xTextObject.vtable->mouse_click(&(pE->xTextObject), iX, iY, iButtonMask, iACS);
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_mouse_dblclick(WBChildFrame *pC, int iX, int iY, int iButtonMask, int iACS)
@@ -1597,6 +1607,9 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+  // TODO:  select the current 'word'?
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_mouse_drag(WBChildFrame *pC, int iX, int iY, int iButtonMask, int iACS)
@@ -1614,6 +1627,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
 
   pE->xTextObject.vtable->begin_mouse_drag(&(pE->xTextObject));
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_mouse_drop(WBChildFrame *pC, int iX, int iY, int iButtonMask, int iACS)
@@ -1631,6 +1646,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
 
   pE->xTextObject.vtable->end_mouse_drag(&(pE->xTextObject));
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_mouse_move(WBChildFrame *pC, int iX, int iY)
@@ -1648,6 +1665,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
 
   pE->xTextObject.vtable->mouse_click(&(pE->xTextObject), iX, iY, 0, 0); // report mouse motion
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_mouse_scrollup(WBChildFrame *pC, int iX, int iY, int iButtonMask, int iACS)
@@ -1664,6 +1683,9 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_mouse_scrolldown(WBChildFrame *pC, int iX, int iY, int iButtonMask, int iACS)
@@ -1680,6 +1702,9 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_mouse_cancel(WBChildFrame *pC)
@@ -1696,6 +1721,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
 static void internal_get_row_col(WBChildFrame *pC, int *piR, int *piC)
