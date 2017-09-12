@@ -144,6 +144,27 @@ extern "C" {
 **/
 void PXM_RGBToYUV(int iR, int iG, int iB, int *piY, int *piU, int *piV);
 
+
+/** \ingroup pixmap
+  * \brief Convert R, G, B values to H, S, V with 0-255 range
+  *
+  * \param iR the Red value (0-255)
+  * \param iG the Green value (0-255)
+  * \param iB the Blue value (0-255)
+  * \param piH the returned 'H' value (0-255)
+  * \param piS the returned 'S' value (0-255)
+  * \param piV the returned 'V' value (0-255)
+  *
+  * Translate colors from RGB to HSV.  Often this is desirable when doing color conversions,
+  * where you want to alter the brightness or saturation, but leave the color 'tone' as-is.\n
+  * The 'hue' (H) information determines the color tone, the 'S' the saturatio, and the value (V)
+  * determines the brightness.
+  *
+  * Header File:  pixmap_helper.h
+**/
+void PXM_RGBToHSV(int iR, int iG, int iB, int *piH, int *piS, int *piV);
+
+
 /** \ingroup pixmap
   * \brief Convert Y, U, V values to  R, G, B with 0-255 range
   *
@@ -173,6 +194,26 @@ void PXM_RGBToYUV(int iR, int iG, int iB, int *piY, int *piU, int *piV);
   * Header File:  pixmap_helper.h
 **/
 void PXM_YUVToRGB(int iY, int iU, int iV, int *piR, int *piG, int *piB);
+
+
+/** \ingroup pixmap
+  * \brief Convert H, S, V values to  R, G, B with 0-255 range
+  *
+  * \param iH the 'H' value (0-255)
+  * \param iS the 'S' value (0-255)
+  * \param iV the 'V' value (0-255)
+  * \param piR the returned Red value (0-255)
+  * \param piG the returned Green value (0-255)
+  * \param piB the returned Blue value (0-255)
+  *
+  * Translate colors from HSV to RGB.  Often this is desirable when doing color conversions,
+  * where you want to alter the brightness or saturation, but leave the color 'tone' as-is.\n
+  * The 'hue' (H) information determines the color tone, the 'S' the saturatio, and the value (V)
+  * determines the brightness.
+  *
+  * Header File:  pixmap_helper.h
+**/
+void PXM_HSVToRGB(int iH, int iS, int iV, int *piR, int *piG, int *piB);
 
 
 /** \ingroup pixmap

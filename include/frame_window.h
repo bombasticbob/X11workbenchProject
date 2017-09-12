@@ -345,19 +345,19 @@ struct __WBChildFrameUI__; // forward declaration
     WB_GEOM geom;
       // client-area geometry (excludes scroll bars)
 
-    int iTop;
-      // cached 0-based position of the top of the current viewport (in lines or pixels)
-    int iHeight;
-      // cached 0-based height of the current viewport (in lines or pixels)
-    int iLeft;
-      // cached 0-based position of the left of the current viewport (in characters or pixels)
-    int iWidth;
-      // cached 0-based width of the current viewport (in characters or pixels)
+    WB_GEOM geomEntire;
+      // entire client-area geometry (for painting scroll bars)
 
-    int iXExtent;
-      // cached X extent for the display surface (determines scrolling behavior)
-    int iYExtent;
-      // cached Y extent for the display surface (determines scrolling behavior)
+    WB_POINT origin;
+      // 'origin' in 'client units' (such as chars and lines) - determines scroll behavior
+
+    WB_EXTENT extent;
+      // 'extent' in 'client units' (such as chars and lines) - determines scroll behavior
+
+    int iRowHeight;
+      // cached 'row height' (height of line including interline spacing)
+    int iColWidth;
+      // cached 'column width' (width of 1 character)
 
     WB_SCROLLINFO scroll;
       // 'scroll info' (horizontal and vertical min/max/pos and other details)
@@ -411,15 +411,13 @@ typedef struct __WBChildFrame__
   WBFrameWindow *pOwner;            ///< a pointer to the WBFrameWindow owner
   XFontSet rFontSet;                ///< default font for the window
 
-  WB_GEOM geom;                     ///< client-area geometry (excludes scroll bars)
+  WB_GEOM geom;                     ///< total client-area geometry (excludes scroll bars) in 'pixels'
+  WB_GEOM geomEntire;               ///< client-area geometry (excludes scroll bars)
+  WB_POINT origin;                  ///< viewport 'origin' in 'client units' (such as chars and lines) - determines scroll behavior
+  WB_EXTENT extent;                 ///< viewport 'extent' in 'client units' (such as chars and lines) - determines scroll behavior
 
-  int iTop;                         ///< cached 0-based position of the top of the current viewport (in lines or pixels)
-  int iHeight;                      ///< cached 0-based height of the current viewport (in lines or pixels)
-  int iLeft;                        ///< cached 0-based position of the left of the current viewport (in characters or pixels)
-  int iWidth;                       ///< cached 0-based width of the current viewport (in characters or pixels)
-
-  int iXExtent;                     ///< cached X extent for the display surface (determines scrolling behavior)
-  int iYExtent;                     ///< cached Y extent for the display surface (determines scrolling behavior)
+  int iRowHeight;                   ///< cached 'row height' (height of line including interline spacing)
+  int iColWidth;                    ///< cached 'column width' (width of 1 character)
 
   WB_SCROLLINFO scroll;             ///< 'scroll info' (horizontal and vertical min/max/pos and other details)
 

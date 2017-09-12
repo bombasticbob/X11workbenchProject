@@ -6,6 +6,9 @@ X11workbench_SOURCES += doxy_comments.dox doxy.txt
 
 X11workbench_DEPENDENCIES = toolkit_lib
 
+# allow multiple simultaneous jobs to speed up automake process
+AUTOMAKE_JOBS = 4
+
 AM_CPPFLAGS = $(X_CFLAGS) -DGLOBAL_XPATH="\"$(GLOBAL_XPATH)/etc\"" -DGLOBAL_PATH="\"$(sysconfdir)\""
 
 
@@ -26,7 +29,7 @@ LDADD=./lib/libX11workbenchToolkit.a
 LIBS = -L./lib -lX11workbenchToolkit $(X_LIBS) -lm -lX11 $(X_PRE_LIBS) $(X_EXTRA_LIBS)
 
 # any additional libraries go here
-LIBS += -lpthread
+LIBS += -lpthread -lm
 
 if NEED_LRT
   LIBS += -lrt

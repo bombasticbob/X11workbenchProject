@@ -176,31 +176,8 @@ Atom aTAB_CONTROL = None;               ///< Standard Dialog Control -'tab' cont
 
 
 // NOTE:  'xatoms' is in the CORE group - consider moving this into CORE
-/** \ingroup xatoms
-  * \hideinitializer
- Scroll notifications via ClientMessage
-  *
-  * MENU_COMMAND message format (relative to XEvent.xclient)\n
-  * type == ClientMessage\n
-  * message_type == aSCROLL_NOTIFY\n
-  * format == 32 (always)\n
-  * data.l[0] Identifies the bar (SCROLL_VERTICAL, SCROLL_HORIZONTAL, or SCROLL_DEFAULT)\n
-  * data.l[1] Indicates the notification type, one of the following:\n
-  * \li WB_SCROLL_KNOB    'knob track' - knob position will be in data.l[2]
-  * \li WB_SCROLL_FORWARD  move down, or move right
-  * \li WB_SCROLL_BACKWARD move up, or move left
-  * \li WB_SCROLL_PAGEFWD  page down or page right
-  * \li WB_SCROLL_PAGEBACK page up or page left
-  * \li WB_SCROLL_FIRST    scroll to first entry, i.e. home or top
-  * \li WB_SCROLL_LAST     scroll to last entry, i.e. bottom or end
-  * \li WB_SCROLL_DBLCLICK double-click detection (no selection info in data.l[2])
-  * \li WB_SCROLL_ABSOLUTE absolute scroll, to the absolute position in data.l[2]
-  * \li WB_SCROLL_RELATIVE relative scroll, relative +/- position in data.l[2]
-  * \li WB_SCROLL_NA       generic 'NA' or 'UNDEFINED' value
-  *
-  * data.l[2] Optional parameter, typically the absolute or relative scroll position
-*/
-Atom aSCROLL_NOTIFY = None; // specific notification for scrollbars
+
+
 
 ////Atom aCONTROL_NOTIFY = None; moved
 /** \ingroup dlgctrl_notify
@@ -479,7 +456,6 @@ void WBDialogControlsInit(void)
   INIT_ATOM(TAB_CONTROL);
 
 //  INIT_ATOM2(aCONTROL_NOTIFY,"ControlNotify");
-  INIT_ATOM2(aSCROLL_NOTIFY,"ScrollNotify");
   INIT_ATOM2(aBUTTON_PRESS,"ButtonPress");
   INIT_ATOM2(aLIST_NOTIFY,"ListNotify");
   INIT_ATOM2(aTEXT_CHANGED,"TextChanged");
@@ -1838,6 +1814,14 @@ WB_SCROLLINFO *pScrollInfo;
                    (int)pEvent->xclient.data.l[3],
                    (int)pEvent->xclient.data.l[4]);
 
+    pScrollInfo = (WB_SCROLLINFO *)WBDialogControlGetProperty2(pCtrl, aDLGC_SCROLLINFO);
+
+    if(pScrollInfo && WBScrollBarEvent(wID, pEvent, pScrollInfo))
+    {
+      return 1;
+    }
+
+#if 0
     if(pEvent->xclient.data.l[0] == WB_POINTER_CLICK)
     {
       // TODO:  handle shift-click, ctrl-click, alt-click
@@ -2126,6 +2110,7 @@ WB_SCROLLINFO *pScrollInfo;
     {
       DLGNotifySelf(pCtrl, aSCROLL_NOTIFY, WB_SCROLL_VERTICAL, WB_SCROLL_FORWARD, 0, 0, 0);
     }
+#endif // 0
   }
   else if(pEvent->xclient.message_type == aWM_CHAR)
   {

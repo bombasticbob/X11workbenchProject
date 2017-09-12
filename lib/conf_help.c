@@ -2345,6 +2345,11 @@ const CHXSetting *pXS;
 // X M L   P A R S I N G //
 ///////////////////////////
 
+CHXMLEntry *CHParseXML(const char *pXMLData, int cbLength)
+{
+  return NULL; // for now...
+}
+
 char *CHParseXMLTagContents(const char *pTagContents, int cbLength)
 {
 const char *pCur = pTagContents, *pEnd = pTagContents + cbLength;
@@ -2579,28 +2584,45 @@ no_value:
   return pRval;
 }
 
+const char *CHFindNextXMLTag(const char *pTagContents, int cbLength)
+{
+  return NULL; // for now...
+}
 
-
-const char *CHFindEndOfXMLTag(const char *pTagContents)
+const char *CHFindEndOfXMLTag(const char *pTagContents, int cbLength)
 {
 register const char *p1 = pTagContents;
+const char *pE;
 
-  if(!p1)
+
+  if(!p1 || !cbLength)
   {
     return NULL;
   }
 
-  while(*p1)
+  if(cbLength < 0)
+  {
+    cbLength = strlen(p1);
+  }
+
+  pE = p1 + cbLength;
+
+  while(p1 < pE && *p1)
   {
     // need to parse out this tag.
     if(*p1 == '"' || *p1 == '\'') //handle quotes
     {
       char c1 = *p1;
       p1++;
-      while(*p1 &&
-            (*p1 != c1 || p1[1] == c1))
+      if(p1 >= pE)
       {
-        if(*p1 == c1)
+        break;
+      }
+
+      while(p1 < pE && *p1 &&
+            (*p1 != c1 || ((p1 + 1) < pE && p1[1] == c1)))
+      {
+        if(*p1 == c1) // doubled quote?
         {
           p1 += 2;
         }
@@ -2609,6 +2631,12 @@ register const char *p1 = pTagContents;
           p1++;
         }
       }
+
+      if(p1 >= pE)
+      {
+        break;
+      }
+
       if(*p1 == c1)
       {
         p1++; // now past the quote

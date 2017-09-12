@@ -52,6 +52,7 @@
 #include <memory.h>
 #include <string.h>
 #include <strings.h>
+#include <math.h> // and now I'll need -lm
 
 // application header file
 #include "pixmap_helper.h" // this will include platform_helper.h and window_helper.h
@@ -88,6 +89,9 @@ static void DebugDumpColormap(const XStandardColormap *pMap);
 #define DEBUG_DUMP_XPM_ATTRIBUTES(X) DebugDumpXpmAttributes(__FUNCTION__, __LINE__, X)
 #define DEBUG_DUMP_COLORMAP(X) DebugDumpColormap(X)
 #endif // NO_DEBUG
+
+
+#define _PI_ 3.1415926535897932384626433832795028841971693993751058209749445923078164062862089986280348253421170679 /* approximately */
 
 
 #define MINIMUM_ATOM_RESOURCE_LIST_SIZE 256
@@ -175,6 +179,92 @@ int iE = iV - 128;
   if(piB)
   {
     *piB = iB;
+  }
+}
+
+void PXM_HSVToRGB(int iH, int iS, int iV, int *piR, int *piG, int *piB)
+{
+int iR, iG, iB;
+double dH = iH * _PI_ * 2.0 / 256;
+
+  iR = clip255((int)floor(iV * (1.0 + iS * (cos(dH) - 1.0))));
+  iG = clip255((int)floor(iV * (1.0 + iS * (cos(dH - (_PI_ * 2.0 / 3.0)) - 1.0))));
+  iB = clip255((int)floor(iV * (1.0 + iS * (cos(dH + (_PI_ * 2.0 / 3.0)) - 1.0))));
+
+//    function hsv.torgb(h,s,v)
+//        local r=v*(1+s*(cos(h)-1))
+//        local g=v*(1+s*(cos(h-2.09439)-1))
+//        local b=v*(1+s*(cos(h+2.09439)-1))
+//        return r,g,b
+//    end
+
+  if(piR)
+  {
+    *piR = iR;
+  }
+
+  if(piG)
+  {
+    *piG = iG;
+  }
+
+  if(piB)
+  {
+    *piB = iB;
+  }
+}
+
+void PXM_RGBToHSV(int iR, int iG, int iB, int *piH, int *piS, int *piV)
+{
+int iC = iR + iG + iB;
+int iH=0, iS=0, iV=0;
+
+  if(iC == 0) // black
+  {
+    iH = 0;
+    iS = 512 / 3; // red?
+    iV = 0;
+  }
+  else
+  {
+    int iP = 2*(iB * iB + iG * iG + iR * iR - iG * iR - iB * iG - iB * iR);
+
+    if(iP < 0)
+    {
+      iP = 0; // added by bob, to prevent dividing by zero (evar)
+    }
+    iH = ((int)floor(256 * atan2(iB - iG, sqrt(fabs((2.0 * iR - iB - iG)/3.0))) / (_PI_ * 2.0)))
+          & 255; // this is calculating an angle, 0 to 2PI, which should rotate 0-255
+    iS = clip255(iP / (iC + iP));  // iC is never zero
+    iV = clip255((iC + iP) / 3);
+
+//    function hsv.fromrgb(r,b,g)
+//        local c=r+g+b
+//        if c<1e-4 then
+//            return 0,2/3,0
+//        else
+//            local p=2*(b*b+g*g+r*r-g*r-b*g-b*r)^0.5
+//            local h=atan2(b-g,(2*r-b-g)/3^0.5)
+//            local s=p/(c+p)
+//            local v=(c+p)/3
+//            return h,s,v
+//        end
+//    end
+  }
+
+  if(piH)
+  {
+    *piH = iH;
+  }
+
+  if(piS)
+  {
+    *piS = iS;
+  }
+
+  if(piV)
+  {
+    *piV = iV;
   }
 }
 

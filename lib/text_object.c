@@ -1861,9 +1861,19 @@ static void __internal_get_select(const struct _text_object_ *pThis, WB_RECT *pR
 }
 static void __internal_set_select(struct _text_object_ *pThis, const WB_RECT *pRct)
 {
+  // setting NULL for the selection rectangle selects 'none'
+
   if(WBIsValidTextObject(pThis))
   {
-    memcpy(&(pThis->rctSel), pRct, sizeof(*pRct));
+    if(!pRct)
+    {
+      pThis->rctSel.left = pThis->rctSel.top = pThis->rctSel.right = pThis->rctSel.bottom
+       = 0; // select NONE
+    }
+    else
+    {
+      memcpy(&(pThis->rctSel), pRct, sizeof(*pRct));
+    }
   }
 }
 static int __internal_has_select(const struct _text_object_ *pThis)

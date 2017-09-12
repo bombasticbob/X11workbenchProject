@@ -233,22 +233,6 @@ void WBSetVScrollPos(WB_SCROLLINFO *pSI, int iPos);
 void WBSetHScrollPos(WB_SCROLLINFO *pSI, int iPos);
 
 /** \ingroup window_dressing
-  * \brief Update the scroll bar geometry within the WB_SCROLLINFO structure
-  *
-  * \param pSI A pointer to the WB_SCROLLINFO structure
-  * \param fontSetRef The reference font set for scroll bar size.  Pass None to use the 'Default' font set.
-  * \param pgeomClient The geometry of the client area where the scroll bars will be displayed.
-  * \param pgeomUsable Returns the resulting 'usable' client area after scroll bar geometry calculations are done.
-  *
-  * Use this function to assign the correct 'scroll position' for a vertical scroll bar that
-  * is managed by a WB_SCROLLINFO structure
-  *
-  * Header File:  window_dressing.h
-**/
-void WBUpdateScrollBarGeometry(WB_SCROLLINFO *pSI, XFontSet fontSetRef,
-                               WB_GEOM *pgeomClient, WB_GEOM *pgeomUsable);
-
-/** \ingroup window_dressing
   * \brief Calculate and assign the correct vertical scroll bar position from mouse coordinates
   *
   * \param pScrollInfo A pointer to the WB_SCROLLINFO structure
@@ -308,6 +292,40 @@ void WBCalcVScrollBar(WB_SCROLLINFO *pScrollInfo, WB_GEOM *pgeomClient, int iVSc
 **/
 void WBCalcHScrollBar(WB_SCROLLINFO *pScrollInfo, WB_GEOM *pgeomClient, int iVScrollWidth,
                       int iHScrollHeight, int nListItems, int nPos);  // calculates H scroll geometry for paint
+
+/** \ingroup window_dressing
+  * \brief Update the scroll bar geometry within the WB_SCROLLINFO structure
+  *
+  * \param pSI A pointer to the WB_SCROLLINFO structure
+  * \param fontSetRef The reference font set for scroll bar size.  Pass None to use the 'Default' font set.
+  * \param pgeomClient The geometry of the client area where the scroll bars will be displayed.
+  * \param pgeomUsable Returns the resulting 'usable' client area after scroll bar geometry calculations are done.
+  *
+  * Use this function to assign the correct 'scroll position' for a vertical scroll bar that
+  * is managed by a WB_SCROLLINFO structure
+  *
+  * Header File:  window_dressing.h
+**/
+void WBUpdateScrollBarGeometry(WB_SCROLLINFO *pSI, XFontSet fontSetRef,
+                               WB_GEOM *pgeomClient, WB_GEOM *pgeomUsable);
+
+/** \ingroup window_dressing
+  * \brief Event handler for scroll bars
+  *
+  * \param wID The Window ID for the scroll bar owner
+  * \param pEvent A pointer to the XEvent to (possibly) be handled
+  * \param pScrollInfo A pointer to the WB_SCROLLINFO structure for the window's scroll bars
+  * \returns A non-zero value if the event was handled, or zero if no processing was done
+  *
+  * This function generically handles pointer and keyboard events associated with scroll bars, generating
+  * scroll bar notification (and related) ClientMessage events from mouse clicks, drags, and scrolling
+  * related to the scroll bars.  The scroll bar geometry must have already been calculated for this to
+  * work properly.  The function returns a non-zero value if the event was processed.
+  *
+  * This function does NOT handle Expose events.
+  *
+**/
+int WBScrollBarEvent(Window wID, XEvent *pEvent, WB_SCROLLINFO *pScrollInfo);
 
 /** \ingroup window_dressing
   * \brief Paint the vertical scroll bar within a window based on WB_SCROLLINFO

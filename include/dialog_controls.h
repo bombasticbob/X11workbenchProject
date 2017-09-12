@@ -907,10 +907,6 @@ extern const Atom aTEXTSELECT_CHANGE;
 
 // other notification messages
 
-// scroll notifications
-extern const Atom aSCROLL_NOTIFY; // specific notification for scrollbars (see enumeration, below)
-// data.l[0] is scrollbar enum, data.l[1] is notification enum, data.l[2] is optional position modifier
-
 
 // common to all
 extern const Atom aGOTFOCUS;  // sent as its own message type - data.l[0] = wID, data.l[1] = pDlgControlEntry
@@ -951,38 +947,6 @@ extern Atom aDLGC_PATH; // PATH information for file-related controls
 #define WB_LIST_DBLCLICK  2 /**< double click by default drives an 'End Dialog' with IDOK */
 
 
-
-// parameter enumerations for aSCROLL_NOTIFY ClientMessage
-
-// consider moving this to another group
-/** \ingroup dlgctrl
-  * \hideinitializer
-  * \brief Enumeration for \ref aSCROLL_NOTIFY CLientMessage
-  *
-  * Enumeration of values used in scroll notification messages.\n
-  * \sa  \ref DLGScrollBarHandler()
-*/
-enum
-{
-  WB_SCROLL_DEFAULT = 0,    ///< 1st parameter (bar) - 'Default Bar', currently not implemented, probably won't be used
-  WB_SCROLL_HORIZONTAL = 1, ///< 1st parameter (bar) - The horizontal scroll bar for the control or window
-  WB_SCROLL_VERTICAL = 2,   ///< 1st parameter (bar) - The vertical scroll bar for the control or window.
-
-  WB_SCROLL_KNOB = 0,       ///< 2nd parameter (direction) - 'knob track' - pos in data.l[2]
-  WB_SCROLL_FORWARD = 1,    ///< 2nd parameter (direction) - down, right
-  WB_SCROLL_BACKWARD = -1,  ///< 2nd parameter (direction) - up, left
-  WB_SCROLL_PAGEFWD = 2,    ///< 2nd parameter (direction) - pgdn, pgright
-  WB_SCROLL_PAGEBACK = -2,  ///< 2nd parameter (direction) - pgup, pgleft
-  WB_SCROLL_FIRST = -3,     ///< 2nd parameter (direction) - home, top
-  WB_SCROLL_LAST = 3,       ///< 2nd parameter (direction) - bottom, end
-
-  WB_SCROLL_DBLCLICK = 4,   ///< 2nd parameter (direction) - double-clicked item (no selection change info) (sent to list control's owner)
-
-  WB_SCROLL_ABSOLUTE = 99,  ///< 2nd parameter (direction) - absolute scroll - pos in data.l[2]
-  WB_SCROLL_RELATIVE = -99, ///< 2nd parameter (direction) - relative scroll - rel pos in data.l[2]
-
-  WB_SCROLL_NA = 0x80000000 ///< generic 'NA' or 'UNDEFINED' value
-};
 
 
 ////////////////////////////////

@@ -551,11 +551,13 @@ Display *pDisplay = WBGetWindowDisplay(wID);
 
       XSetForeground(pDisplay, gc, clrFG.pixel);
 
+      // TODO:  'split' handling - 2 different sections must be painted separately
+
 //      xFontSet = pE->childframe.rFontSet;
 
       pE->xTextObject.vtable->do_expose(&(pE->xTextObject), pDisplay, wID, gc,
                                         &geom, // the GEOM to 'paint to'
-                                        NULL,//&geom2, // the GEOM bordering the window's viewport (NULL for ALL)
+                                        &(pE->childframe.geom),//NULL,//&geom2, // the GEOM bordering the window's viewport (NULL for ALL)
                                         pE->childframe.rFontSet);
       WBEndPaint(wID, gc);
 
@@ -1516,7 +1518,17 @@ WB_RECT rct;
   rct.right = pE->xTextObject.vtable->get_cols(&(pE->xTextObject));
   rct.bottom = pE->xTextObject.vtable->get_rows(&(pE->xTextObject));
 
+  WB_ERROR_PRINT("TEMPORARY:  %s - selecting %d,%d,%d,%d\n", __FUNCTION__,
+                 rct.left, rct.top, rct.right, rct.bottom);
+
   pE->xTextObject.vtable->set_select(&(pE->xTextObject), &rct); // select 'all'
+
+//#if 1
+//  pE->xTextObject.vtable->get_select(&(pE->xTextObject), &rct); // get selection for testing
+//
+//  WB_ERROR_PRINT("TEMPORARY:  %s - selected %d,%d,%d,%d\n", __FUNCTION__,
+//                 rct.left, rct.top, rct.right, rct.bottom);
+//#endif // 1
 
   internal_new_cursor_pos((WBEditWindow *)pC);
 }
@@ -1764,6 +1776,21 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return 0;
   }
 
+  if(pE->xTextObject.vtable->get_select)
+  {
+    WB_RECT rctSel;
+
+    pE->xTextObject.vtable->get_select(&(pE->xTextObject), &rctSel);
+
+//    WB_ERROR_PRINT("TEMPORARY:  %s - selection rectangle %d,%d,%d,%d\n", __FUNCTION__,
+//                   rctSel.left, rctSel.top, rctSel.right, rctSel.bottom);
+
+    if(rctSel.left != rctSel.right || rctSel.bottom != rctSel.top) // NOT empty
+    {
+      return 1; // has a selection
+    }
+  }
+
   return 0; // no current selection
 }
 
@@ -1858,6 +1885,6 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return 0; // NOT empty
   }
 
-  return 0; // empty (for now; later, do I dive directly into xTextObject ???  new API for vtable?)
+  return 1; // empty (for now; later, do I dive directly into xTextObject ???  new API for vtable?)
 }
 

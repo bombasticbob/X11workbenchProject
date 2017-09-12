@@ -539,35 +539,109 @@ int CHGetCursorBlinkTime(Display *pDisplay);
 
 // XML help
 
+/** \ingroup desktop_settings
+  * \struct _CHXMLEntry_
+  * \copydoc CHXMLEntry
+**/
+/** \ingroup text_xml
+  * \typedef CHXMLEntry
+  * \brief Descriptor for parsed XML entry
+  *
+  * This structure describes an XML entry. It is expected to be a part of an array of such structures,
+  * in which the next element will be referenced by 'iNextIndex', and the first contents referenced
+  * by 'iContentsIndex', with respect to the beginning of that array.
+  *
+  * You can construct an array of CHXMLEntry structures from XML data using \ref CHParseXML()
+  *
+  * \code
+
+  typedef struct _CHXMLEntry_
+  {
+    int iNextIndex;      // index for next item at this level; -1 for none
+    int iContentsIndex;  // first array index for 'contents' for this entry; -1 for none
+
+    int nLabelOffset;    // offset to label (zero-byte-terminated) string (from beginning of array)
+                         // for this entry; -1 for 'no label'
+    int nDataOffset;     // offset to data (zero-byte-terminated) string (from beginning of array)
+                         // for the entry data; -1 for 'no data'
+
+  } CHXMLEntry;
+
+  * \endcode
+  *
+**/
+typedef struct _CHXMLEntry_
+{
+  int iNextIndex;      ///< index for next item at this level; -1 for none
+  int iContentsIndex;  ///< first array index for 'contents' for this entry; -1 for none
+
+  int nLabelOffset;    ///< offset to label (zero-byte-terminated) string (from beginning of array) for this entry; -1 for 'no label'
+  int nDataOffset;     ///< offset to data (zero-byte-terminated) string (from beginning of array) for the entry data; -1 for 'no data'
+
+} CHXMLEntry;
+
 /** \ingroup text_xml
   * \brief Parses contents of an XML tag, returning as WBAlloc'd string list similar to environment strings
   *
+  * \param pXMLData A pointer to the XML data as a const char *
+  * \param cbLength The length of the XML data (can include a terminating 0 byte)
+  *
+  * \returns A WBAlloc()'d array of CHXMLEntry structures, followed by the actual XML data, or NULL on error.
+  *
+  * Generic XML parsing.  Parse the XML data, returning a WBAlloc()'d array of CHXMLEntry structures.
+  * The last structure in the list will have '-1' as its iNextIndex value.  The actual XML data
+  * related to the parsed information follows the array, and the index values in the CHXMLEntry
+  * structures are with respet to the beginning of the array (in bytes).  Caller must free any
+  * non-NULL pointer returned by this function, using WBFree()
+  *
+  * Header File:  conf_help.h
+**/
+CHXMLEntry *CHParseXML(const char *pXMLData, int cbLength);
+
+/** \ingroup text_xml
+  * \brief Parses contents of a single XML tag, returning as WBAlloc'd string list similar to environment strings
+  *
   * \param pTagContents A pointer to the string position just past the tag name
-  * \param cbLength The length of the tag contents up the trailing '>'.  Preceding characters
-  * (such as '-->' or '/>') will be ignored, as well as the trailing '>'
-  * \returns A WBAlloc'd string list, similar in format to 'environ'; i.e. "VALUE=xxxx xxxx xxxx\0"
-  * with possible embedded quotes (not doubled or '\'d) ending in a zero byte.
-  * The end is marked with an additional '\0'
+  * \param cbLength The length of the tag contents up the trailing '>'.  Preceding characters (such as '-->' or '/>') will be ignored, as well as the trailing '>'
+  *
+  * \returns A WBAlloc'd string list, similar in format to 'environ'; i.e. "VALUE=xxxx xxxx xxxx\0", with the possibility of embedded quotes (not doubled nor '\'d), and ending in a zero byte.  The end of the list is marked with an additional '\0'.  Returns NULL on error.
   *
   * Generic XML tag parsing.  Parse the tag to 'just past the tag name', find the ending '>',
-  * and pass that length as 'cbLength'.
+  * and pass that length as 'cbLength'.  Caller must free any non-NULL pointer returned
+  * by this function, using WBFree()
   *
   * Header File:  conf_help.h
 **/
 char *CHParseXMLTagContents(const char *pTagContents, int cbLength);
 
 /** \ingroup text_xml
-  * \brief Parses contents of an XML tag to find the end of it
+  * \brief Parses contents of a XML to find the next tag, skipping comments along the way
   *
   * \param pTagContents A pointer to the string position just past the tag name
-  * \return A pointer to the '>' at the end of the XML tag
+  * \param cbLength The (maximum) length of the XML data to parse
+  * \return A pointer to the '<' at the beginning of the XML tag, or 'one byte past the end' if no tag found.  Returns NULL on error.
   *
-  * Generic XML tag parsing.  Parse the tag to find its end.  The returned pointer will
-  * either be the end of the string, or a pointer to the ending '>'.
+  * Generic XML tag parsing.  Parse past the end of a tag to find the next tag.  The returned pointer will
+  * either be the end of the string, or a pointer to the '<'.  The end of the string is defined
+  * by either a 0-byte terminator, or 'cbLength' bytes.
   *
   * Header File:  conf_help.h
 **/
-const char *CHFindEndOfXMLTag(const char *pTagContents);
+const char *CHFindNextXMLTag(const char *pTagContents, int cbLength);
+
+/** \ingroup text_xml
+  * \brief Parses contents of an XML tag to find the end of it
+  *
+  * \param pTagContents A pointer to the string position just past the tag name
+  * \return A pointer to the '>' at the end of the XML tag, or 'one byte past the end' if no end-of-tag found.
+  *
+  * Generic XML tag parsing.  Parse the tag to find its end.  The returned pointer will
+  * either be the end of the string, or a pointer to the ending '>'.  The end of the string is defined
+  * by either a 0-byte terminator, or 'cbLength' bytes.
+  *
+  * Header File:  conf_help.h
+**/
+const char *CHFindEndOfXMLTag(const char *pTagContents, int cbLength);
 
 
 

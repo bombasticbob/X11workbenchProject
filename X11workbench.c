@@ -1451,7 +1451,7 @@ find_url_opener:
               {
                 // parse the tag, find 'href'
 
-                p4 = CHFindEndOfXMLTag(p2);
+                p4 = CHFindEndOfXMLTag(p2, -1);
 
                 if(*p4 == '>')
                 {
@@ -1502,7 +1502,7 @@ find_url_opener:
 
                 if(*p2 == '<' && p2[1] == '!' && p2[2] == '-' && p2[3] == '-') // doxytag comment block
                 {
-                  p4 = CHFindEndOfXMLTag(p2 + 4); // point past the '<!--' first, then find the end
+                  p4 = CHFindEndOfXMLTag(p2 + 4, -1); // point past the '<!--' first, then find the end
 
                   if(*p4 == '>')
                   {

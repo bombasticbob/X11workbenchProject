@@ -2892,6 +2892,7 @@ WB_FILE_HANDLE hIn, hOut, hErr;
 
     if(dup2(hIn, 0) != -1 && dup2(hOut, 1) != -1 && dup2(hErr, 2) != -1) // stdin, stdout, stderr
     {
+      static const char szMsg[]="ERROR: 'execve()' failure\n";
       extern char **environ; // this is what the man page says to do (it's part of libc)
 
       // TODO:  customize environment?
@@ -2901,12 +2902,24 @@ WB_FILE_HANDLE hIn, hOut, hErr;
       signal(SIGHUP, SIG_DFL); // restore default handling of 'HUP' ['daemon()' does this]
 
       execve(pAppName, argv, environ); // NOTE:  execute clears all existing signal handlers back to 'default' but retains 'ignored' signals
+
+      write(2, szMsg, sizeof(szMsg) - 1); // stderr is still 'the old one' at this point
+      fsync(2);
+
+      // TODO:  if execve fails, should I forcibly close the duplicated handles??
+//      close(0);
+//      close(1);
+//      close(2);
     }
     else
     {
       static const char szMsg[]="ERROR: 'dup2()' failure\n";
       write(2, szMsg, sizeof(szMsg) - 1); // stderr is still 'the old one' at this point
     }
+
+    close(hIn); // explicitly close these if I get here
+    close(hOut);
+    close(hErr);
 
     _exit(-1); // should never get here, but this must be done if execve fails
   }
@@ -3250,9 +3263,18 @@ unsigned int cbBuf;
 
     if(i1 <= 0)
     {
-      if(i1 == 0 && !iRunning)
+      if(!iRunning)
       {
-        break; // end of file, process ended, bail out now
+        if(i1 == 0)
+        {
+          break; // end of file, process ended, bail out now
+        }
+//        else // this could be caused by the process forking, and the program failing to run
+//        {
+//          // TODO:  allow a few retries, then bail??
+//
+//          break; // for now, bail out on this as well.  should still get "all of it" in the output
+//        }
       }
 
       if(errno == EAGAIN)

@@ -278,6 +278,373 @@ static int ilog2ll(WB_UINT64 y)
 }
 #endif // 0
 
+
+void WBSetVScrollRange(WB_SCROLLINFO *pSI, int iMin, int iMax)
+{
+  // TODO:  data validation
+  pSI->iVMin = iMin;
+  pSI->iVMax = iMax;
+}
+
+void WBSetHScrollRange(WB_SCROLLINFO *pSI, int iMin, int iMax)
+{
+  // TODO:  data validation
+  pSI->iHMin = iMin;
+  pSI->iHMax = iMax;
+}
+
+void WBSetVScrollPos(WB_SCROLLINFO *pSI, int iPos)
+{
+  // TODO:  data validation
+  pSI->iVPos = iPos;
+}
+
+void WBSetHScrollPos(WB_SCROLLINFO *pSI, int iPos)
+{
+  // TODO:  data validation
+  pSI->iHPos = iPos;
+}
+
+static void InternalNotifySelf(Window wID, Atom aNotify, long lData0, long lData1, long lData2, long lData3, long lData4)
+{
+Display *pDisplay = WBGetWindowDisplay(wID);
+
+  XClientMessageEvent evt = {
+                              .type=ClientMessage,
+                              .serial=0,
+                              .send_event=0,
+                              .display=pDisplay,
+                              .window=wID,
+                              .message_type=aNotify,
+                              .format=32
+                            };
+  evt.data.l[0] = lData0;
+  evt.data.l[1] = lData1;
+  evt.data.l[2] = lData2;
+  evt.data.l[3] = lData3;
+  evt.data.l[4] = lData4;
+
+  WBWindowDispatch(wID, (XEvent *)&evt);
+}
+
+
+static void InternalCalcVScrollBar(WB_SCROLLINFO *pScrollInfo, WB_GEOM *pgeomClient, int iVScrollWidth, int iHScrollHeight)
+{
+int iKnobSize, iKnobPos, iBarHeight, iBarWidth;
+int i1, i2;
+int nListItems;
+
+
+  iBarHeight = pgeomClient->height;
+  iBarWidth = pgeomClient->width;
+
+  pScrollInfo->iVScrollWidth = iVScrollWidth;
+  pScrollInfo->iVBarHeight = iBarHeight;
+
+
+  if(pScrollInfo->iVPos < pScrollInfo->iVMin || pScrollInfo->iVPos > pScrollInfo->iVMax)
+  {
+    pScrollInfo->iVPos = -1; // for now
+  }
+
+  nListItems = pScrollInfo->iVMax - pScrollInfo->iVMin + 1;
+
+
+  // knob height equals 'nListItems / nListItems!' multiplied by
+  // the available knob height, for a minimum value of 'iHScrollHeight'
+
+  iKnobSize = (iBarHeight - 4 * iHScrollHeight - 2);
+
+  if(iKnobSize > iHScrollHeight / 2)
+  {
+    i1 = iHScrollHeight * (2 * iHScrollHeight + 1);  // 'twice scroll height' factorial
+    i2 = iHScrollHeight * 2;
+
+    while(i2 > 2 && i1 > iKnobSize) // using the above starting point get 'max factorial less than height'
+    {
+      i1 -= i2;
+      i2--;
+    }
+
+    if(nListItems >= i2) // more than twice scroll height?
+    {
+      if(nListItems > iKnobSize || iKnobSize - i1 < iHScrollHeight / 2)
+      {
+        iKnobSize = -1;  // to fix later
+      }
+      else
+      {
+        iKnobSize -= i1;  // twice scroll height factorial
+        iKnobSize -= (nListItems - iHScrollHeight * 2 + 1);
+      }
+    }
+    else
+    {
+      iKnobSize -= i1  // 'twice knob height' factorial
+                 - (nListItems + 1) * nListItems / 2;  // 'nListItems' factorial
+    }
+
+    if(iKnobSize < 3 * iHScrollHeight / 4)
+    {
+      iKnobSize = 3 * iHScrollHeight / 4;  // minimum size
+    }
+  }
+  else
+  {
+    iKnobSize = 3 * iHScrollHeight / 4;  // worst case use this anyway
+  }
+
+  // cache these geometries because I need them for mouse handling
+
+  pScrollInfo->geomVBar.y      = pgeomClient->y + 1;
+  pScrollInfo->geomVBar.height = pgeomClient->height - 2;
+  pScrollInfo->geomVBar.width  = pScrollInfo->iVScrollWidth;
+  pScrollInfo->geomVBar.x      = pgeomClient->x + pgeomClient->width
+                               - pScrollInfo->geomVBar.width - 1;
+
+  pScrollInfo->geomVDown.x      = pScrollInfo->geomVUp.x
+                                = pScrollInfo->geomVBar.x + 1;
+  pScrollInfo->geomVDown.width  = pScrollInfo->geomVUp.width
+                                = pScrollInfo->geomVBar.width - 2;
+  pScrollInfo->geomVDown.height = pScrollInfo->geomVUp.height
+                                = iHScrollHeight - 1;
+
+  pScrollInfo->geomVUp.y   = pScrollInfo->geomVBar.y + 1;
+  pScrollInfo->geomVDown.y = pScrollInfo->geomVBar.y
+                           + pScrollInfo->geomVBar.height
+                           - pScrollInfo->geomVDown.height
+                           - 1;
+
+  pScrollInfo->geomVKnob.x      = pScrollInfo->geomVDown.x;
+  pScrollInfo->geomVKnob.width  = pScrollInfo->geomVDown.width;
+  pScrollInfo->geomVKnob.height = pScrollInfo->iVKnobSize
+                                = iKnobSize;
+
+  // now that I have a reasonable estimate of the knob size, calculate
+  // the starting vertical position of the knob
+
+  if(pScrollInfo->iVPos <= 0 || nListItems <= 0)
+  {
+    iKnobPos = 0;
+  }
+  else
+  {
+    int iBarScrollArea = pScrollInfo->geomVDown.y
+                       - (pScrollInfo->geomVUp.y + pScrollInfo->geomVUp.height)
+                       - iKnobSize
+                       - 1; // inclusive value
+
+    if(pScrollInfo->iVPos >= (nListItems - 1))
+    {
+      iKnobPos = iBarScrollArea;
+    }
+    else
+    {
+      iKnobPos = (WB_INT64)pScrollInfo->iVPos * (WB_INT64)iBarScrollArea
+               / (WB_INT64)(nListItems - 1);
+    }
+  }
+
+
+  pScrollInfo->geomVKnob.y = (pScrollInfo->iVKnob = iKnobPos)
+                           + pScrollInfo->geomVUp.y + pScrollInfo->geomVUp.height;
+
+  // fixed values go here
+  pScrollInfo->geomVBar.border = 1;
+  pScrollInfo->geomVUp.border = 0;
+  pScrollInfo->geomVDown.border = 0;
+  pScrollInfo->geomVKnob.border = 0;
+
+}
+
+
+static void InternalCalcHScrollBar(WB_SCROLLINFO *pScrollInfo, WB_GEOM *pgeomClient, int iVScrollWidth, int iHScrollHeight)
+{
+int iKnobSize, iKnobPos, iBarHeight, iBarWidth;
+int i1, i2;
+int nListItems;
+
+
+
+  iBarHeight = pgeomClient->height;
+  iBarWidth = pgeomClient->width;
+
+  pScrollInfo->iHScrollHeight = iHScrollHeight;
+  pScrollInfo->iHBarWidth = iBarWidth;
+
+
+  if(pScrollInfo->iHPos < pScrollInfo->iHMin || pScrollInfo->iHPos > pScrollInfo->iHMax)
+  {
+    pScrollInfo->iHPos = -1; // for now
+  }
+
+  nListItems = pScrollInfo->iHMax - pScrollInfo->iHMin + 1;
+
+
+  // knob height equals 'nListItems / nListItems!' multiplied by
+  // the available knob height, for a minimum value of 'iHScrollHeight'
+
+  iKnobSize = (iBarHeight - 4 * iHScrollHeight - 2);
+
+  if(iKnobSize > iVScrollWidth / 2)
+  {
+    i1 = iVScrollWidth * (2 * iVScrollWidth + 1);  // 'twice scroll height' factorial
+    i2 = iVScrollWidth * 2;
+
+    while(i2 > 2 && i1 > iKnobSize) // using the above starting point get 'max factorial less than height'
+    {
+      i1 -= i2;
+      i2--;
+    }
+
+    if(nListItems >= i2) // more than twice scroll height?
+    {
+      if(nListItems > iKnobSize || iKnobSize - i1 < iVScrollWidth / 2)
+      {
+        iKnobSize = -1;  // to fix later
+      }
+      else
+      {
+        iKnobSize -= i1;  // twice scroll height factorial
+        iKnobSize -= (nListItems - iVScrollWidth * 2 + 1);
+      }
+    }
+    else
+    {
+      iKnobSize -= i1  // 'twice knob height' factorial
+                 - (nListItems + 1) * nListItems / 2;  // 'nListItems' factorial
+    }
+
+    if(iKnobSize < 3 * iVScrollWidth / 4)
+    {
+      iKnobSize = 3 * iVScrollWidth / 4;  // minimum size
+    }
+  }
+  else
+  {
+    iKnobSize = 3 * iVScrollWidth / 4;  // worst case use this anyway
+  }
+
+  // cache these geometries because I need them for mouse handling
+
+  pScrollInfo->geomHBar.x      = pgeomClient->x + 1;
+  pScrollInfo->geomVBar.width  = pgeomClient->width - 2;
+  pScrollInfo->geomVBar.height = pScrollInfo->iHScrollHeight;
+  pScrollInfo->geomVBar.y      = pgeomClient->y + pgeomClient->height
+                               - pScrollInfo->geomVBar.height - 1;
+
+  pScrollInfo->geomHLeft.y      = pScrollInfo->geomHRight.y
+                                = pScrollInfo->geomHBar.y + 1;
+  pScrollInfo->geomHLeft.height = pScrollInfo->geomHRight.height
+                                = pScrollInfo->geomHBar.height - 2;
+  pScrollInfo->geomHLeft.width  = pScrollInfo->geomHRight.width
+                                = iVScrollWidth - 1;
+
+  pScrollInfo->geomHLeft.x     = pScrollInfo->geomHBar.x + 1;
+  pScrollInfo->geomHRight.x    = pScrollInfo->geomHBar.x
+                               + pScrollInfo->geomHBar.width
+                               - pScrollInfo->geomHRight.width
+                               - 1;
+
+  pScrollInfo->geomHKnob.y      = pScrollInfo->geomHLeft.y;
+  pScrollInfo->geomHKnob.height = pScrollInfo->geomHLeft.height;
+  pScrollInfo->geomHKnob.width  = pScrollInfo->iHKnobSize
+                                = iKnobSize;
+
+  // now that I have a reasonable estimate of the knob size, calculate
+  // the starting vertical position of the knob
+
+  if(pScrollInfo->iHPos <= 0 || nListItems <= 0)
+  {
+    iKnobPos = 0;
+  }
+  else
+  {
+    int iBarScrollArea = pScrollInfo->geomHRight.y
+                       - (pScrollInfo->geomHLeft.y + pScrollInfo->geomHLeft.width)
+                       - iKnobSize
+                       - 1; // inclusive value
+
+    if(pScrollInfo->iHPos >= (nListItems - 1))
+    {
+      iKnobPos = iBarScrollArea;
+    }
+    else
+    {
+      iKnobPos = (WB_INT64)pScrollInfo->iHPos * (WB_INT64)iBarScrollArea
+               / (WB_INT64)(nListItems - 1);
+    }
+  }
+
+
+  pScrollInfo->geomHKnob.x = (pScrollInfo->iHKnob = iKnobPos)
+                           + pScrollInfo->geomHLeft.x + pScrollInfo->geomHLeft.width;
+
+  // fixed values go here
+  pScrollInfo->geomVBar.border = 1;
+  pScrollInfo->geomVUp.border = 0;
+  pScrollInfo->geomVDown.border = 0;
+  pScrollInfo->geomVKnob.border = 0;
+
+}
+
+
+
+
+void WBCalcVScrollBar(WB_SCROLLINFO *pScrollInfo, WB_GEOM *pgeomClient, int iVScrollWidth,
+                      int iHScrollHeight, int nListItems, int nPos)
+{
+int iBarHeight, iBarWidth;
+
+
+  iBarHeight = pgeomClient->height;
+  iBarWidth = pgeomClient->width;
+
+  if(pScrollInfo->iVBarHeight == iBarHeight &&
+     pScrollInfo->iHBarWidth == iBarWidth &&
+     pScrollInfo->iVKnob >= 0 &&
+     pScrollInfo->iVKnobSize >= 0 &&
+     pScrollInfo->iVPos == nPos &&
+     pScrollInfo->iVMin == 0 &&
+     pScrollInfo->iVMax == (nListItems - 1))
+  {
+    // assume it's set up correctly
+
+//    WB_ERROR_TEXT("TEMPORARY:  short cycling calc scroll info\n");
+//    return;
+  }
+
+  if(pScrollInfo->iHBarWidth != iBarWidth ||
+     pScrollInfo->iVBarHeight != iBarHeight) // TODO:  do i need this???
+  {
+    // client size change detected
+    // zero out the H Scroll info so that it forces re-calculation next time
+    pScrollInfo->iHKnob = pScrollInfo->iHKnobSize = pScrollInfo->iHPos = pScrollInfo->iHMin = pScrollInfo->iHMax = 0;
+  }
+
+//  WB_ERROR_PRINT("TEMPORARY:  %d %d %d %d %d\n",
+//                 iBarHeight, iVScrollWidth, iHScrollHeight, nListItems, nPos);
+
+  pScrollInfo->iVMin = 0;
+  pScrollInfo->iVMax = nListItems - 1;
+
+  if(nPos == -1 ||
+     (nPos >= pScrollInfo->iVMin && nPos <= pScrollInfo->iVMax))
+  {
+    pScrollInfo->iVPos = nPos;
+  }
+  else
+  {
+    pScrollInfo->iVPos = nPos = -1;
+  }
+
+  InternalCalcVScrollBar(pScrollInfo, pgeomClient, iVScrollWidth, iHScrollHeight);
+
+  pScrollInfo->iHScrollHeight = iHScrollHeight;
+  pScrollInfo->iHBarWidth = iBarWidth;
+
+}
+
 void WBCalcHScrollBar(WB_SCROLLINFO *pScrollInfo, WB_GEOM *pgeomClient, int iVScrollWidth,
                       int iHScrollHeight, int nListItems, int nPos)
 {
@@ -288,8 +655,6 @@ int /*iKnobSize, iKnobPos,*/ iBarHeight, iBarWidth;
   iBarWidth = pgeomClient->width;
 
   if(pScrollInfo->iVBarHeight == iBarHeight &&
-     pScrollInfo->iHBarWidth == iBarWidth &&
-     pScrollInfo->iVBarHeight == iBarHeight &&
      pScrollInfo->iHBarWidth == iBarWidth &&
      pScrollInfo->iVKnob >= 0 &&
      pScrollInfo->iVKnobSize >= 0 &&
@@ -304,22 +669,17 @@ int /*iKnobSize, iKnobPos,*/ iBarHeight, iBarWidth;
   }
 
   if(pScrollInfo->iVBarHeight != iBarHeight ||
-     pScrollInfo->iHBarWidth != iBarWidth ||
-     pScrollInfo->iVBarHeight != iBarHeight ||
-     pScrollInfo->iHBarWidth != iBarWidth)
+     pScrollInfo->iHBarWidth != iBarWidth) // TODO:  do I need this??
   {
     // client size change detected
     // zero out the V Scroll info so that it forces re-calculation next time
     pScrollInfo->iVKnob = pScrollInfo->iVKnobSize = pScrollInfo->iVPos = pScrollInfo->iVMin = pScrollInfo->iVMax = 0;
   }
 
-  pScrollInfo->iVScrollWidth = iVScrollWidth;
-  pScrollInfo->iHScrollHeight = iHScrollHeight;
-  pScrollInfo->iVBarHeight = iBarHeight;
-  pScrollInfo->iHBarWidth = iBarWidth;
-
   pScrollInfo->iHMin = 0;
   pScrollInfo->iHMax = nListItems - 1;
+
+
   if(nPos == -1 ||
      (nPos >= 0 && nPos < nListItems))
   {
@@ -330,11 +690,14 @@ int /*iKnobSize, iKnobPos,*/ iBarHeight, iBarWidth;
     pScrollInfo->iHPos = nPos = -1;
   }
 
+  InternalCalcHScrollBar(pScrollInfo, pgeomClient, iVScrollWidth, iHScrollHeight);
 
-
-  // TODO:  calculate the geometries
+  pScrollInfo->iVScrollWidth = iVScrollWidth;
+  pScrollInfo->iVBarHeight = iBarHeight;
 
 }
+
+
 
 int WBCalcVScrollDragPos(WB_SCROLLINFO *pScrollInfo, int iY)
 {
@@ -386,166 +749,460 @@ int WBCalcHScrollDragPos(WB_SCROLLINFO *pScrollInfo, int iX)
   return -1;  // for now, until implemented
 }
 
-void WBCalcVScrollBar(WB_SCROLLINFO *pScrollInfo, WB_GEOM *pgeomClient, int iVScrollWidth,
-                      int iHScrollHeight, int nListItems, int nPos)
+
+void WBUpdateScrollBarGeometry(WB_SCROLLINFO *pSI, XFontSet fontSetRef,
+                               WB_GEOM *pgeomClient, WB_GEOM *pgeomUsable)
 {
-int iKnobSize, iKnobPos, iBarHeight, iBarWidth;
-int i1, i2;
+WB_GEOM geom;
+int iVScrollWidth, iHScrollHeight;
+XCharStruct xBounds;
 
-  iBarHeight = pgeomClient->height;
-  iBarWidth = pgeomClient->width;
+  // TODO:  data validation
 
-  if(pScrollInfo->iVBarHeight == iBarHeight &&
-     pScrollInfo->iHBarWidth == iBarWidth &&
-     pScrollInfo->iVBarHeight == iBarHeight &&
-     pScrollInfo->iHBarWidth == iBarWidth &&
-     pScrollInfo->iVKnob >= 0 &&
-     pScrollInfo->iVKnobSize >= 0 &&
-     pScrollInfo->iVPos == nPos &&
-     pScrollInfo->iVMin == 0 &&
-     pScrollInfo->iVMax == (nListItems - 1))
+  geom.x = pgeomClient->x;
+  geom.y = pgeomClient->y;
+  geom.width = pgeomClient->width;
+  geom.height = pgeomClient->height;
+
+  xBounds = WBFontSetMaxBounds(/*pDisplay*/WBGetDefaultDisplay(), fontSetRef);
+
+  iVScrollWidth = WBTextWidth(fontSetRef, "X", 1) * 2 + 4; // standard width of vertical scrollbar
+  iHScrollHeight = xBounds.ascent + xBounds.descent + 4;
+
+  // calculate the rectangles for the scroll bars
+
+  if(pSI->iVMin < pSI->iVMax)
   {
-    // assume it's set up correctly
+//    InternalCalcVScrollBar(pSI, pgeomClient, iVScrollWidth, pScrollInfo->iVMin,
+//                           pScrollInfo->iVMax, pScrollInfo->iVPos);
+    InternalCalcVScrollBar(pSI, pgeomClient, iVScrollWidth, geom.height - iHScrollHeight);
 
-//    WB_ERROR_TEXT("TEMPORARY:  short cycling calc scroll info\n");
-//    return;
+    geom.width -= iVScrollWidth;
   }
 
-  if(pScrollInfo->iVBarHeight != iBarHeight ||
-     pScrollInfo->iHBarWidth != iBarWidth ||
-     pScrollInfo->iVBarHeight != iBarHeight ||
-     pScrollInfo->iHBarWidth != iBarWidth)
+  if(pSI->iHMin < pSI->iHMax)
   {
-    // client size change detected
-    // zero out the H Scroll info so that it forces re-calculation next time
-    pScrollInfo->iHKnob = pScrollInfo->iHKnobSize = pScrollInfo->iHPos = pScrollInfo->iHMin = pScrollInfo->iHMax = 0;
+//    InternalCalcHScrollBar(pSI, pgeomClient, iHScrollHeight, pScrollInfo->iHMin,
+//                           pScrollInfo->iHMax, pScrollInfo->iHPos);
+    InternalCalcHScrollBar(pSI, pgeomClient, iHScrollHeight, geom.width - iVScrollWidth);
+
+
+    geom.height -= iHScrollHeight;
   }
 
-
-//  WB_ERROR_PRINT("TEMPORARY:  %d %d %d %d %d\n",
-//                 iBarHeight, iVScrollWidth, iHScrollHeight, nListItems, nPos);
-
-  pScrollInfo->iVScrollWidth = iVScrollWidth;
-  pScrollInfo->iHScrollHeight = iHScrollHeight;
-  pScrollInfo->iVBarHeight = iBarHeight;
-  pScrollInfo->iHBarWidth = iBarWidth;
-
-  pScrollInfo->iVMin = 0;
-  pScrollInfo->iVMax = nListItems - 1;
-  if(nPos == -1 ||
-     (nPos >= 0 && nPos < nListItems))
+  if(pgeomUsable)
   {
-    pScrollInfo->iVPos = nPos;
+    memcpy(pgeomUsable, &geom, sizeof(*pgeomUsable));
   }
-  else
-  {
-    pScrollInfo->iVPos = nPos = -1;
-  }
-
-  // knob height equals 'nListItems / nListItems!' multiplied by
-  // the available knob height, for a minimum value of 'iHScrollHeight'
-
-  iKnobSize = (iBarHeight - 4 * iHScrollHeight - 2);
-  if(iKnobSize > iHScrollHeight / 2)
-  {
-    i1 = iHScrollHeight * (2 * iHScrollHeight + 1);  // 'twice scroll height' factorial
-    i2 = iHScrollHeight * 2;
-
-    while(i2 > 2 && i1 > iKnobSize) // using the above starting point get 'max factorial less than height'
-    {
-      i1 -= i2;
-      i2--;
-    }
-
-    if(nListItems >= i2) // more than twice scroll height?
-    {
-      if(nListItems > iKnobSize || iKnobSize - i1 < iHScrollHeight / 2)
-      {
-        iKnobSize = -1;  // to fix later
-      }
-      else
-      {
-        iKnobSize -= i1;  // twice scroll height factorial
-        iKnobSize -= (nListItems - iHScrollHeight * 2 + 1);
-      }
-    }
-    else
-    {
-      iKnobSize -= i1  // 'twice knob height' factorial
-                 - (nListItems + 1) * nListItems / 2;  // 'nListItems' factorial
-    }
-
-    if(iKnobSize < 3 * iHScrollHeight / 4)
-    {
-      iKnobSize = 3 * iHScrollHeight / 4;  // minimum size
-    }
-  }
-  else
-  {
-    iKnobSize = 3 * iHScrollHeight / 4;  // worst case use this anyway
-  }
-
-  // cache these geometries because I need them for mouse handling
-
-  pScrollInfo->geomVBar.y      = pgeomClient->y + 1;
-  pScrollInfo->geomVBar.height = pgeomClient->height - 2;
-  pScrollInfo->geomVBar.width  = pScrollInfo->iVScrollWidth;
-  pScrollInfo->geomVBar.x      = pgeomClient->x + pgeomClient->width
-                              - pScrollInfo->geomVBar.width - 1;
-
-  pScrollInfo->geomVDown.x      = pScrollInfo->geomVUp.x
-                               = pScrollInfo->geomVBar.x + 1;
-  pScrollInfo->geomVDown.width  = pScrollInfo->geomVUp.width
-                               = pScrollInfo->geomVBar.width - 2;
-  pScrollInfo->geomVDown.height = pScrollInfo->geomVUp.height
-                               = pScrollInfo->iHScrollHeight - 1;
-
-  pScrollInfo->geomVUp.y   = pScrollInfo->geomVBar.y + 1;
-  pScrollInfo->geomVDown.y = pScrollInfo->geomVBar.y
-                          + pScrollInfo->geomVBar.height
-                          - pScrollInfo->geomVDown.height - 1;
-
-  pScrollInfo->geomVKnob.x     = pScrollInfo->geomVDown.x;
-  pScrollInfo->geomVKnob.width = pScrollInfo->geomVDown.width;
-  pScrollInfo->geomVKnob.height = pScrollInfo->iVKnobSize
-                               = iKnobSize;
-
-  // now that I have a reasonable estimate of the knob size, calculate
-  // the starting vertical position of the knob
-
-  if(nPos <= 0 || nListItems <= 0)
-  {
-    iKnobPos = 0;
-  }
-  else
-  {
-    int iBarScrollArea = pScrollInfo->geomVDown.y
-                       - (pScrollInfo->geomVUp.y + pScrollInfo->geomVUp.height)
-                       - iKnobSize
-                       - 1; // inclusive value
-
-    if(nPos >= (nListItems - 1))
-    {
-      iKnobPos = iBarScrollArea;
-    }
-    else
-    {
-      iKnobPos = (WB_INT64)nPos * (WB_INT64)iBarScrollArea
-               / (WB_INT64)(nListItems - 1);
-    }
-  }
-
-
-  pScrollInfo->geomVKnob.y = (pScrollInfo->iVKnob = iKnobPos)
-                           + pScrollInfo->geomVUp.y + pScrollInfo->geomVUp.height;
-
-  // fixed values go here
-  pScrollInfo->geomVBar.border = 1;
-  pScrollInfo->geomVUp.border = 0;
-  pScrollInfo->geomVDown.border = 0;
-  pScrollInfo->geomVKnob.border = 0;
-
 }
+
+
+int WBScrollBarEvent(Window wID, XEvent *pEvent, WB_SCROLLINFO *pScrollInfo)
+{
+int iX, iY, iDirection, iPosition;
+
+
+  if(wID == None || !pEvent || pEvent->type != ClientMessage || !pScrollInfo)
+  {
+    return 0; // only client message events and valid parameters
+  }
+
+  if(pEvent->xclient.message_type == aWM_POINTER)
+  {
+    if(pEvent->xclient.data.l[0] == WB_POINTER_CLICK)
+    {
+      // TODO:  handle shift-click, ctrl-click, alt-click
+
+      if(pEvent->xclient.data.l[1] == WB_POINTER_BUTTON1 && // left button
+         !pEvent->xclient.data.l[2])
+      {
+        iX = pEvent->xclient.data.l[3];
+        iY = pEvent->xclient.data.l[4];
+
+        if(WB_LIKELY(pScrollInfo != NULL))
+        {
+          iDirection = WB_SCROLL_NA;
+          iPosition = 0;
+
+          if(WBPointInGeom(iX, iY, pScrollInfo->geomVBar))
+          {
+            if(WBPointInGeom(iX, iY, pScrollInfo->geomVUp))
+            {
+              iDirection = WB_SCROLL_BACKWARD;
+              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (up)\n", __FUNCTION__);
+            }
+            else if(WBPointInGeom(iX, iY, pScrollInfo->geomVDown))
+            {
+              iDirection = WB_SCROLL_FORWARD;
+              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (down)\n", __FUNCTION__);
+            }
+            else if(WBPointInGeom(iX, iY, pScrollInfo->geomVKnob))
+            {
+              // ON THE KNOB - VScroll
+
+              iDirection = WB_SCROLL_KNOB;
+//              iPosition = pScrollInfo->iVMin; //pListInfo->nTop; // NO!
+              iPosition = WBCalcVScrollDragPos(pScrollInfo, iY);
+
+              if(iPosition < 0)
+              {
+                iPosition = pScrollInfo->iVMin; //pListInfo->nTop;
+              }
+
+              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (knob)\n", __FUNCTION__);
+
+              // TODO:  determine position of knob
+            }
+            else if(iY >= pScrollInfo->geomVUp.y + pScrollInfo->geomVUp.height &&
+                    iY < pScrollInfo->geomVKnob.y)
+            {
+              iDirection = WB_SCROLL_PAGEBACK;
+              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (page up)\n", __FUNCTION__);
+            }
+            else if(iY >= pScrollInfo->geomVKnob.y + pScrollInfo->geomVKnob.height &&
+                    iY < pScrollInfo->geomVDown.y)
+            {
+              iDirection = WB_SCROLL_PAGEFWD;
+              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (page down)\n", __FUNCTION__);
+            }
+            else
+            {
+              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (unknown)\n", __FUNCTION__);
+            }
+
+            InternalNotifySelf(wID, aSCROLL_NOTIFY, WB_SCROLL_VERTICAL, iDirection, iPosition, 0, 0);
+
+            return 1;  // handled
+          }
+          else if(WBPointInGeom(iX, iY, pScrollInfo->geomHBar))
+          {
+            if(WBPointInGeom(iX, iY, pScrollInfo->geomHLeft))
+            {
+              iDirection = WB_SCROLL_BACKWARD;
+              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (left)\n", __FUNCTION__);
+            }
+            else if(WBPointInGeom(iX, iY, pScrollInfo->geomHRight))
+            {
+              iDirection = WB_SCROLL_FORWARD;
+              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (right)\n", __FUNCTION__);
+            }
+            else if(WBPointInGeom(iX, iY, pScrollInfo->geomHKnob))
+            {
+              // ON THE KNOB - HScroll
+
+              iDirection = WB_SCROLL_KNOB;
+//              iPosition = pScrollInfo->iHMin; // NO!
+              iPosition = WBCalcHScrollDragPos(pScrollInfo, iY);
+
+              if(iPosition < 0)
+              {
+                iPosition = pScrollInfo->iHMin; //pListInfo->nTop;
+              }
+
+              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (knob)\n", __FUNCTION__);
+
+              // TODO:  determine position of knob
+            }
+            else if(iX >= pScrollInfo->geomHLeft.x + pScrollInfo->geomHLeft.width &&
+                    iX < pScrollInfo->geomHKnob.x)
+            {
+              iDirection = WB_SCROLL_PAGEBACK;
+              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (page left)\n", __FUNCTION__);
+            }
+            else if(iX >= pScrollInfo->geomHKnob.x + pScrollInfo->geomHKnob.width &&
+                    iX < pScrollInfo->geomHRight.x)
+            {
+              iDirection = WB_SCROLL_PAGEFWD;
+              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (page right)\n", __FUNCTION__);
+            }
+            else
+            {
+              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (unknown)\n", __FUNCTION__);
+            }
+
+            InternalNotifySelf(wID, aSCROLL_NOTIFY, WB_SCROLL_HORIZONTAL, iDirection, iPosition, 0, 0);
+
+            return 1;  // handled
+          }
+        }
+      }
+    }
+    else if(pEvent->xclient.data.l[0] == WB_POINTER_DBLCLICK)
+    {
+      if(pEvent->xclient.data.l[1] == WB_POINTER_BUTTON1 && // left button
+         !pEvent->xclient.data.l[2])
+      {
+        iX = pEvent->xclient.data.l[3];
+        iY = pEvent->xclient.data.l[4];
+        // assume selection already done, so notify owner
+
+        if(WB_LIKELY(pScrollInfo != NULL))
+        {
+          if(WBPointInGeom(iX, iY, pScrollInfo->geomVBar))
+          {
+            // if not within knob, re-post to self as single-click
+            if(!WBPointInGeom(iX, iY, pScrollInfo->geomVKnob))
+            {
+              XClientMessageEvent evt;
+              memcpy(&evt, pEvent, sizeof(evt));
+              evt.data.l[0] = WB_POINTER_CLICK;
+
+              return WBScrollBarEvent(wID, (XEvent *)&evt, pScrollInfo);
+            }
+          }
+          else if(WBPointInGeom(iX, iY, pScrollInfo->geomHBar))
+          {
+            // if not within knob, re-post to self as single-click
+            if(!WBPointInGeom(iX, iY, pScrollInfo->geomHKnob))
+            {
+              XClientMessageEvent evt;
+              memcpy(&evt, pEvent, sizeof(evt));
+              evt.data.l[0] = WB_POINTER_CLICK;
+
+              return WBScrollBarEvent(wID, (XEvent *)&evt, pScrollInfo);
+            }
+          }
+        }
+      }
+    }
+    else if(pEvent->xclient.data.l[0] == WB_POINTER_CANCEL)
+    {
+      // canceling drag (as appropriate)
+
+//      if(pScrollInfo &&
+//         pEvent->xclient.data.l[1] == WB_POINTER_BUTTON1 && // left button
+//         !pEvent->xclient.data.l[2])
+//      {
+//        pScrollInfo->iScrollState &= ~WBScrollState_LDRAG;
+//      }
+      if((pScrollInfo->iScrollState & WBScrollState_LDRAG) ||
+         (pScrollInfo->iScrollState & WBScrollState_MDRAG) ||
+         (pScrollInfo->iScrollState & WBScrollState_RDRAG))
+      {
+        pScrollInfo->iScrollState &= ~(WBScrollState_LDRAG | WBScrollState_MDRAG | WBScrollState_RDRAG);
+
+        return 1;  // "handled"
+      }
+    }
+    else if(pEvent->xclient.data.l[0] == WB_POINTER_DRAG ||
+            pEvent->xclient.data.l[0] == WB_POINTER_MOVE)
+    {
+      if(pEvent->xclient.data.l[1] == WB_POINTER_BUTTON1 && // left button
+         !pEvent->xclient.data.l[2])
+      {
+        iX = pEvent->xclient.data.l[3];
+        iY = pEvent->xclient.data.l[4];
+
+        if(WB_LIKELY(pScrollInfo != NULL))
+        {
+          if(!WBPointInGeom(iX, iY, pScrollInfo->geomVBar) &&
+             !WBPointInGeom(iX, iY, pScrollInfo->geomHBar) &&
+             (!(pScrollInfo->iScrollState & WBScrollState_LDRAG) ||
+              pEvent->xclient.data.l[0] == WB_POINTER_DRAG))
+          {
+            // TODO:  this is for multi-select listboxes, doing a drag-select
+
+            pScrollInfo->iScrollState &= ~WBScrollState_LDRAG; // make sure
+
+            return 0;  // "not handled" (allow drag-select to be handled by scrollbar owner)
+          }
+          else if(WBPointInGeom(iX, iY, pScrollInfo->geomVKnob) ||
+                  WB_LIKELY(pEvent->xclient.data.l[0] == WB_POINTER_MOVE &&
+                            (pScrollInfo->iScrollState & WBScrollState_LDRAG)))
+          {
+            if(pEvent->xclient.data.l[0] == WB_POINTER_DRAG) // begin drag, return window ID
+            {
+              WB_ERROR_PRINT("TEMPORARY - %s Mouse drag in scroll bar (knob)\n", __FUNCTION__);
+
+              pScrollInfo->iScrollState |= WBScrollState_LDRAG;  // set the state bit for left-drag
+              return((int)wID); // enabling the drag
+            }
+
+            iPosition = WBCalcVScrollDragPos(pScrollInfo, iY);
+
+            if(iPosition < 0)
+            {
+              iPosition = pScrollInfo->iVMin; //pListInfo->nTop;
+            }
+
+            // track the mouse position along the center of the knob, if possible
+
+            WB_ERROR_PRINT("TEMPORARY - %s Mouse motion in scroll bar (knob)\n", __FUNCTION__);
+
+            InternalNotifySelf(wID, aSCROLL_NOTIFY, WB_SCROLL_VERTICAL,
+                               WB_SCROLL_KNOB, iPosition, 0, 0);
+          }
+          else if(WBPointInGeom(iX, iY, pScrollInfo->geomHKnob) ||
+                  WB_LIKELY(pEvent->xclient.data.l[0] == WB_POINTER_MOVE &&
+                            (pScrollInfo->iScrollState & WBScrollState_HLDRAG)))
+          {
+            if(pEvent->xclient.data.l[0] == WB_POINTER_DRAG) // begin drag, return window ID
+            {
+              WB_ERROR_PRINT("TEMPORARY - %s Mouse drag in scroll bar (knob)\n", __FUNCTION__);
+
+              pScrollInfo->iScrollState |= WBScrollState_HLDRAG;  // set the state bit for left-drag
+              return((int)wID); // enabling the drag (window ID cannot be 'None')
+            }
+
+            iPosition = WBCalcHScrollDragPos(pScrollInfo, iX);
+
+            if(iPosition < 0)
+            {
+              iPosition = pScrollInfo->iHMin; // pListInfo->nTop;
+            }
+
+            // track the mouse position along the center of the knob, if possible
+
+            WB_ERROR_PRINT("TEMPORARY - %s Mouse motion in scroll bar (knob)\n", __FUNCTION__);
+
+            InternalNotifySelf(wID, aSCROLL_NOTIFY, WB_SCROLL_HORIZONTAL,
+                               WB_SCROLL_KNOB, iPosition, 0, 0);
+          }
+          else
+          {
+            WB_ERROR_PRINT("TEMPORARY - %s mouse motion in scroll bar outside of knob\n", __FUNCTION__);
+          }
+        }
+      }
+    }
+    else if(pEvent->xclient.data.l[0] == WB_POINTER_DROP)
+    {
+      if(WB_LIKELY(pScrollInfo != NULL))
+      {
+        if((pScrollInfo->iScrollState & WBScrollState_LDRAG) ||
+           (pScrollInfo->iScrollState & WBScrollState_MDRAG) ||
+           (pScrollInfo->iScrollState & WBScrollState_RDRAG))
+        {
+          pScrollInfo->iScrollState &= ~(WBScrollState_LDRAG | WBScrollState_MDRAG | WBScrollState_RDRAG);
+
+          return 1;  // "handled" (just a notification anyway)
+        }
+      }
+    }
+    else if(pEvent->xclient.data.l[0] == WB_POINTER_SCROLLUP)
+    {
+      InternalNotifySelf(wID, aSCROLL_NOTIFY, WB_SCROLL_VERTICAL, WB_SCROLL_BACKWARD, 0, 0, 0);
+    }
+    else if(pEvent->xclient.data.l[0] == WB_POINTER_SCROLLDOWN)
+    {
+      InternalNotifySelf(wID, aSCROLL_NOTIFY, WB_SCROLL_VERTICAL, WB_SCROLL_FORWARD, 0, 0, 0);
+    }
+
+    // TODO:  anything else?
+  }
+  else if(pEvent->xclient.message_type == aWM_CHAR)
+  {
+    // handle cursors only - up, down, left, right, home, end, page up, page down, etc.
+
+    long lKey = pEvent->xclient.data.l[0];             // return from WBKeyEventProcessKey
+    long lAltCtrlShift = pEvent->xclient.data.l[1];    // *piAltCtrlShift from WBKeyEventProcessKey
+#ifndef NO_DEBUG
+    int nChar = (int)pEvent->xclient.data.l[2];        // # of characters decoded into pBuf (below)
+    char *pBuf = (char *)&(pEvent->xclient.data.l[3]); // decode buffer (at least 8 chars in length)
+#endif // !NO_DEBUG
+
+
+    // TODO:  scroll bar hotkeys
+
+
+  }
+
+  return 0;
+}
+
+
+// this assumes WB_SCROLLINFO is valid.  To make it so, call WBUpdateScrollBarGeometry() or similar
+
+void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable wID,
+                       GC gc, WB_GEOM *pgeomClient)
+{
+  CheckInitScrollColors();
+
+  // fill scrollbar with background color
+  XSetForeground(pDisplay, gc, clrScrollBG.pixel);
+  XFillRectangle(pDisplay, wID, gc, pScrollInfo->geomHBar.x - 1, pScrollInfo->geomHBar.y,
+                 pScrollInfo->geomHBar.width + 1, pScrollInfo->geomHBar.height);
+
+  // draw 3D borders around everything
+
+  WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomHBar),
+                     clrScrollBD3.pixel, clrScrollBD2.pixel);
+
+  // if the scrollbar is DISABLED, do not draw the rest of it
+  if(pScrollInfo->iHPos < pScrollInfo->iHMin ||
+     pScrollInfo->iHPos > pScrollInfo->iHMax ||
+     pScrollInfo->iHMax < pScrollInfo->iHMin)
+  {
+//    WB_ERROR_PRINT("TEMPORARY:  grey out %d %d %d\n",
+//                   pScrollInfo->iVPos, pScrollInfo->iVMin, pScrollInfo->iVMax);
+    return;  // I am done (greyed out bar)
+  }
+
+  WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomHLeft),
+                     clrScrollBD2.pixel, clrScrollBD3.pixel);
+  WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomHRight),
+                     clrScrollBD2.pixel, clrScrollBD3.pixel);
+  WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomHKnob),
+                     clrScrollBD2.pixel, clrScrollBD3.pixel);
+
+  // draw arrows
+
+  WBDrawLeftArrow(pDisplay, wID, gc, &(pScrollInfo->geomHLeft), clrScrollFG.pixel);
+  WBDrawRightArrow(pDisplay, wID, gc, &(pScrollInfo->geomHRight), clrScrollFG.pixel);
+}
+
+// NOTE:  this assumes WB_SCROLLINFO is valid.  To make it so, call WBUpdateScrollBarGeometry() or similar
+
+void WBPaintVScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable wID,
+                       GC gc, WB_GEOM *pgeomClient)
+{
+  CheckInitScrollColors();
+
+  // fill scrollbar with background color
+  XSetForeground(pDisplay, gc, clrScrollBG.pixel);
+  XFillRectangle(pDisplay, wID, gc, pScrollInfo->geomVBar.x - 1, pScrollInfo->geomVBar.y,
+                 pScrollInfo->geomVBar.width + 1, pScrollInfo->geomVBar.height);
+
+  // draw 3D borders around everything
+
+  WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomVBar),
+                     clrScrollBD3.pixel, clrScrollBD2.pixel);
+
+  // if the scrollbar is DISABLED, do not draw the rest of it
+  if(pScrollInfo->iVPos < pScrollInfo->iVMin ||
+     pScrollInfo->iVPos > pScrollInfo->iVMax ||
+     pScrollInfo->iVMax < pScrollInfo->iVMin)
+  {
+//    WB_ERROR_PRINT("TEMPORARY:  grey out %d %d %d\n",
+//                   pScrollInfo->iVPos, pScrollInfo->iVMin, pScrollInfo->iVMax);
+    return;  // I am done (greyed out bar)
+  }
+
+  WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomVUp),
+                     clrScrollBD2.pixel, clrScrollBD3.pixel);
+  WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomVDown),
+                     clrScrollBD2.pixel, clrScrollBD3.pixel);
+  WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomVKnob),
+                     clrScrollBD2.pixel, clrScrollBD3.pixel);
+
+  // draw arrows
+
+  WBDrawUpArrow(pDisplay, wID, gc, &(pScrollInfo->geomVUp), clrScrollFG.pixel);
+  WBDrawDownArrow(pDisplay, wID, gc, &(pScrollInfo->geomVDown), clrScrollFG.pixel);
+}
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                                              //
+//   ____                         _                 ____         _                    _    _                    //
+//  |  _ \  _ __  __ _ __      __(_) _ __    __ _  |  _ \  _ __ (_) _ __ ___    __ _ | |_ (_)__   __ ___  ___   //
+//  | | | || '__|/ _` |\ \ /\ / /| || '_ \  / _` | | |_) || '__|| || '_ ` _ \  / _` || __|| |\ \ / // _ \/ __|  //
+//  | |_| || |  | (_| | \ V  V / | || | | || (_| | |  __/ | |   | || | | | | || (_| || |_ | | \ V /|  __/\__ \  //
+//  |____/ |_|   \__,_|  \_/\_/  |_||_| |_| \__, | |_|    |_|   |_||_| |_| |_| \__,_| \__||_|  \_/  \___||___/  //
+//                                          |___/                                                               //
+//                                                                                                              //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void WBDrawBorderRect(Display *pDisplay, Drawable wID, GC gc,
                       WB_GEOM *pgeomBorder, unsigned long lBorderColor)
@@ -683,85 +1340,6 @@ GC gc2;
     WB_ERROR_PRINT("%s:%d - unable to create GC\n", __FUNCTION__, __LINE__);
   }
 }
-
-// this assumes WB_SCROLLINFO is valid.  TO make it so, call ListCalcVScrollBar or similar
-void WBPaintVScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable wID,
-                       GC gc, WB_GEOM *pgeomClient)
-{
-  CheckInitScrollColors();
-
-  // fill scrollbar with background color
-  XSetForeground(pDisplay, gc, clrScrollBG.pixel);
-  XFillRectangle(pDisplay, wID, gc, pScrollInfo->geomVBar.x - 1, pScrollInfo->geomVBar.y,
-                 pScrollInfo->geomVBar.width + 1, pScrollInfo->geomVBar.height);
-
-  // draw 3D borders around everything
-
-  WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomVBar),
-                     clrScrollBD3.pixel, clrScrollBD2.pixel);
-
-  // if the scrollbar is DISABLED, do not draw the rest of it
-  if(pScrollInfo->iVPos < pScrollInfo->iVMin ||
-     pScrollInfo->iVPos > pScrollInfo->iVMax ||
-     pScrollInfo->iVMax < pScrollInfo->iVMin)
-  {
-//    WB_ERROR_PRINT("TEMPORARY:  grey out %d %d %d\n",
-//                   pScrollInfo->iVPos, pScrollInfo->iVMin, pScrollInfo->iVMax);
-    return;  // I am done (greyed out bar)
-  }
-
-  WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomVUp),
-                     clrScrollBD2.pixel, clrScrollBD3.pixel);
-  WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomVDown),
-                     clrScrollBD2.pixel, clrScrollBD3.pixel);
-  WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomVKnob),
-                     clrScrollBD2.pixel, clrScrollBD3.pixel);
-
-  // draw arrows
-
-  WBDrawUpArrow(pDisplay, wID, gc, &(pScrollInfo->geomVUp), clrScrollFG.pixel);
-  WBDrawDownArrow(pDisplay, wID, gc, &(pScrollInfo->geomVDown), clrScrollFG.pixel);
-}
-
-// this assumes WB_SCROLLINFO is valid.  TO make it so, call ListCalcHScrollBar or similar
-void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable wID,
-                       GC gc, WB_GEOM *pgeomClient)
-{
-  CheckInitScrollColors();
-
-  // fill scrollbar with background color
-  XSetForeground(pDisplay, gc, clrScrollBG.pixel);
-  XFillRectangle(pDisplay, wID, gc, pScrollInfo->geomHBar.x - 1, pScrollInfo->geomHBar.y,
-                 pScrollInfo->geomHBar.width + 1, pScrollInfo->geomHBar.height);
-
-  // draw 3D borders around everything
-
-  WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomHBar),
-                     clrScrollBD3.pixel, clrScrollBD2.pixel);
-
-  // if the scrollbar is DISABLED, do not draw the rest of it
-  if(pScrollInfo->iHPos < pScrollInfo->iHMin ||
-     pScrollInfo->iHPos > pScrollInfo->iHMax ||
-     pScrollInfo->iHMax < pScrollInfo->iHMin)
-  {
-//    WB_ERROR_PRINT("TEMPORARY:  grey out %d %d %d\n",
-//                   pScrollInfo->iVPos, pScrollInfo->iVMin, pScrollInfo->iVMax);
-    return;  // I am done (greyed out bar)
-  }
-
-  WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomHLeft),
-                     clrScrollBD2.pixel, clrScrollBD3.pixel);
-  WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomHRight),
-                     clrScrollBD2.pixel, clrScrollBD3.pixel);
-  WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomHKnob),
-                     clrScrollBD2.pixel, clrScrollBD3.pixel);
-
-  // draw arrows
-
-  WBDrawLeftArrow(pDisplay, wID, gc, &(pScrollInfo->geomHLeft), clrScrollFG.pixel);
-  WBDrawRightArrow(pDisplay, wID, gc, &(pScrollInfo->geomHRight), clrScrollFG.pixel);
-}
-
 
 void WBDrawLeftArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect, unsigned long lColor)
 {

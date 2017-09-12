@@ -182,6 +182,76 @@ typedef int (* WBWinEvent)(Window wID, XEvent *pEvent);
 **/
 typedef int (* WBAppEvent)(XEvent *pEvent);
 
+/** \struct _WBPoint_
+  * \ingroup core
+  * \copydoc WB_POINT
+**/
+/** \typedef WB_POINT
+  * \ingroup core
+  * \brief internal wrapper struct for 'point' definition
+  *
+  * The point structure has been defined primarily for convenience,
+  * so that specific coding methods that work well in GUI environments
+  * that use 'points' can easily be ported into this environment.
+  *
+  * \code
+
+  typedef struct _WBPoint_
+  {
+    int x;   // the 'x' value of the point.  can be negative.
+    int y;   // the 'y' value of the point.  can be negative.
+  } WB_POINT;
+
+  * \endcode
+  *
+  * Note that this is different from an XPoint structure, which is defined as
+  *
+  * \code
+
+  typedef struct
+  {
+    short x, y;
+  } XPoint;
+
+  * \endcode
+  *
+*/
+typedef struct _WBPoint_
+{
+  int x;   ///< the 'x' value of the point.  can be negative.
+  int y;   ///< the 'y' value of the point.  can be negative.
+} WB_POINT;
+
+/** \struct _WBExtent_
+  * \ingroup core
+  * \copydoc WB_EXTENT
+**/
+/** \typedef WB_EXTENT
+  * \ingroup core
+  * \brief internal wrapper struct for 'extent' definition
+  *
+  * The extent structure has been defined primarily for convenience,
+  * so that specific coding methods that work well in GUI environments
+  * that use 'extents' can easily be ported into this environment.
+  *
+  * \code
+
+  typedef struct _WBExtent_
+  {
+    unsigned int width;   // the 'width' value of the extent.
+    unsigned int height;  // the 'height' value of the extent.
+  } WB_EXTENT;
+
+  * \endcode
+  *
+  *
+*/
+typedef struct _WBExtent_
+{
+  unsigned int width;   ///< the 'width' value of the extent.
+  unsigned int height;  ///< the 'height' value of the extent.
+} WB_EXTENT;
+
 /** \struct _WBRect_
   * \ingroup core
   * \copydoc WB_RECT
@@ -196,20 +266,24 @@ typedef int (* WBAppEvent)(XEvent *pEvent);
   * into this environment.
   *
   * \code
+
   typedef struct _WBRect_
   {
     int left, top, right, bottom;
   } WB_RECT;
+
   * \endcode
   *
-  * Note that this is different from an XRectangle, which is defined as
+  * Note that this is different from an XRectangle structure, which is defined as
   *
   * \code
+
   typedef struct
   {
     short x, y;
     unsigned short width, height;
   } XRectangle;
+
   * \endcode
   *
 */
@@ -237,21 +311,25 @@ typedef struct _WBRect_
   * for cacheing geometry information.
   *
   * \code
+
   typedef struct _WBGeom_
   {
     int x, y;
     unsigned int width, height, border;
   } WB_GEOM;
+
   * \endcode
   *
-  * Use of 'int' for each parameter is consistent with the various 'Geom' functions
-  * which typically use 'int *' for returned parameters, such as:
+  * Use of 'int' and 'unsigned int' for the various parameter is consistent with the various
+  * 'Geom' functions, which typically use 'int *' for returned parameters, as shown:
   *
   * \code
+
   Status XGetGeometry(Display *display, Drawable d, Window *root_return,
                       int *x_return, int *y_return,
                       unsigned int *width_return, unsigned int *height_return,
                       unsigned int *border_return, unsigned int *depth_return);
+
   * \endcode
   *
 */
@@ -274,7 +352,9 @@ typedef struct _WBGeom_
   * and any 'Exit' functions, should all set this to TRUE (non-zero) to force the application to exit.
   *
   * \code
+
   extern int bQuitFlag;
+
   * \endcode
   *
 **/
@@ -886,9 +966,12 @@ Window WBGetHiddenHelperWindow(void);  // if you need "a window" for the default
 extern const Atom aMENU_COMMAND;     // commands sent by menus via ClientMessage
 extern const Atom aMENU_UI_COMMAND;  // UI notification sent by menus to owning frame windows via ClientMessage using WBWindowDispatch
 extern const Atom aRESIZE_NOTIFY;    // notification of window re-size via ClientMessage
+extern const Atom aSCROLLBAR_NOTIFY; // notification of scroll bar/position changes via ClientMessage
 extern const Atom aDESTROY_NOTIFY;   // notify parent that child is being destroyed
 extern const Atom aCONTROL_NOTIFY;   // dialog control and child window notification messages
                                      // l[0] contains control ID or -1, l[1] is notify code, l[2] is window ID
+extern const Atom aSCROLL_NOTIFY;    // specific notification for scrollbars (see enumeration, below)
+                                     // data.l[0] is scrollbar enum, data.l[1] is notification enum, data.l[2] is optional position modifier
 extern const Atom aQUERY_CLOSE;      // command sent by Client Message - return 0 if ok to close, 1 if not ok to close, -1 on error
 extern const Atom aRECALC_LAYOUT;    // notify window that it should re-calculate things like scrollbars and viewports
 
@@ -929,6 +1012,43 @@ extern const Atom aMULTIPLE;         // Atom for 'MULTIPLE'
 extern const Atom aTIMESTAMP;        // Atom for 'TIMESTAMP'
 extern const Atom aNULL;             // Atom for 'NULL'
 #endif // !_WINDOW_HELPER_C, !_CLIPBOARD_HELPER_C
+
+
+
+// parameter enumerations for aSCROLL_NOTIFY ClientMessage
+
+/** \ingroup xatoms
+  * \hideinitializer
+  * \brief Enumeration for \ref aSCROLL_NOTIFY ClientMessage
+  *
+  * Enumeration of values used in scroll notification messages.\n
+  * \sa  \ref WBScrollBarEvent()
+*/
+enum
+{
+  WB_SCROLL_DEFAULT = 0,    ///< 1st parameter (bar) - 'Default Bar', currently not implemented, probably won't be used
+  WB_SCROLL_HORIZONTAL = 1, ///< 1st parameter (bar) - The horizontal scroll bar for the control or window
+  WB_SCROLL_VERTICAL = 2,   ///< 1st parameter (bar) - The vertical scroll bar for the control or window.
+
+  WB_SCROLL_KNOB = 0,       ///< 2nd parameter (direction) - 'knob track' - pos in data.l[2]
+  WB_SCROLL_FORWARD = 1,    ///< 2nd parameter (direction) - down, right
+  WB_SCROLL_BACKWARD = -1,  ///< 2nd parameter (direction) - up, left
+  WB_SCROLL_PAGEFWD = 2,    ///< 2nd parameter (direction) - pgdn, pgright
+  WB_SCROLL_PAGEBACK = -2,  ///< 2nd parameter (direction) - pgup, pgleft
+  WB_SCROLL_FIRST = -3,     ///< 2nd parameter (direction) - home, top
+  WB_SCROLL_LAST = 3,       ///< 2nd parameter (direction) - bottom, end
+
+  WB_SCROLL_DBLCLICK = 4,   ///< 2nd parameter (direction) - double-clicked item (no selection change info) (sent to list control's owner)
+
+  WB_SCROLL_ABSOLUTE = 99,  ///< 2nd parameter (direction) - absolute scroll - pos in data.l[2]
+  WB_SCROLL_RELATIVE = -99, ///< 2nd parameter (direction) - relative scroll - rel pos in data.l[2]
+
+  WB_SCROLL_NA = 0x80000000 ///< generic 'NA' or 'UNDEFINED' value
+};
+
+
+
+
 
 
 
@@ -2960,6 +3080,8 @@ WB_UINT64 WBGetTimeIndex(void);  // returns current 'time index' (in microsecond
   * A timer created by this function must be subsequently deleted via \ref DeleteTimer()
   *
   * Header File:  window_helper.h
+  *
+  * \sa aWM_TIMER
 **/
 int CreateTimer(Display *pDisplay, Window wID, unsigned long lInterval, long lID, int iPeriodic);
   // NOTE:  'iPeriodic' non-zero for periodic, zero for one-shot.  'lInterval' is in microseconds
@@ -2976,6 +3098,8 @@ int CreateTimer(Display *pDisplay, Window wID, unsigned long lInterval, long lID
   * the same Display, Window, and Timer 'unique' ID that were used to create it.
   *
   * Header File:  window_helper.h
+  *
+  * \sa aWM_TIMER
 **/
 void DeleteTimer(Display *pDisplay, Window wID, long lID);  // deletes entry with matching Display, Window, ID
 

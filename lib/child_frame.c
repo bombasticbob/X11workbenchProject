@@ -171,6 +171,10 @@ int iRval = -1;
     }
   }
 
+  // initialize scroll info
+  WBInitScrollInfo(&(pChildFrame->scroll)); // re-initialize (TODO:  must I do this every time?)
+
+
   // if the owner is valid, but NOT tabbed, and it already has
   // a WBChildFrame, then I fail to create this one.
 
@@ -622,40 +626,13 @@ void FWSetChildFrameExtent(WBChildFrame *pChildFrame, int iXExtent, int iYExtent
 }
 
 
-void FWSetChildFrameScrollInfo(WBChildFrame *pChildFrame, int iRow, int iMaxRow, int iCol, int iMaxCol,
-                               int iRowHeight, int iColWidth)
-{
-  if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
-  {
-    WB_ERROR_PRINT("ERROR:  %s - pChildFrame not valid\n", __FUNCTION__);
-
-    return;
-  }
-
-  // NOTE:  this function must *NOT* call FWChildFrameRecalcLayout, nor FWSetChildFrameExtent, in
-  //        order to prevent problems with recursion.  Instead, it must 'nuke out' (aka 'derive')
-  //        all of those things, independently.
-
-  WB_ERROR_PRINT("TODO:  %s - implement.  %p %u (%08xH)  %d, %d, %d, %d, %d, %d\n", __FUNCTION__,
-                 pChildFrame, (int)pChildFrame->wID, (int)pChildFrame->wID,
-                 iRow, iMaxRow, iCol, iMaxCol, iRowHeight, iColWidth);
-
-}
-
-
-void FWChildFrameRecalcLayout(WBChildFrame *pChildFrame)
+// this function calculates 'pChildFrame->geom' correctly
+static void InternalChildFrameRecalcGeom(WBChildFrame *pChildFrame, int bResize)
 {
 WBFrameWindow *pOwner;
 Display *pDisplay;
 int iL, iT, iW, iH;
-
-
-  if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
-  {
-    WB_ERROR_PRINT("ERROR:  %s - pChildFrame not valid\n", __FUNCTION__);
-
-    return;
-  }
+int nL, nL2, nC, nC2;
 
 
   pDisplay = WBGetWindowDisplay(pChildFrame->wID);
@@ -673,9 +650,12 @@ int iL, iT, iW, iH;
   iW = pOwner->iClientWidth;
   iH = pOwner->iClientHeight;
 
-  // resize the window accordingly
-  XMoveWindow(pDisplay, pChildFrame->wID, iL, iT);
-  XResizeWindow(pDisplay, pChildFrame->wID, iW - 2, iH - 2); // allow 1 pixel for border
+  if(bResize) // I called this because I resized the owner window
+  {
+    // resize the window accordingly
+    XMoveWindow(pDisplay, pChildFrame->wID, iL, iT);
+    XResizeWindow(pDisplay, pChildFrame->wID, iW - 2, iH - 2); // allow 1 pixel for border
+  }
 
   // calculate new client 'geom', backing out 2 additional pixels in all 4 directions
 
@@ -684,6 +664,69 @@ int iL, iT, iW, iH;
   pChildFrame->geom.width = iW - 6;
   pChildFrame->geom.height = iH - 6;  // the new width/height of client area
 
+  // cache this value for later, when I paint
+  memcpy(&(pChildFrame->geomEntire), &(pChildFrame->geom), sizeof(pChildFrame->geomEntire));
+
+  // NEXT, calculate the total height in rows, and width in cols, and determine whether
+  // the scroll bars need to be made visible.
+
+  if(pChildFrame->iRowHeight <= 0 || pChildFrame->iColWidth <= 0)
+  {
+    nL2 = WBTextObjectCalculateLineHeight(WBFontSetAscent(pDisplay, pChildFrame->rFontSet),
+                                          WBFontSetDescent(pDisplay, pChildFrame->rFontSet));
+    nC2 = WBFontSetAvgCharWidth(pDisplay, pChildFrame->rFontSet);
+
+    if(nL2 < 0)
+    {
+      nL2 = 16; // for now just use this
+    }
+    if(nC2 < 0)
+    {
+      nC2 = 8; // for now just use this
+    }
+//    pChildFrame->iRowHeight = nL2; // TODO:  do this?
+//    pChildFrame->iColWidth = nC2; // TODO:  do this?
+  }
+  else
+  {
+    nL2 = pChildFrame->iRowHeight;
+    nC2 = pChildFrame->iColWidth;
+  }
+
+  nL = pChildFrame->geom.height - nL2 - 4; // the size if there were scroll bars
+  nC = pChildFrame->geom.width - nC2 - 4;
+
+  nL /= nL2; // total number of lines displayed (if scroll bars present)
+  nC /= nC2; // total number of columns displayed (if scroll bars present)
+
+  if((nL && nL <= pChildFrame->extent.height) || // # lines on screen > 0 and less than the extent's height?
+     (nC && nC <= pChildFrame->extent.width))    // # cols on screen > 0 and less than the extent's width?
+  {
+    // set up the scroll bar ranges correctly
+
+    if(nC > 0)
+    {
+      WBSetHScrollRange(&(pChildFrame->scroll), 0, pChildFrame->extent.width);             // use entire width for range
+    }
+    else
+    {
+      WBSetHScrollRange(&(pChildFrame->scroll), 0, 0);  // disabled
+    }
+
+    if((nL - 2) < pChildFrame->extent.height)
+    {
+      WBSetVScrollRange(&(pChildFrame->scroll), 0, pChildFrame->extent.height - (nL - 2)); // 2 extra line - scroll is for the top
+    }
+    else
+    {
+      WBSetVScrollRange(&(pChildFrame->scroll), 0, 0);
+    }
+  }
+  else
+  {
+    WBSetHScrollRange(&(pChildFrame->scroll), 0, 0); // thus disabling them
+    WBSetVScrollRange(&(pChildFrame->scroll), 0, 0);
+  }
 
   // TODO:  anything ELSE that I need to do when re-calculating the layout, scrollbars, whatever
   //        just apply that to geom so that it reflects the correct viewpoirt in pixels
@@ -696,11 +739,72 @@ int iL, iT, iW, iH;
   //        the geometry width and height, as needed
 
 
-//  pChildFrame->iLeft = iL converted to correct units and scrolled;
-//  pChildFrame->iTop = iT converted to correct units and scrolled;
-//  pChildRrame->iWidth = iW converted to correct units;
-//  pChildFrame->iHeight = iH converted to correct units;
+  WBUpdateScrollBarGeometry(&(pChildFrame->scroll), pChildFrame->rFontSet, // for now do this
+                            &(pChildFrame->geom), &(pChildFrame->geom));
 
+}
+
+void FWSetChildFrameScrollInfo(WBChildFrame *pChildFrame, int iRow, int iMaxRow, int iCol, int iMaxCol,
+                               int iRowHeight, int iColWidth)
+{
+  if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - pChildFrame not valid\n", __FUNCTION__);
+
+    return;
+  }
+
+  pChildFrame->extent.width = iMaxCol;
+  pChildFrame->extent.height = iMaxRow;
+  pChildFrame->iRowHeight = iRowHeight;
+  pChildFrame->iColWidth = iColWidth;
+
+  // NOTE:  this function must *NOT* call FWChildFrameRecalcLayout, nor FWSetChildFrameExtent, in
+  //        order to prevent problems with recursion.  Instead, it must 'nuke out' (aka 'derive')
+  //        all of those things, independently.
+
+  InternalChildFrameRecalcGeom(pChildFrame, 0); // re-calculate geom but do NOT re-size window
+  
+  // NEXT: see if I need scroll bars.  if I do, make them visible and shrink the size of the viewport
+  //       according to the scroll bar sizes [this is the same as what the listbox already does]
+
+
+
+  // FINALLY, auto-scroll iRow and iCol into view [as needed]
+
+
+  WB_ERROR_PRINT("TODO:  %s - implement.  %p %u (%08xH)  %d, %d, %d, %d, %d, %d\n", __FUNCTION__,
+                 pChildFrame, (int)pChildFrame->wID, (int)pChildFrame->wID,
+                 iRow, iMaxRow, iCol, iMaxCol, iRowHeight, iColWidth);
+
+
+}
+
+
+
+void FWChildFrameRecalcLayout(WBChildFrame *pChildFrame)
+{
+WBFrameWindow *pOwner;
+Display *pDisplay;
+int iL, iT, iW, iH;
+
+
+  if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - pChildFrame not valid\n", __FUNCTION__);
+
+    return;
+  }
+
+  // before I begin, recalculate the geometry and account for scroll bars
+
+  InternalChildFrameRecalcGeom(pChildFrame, 1); // re-calculate geom and re-size window
+
+  // TODO:
+  //  pChildFrame->iLeft = iL converted to correct units and scrolled;
+  //  pChildFrame->iTop = iT converted to correct units and scrolled;
+  //  pChildRrame->iWidth = iW converted to correct units;
+  //  pChildFrame->iHeight = iH converted to correct units;
 
 
   // NOW, tell the user callback function (if any) what's happening.
@@ -729,9 +833,33 @@ int iL, iT, iW, iH;
     pChildFrame->pUserCallback(evt.window, (XEvent *)&evt);
   }
 
-
   // TODO:  fix the scrollbars and invalidate rectangles
 
+  WBInvalidateRect(pChildFrame->wID, NULL, 1); // for now, do this
+
+#if 0
+
+  // notify owner of scroll changes by calling its event handler directly
+
+  if(pChildFrame->pUserCallback)
+  {
+    Display *pDisplay;
+    XClientMessageEvent evt;
+
+    pDisplay = WBGetWindowDisplay(pChildFrame->wID);
+
+    bzero(&evt, sizeof(evt));
+    evt.type = ClientMessage;
+
+    evt.display = pDisplay;
+    evt.window = pChildFrame->wID;
+    evt.message_type = aSCROLLBAR_NOTIFY;
+    evt.format = 32;
+
+    pChildFrame->pUserCallback(&evt);
+  }
+
+#endif // 0
 }
 
 void FWChildFrameStatusChanged(WBChildFrame *pChildFrame)
@@ -789,12 +917,14 @@ int FWChildFrameEvent(Window wID, XEvent *pEvent)
 int iRval = 0;
 WBChildFrame *pC;
 WBFrameWindow *pFW;
+Display *pDisplay;
 #ifndef NO_DEBUG
 char tbuf[32]; // for keyboard input
 int nChar = sizeof(tbuf);
 #endif // NO_DEBUG
 
 
+  pDisplay = WBGetWindowDisplay(wID);
   pC = FWGetChildFrameStruct(wID);
 
   if(!pC)
@@ -809,6 +939,73 @@ int nChar = sizeof(tbuf);
   }
 
   pFW = pC->pOwner; // make sure I know my owning frame window
+
+  // if I have visible scroll bars, paint them on 'Expose'
+  if(pEvent->type == Expose)
+  {
+    WB_GEOM geomTemp;
+    GC gc;
+    XColor clrBG;
+
+    // first, horizontal bar
+    geomTemp.x = pC->geom.x;
+    geomTemp.y = pC->geom.y + pC->geom.height;
+    geomTemp.width = pC->geom.width;
+    geomTemp.height = pC->geomEntire.height - pC->geom.height;
+
+    if(geomTemp.width > 0 && geomTemp.height > 0)
+    {
+      gc = WBBeginPaintGeom(pC->wID, &geomTemp);
+
+      if(gc != None)
+      {
+        WBPaintHScrollBar(&(pC->scroll), pDisplay, wID, gc, &(pC->geomEntire));
+        WBEndPaint(wID, gc);
+      }
+    }
+
+    // then, vertical bar
+    geomTemp.x = pC->geom.x + pC->geom.width;
+    geomTemp.y = pC->geom.y;
+    geomTemp.width = pC->geomEntire.width - pC->geom.width;
+    geomTemp.height = pC->geom.height;
+
+    if(geomTemp.width > 0 && geomTemp.height > 0)
+    {
+      gc = WBBeginPaintGeom(pC->wID, &geomTemp);
+
+      if(gc != None)
+      {
+        WBPaintVScrollBar(&(pC->scroll), pDisplay, wID, gc, &(pC->geomEntire));
+        WBEndPaint(wID, gc);
+      }
+    }
+
+    // finally, if both bars are visible, I need to paint the square in the lower
+    // right-hand corner.  I'll use the frame background default color for that
+
+    geomTemp.x = pC->geom.x + pC->geom.width;
+    geomTemp.y = pC->geom.y + pC->geom.height;
+    geomTemp.width = pC->geomEntire.width - pC->geom.width;
+    geomTemp.height = pC->geomEntire.height - pC->geom.height;
+    
+    if(geomTemp.width > 0 && geomTemp.height > 0)
+    {
+      clrBG = FWGetDefaultBG();
+
+      gc = WBBeginPaintGeom(pC->wID, &geomTemp);
+
+      if(gc != None)
+      {
+        XSetForeground(pDisplay, gc, clrBG.pixel);
+        XSetBackground(pDisplay, gc, clrBG.pixel);
+
+        XFillRectangle(pDisplay, wID, gc, geomTemp.x, geomTemp.y, geomTemp.width, geomTemp.height);
+
+        WBEndPaint(wID, gc);
+      }
+    }
+  }
 
 
   // TODO:  messages I handle myself, before any user callbacks
@@ -1881,6 +2078,10 @@ WBFrameWindow *pFrame;
     return 1; // HANDLED
   }
 
+  WB_ERROR_PRINT("NOT HANDLED:  %s - pChidlFrame->pUI = %p, select_all = %p\n",
+                 __FUNCTION__, pChildFrame->pUI,
+                 (void *)(pChildFrame->pUI ? pChildFrame->pUI->select_all : NULL));
+
   return 0; // NOT handled (but not an error)
 }
 
@@ -1918,6 +2119,10 @@ WBFrameWindow *pFrame;
 
     return 1; // HANDLED
   }
+
+  WB_ERROR_PRINT("NOT HANDLED:  %s - pChidlFrame->pUI = %p, select_none = %p\n",
+                 __FUNCTION__, pChildFrame->pUI,
+                 (void *)(pChildFrame->pUI ? pChildFrame->pUI->select_none : NULL));
 
   return 0; // NOT handled (but not an error)
 }
@@ -2156,6 +2361,12 @@ WBMenuPopupWindow *pPopup;
           {
             return 1; // select this
           }
+          else
+          {
+            WB_ERROR_PRINT("TEMPORARY:  %s - no selection or is empty\n", __FUNCTION__);
+
+            return -1;
+          }
         }
       }
     }
@@ -2199,6 +2410,12 @@ WBMenuPopupWindow *pPopup;
           if(pChildFrame->pUI->has_selection(pChildFrame))
           {
             return 1; // select this
+          }
+          else
+          {
+            WB_ERROR_PRINT("TEMPORARY:  %s - no selection\n", __FUNCTION__);
+
+            return -1;
           }
         }
       }
