@@ -4,6 +4,16 @@ LGPLv2, as appropriate, for library components). You may use, distribute,
 modify, etc. under the requirements of any of these licenses, as you see
 fit, for non-commercial purposes.  For additional information, see 'COPYING'.
 
+       USE OF LIMITED PORTIONS OF THE CODE AND USE AS SAMPLE CODE
+       ----------------------------------------------------------
+
+Limited portions of this project, such as utility functions, may be included
+in 'non-derived' works without a license, as long as you have the author's
+permission.  General permission is granted for anyone who uses any of the
+code in this project as 'sample code', to derive your own work based on the
+methodologies used, so long as it is not outright plagiarized.
+
+
 A copy of the GPLv2 is included in this file, for reference.  Additional GPL
 (compatible) licenses may be found here:
 
