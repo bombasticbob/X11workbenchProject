@@ -2345,9 +2345,202 @@ const CHXSetting *pXS;
 // X M L   P A R S I N G //
 ///////////////////////////
 
+/** \ingroup text_xml
+  * \brief Parses contents of an XML tag, returning as WBAlloc'd string list similar to environment strings
+  *
+  * \param ppOrigin A pointer to the 'origin' pointer for CHXMLEntry array
+  *
+  * Internal function for use by CHParseXML, to recurse levels of XML
+  *
+**/
+static const char *InternalParseXML(CHXMLEntry **ppOrigin, int *pcbOrigin, CHXMLEntry **ppCur,
+                                    char **ppData, int *pcbData, char **ppCurData,
+                                    const char *ppXMLData, const char *pXMLDataEnd)
+{
+  // parse a section of XML, adding contents to the end of 'ppOrigin', and returning
+  // a pointer to the next element on success (or NULL otherwise).  This function will
+  // re-allocate '*ppOrigin' as needed, storing the max size in '*pcbOrigin'.  It can
+  // also recurse to embedded sections, and then process them as needed to get the XML
+  // hierarchy correct in the CHXMLEntry pointed to by 'ppOrigin'.
+  //
+  // A recursive call can affect *ppOrigin.  It should be explicitly re-loaded on return.
+
+  // this isn't needed per se, but having it here can't hurt..
+  if(!ppOrigin || !*ppOrigin || !pcbOrigin || !ppCur || !*ppCur ||
+     !ppXMLData || !*ppXMLData || !pXMLDataEnd ||
+     (((WB_UINTPTR)pXMLDataEnd) < ((WB_UINTPTR)*ppXMLData))) // warning abatement, use type cast for WB_UINTPTR
+  {
+    return NULL; // just reject these possibilities outright and return "error"
+  }
+
+  // this function will return on error or if it finds and parses the ending tag
+
+    // OK what kind of tag do we have now?
+
+
+//    pCur = CHFindNextXMLTag(pCur, cbLength, 0);
+//
+//    if(!pCur) // no more tags
+//    {
+//      break;
+//    }
+//
+//    pCur++; // points past the tag
+
+
+  // returned pointer is the next point at which to parse a 'same level' tag
+
+  return pXMLDataEnd; // for now
+}
+
+
+//  typedef struct _CHXMLEntry_
+//  {
+//    int iNextIndex;      // 0-based index for next item at this level; <= 0 for none.  0 marks "end of list" for top level
+//    int iContainer;      // 0-based index for container; <= 0 for none.
+//    int iContentsIndex;  // 0-based first array index for 'contents' for this entry; <= 0 for none
+//
+//    int nLabelOffset;    // BYTE offset to label (zero-byte-terminated) string (from beginning of array)
+//                         // for this entry; <= 0 for 'no label'
+//    int nDataOffset;     // BYTE offset to data (zero-byte-terminated) string (from beginning of array)
+//                         // for the entry data; <= 0 for 'no data'
+//
+//  } CHXMLEntry;
+
 CHXMLEntry *CHParseXML(const char *pXMLData, int cbLength)
 {
-  return NULL; // for now...
+CHXMLEntry *pRval = NULL;
+CHXMLEntry *pXE, *pXCur, *pXPrev;
+int cbRval, cbData, cbNeed, cbOffs;
+const char *pEnd = pXMLData + cbLength;
+const char *pCur;
+char *pData, *pCurData;
+
+
+  if(!pXMLData || !cbLength || !*pXMLData)
+  {
+    return NULL;
+  }
+
+  cbRval = 0x1000 * sizeof(CHXMLEntry); // 64k entries
+  cbData = 0x100000; // 256k, to start with
+
+  pRval = (CHXMLEntry *)malloc(cbRval);
+  pData = malloc(cbData);
+  if(!pRval || !pData)
+  {
+    if(pRval)
+    {
+      free(pRval);
+    }
+
+    if(pData)
+    {
+      free(pData);
+    }
+    return NULL; // not enough memory (oops)
+  }
+
+
+
+  pCur = pXMLData;
+  pXCur = pRval;
+  pXPrev = NULL;
+  pCurData = pData;
+
+  *pData = 0; // ending zero byte - must be present at pData[length]
+
+  pXCur->iNextIndex = 0; // marks "end of list"
+  pXCur->iContainer = 0; // marks it as "top level"
+  pXCur->iContentsIndex = 0;
+  pXCur->nLabelOffset = 0;
+  pXCur->nDataOffset = 0;
+
+
+  while(pCur < pEnd)
+  {
+    // call recursive function that does "one level" of XML and all of its contents
+
+    pCur = InternalParseXML(&pRval, &cbRval, &pXCur, &pData, &cbData, &pCurData, pCur, pEnd);
+
+    if(!pCur) // error
+    {
+      goto error_exit;
+    }
+
+    // TODO:  look at the beginning for things like <?xml version="xx"?> and <!DOCTYPE xxx>
+
+  }
+
+  // at this point 'pXCur' is the pointer to the final entry, and there's room in the array for it.
+
+  pXCur->iNextIndex = 0; // marks "end of list"
+  pXCur->iContainer = 0; // assign the other zeros by convention
+  pXCur->iContentsIndex = 0;
+  pXCur->nLabelOffset = 0;
+  pXCur->nDataOffset = 0;
+
+  cbOffs = ((char *)(pXCur + 1) - (char *)pRval); // offset to where the data is, for fixups
+           // I use 'pXCur + 1' here because I'll increment it later.  but I also need it
+           // for a limit pointer in the fixup loop, so I don't increment it YET...
+  cbNeed = cbOffs + 2 * sizeof(*pXCur)
+         + (pCurData - pData); // the actual size of the data
+
+  if(cbNeed > cbRval) // need to re-allocate
+  {
+    void *pTemp = realloc(pRval, cbNeed);
+
+    if(!pTemp)
+    {
+      goto error_exit;
+    }
+
+    pXCur = (pXCur - pRval) + ((CHXMLEntry *)pTemp); // new 'pXCur'
+    pRval = (CHXMLEntry *)pTemp;                     // new 'pRval'
+  }
+
+  // fix up all of the data indices
+  for(pXE=pRval; pXE < pXCur; pXE++)
+  {
+    if(pXCur->nLabelOffset >= 0) // allow '0' for this part
+    {
+      pXCur->nLabelOffset += cbOffs; // fix up the data offset
+    }
+    else
+    {
+      pXCur->nLabelOffset = 0; // make it zero to mark it 'unused'
+    }
+
+    if(pXCur->nDataOffset >= 0) // allow '0' for this part
+    {
+      pXCur->nDataOffset += cbOffs; // fix up the data offset
+    }
+    else
+    {
+      pXCur->nDataOffset = 0; // make it zero to mark it 'unused'
+    }
+  }
+
+  pXCur++; // this is where the data will start, now
+
+  // copy the data where it needs to be
+
+  memcpy(pXCur, pData, (pCurData - pData) + 1); // copy data, including the final 0-byte at 'pData[length]'
+
+  // and now I'm done!
+
+  goto the_end;
+
+error_exit:
+
+  free(pRval);
+  pRval = NULL;
+
+
+the_end:
+  free(pData); // not needed any more
+
+  return pRval; // the self-contained structure, or NULL on error
 }
 
 char *CHParseXMLTagContents(const char *pTagContents, int cbLength)
@@ -2380,6 +2573,11 @@ int i1, cbRval = 4096;
   pC[0] = pC[1] = 0;
 
 
+  // NOTE:  XML spec requires that '>' and '&' be treated special, and quotes ignored for these.
+  //        The strings "&amp;" "&lt;" "&gt;" must also be honored inside or outside of quotes.
+  //        when I find '>' inside of quotes, I could optionally ignore it, but the spec says "NO"
+  //        so the result should be some kind of XML syntax error...
+
   while(pCur < pEnd && *pCur)
   {
     // find value name
@@ -2389,9 +2587,14 @@ int i1, cbRval = 4096;
     }
 
     p1 = pCur;
-    while(pCur < pEnd && *pCur > ' ' && *pCur != '=' && *pCur != '>')
+    while(pCur < pEnd && *pCur > ' ' && *pCur != '=' && *pCur != '>' && *pCur != '[' && *pCur != '(')
     {
       pCur++; // find end of string
+    }
+
+    if(pCur >= pEnd)
+    {
+      break; // went past the end of the buffer
     }
 
     if(*pCur == '>') // end of tag?
@@ -2409,11 +2612,46 @@ int i1, cbRval = 4096;
         pCur --; // prior to '/>'
       }
     }
+#if 0
+    else if(*pCur == '(' || *pCur == '[') // an embedded section ??? [this only applies to CDATA]
+    {
+      // in this case it's an embedded entity and I want to preserve it in its entirety
+      char cTemp = *pCur;
+
+      if(cTemp == '(')
+      {
+        cTemp = ')';
+      }
+      else
+      {
+        cTemp = ']';
+      }
+
+      pCur++;
+      if(pCur >= pEnd)
+      {
+        break; // I'm outa here - past end of buffer
+      }
+
+      p2 = pCur;
+      pCur = CHFindEndOfXMLSection(pCur, pEnd - pCur, cTemp, 0); // find end of section
+
+      if(pCur < pEnd)
+      {
+        pCur++; // point to next char past the end of this section
+      }
+
+      p5 = WBCopyStringN(p2, pCur - p2); // make a copy of the section, allocated as p5
+
+      goto value_is_now_p5; // this will check for NULL 'p5' also
+    }
+#endif // 0
 
     if(pCur == p1)
     {
       break; // I am done
     }
+
 
     p2 = pCur;
 
@@ -2421,6 +2659,8 @@ int i1, cbRval = 4096;
     {
       pCur++; // skip white space
     }
+
+    // NOTE:  this function does not handle '&amp;' or '&gt;' etc. outside of quotes
 
     if(pCur < pEnd && *pCur == '=') // value follows
     {
@@ -2457,10 +2697,10 @@ int i1, cbRval = 4096;
 
         p5 = WBCopyStringN(p3, pCur - p3); // copy all including start/end quotes
 
-        // make de-quoted version
+        // make de-quoted normalized version
         if(p5)
         {
-          WBDeQuoteString(p5); // remove quotes
+          WBNormalizeXMLString(p5); // remove quotes and sub '&gt;' '&amp;' etc.
         }
       }
       else
@@ -2492,7 +2732,15 @@ int i1, cbRval = 4096;
         }
 
         p5 = WBCopyStringN(p3, pCur - p3);
+
+        // make normalized version
+        if(p5)
+        {
+          WBNormalizeXMLString(p5); // remove quotes and sub '&gt;' '&amp;' etc.
+        }
       }
+
+//value_is_now_p5:
 
       if(!p5)
       {
@@ -2584,12 +2832,59 @@ no_value:
   return pRval;
 }
 
-const char *CHFindNextXMLTag(const char *pTagContents, int cbLength)
+const char *CHFindNextXMLTag(const char *pTagContents, int cbLength, int nNestingFlags)
 {
-  return NULL; // for now...
+const char *p1, *pEnd = pTagContents + cbLength;
+
+
+  if(!pTagContents || cbLength == 0 || !*pTagContents)
+  {
+    return pTagContents;
+  }
+
+  if(cbLength < 0)
+  {
+    cbLength = strlen(pTagContents);
+  }
+
+  p1 = pTagContents;
+
+  // outside of a tag, we don't check quote marks.  however, I do check for parens
+  // when the bit flags in 'nNestingFlags' tell me to.
+  // TODO:  add a 'quote mark' check to 'nNestingFlags' ?
+
+  // NOTE:  XML spec requires that '>' and '&' be treated special, and quotes ignored for these.
+  //        The strings "&amp;" "&lt;" "&gt;" must also be honored inside or outside of quotes.
+  //        when I find '>' inside of quotes, I could optionally ignore it, but the spec says "NO"
+  //        so the result should be some kind of XML syntax error...
+
+  while(p1 < pEnd && *p1)
+  {
+    if(*p1 == '<') // next tag (includes comment tags, etc.)
+    {
+      break;
+    }
+
+    // TODO:  exit if I find ending tag?
+
+    if((nNestingFlags & CHPARSEXML_PAREN) && (*p1 == '(' || *p1 == ')'))
+    {
+      break;
+    }
+
+    if((nNestingFlags & CHPARSEXML_BRACKET) && (*p1 == '[' || *p1 == ']'))
+    {
+      break;
+    }
+
+    p1++;
+  }
+
+  return p1;
 }
 
-const char *CHFindEndOfXMLTag(const char *pTagContents, int cbLength)
+
+const char *CHFindEndOfXMLSection(const char *pTagContents, int cbLength, char cEndChar, int bUseQuotes)
 {
 register const char *p1 = pTagContents;
 const char *pE;
@@ -2607,10 +2902,18 @@ const char *pE;
 
   pE = p1 + cbLength;
 
+  // in cases of <!CDATA ... >  and other tags that might have nesting within them, this
+  // function needs to pay attention to '[' ']' '(' and ')' that are OUTSIDE of quoted strings
+
+  // NOTE:  XML spec requires that '>' and '&' be treated special, and quotes ignored for these.
+  //        The strings "&amp;" "&lt;" "&gt;" must also be honored inside or outside of quotes.
+  //        when I find '>' inside of quotes, I could optionally ignore it, but the spec says "NO"
+  //        so the result should be some kind of XML syntax error...
+
   while(p1 < pE && *p1)
   {
     // need to parse out this tag.
-    if(*p1 == '"' || *p1 == '\'') //handle quotes
+    if(bUseQuotes && (*p1 == '"' || *p1 == '\'')) //handle quotes
     {
       char c1 = *p1;
       p1++;
@@ -2642,9 +2945,71 @@ const char *pE;
         p1++; // now past the quote
       }
     }
-    else if(*p1 == '>') // end of XML tag
+    else if(*p1 == cEndChar) // end of the tag/section
     {
       break;
+    }
+
+    // Assuming we are already "within a tag" it's possible, for some tags, to have
+    // a bunch of stuff embedded within them using '( )' '[ ]' etc..  This function
+    // will recurse and allow for nested things like that.
+
+    else if(*p1 == '(') // now we look for embedded things
+    {
+      p1++;
+      if(p1 >= pE)
+      {
+        break;
+      }
+
+      p1 = CHFindEndOfXMLSection(p1, pE - p1, ')', 0);
+
+      if(!p1 || p1 >= pE || !*p1 )
+      {
+        break;
+      }
+
+      p1++; // point it past the ')' I just found
+    }
+    else if(*p1 == '[')
+    {
+      p1++;
+      if(p1 >= pE)
+      {
+        break;
+      }
+
+      p1 = CHFindEndOfXMLSection(p1, pE - p1, ']', 0);
+
+      if(!p1 || p1 >= pE || !*p1 )
+      {
+        break;
+      }
+
+      p1++; // point it past the ']' I just found
+    }
+    else if(!bUseQuotes && *p1 == '<' && (cEndChar == ']' || cEndChar == ')'))
+    {
+      // special case within an embedded section surrounded by '[]' or '()'
+      //   IF I'm searching for an end bracket/paren, and
+      //   IF I've just run across the beginning of a tag, and
+      //   IF I'm currently ignoring quote marks
+      //   THEN, I want to parse the XML tag with respect to quote marks until the end of the tag
+
+      p1++;
+      if(p1 >= pE)
+      {
+        break;
+      }
+
+      p1 = CHFindEndOfXMLSection(p1, pE - p1, '>', 1);
+
+      if(!p1 || p1 >= pE || !*p1 )
+      {
+        break;
+      }
+
+      p1++; // point it past the '>' I just found (it's embedded)
     }
     else
     {
@@ -2653,6 +3018,11 @@ const char *pE;
   }
 
   return p1;
+}
+
+const char *CHFindEndOfXMLTag(const char *pTagContents, int cbLength)
+{
+  return CHFindEndOfXMLSection(pTagContents, cbLength, '>', 1);
 }
 
 

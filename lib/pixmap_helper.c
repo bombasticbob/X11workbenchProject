@@ -319,10 +319,10 @@ XStandardColormap map;
       {
         l2 = 65535;
       }
-      else if(lColor < 0)
-      {
-        l2 = 0;
-      }
+//      else if(lColor < 0)
+//      {
+//        l2 = 0;
+//      }
       else
       {
         l2 /= pMap->red_max;
@@ -346,10 +346,10 @@ XStandardColormap map;
       {
         l2 = 65535 * pMap->red_max;
       }
-      else if(lColor < 0) // won't happen
-      {
-        l2 = 0;
-      }
+//      else if(lColor < 0) // won't happen
+//      {
+//        l2 = 0;
+//      }
       else
       {
         l2 /= pMap->red_max;
@@ -366,10 +366,10 @@ XStandardColormap map;
       {
         l2 = 65535 * pMap->green_max;
       }
-      else if(lColor < 0) // won't happen
-      {
-        l2 = 0;
-      }
+//      else if(lColor < 0) // won't happen
+//      {
+//        l2 = 0;
+//      }
       else
       {
         l2 /= pMap->green_max;
@@ -391,10 +391,10 @@ XStandardColormap map;
         {
           l2 = 65535 * pMap->blue_max;
         }
-        else if(lColor < 0)
-        {
-          l2 = 0;
-        }
+//        else if(lColor < 0)
+//        {
+//          l2 = 0;
+//        }
         else
         {
           l2 /= pMap->blue_max;
@@ -413,10 +413,10 @@ XStandardColormap map;
       {
         l2 = 65535 * pMap->red_max;
       }
-      else if(lColor < 0)
-      {
-        l2 = 0;
-      }
+//      else if(lColor < 0)
+//      {
+//        l2 = 0;
+//      }
       else
       {
         l2 /= pMap->red_max;
@@ -433,10 +433,10 @@ XStandardColormap map;
       {
         l2 = 65535 * pMap->blue_max;
       }
-      else if(lColor < 0)
-      {
-        l2 = 0;
-      }
+//      else if(lColor < 0)
+//      {
+//        l2 = 0;
+//      }
       else
       {
         l2 /= pMap->blue_max;
@@ -458,10 +458,10 @@ XStandardColormap map;
         {
           l2 = 65535 * pMap->green_max;
         }
-        else if(lColor < 0)
-        {
-          l2 = 0;
-        }
+//        else if(lColor < 0)
+//        {
+//          l2 = 0;
+//        }
         else
         {
           l2 /= pMap->green_max;
@@ -485,10 +485,10 @@ XStandardColormap map;
       {
         l2 = 65535 * pMap->green_max;
       }
-      else if(lColor < 0)
-      {
-        l2 = 0;
-      }
+//      else if(lColor < 0)
+//      {
+//        l2 = 0;
+//      }
       else
       {
         l2 /= pMap->green_max;
@@ -505,10 +505,10 @@ XStandardColormap map;
       {
         l2 = 65535 * pMap->red_max;
       }
-      else if(lColor < 0)
-      {
-        l2 = 0;
-      }
+//      else if(lColor < 0)
+//      {
+//        l2 = 0;
+//      }
       else
       {
         l2 /= pMap->red_max;
@@ -530,10 +530,10 @@ XStandardColormap map;
         {
           l2 = 65535 * pMap->blue_max;
         }
-        else if(lColor < 0)
-        {
-          l2 = 0;
-        }
+//        else if(lColor < 0)
+//        {
+//          l2 = 0;
+//        }
         else
         {
           l2 /= pMap->blue_max;
@@ -552,10 +552,10 @@ XStandardColormap map;
       {
         l2 = 65535 * pMap->green_max;
       }
-      else if(lColor < 0)
-      {
-        l2 = 0;
-      }
+//      else if(lColor < 0)
+//      {
+//        l2 = 0;
+//      }
       else
       {
         l2 /= pMap->green_max;
@@ -572,10 +572,10 @@ XStandardColormap map;
       {
         l2 = 65535 * pMap->blue_max;
       }
-      else if(lColor < 0)
-      {
-        l2 = 0;
-      }
+//      else if(lColor < 0)
+//      {
+//        l2 = 0;
+//      }
       else
       {
         l2 /= pMap->blue_max;
@@ -597,10 +597,10 @@ XStandardColormap map;
         {
           l2 = 65535 * pMap->red_max;
         }
-        else if(lColor < 0)
-        {
-          l2 = 0;
-        }
+//        else if(lColor < 0)
+//        {
+//          l2 = 0;
+//        }
         else
         {
           l2 /= pMap->red_max;
@@ -624,10 +624,10 @@ XStandardColormap map;
       {
         l2 = 65535 * pMap->blue_max;
       }
-      else if(lColor < 0)
-      {
-        l2 = 0;
-      }
+//      else if(lColor < 0)
+//      {
+//        l2 = 0;
+//      }
       else
       {
         l2 /= pMap->blue_max;
@@ -644,10 +644,10 @@ XStandardColormap map;
       {
         l2 = 65535 * pMap->red_max;
       }
-      else if(lColor < 0)
-      {
-        l2 = 0;
-      }
+//      else if(lColor < 0)
+//      {
+//        l2 = 0;
+//      }
       else
       {
         l2 /= pMap->red_max;
@@ -669,10 +669,10 @@ XStandardColormap map;
         {
           l2 = 65535 * pMap->green_max;
         }
-        else if(lColor < 0)
-        {
-          l2 = 0;
-        }
+//        else if(lColor < 0)
+//        {
+//          l2 = 0;
+//        }
         else
         {
           l2 /= pMap->green_max;
@@ -691,10 +691,10 @@ XStandardColormap map;
       {
         l2 = 65535 * pMap->blue_max;
       }
-      else if(lColor < 0)
-      {
-        l2 = 0;
-      }
+//      else if(lColor < 0)
+//      {
+//        l2 = 0;
+//      }
       else
       {
         l2 /= pMap->blue_max;
@@ -711,10 +711,10 @@ XStandardColormap map;
       {
         l2 = 65535 * pMap->green_max;
       }
-      else if(lColor < 0)
-      {
-        l2 = 0;
-      }
+//      else if(lColor < 0)
+//      {
+//        l2 = 0;
+//      }
       else
       {
         l2 /= pMap->green_max;
@@ -737,10 +737,10 @@ XStandardColormap map;
         {
           l2 = 65535 * pMap->red_max;
         }
-        else if(lColor < 0)
-        {
-          l2 = 0;
-        }
+//        else if(lColor < 0)
+//        {
+//          l2 = 0;
+//        }
         else
         {
           l2 /= pMap->red_max;
@@ -785,11 +785,12 @@ XStandardColormap map;
     lR = (unsigned long)(pColor->red * pMap->red_max) / 65535;
   }
 
-  if(lR < 0)
-  {
-    lR = 0;
-  }
-  else if(lR > pMap->red_max)
+//  if(lR < 0)
+//  {
+//    lR = 0;
+//  }
+//  else
+   if(lR > pMap->red_max)
   {
     lR = pMap->red_max;
   }
@@ -799,11 +800,12 @@ XStandardColormap map;
     lG = (unsigned long)(pColor->green * pMap->green_max) / 65535;
   }
 
-  if(lG < 0)
-  {
-    lG = 0;
-  }
-  else if(lG > pMap->green_max)
+//  if(lG < 0)
+//  {
+//    lG = 0;
+//  }
+//  else
+   if(lG > pMap->green_max)
   {
     lG = pMap->green_max;
   }
@@ -813,11 +815,12 @@ XStandardColormap map;
     lB = (unsigned long)(pColor->blue * pMap->blue_max) / 65535;
   }
 
-  if(lB < 0)
-  {
-    lB = 0;
-  }
-  else if(lB > pMap->blue_max)
+//  if(lB < 0)
+//  {
+//    lB = 0;
+//  }
+//  else
+   if(lB > pMap->blue_max)
   {
     lB = pMap->blue_max;
   }

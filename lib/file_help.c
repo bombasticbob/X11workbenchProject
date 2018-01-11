@@ -569,6 +569,151 @@ void FBReplaceLineInFileBuf(file_help_buf_t **ppBuf, long lLineNum, const char *
 // FILE SYSTEM INDEPENDENT FILE AND DIRECTORY UTILITIES
 // UNIX/LINUX versions - TODO windows versions?
 
+size_t WBReadFileIntoBuffer(const char *szFileName, char **ppBuf)
+{
+off_t cbLen;
+size_t cbF;
+int cb1, iChunk;
+char *pBuf;
+int iFile;
+
+
+  if(!ppBuf)
+  {
+    return (size_t)-1;
+  }
+
+  iFile = open(szFileName, O_RDONLY); // open read only (assume no locking for now)
+
+  if(iFile < 0)
+  {
+    return (size_t)-1;
+  }
+
+  // how long is my file?
+
+  cbLen = (unsigned long)lseek(iFile, 0, SEEK_END); // location of end of file
+
+  if(cbLen == (off_t)-1)
+  {
+    *ppBuf = NULL; // make sure
+  }
+  else
+  {
+    lseek(iFile, 0, SEEK_SET); // back to beginning of file
+
+    *ppBuf = pBuf = WBAlloc(cbLen + 1);
+
+    if(!pBuf)
+    {
+      cbLen = (off_t)-1; // to mark 'error'
+    }
+    else
+    {
+      cbF = cbLen;
+
+      while(cbF > 0)
+      {
+        iChunk = 1048576; // 1MByte at a time
+
+        if(iChunk > cbF)
+        {
+          iChunk = (int)cbF;
+        }
+
+        cb1 = read(iFile, pBuf, iChunk);
+
+        if(cb1 == -1)
+        {
+          if(errno == EAGAIN) // allow this
+          {
+            usleep(100);
+            continue; // for now just do this
+          }
+
+          cbLen = -1;
+          break;
+        }
+        else if(cb1 != iChunk) // did not read enough bytes
+        {
+          iChunk = cb1; // for now
+        }
+
+        WBDebugPrint("TEMPORARY:  read %d bytes\n", (int)iChunk);
+
+        cbF -= iChunk;
+        pBuf += iChunk;
+      }
+    }
+  }
+
+  close(iFile);
+
+  WBDebugPrint("TEMPORARY WBReadFileIntoBuffer:  return %d  buf=%p\n", (int)cbLen, *ppBuf);
+
+  return (size_t) cbLen;
+}
+
+int WBWriteFileFromBuffer(const char *szFileName, const char *pBuf, size_t cbBuf)
+{
+int iFile, iRval, iChunk;
+
+
+  if(!pBuf)
+  {
+    return -1;
+  }
+
+  iFile = open(szFileName, O_CREAT | O_TRUNC | O_RDWR, 0666);  // always create with mode '666' (umask should apply)
+
+  if(iFile < 0)
+  {
+    return -1;
+  }
+
+  while(cbBuf > 0)
+  {
+    // write chunks of 1Mb or size remaining
+
+    iChunk = 1048576;
+    if(iChunk > cbBuf)
+    {
+      iChunk = (int)cbBuf;
+    }
+
+    iRval = write(iFile, pBuf, iChunk);
+
+    if(iRval < 0)
+    {
+      if(errno == EAGAIN)
+      {
+        usleep(100);
+
+        // TODO:  time limit?  for now, no
+
+        continue; // try again
+      }
+
+      close(iFile);
+      return -1; // error
+    }
+    else if(iRval != iChunk) // TODO:  allow this??
+    {
+      WBDebugPrint("TEMPORARY:  writing file, only wrote %d of %d bytes\n", iRval, iChunk);
+      iChunk = iRval;
+    }
+
+    pBuf += iChunk;
+    cbBuf -= iChunk;
+  }
+
+  iRval = 0; // at this point, success!
+
+  close(iFile);
+
+  return iRval;
+}
+
 int WBReplicateFilePermissions(const char *szProto, const char *szTarget)
 {
 struct stat sb;

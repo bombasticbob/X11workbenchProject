@@ -96,6 +96,15 @@ static void WBFreePointerHashes(void);
 static void __add_to_temp_file_list(const char *szFile);
 
 
+int bQuitFlag = FALSE;             // defined here, used globally
+
+// within this file debug level is writable.  outside of this file, it's (technically) read-only
+unsigned int iWBDebugLevel = 0; // default is no debug except errors, all subsystems
+
+// application name (from argv[0])
+static char szAppName[PATH_MAX * 2]="";
+
+
 
 //////////////////////////////////////////////////////////////////////////////
 //                                                                          //
@@ -179,6 +188,414 @@ char *p1;
   }
 
 }
+
+// NOTE: when this function is called first, the arguments will be parsed in order to obtain
+// information needed by WBInit and WBInitDisplay.  Otherwise, default values are used by
+// the WBInit and WBInitDisplay functions.
+
+int WBParseStandardArguments(int *pargc, char ***pargv, char ***penvp)
+{
+int argc = *pargc;
+char **argv = *pargv;
+char **envp = *penvp;
+char **p1;
+char **argvNew = NULL;
+int argcNew = 0;
+int i1, i2;
+int iDebugLevelSeen = 0;
+
+static const char * const aszCmdLineOptions[]=
+{
+  "debug","subsys","display","minimize","maximize","geometry",
+  NULL // marks end of list
+};
+
+static const char * const aszDebugSubSys[]=
+{
+  "init","application","window","menu","event",
+  "dialog","dialogctrl","frame","keyboard",
+  "mouse","font","settings","selection",
+  "pixmap","expose","editwindow",
+  NULL
+};
+
+enum
+{
+    option_debug=0,
+    option_subsys,
+    option_display,
+    option_minimize,
+    option_maximize,
+    option_geometry
+};
+
+  // grab the name of the program and cache it.  I'll need the path info.
+
+  strncpy(szAppName, argv[0], sizeof(szAppName));
+  szAppName[sizeof(szAppName) - 1] = 0; // make sure
+
+  // search for DISPLAY environment variable, pre-assign to szStartupDisplayName
+  p1 = envp;
+
+  if(p1)
+  {
+    while(*p1)
+    {
+      if(!strncmp(*p1, "DISPLAY=", 8))
+      {
+        __internal_startup_display(*p1 + 8);
+        break;  // I am done
+      }
+
+      p1++;
+    }
+  }
+  else // with no environment pointers, use the 'getenv' C language function
+  {
+    char *p1a = getenv("DISPLAY");
+
+    if(p1a)
+    {
+      __internal_startup_display(p1a);
+    }
+  }
+
+  // parse arg list and make copy as needed
+
+  while(argc > 1)
+  {
+    int argc0 = argc;  // value at start of loop iteration
+    int iFlag = 0;
+
+    if(argv[1][0] != '-' || !argv[1][1])
+    {
+      // end of arguments is a '-' by itself or something not starting with '-'
+      break;
+    }
+
+    if(argv[1][1] != '-') // double '-' is what I'm looking for
+    {
+      if(!argvNew) // aren't making copies yet
+      {
+        argv++; // keep looking but don't touch anything yet
+        argc--;
+        continue;
+      }
+    }
+    else
+    {
+      // options here start with two '-' and are followed by
+      // text=value or text [space] value
+
+      for(i1=0; aszCmdLineOptions[i1]; i1++)
+      {
+        const char *szOpt = aszCmdLineOptions[i1];
+        int iLen = strlen(szOpt);
+        const char *szArg = argv[1] + 2;
+        const char *szVal = szArg + iLen;
+
+        if(!strncmp(szOpt, szArg, iLen) &&
+           (*szVal == '=' || !*szVal))
+        {
+          if(!*szVal)
+          {
+            if(argc > 2)
+            {
+              // skip over arg for loop
+              argv++;
+              argc--;
+              szVal = argv[1];
+            }
+          }
+
+          switch(i1)
+          {
+            case option_debug:
+              i2 = atoi(szVal);
+
+              if(*szVal < '0' || *szVal > '9' || i2 < 0 || i2 > DebugLevel_Excessive)
+              {
+                WBDebugPrint("Invalid debug level %s\n", szVal);
+
+                if(argvNew)
+                {
+                  WBFree(argvNew);
+                }
+
+                return -1;
+              }
+
+              iDebugLevelSeen = 1;
+              iWBDebugLevel = (iWBDebugLevel & DebugSubSystem_MASK)
+                            | (atoi(szVal) & DebugLevel_MASK);
+              break;
+
+            case option_subsys:
+              for(i2=0; aszDebugSubSys[i2]; i2++)
+              {
+                if(!strcasecmp(aszDebugSubSys[i2], szVal))
+                {
+                  iWBDebugLevel |= 1L << (i2 + DebugSubSystem_BITSHIFT);
+                  break;
+                }
+              }
+              if(!aszDebugSubSys[i2])
+              {
+                i2 = atoi(szVal);
+                if(i2 > 0 && (i2 + DebugSubSystem_BITSHIFT) <= 32)
+                {
+                  iWBDebugLevel |= 1L << (i2 + DebugSubSystem_BITSHIFT - 1);
+                }
+                else
+                {
+                  WBDebugPrint("unrecognized subsystem %s\n", szVal);
+
+                  if(argvNew)
+                  {
+                    WBFree(argvNew);
+                  }
+
+                  return -1;
+                }
+              }
+
+              if(!iDebugLevelSeen)
+              {
+                // assume EXCESSIVE debug level unless otherwise specified
+
+                iWBDebugLevel = (iWBDebugLevel & DebugSubSystem_MASK)
+                              | DebugLevel_Excessive;
+              }
+
+              break;
+
+            case option_display:
+              __internal_startup_display(szVal);
+              break;
+
+            case option_minimize:
+              __internal_startup_minimize();
+              break;
+            case option_maximize:
+              __internal_startup_maximize();
+              break;
+            case option_geometry:
+              __internal_startup_geometry(szVal);
+              break;
+            default:
+              WBDebugPrint("Unrecognized option: --%s\n", szArg);
+
+              if(argvNew)
+              {
+                WBFree(argvNew);
+              }
+
+              return -1;
+          }
+
+          iFlag = 1;  // skip this entry (I found a match)
+          break;
+        }
+      }
+    }
+
+    // at this point the argument wasn't recognized and so I must
+    // copy it into the destination
+
+    if(!argvNew) // need to allocate copy
+    {
+      argvNew = WBAlloc(sizeof(*argvNew) * (argc + 2));
+      if(!argvNew)
+      {
+        return -1;  // not enough memory
+      }
+
+      i2 = *pargc;  // the original 'argc' value
+      argcNew = 0;
+      while(i2 >= argc0) // I want to do this once on the first pass, etc.
+      {
+        argvNew[argcNew] = argv[argcNew];
+        argcNew++;
+        i2--;
+      }
+    }
+
+    if(!iFlag)
+    {
+      argvNew[argcNew++] = argv[1];
+    }
+
+    argv++;
+    argc--;
+  }
+
+  if(argvNew)
+  {
+    while(argc > 1)
+    {
+      argvNew[argcNew++] = argv[1];
+      argv++;
+      argc--;
+    }
+
+    *pargv = argvNew;
+    *pargc = argcNew;
+  }
+
+  if((iWBDebugLevel & DebugLevel_MASK) > 0)
+  {
+    WBDebugPrint("DebugLevel set to %d\n", (int)(iWBDebugLevel & DebugLevel_MASK));
+  }
+
+  if((iWBDebugLevel & DebugSubSystem_MASK) != 0)
+  {
+    i2 = 0;
+    for(i1=0; aszDebugSubSys[i1]; i1++)
+    {
+      if(iWBDebugLevel & (1L << (i1 + DebugSubSystem_BITSHIFT)))
+      {
+        if(!i2)
+        {
+          WBDebugPrint("Debug SubSystem: %s", aszDebugSubSys[i1]);
+          i2 = 1;
+        }
+        else
+        {
+          WBDebugPrint(", %s", aszDebugSubSys[i1]);
+        }
+      }
+    }
+
+    for(; (i1 + DebugSubSystem_BITSHIFT) < 32; i1++)
+    {
+      if(iWBDebugLevel & (1L << (i1 + DebugSubSystem_BITSHIFT)))
+      {
+        if(!i2)
+        {
+          WBDebugPrint("Debug SubSystem: %d", i1 + 1);
+          i2 = 1;
+        }
+        else
+        {
+          WBDebugPrint(", %d", i1 + 1);
+        }
+      }
+    }
+
+    WBDebugPrint("\n");
+  }
+
+  return 0;
+}
+
+void WBToolkitUsage(void)
+{
+  fputs("X11 WorkBench Toolkit options (these should precede other options)\n"
+        "--debug n       debug level (default 0, errors only)\n"
+        "                1 = minimal, 7 is maximum debug level\n"
+        "--subsys xx     subsystem to debug (implies --debug 7 if not specified)\n"
+        "                'xx' is a subsystem name or bit value (see window_helper.h)\n"
+        "                A bit value of 1 is equivalent to the lowest subsystem bit\n"
+        "                NOTE:  this option can be specified multiple times\n"
+        "--display xx    X11 display to use (default is DISPLAY env variable)\n"
+        "--minimize      show minimized window on startup\n"
+        "--maximize      show maximized window on startup\n"
+        "--geometry geom specify window geometry on startup\n"
+        "                geometry spec as per X specification (see X man page)\n"
+        "                typical value might be 800x600+100+50\n"
+        "                (default centers window with reasonable size)\n"
+        "\n", stderr);
+}
+
+const char *GetStartupAppName(void)
+{
+  return szAppName;
+}
+
+
+
+//////////////////////////////////////////////////////////////////////////////
+//                                                                          //
+//                     ____         _                                       //
+//                    |  _ \   ___ | |__   _   _   __ _                     //
+//                    | | | | / _ \| '_ \ | | | | / _` |                    //
+//                    | |_| ||  __/| |_) || |_| || (_| |                    //
+//                    |____/  \___||_.__/  \__,_| \__, |                    //
+//                                                |___/                     //
+//                                                                          //
+//////////////////////////////////////////////////////////////////////////////
+
+void WBSetDebugLevel(unsigned int iNew)  // pass level as argument, 0 for none, 1 for minimal, 2 for more, etc. up to 7
+{
+  iWBDebugLevel = iNew;
+}
+
+#ifndef __GNUC__
+// querying debug level.  Useful in WB_DEBUG_PRINT macro
+unsigned int WBGetDebugLevel(void) // window_helper.h makes this inline when __GNUC__ defined
+{
+  return iWBDebugLevel;
+}
+#endif // __GNUC__
+
+void WBDebugPrint(const char *fmt, ...)
+{
+va_list va;
+
+  va_start(va, fmt);
+
+  vfprintf(stderr, fmt, va);
+  fflush(stderr); // dump NOW before (possibly) crashing
+
+  // TODO:  log file?
+
+  va_end(va);
+}
+
+void WBDebugDump(const char *szTitle, void *pData, int cbData)
+{
+int i1, i2;
+unsigned char *pX = (unsigned char *)pData;
+static const int nCols = 16;
+
+  WBDebugPrint("==========================================================================================\n"
+               "%s\n", szTitle);
+
+  for(i1=0; i1 < cbData; i1 += nCols, pX += nCols)
+  {
+    WBDebugPrint("%06x: ", i1); // assume less than 1Mb for now
+
+    for(i2=0; i2 < nCols && (i1 + i2) < cbData; i2++)
+    {
+      WBDebugPrint("%02x ", pX[i2]);
+    }
+
+    for(; i2 < nCols; i2++)
+    {
+      WBDebugPrint("   ");
+    }
+
+    WBDebugPrint("|");
+
+    for(i2=0; i2 < nCols && (i1 + i2) < cbData; i2++)
+    {
+      if(pX[i2] < ' ' || pX[i2] >= 0x80)
+      {
+        WBDebugPrint(" .");
+      }
+      else
+      {
+        WBDebugPrint(" %c", pX[i2]);
+      }
+    }
+
+    WBDebugPrint("\n");
+  }
+
+  WBDebugPrint("==========================================================================================\n");
+}
+
+
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -683,6 +1100,101 @@ char *p1, *pDest;
   *pDest = 0; // make sure
 }
 
+static char __amp_char(char **ppSpot)
+{
+char *pS = *ppSpot;
+
+  if(!memcmp(pS, "&amp;", 5))
+  {
+    *ppSpot += 5;
+    return '&';
+  }
+  else if(!memcmp(pS, "&lt;", 4))
+  {
+    *ppSpot += 4;
+    return '<';
+  }
+  else if(!memcmp(pS, "&gt;", 4))
+  {
+    *ppSpot += 4;
+    return '>';
+  }
+
+  return 0;
+}
+
+void WBNormalizeXMLString(char *pString)
+{
+char *p1, *pDest;
+char c1, c2;
+
+
+  // not only de-quoting, but converting '&amp;' '&lt;' '&gt;' to '&' '<' and '>'
+
+  p1 = pDest = pString;
+
+  while(*p1)
+  {
+    if(*p1 == '"' || *p1 == '\'')
+    {
+      c1 = *(p1++);
+
+      while(*p1 &&
+            (*p1 != c1 || p1[1] == c1))
+      {
+        if(*p1 == c1)
+        {
+          p1++;
+        }
+        else if(*p1 == '&') // substitute
+        {
+          c2 = __amp_char(&p1);
+
+          if(c2)
+          {
+            *(pDest++) = c2;
+            continue;
+          }
+
+          // if it's not recognized, just process it as normal chars
+        }
+
+        *(pDest++) = *(p1++);
+      }
+
+      if(*p1 == c1)
+      {
+        p1++;
+      }
+    }
+    else if(*p1 == '&') // substitute
+    {
+      c2 = __amp_char(&p1);
+
+      if(!c2)
+      {
+        goto normal_char; // just process it as normal chars
+      }
+
+      *(pDest++) = c2;
+    }
+    else
+    {
+normal_char:
+
+      if(pDest != p1)
+      {
+        *pDest = *p1;
+      }
+
+      pDest++;
+      p1++;
+    }
+  }
+
+  *pDest = 0; // make sure
+}
+
 int WBStringLineCount(const char *pSrc, unsigned int nMaxChars)
 {
 int iRval = 1;
@@ -794,14 +1306,11 @@ int nMaxChars;
 
   if(pnMaxChars)
   {
-    *pnMaxChars = 0;
+    *pnMaxChars = nMaxChars;
   }
 
   return pSrc;
 }
-
-
-
 
 
 
@@ -819,7 +1328,7 @@ int nMaxChars;
 
 typedef struct __pointer_hash__
 {
-  WB_UINT32 uiHash;     // hash value, must be zero for 'free' entry
+  WB_UINT32 uiHash;     // 32-bit pointer hash value, must be zero for 'free' entry
   void *pValue;         // NULL if unused entry, else the pointer value
   WB_UINT32 dwTick;     // millis count when I last created/referenced this hash
   WB_UINT32 dwRefCount; // reference count (deleted on '0')
@@ -1465,6 +1974,17 @@ unsigned int nAtom;
 
 
 
+//////////////////////////////////////////////////////////////////////////////
+//                                                                          //
+//                                           _                              //
+//                   __ _  ___   ___   _ __ | |_       _ __                 //
+//                  / _` |/ __| / _ \ | '__|| __|     | '__|                //
+//                 | (_| |\__ \| (_) || |   | |_      | |                   //
+//                  \__, ||___/ \___/ |_|    \__|_____|_|                   //
+//                     |_|                      |_____|                     //
+//                                                                          //
+//////////////////////////////////////////////////////////////////////////////
+
 // ========================================================
 // Dealing with a lack of or improperly supported qsort_r()
 // ========================================================
@@ -1681,11 +2201,12 @@ unsigned char buf[32], buf2[32]; // if smaller than 32 bytes, use THIS for temp 
 
 #if !defined(HAVE_XPM) || defined(__DOXYGEN__)
 
-////////////////////////////////////////
-// SUBSTITUTE CODE FOR MISSING libXpm //
-////////////////////////////////////////
+//////////////////////////////////////////////////////
+// SUBSTITUTE CODE FOR MISSING (or unwanted) libXpm //
+//////////////////////////////////////////////////////
 
 // parse an XPM, and generate data that I can THEN create a bitmap from
+//
 // The XPM will have 4 numbers at the start (in ASCII): WIDTH HEIGHT nColors chars_per_color
 // 'nColors' is the size of the color table (one line each)
 // 'chars_per_color' is the # of characters that represent a color
@@ -1693,7 +2214,12 @@ unsigned char buf[32], buf2[32]; // if smaller than 32 bytes, use THIS for temp 
 // To create a transparency mask look for a color called "None" which is the background color
 // for the transparency mask.  The mask will be a monochrome bitmap with '0' for transparency,
 // and '1' for everything else.
+//
 // mono bitmap format will be 1 bit per pixel, 16-bit MSB
+//
+// This function is generally PREFERABLE to the libXpm version as it's a LOT faster
+// Additionally, it can be made 'MS Windows Compatible' so that XPM resources can be
+// used within WIN32 applications.
 
 #define MAX_XPM_COLOR_CHAR_SIZE 4
 
@@ -2322,9 +2848,18 @@ Pixmap pxTemp;
 
 
 
-///////////////////////////////////
-// EXTERNAL APPLICATION EXECUTION
-///////////////////////////////////
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                                               //
+//   ____         _    _                              _   _____                         _____  _  _              //
+//  |  _ \  __ _ | |_ | |__   ___    __ _  _ __    __| | |_   _|___  _ __ ___   _ __   |  ___|(_)| |  ___  ___   //
+//  | |_) |/ _` || __|| '_ \ / __|  / _` || '_ \  / _` |   | | / _ \| '_ ` _ \ | '_ \  | |_   | || | / _ \/ __|  //
+//  |  __/| (_| || |_ | | | |\__ \ | (_| || | | || (_| |   | ||  __/| | | | | || |_) | |  _|  | || ||  __/\__ \  //
+//  |_|    \__,_| \__||_| |_||___/  \__,_||_| |_| \__,_|   |_| \___||_| |_| |_|| .__/  |_|    |_||_| \___||___/  //
+//                                                                             |_|                               //
+//                                                                                                               //
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
 char * WBSearchPath(const char *szFileName)
 {
@@ -2453,18 +2988,6 @@ no_stat:
 
   return pRval;
 }
-
-
-//////////////////////////////////////////////////////////////////////////////////////////////
-//                                                                                          //
-//   _____                                                         _____  _  _              //
-//  |_   _|___  _ __ ___   _ __    ___   _ __  __ _  _ __  _   _  |  ___|(_)| |  ___  ___   //
-//    | | / _ \| '_ ` _ \ | '_ \  / _ \ | '__|/ _` || '__|| | | | | |_   | || | / _ \/ __|  //
-//    | ||  __/| | | | | || |_) || (_) || |  | (_| || |   | |_| | |  _|  | || ||  __/\__ \  //
-//    |_| \___||_| |_| |_|| .__/  \___/ |_|   \__,_||_|    \__, | |_|    |_||_| \___||___/  //
-//                        |_|                              |___/                            //
-//                                                                                          //
-//////////////////////////////////////////////////////////////////////////////////////////////
 
 
 char * WBTempFile0(const char *szExt)
@@ -2638,17 +3161,26 @@ char *pTemp;
 }
 
 
-//////////////////////////////////////////////////////////////////////////////
-//                                                                          //
-//             ____                                                         //
-//            |  _ \  _ __  ___    ___  ___  ___  ___   ___  ___            //
-//            | |_) || '__|/ _ \  / __|/ _ \/ __|/ __| / _ \/ __|           //
-//            |  __/ | |  | (_) || (__|  __/\__ \\__ \|  __/\__ \           //
-//            |_|    |_|   \___/  \___|\___||___/|___/ \___||___/           //
-//                                                                          //
-//                                                                          //
-//////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                                                       //
+//   _____        _                             _      _                   _  _              _    _                      //
+//  | ____|__  __| |_  ___  _ __  _ __    __ _ | |    / \    _ __   _ __  | |(_)  ___  __ _ | |_ (_)  ___   _ __   ___   //
+//  |  _|  \ \/ /| __|/ _ \| '__|| '_ \  / _` || |   / _ \  | '_ \ | '_ \ | || | / __|/ _` || __|| | / _ \ | '_ \ / __|  //
+//  | |___  >  < | |_|  __/| |   | | | || (_| || |  / ___ \ | |_) || |_) || || || (__| (_| || |_ | || (_) || | | |\__ \  //
+//  |_____|/_/\_\ \__|\___||_|   |_| |_| \__,_||_| /_/   \_\| .__/ | .__/ |_||_| \___|\__,_| \__||_| \___/ |_| |_||___/  //
+//                                                          |_|    |_|                                                   //
+//                                                                                                                       //
+//                          _                _   ____                                                                    //
+//                         / \    _ __    __| | |  _ \  _ __  ___    ___  ___  ___  ___   ___  ___                       //
+//                        / _ \  | '_ \  / _` | | |_) || '__|/ _ \  / __|/ _ \/ __|/ __| / _ \/ __|                      //
+//                       / ___ \ | | | || (_| | |  __/ | |  | (_) || (__|  __/\__ \\__ \|  __/\__ \                      //
+//                      /_/   \_\|_| |_| \__,_| |_|    |_|   \___/  \___|\___||___/|___/ \___||___/                      //
+//                                                                                                                       //
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+///////////////////////////////////
+// EXTERNAL APPLICATION EXECUTION
+///////////////////////////////////
 
 WB_PROCESS_ID WBRunAsyncPipeV(WB_FILE_HANDLE hStdIn, WB_FILE_HANDLE hStdOut, WB_FILE_HANDLE hStdErr,
                               const char *szAppName, va_list va)

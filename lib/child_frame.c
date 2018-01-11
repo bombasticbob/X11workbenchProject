@@ -217,6 +217,8 @@ int iRval = -1;
     pChildFrame->pszMenuResource = NULL;
   }
 
+  pChildFrame->iContextMenuID = -1; // default; use
+
   if(pHandlerArray)
   {
     const WBFWMenuHandler *pH;
@@ -479,6 +481,18 @@ void FWSetChildFrameMenu(WBChildFrame *pChildFrame, const char *szFocusMenu)
     pChildFrame->pszMenuResource = NULL;
   }
 
+}
+
+void FWSetChildFrameContextMenuID(WBChildFrame *pChildFrame, int nID)
+{
+  if(!pChildFrame || pChildFrame->ulTag != CHILD_FRAME_TAG)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - pChildFrame not valid\n", __FUNCTION__);
+
+    return;
+  }
+
+  pChildFrame->iContextMenuID = nID;
 }
 
 void FWSetChildFrameMenuHandlers(WBChildFrame *pChildFrame, const WBFWMenuHandler *pHandlerArray)
@@ -764,7 +778,7 @@ void FWSetChildFrameScrollInfo(WBChildFrame *pChildFrame, int iRow, int iMaxRow,
   //        all of those things, independently.
 
   InternalChildFrameRecalcGeom(pChildFrame, 0); // re-calculate geom but do NOT re-size window
-  
+
   // NEXT: see if I need scroll bars.  if I do, make them visible and shrink the size of the viewport
   //       according to the scroll bar sizes [this is the same as what the listbox already does]
 
@@ -988,7 +1002,7 @@ int nChar = sizeof(tbuf);
     geomTemp.y = pC->geom.y + pC->geom.height;
     geomTemp.width = pC->geomEntire.width - pC->geom.width;
     geomTemp.height = pC->geomEntire.height - pC->geom.height;
-    
+
     if(geomTemp.width > 0 && geomTemp.height > 0)
     {
       clrBG = FWGetDefaultBG();
@@ -1026,6 +1040,66 @@ int nChar = sizeof(tbuf);
     // TODO:  special handling?
 
     return iRval;  // default behavior for these
+  }
+
+  ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  //                                                                                                                       //
+  //   _____  _   ___      __  __  _____  _   _  _   _      _     ____  _____  ___ __     __ _   _____  ___  ___   _   _   //
+  //  |  ___|/ | / _ \    |  \/  || ____|| \ | || | | |    / \   / ___||_   _||_ _|\ \   / // \ |_   _||_ _|/ _ \ | \ | |  //
+  //  | |_   | || | | |   | |\/| ||  _|  |  \| || | | |   / _ \ | |      | |   | |  \ \ / // _ \  | |   | || | | ||  \| |  //
+  //  |  _|  | || |_| |   | |  | || |___ | |\  || |_| |  / ___ \| |___   | |   | |   \ V // ___ \ | |   | || |_| || |\  |  //
+  //  |_|    |_| \___/    |_|  |_||_____||_| \_| \___/  /_/   \_\\____|  |_|  |___|   \_//_/   \_\|_|  |___|\___/ |_| \_|  //
+  //                                                                                                                       //
+  //                                                                                                                       //
+  ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+  // checking for menu activation
+
+  if(!iRval && !pFW &&
+     pEvent->type == ClientMessage &&
+     pEvent->xclient.message_type == aWM_CHAR &&
+     pEvent->xclient.data.l[0] == XK_F10 &&             // keystroke is F10
+     (pEvent->xclient.data.l[1] & WB_KEYEVENT_KEYSYM))
+  {
+    // activate the menu in the owning frame (if there is one) or display a popup
+
+    Window wIDMenu = WBGetMenuWindow(pFW->wID);
+
+    int iACS = (int)pEvent->xclient.data.l[1] & WB_KEYEVENT_ACSMASK;
+
+    if(iACS == WB_KEYEVENT_SHIFT)
+    {
+      // send a command to pop up the context menu
+
+      return 1; // handled
+    }
+    else if(!iACS) // no ctrl+alt+shift
+    {
+      if(wIDMenu)
+      {
+        // send command to pop up the frame's menu
+
+        XClientMessageEvent evt;
+
+        // post a high-priority message to myself to display the menu
+
+        bzero(&evt, sizeof(evt));
+        evt.type = ClientMessage;
+        evt.display = WBGetWindowDisplay(wIDMenu);
+        evt.window = wIDMenu;
+        evt.message_type = aMENU_ACTIVATE;
+        evt.format = 32;
+        evt.data.l[0] = 0;
+        evt.data.l[1] = 0;
+
+        WBPostPriorityEvent(wIDMenu, (XEvent *)&evt);
+
+        WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_Menu | DebugSubSystem_Frame,
+                        "%s - posting client event message to display menu\n", __FUNCTION__);
+
+        return 1; // handled
+      }
+    }
   }
 
 

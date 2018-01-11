@@ -11,9 +11,13 @@ AM_INIT_AUTOMAKE
 AC_PREREQ(2.53)
 # FYI assuming automake >= 15
 
-AC_PROG_CC
+# order of search for CC - use 'cc' first, then 'gcc', then 'cl'
+# this way the system-defined C compiler will be invoked by default
+# TODO:  add a configure option to force gcc, clang, Microsoft C, etc.
+AC_PROG_CC([cc gcc cl])
+
 # AM_PROG_CC_C_O required based on a warning on a linux box for per-target
-# flags on pixmap_helper.c with automake 1.11, and AFTER AC_PROG_CC
+# flags on pixmap_helper.c with automake 1.11,and it must be AFTER AC_PROG_CC
 AM_PROG_CC_C_O
 
 AC_PROG_RANLIB

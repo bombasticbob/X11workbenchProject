@@ -197,6 +197,22 @@ void FWDestroyChildFrame(WBChildFrame *pChildFrame);
 void FWSetChildFrameMenu(WBChildFrame *pChildFrame, const char *szFocusMenu);
 
 /** \ingroup child_frame
+  * \brief Function to assign the context menu ID (from the menu resource) to a Child Frame
+  *
+  * \param pChildFrame The pointer to the WBChildFrame structure for the desired Child Frame window
+  * \param nID The popup menu ID from the active menu's resource; can be the owner frame's menu OR a menu assigned by FWSetChildFrameMenu().
+  *        The default is -1, which does not display a context menu
+  *
+  * Assigns the (new) context menu ID for the Child Frame.  A value of '-1' (the default) does not display
+  * any context menu with SHIFT+F10 or right-mouse-click.  Otherwise, the active menu resource is searched
+  * for a popup menu with the appropriate ID value, and the popup menu is displayed as if it were activated
+  * using an appropriate menu hotkey.
+  *
+  * Header File:  child_frame.h
+**/
+void FWSetChildFrameContextMenuID(WBChildFrame *pChildFrame, int nID);
+
+/** \ingroup child_frame
   * \brief Function to assign menu handlers to a Child Frame
   *
   * \param pChildFrame The pointer to the WBChildFrame structure for the desired Child Frame window

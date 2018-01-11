@@ -521,8 +521,8 @@ int iRval;
 //                   (const char *)(pItem->data + pItem->iMenuItemText), iRval);
 //  }
 
-  WBDestroyPointerHash(pMenu);
-  WBDestroyPointerHash(pItem); // clean them up as I'm done with them now
+  WBDestroyPointerHashPtr(pMenu); // destroying hash based on pointer value [not hash value]
+  WBDestroyPointerHashPtr(pItem); // clean them up as I'm done with them now
 
   return iRval;
 }

@@ -58,13 +58,14 @@
 #include "window_helper.h"
 #include "edit_window.h"
 #include "conf_help.h"
+#include "file_help.h"
 #include "draw_text.h"
 
 
-#if 1 // assign to 0 to disable this trace-style debugging
-#define CALLBACK_TRACKER WBDebugPrint("TEMPORARY:  %s - callback tracker\n", __FUNCTION__);
+#if 1 // assign to 0 to disable this trace-style debugging ALL of the time
+#define CALLBACK_TRACKER WBDebugPrint("TEMPORARY - edit_window.c:  %s - callback tracker\n", __FUNCTION__);
 #else //
-#define CALLBACK_TRACKER { }
+#define CALLBACK_TRACKER WB_DEBUG_PRINT((DebugLevel_Heavy | DebugSubSystem_EditWindow), "edit_window.c:  %s - callback tracker\n", __FUNCTION__);
 #endif // 0,1
 
 #define  EDIT_WINDOW_LINE_SPACING 4  /* 4 spaces between each line */
@@ -256,8 +257,9 @@ Display *pDisplay;
 int iRet;
 
 
-  InternalCheckEWColorsAndAtoms();
+  CALLBACK_TRACKER;
 
+  InternalCheckEWColorsAndAtoms();
 
   if(!pOwner)
   {
@@ -290,6 +292,7 @@ int iRet;
   }
 
   WBInitializeInPlaceTextObject(&(pRval->xTextObject), None);
+  pRval->xTextObject.vtable->set_linefeed(&(pRval->xTextObject), LineFeed_DEFAULT);
 
 //  pRval->xTextObject.vtable->set_col(&(pRval->xTextObject), 0);
 //  pRval->xTextObject.vtable->set_row(&(pRval->xTextObject), 0);
@@ -432,18 +435,93 @@ WBEditWindow *pRval = (WBEditWindow *)FWGetChildFrameStruct(wID);
 
 int WBEditWindowLoadFile(WBEditWindow *pEditWindow, const char *pszFileName)
 {
+char *pBuf = NULL;
+long cbBuf = 0;
+int iRval = -1;
+
+
+  CALLBACK_TRACKER;
+
   if(!pEditWindow || !WBIsValidEditWindow(pEditWindow)
      || !pszFileName || !*pszFileName)
   {
+    WBDebugPrint("TEMPORARY:  bad parameters in WBEditWindowLoadFile\n");
     return -1;
   }
 
-  // TODO:  implement 'load file'.  handle unicode files.  UTF-16 files begin with 0xff, 0xfe
-  //        UTF-8 files are assumed to be the same as ASCII (with no prefix).
+  // implement 'load file'.  handle unicode files.  UTF-16 files begin with 0xff, 0xfe
+  // UTF-8 files are assumed to be the same as ASCII (with no prefix).
 
 
+  if(pEditWindow->szFileName)
+  {
+    WBFree(pEditWindow->szFileName);
+  }
 
-  return -1; // error
+//  pEditWindow->xTextObject.vtable->init(&(pEditWindow->xTextObject));
+  WBEditWindowClear(pEditWindow);
+
+  pEditWindow->szFileName = WBCopyString(pszFileName);
+
+  // load the file into a buffer
+
+  cbBuf = (long)WBReadFileIntoBuffer(pszFileName, &pBuf);
+
+  if(cbBuf >= 0 && pBuf)
+  {
+    if(cbBuf >= 2 && (unsigned char)pBuf[0] == 0xff && (unsigned char)pBuf[1] == 0xfe)
+    {
+      // TODO:  unicode file!
+//      pEditWindow->xTextObject.vtable->set_text(&(pEditWindow->xTextObject), pBuf + 2, cbBuf - 2);
+    }
+    else
+    {
+      // TODO:  fix line endings first??
+      pEditWindow->xTextObject.vtable->set_row(&(pEditWindow->xTextObject),0);
+      pEditWindow->xTextObject.vtable->set_col(&(pEditWindow->xTextObject),0);
+
+//      internal_new_cursor_pos(pE);
+      pEditWindow->xTextObject.vtable->set_text(&(pEditWindow->xTextObject), pBuf, cbBuf);
+//      pEditWindow->xTextObject.vtable->ins_chars(&(pEditWindow->xTextObject), pBuf, cbBuf);
+
+      pEditWindow->xTextObject.vtable->set_row(&(pEditWindow->xTextObject),0);
+      pEditWindow->xTextObject.vtable->set_col(&(pEditWindow->xTextObject),0);
+    }
+
+    iRval = 0; // for now; later, check for error state
+  }
+  else
+  {
+    iRval = -1;
+  }
+
+  if(pBuf)
+  {
+    WBFree(pBuf);
+  }
+
+  if(pEditWindow->pUserCallback)
+  {
+    XClientMessageEvent evt;
+
+    bzero(&evt, sizeof(evt));
+
+    evt.type=ClientMessage;
+    evt.display=WBGetWindowDisplay(pEditWindow->childframe.wID);
+    evt.window=pEditWindow->childframe.wID;
+    evt.message_type=aEW_EDIT_CHANGE;
+    evt.format=32;
+
+    evt.data.l[0] = 0; // undo
+    evt.data.l[1] = 0; // cursor x,y
+    evt.data.l[2] = 0;
+
+    pEditWindow->pUserCallback(pEditWindow->childframe.wID, (XEvent *)&evt);
+  }
+
+  WBDebugPrint("TEMPORARY WBEditWindowLoadFile() returning %d\n", iRval);
+
+  return iRval;
 }
 
 int WBEditWindowSaveFile(WBEditWindow *pEditWindow, const char *pszFileName)
@@ -479,6 +557,7 @@ void WBEditWindowClear(WBEditWindow *pEditWindow)
 
   WBDestroyInPlaceTextObject(&(pEditWindow->xTextObject));
   WBInitializeInPlaceTextObject(&(pEditWindow->xTextObject), pEditWindow->childframe.wID);
+  pEditWindow->xTextObject.vtable->set_linefeed(&(pEditWindow->xTextObject), LineFeed_DEFAULT);
 
   FWChildFrameRecalcLayout(&(pEditWindow->childframe));
 }
@@ -867,7 +946,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     {
       // copy selection to the clipboard, then delete - same as internal_cut_to_cb()
 
-      char *p1 = pE->xTextObject.vtable->get_text(&(pE->xTextObject));
+      char *p1 = pE->xTextObject.vtable->get_sel_text(&(pE->xTextObject), NULL);
       if(p1)
       {
         WBSetClipboardData(WBGetWindowDisplay(pC->wID), aUTF8_STRING, 8, p1, strlen(p1) + 1);
@@ -963,12 +1042,24 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-  if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl, shift, or alt with 'up'.  yet.
+  if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-uparrow
   {
+    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
+    pE->xTextObject.vtable->cursor_up(&(pE->xTextObject));
+  }
+  else if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_SHIFT | WB_KEYEVENT_CTRL)) // ctrl-shift-uparrow
+  {
+    // select to start of paragraph?
+    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+  }
+  else if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl, shift, or alt with 'up'.  yet.
+  {
+    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
     XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
   }
   else
   {
+    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
     pE->xTextObject.vtable->cursor_up(&(pE->xTextObject));
   }
 
@@ -989,12 +1080,23 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-  if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl, shift, or alt with 'down'.  yet.
+  if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-downarrow
+  {
+    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
+    pE->xTextObject.vtable->cursor_down(&(pE->xTextObject));
+  }
+  else if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_SHIFT | WB_KEYEVENT_CTRL)) // ctrl-shift-downarrow
+  {
+    // select to start of paragraph?
+    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+  }
+  else if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl, shift, or alt with 'up'.  yet.
   {
     XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
   }
   else
   {
+    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
     pE->xTextObject.vtable->cursor_down(&(pE->xTextObject));
   }
 
@@ -1015,7 +1117,17 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-  if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl, shift, or alt with 'left'.  yet.
+  if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-leftarrow
+  {
+    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
+    pE->xTextObject.vtable->cursor_left(&(pE->xTextObject));
+  }
+  else if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_SHIFT | WB_KEYEVENT_CTRL)) // ctrl-shift-leftarrow
+  {
+    // select to start of previous word?  end of previous word?
+    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+  }
+  else if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl, shift, or alt with 'left'.  yet.
   {
     WB_ERROR_PRINT("TEMPORARY:  %s - iACS=%d (%08xH)\n", __FUNCTION__, iACS, iACS);
 
@@ -1023,6 +1135,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
   else
   {
+    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
     pE->xTextObject.vtable->cursor_left(&(pE->xTextObject));
   }
 
@@ -1043,7 +1156,17 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-  if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl, shift, or alt with 'right'.  yet.
+  if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-rightarrow
+  {
+    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
+    pE->xTextObject.vtable->cursor_right(&(pE->xTextObject));
+  }
+  else if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_SHIFT | WB_KEYEVENT_CTRL)) // ctrl-shift-rightarrow
+  {
+    // select to end of word?  start of next word?
+    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+  }
+  else if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl, shift, or alt with 'right'.  yet.
   {
     WB_ERROR_PRINT("TEMPORARY:  %s - iACS=%d (%08xH)\n", __FUNCTION__, iACS, iACS);
 
@@ -1051,6 +1174,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
   else
   {
+    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
     pE->xTextObject.vtable->cursor_right(&(pE->xTextObject));
   }
 
@@ -1071,8 +1195,20 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-  if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_CTRL) // control+end
+  if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-home
   {
+    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
+    pE->xTextObject.vtable->cursor_home(&(pE->xTextObject));
+  }
+  else if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_SHIFT | WB_KEYEVENT_CTRL)) // ctrl-shift-home
+  {
+    // select to start of document
+    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
+    pE->xTextObject.vtable->cursor_top(&(pE->xTextObject));
+  }
+  else if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_CTRL) // control+home
+  {
+    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
     pE->xTextObject.vtable->cursor_top(&(pE->xTextObject));
   }
   else if(iACS & WB_KEYEVENT_ACSMASK) // not handling shift, or alt with 'home'.  yet.
@@ -1083,6 +1219,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
   else
   {
+    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
     pE->xTextObject.vtable->cursor_home(&(pE->xTextObject));
   }
 
@@ -1103,8 +1240,20 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-  if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_CTRL) // control+end
+  if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-end
   {
+    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
+    pE->xTextObject.vtable->cursor_home(&(pE->xTextObject));
+  }
+  else if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_SHIFT | WB_KEYEVENT_CTRL)) // ctrl-shift-end
+  {
+    // select to end of document
+    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
+    pE->xTextObject.vtable->cursor_bottom(&(pE->xTextObject));
+  }
+  else if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_CTRL) // control+end
+  {
+    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
     pE->xTextObject.vtable->cursor_bottom(&(pE->xTextObject));
   }
   else if(iACS & WB_KEYEVENT_ACSMASK) // not handling shift, or alt with 'end'.  yet.
@@ -1115,6 +1264,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
   else
   {
+    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
     pE->xTextObject.vtable->cursor_end(&(pE->xTextObject));
   }
 
@@ -1141,6 +1291,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
   else
   {
+    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
     pE->xTextObject.vtable->page_up(&(pE->xTextObject));
   }
 
@@ -1167,6 +1318,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
   else
   {
+    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
     pE->xTextObject.vtable->page_down(&(pE->xTextObject));
   }
 
@@ -1193,6 +1345,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
 //  }
 //  else
   {
+    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
     pE->xTextObject.vtable->page_left(&(pE->xTextObject));
   }
 
@@ -1219,6 +1372,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
 //  }
 //  else
   {
+    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
     pE->xTextObject.vtable->page_right(&(pE->xTextObject));
   }
 
@@ -1331,7 +1485,7 @@ char *p1;
 
   if(pE->xTextObject.vtable->has_select(&(pE->xTextObject)))
   {
-    p1 = pE->xTextObject.vtable->get_text(&(pE->xTextObject));
+    p1 = pE->xTextObject.vtable->get_sel_text(&(pE->xTextObject), NULL);
 
     if(p1)
     {
@@ -1414,6 +1568,8 @@ char *p1;
 
     if(p1)
     {
+      WBDebugDump("Edit window 'paste'", p1, nData);
+
       if(pE->xTextObject.vtable->has_select(&(pE->xTextObject)))
       {
         pE->xTextObject.vtable->replace_select(&(pE->xTextObject), p1, nData);
@@ -1456,7 +1612,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   {
     // copy selection to the clipboard, then delete - same as internal_cut_to_cb()
 
-    char *p1 = pE->xTextObject.vtable->get_text(&(pE->xTextObject));
+    char *p1 = pE->xTextObject.vtable->get_sel_text(&(pE->xTextObject), NULL);
     if(p1)
     {
       WBSetClipboardData(WBGetWindowDisplay(pC->wID), aUTF8_STRING, 8, p1, strlen(p1) + 1);

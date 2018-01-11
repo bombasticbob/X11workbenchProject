@@ -1470,7 +1470,7 @@ void WBDraw3DBorderTab(Display *pDisplay, Drawable dw, GC gc, WB_GEOM *pgeomOutl
 XPoint xpt[13];
 XColor clrAvg, clrTemp;
 int iFontHeight, bFocus;
-int i1, i2, iR, iG, iB, iY, iU, iV, iYBG;
+int i1, i2, iR, iG, iB, iY, iU, iV, iYBG, iY0, iU0, iV0;
 Region rgnClip;
 GC gc2;
 WB_RECT rctTemp;
@@ -1568,31 +1568,56 @@ WB_RECT rctTemp;
     iB = clrTemp.blue >> 8;
 
     PXM_RGBToYUV(iR, iG, iB, &iYBG, NULL, NULL); // get 'Y' for the background (assume grey)
+    // if the background Y is less than 'pure white', split the difference
+    if(iYBG < 255)
+    {
+      iYBG = (iYBG + 256) / 2;
+    }
 
-    i2 = 3 * (xpt[0].y - xpt[5].y - 2) / 5;
+    i2 = 6 * (xpt[0].y - xpt[5].y - 2) / 7; // calculate 6/7 of the height
+
 
 //    WB_ERROR_PRINT("TEMPORARY:  %s - i2 is %d, from %d and %d\n", __FUNCTION__,
 //                   i2, xpt[0].y, xpt[5].y);
 
+    iY0 = iYBG; // initialize this way
+
+    clrTemp.pixel = lHighlightColor;
+    PXM_PixelToRGB(NULL, &clrTemp);
+
+    iR = clrTemp.red >> 8;
+    iG = clrTemp.green >> 8;
+    iB = clrTemp.blue >> 8;
+
+    PXM_RGBToYUV(iR, iG, iB, &iY0, &iU0, &iV0); // cache YUV as iY0, iU0, iV0
+
+    if(iY0 > 3 * iYBG / 4) // restrict the range of the brightness of the highlight color vs background
+    {
+      iY0 = 3 * iYBG / 4;
+    }
+    else if(iY0 < 3 * iYBG / 7)
+    {
+      iY0 = 3 * iYBG / 7;
+    }
+
     for(i1=xpt[5].y; i1 < xpt[0].y - 2; i1++)
     {
       XPoint xpt2[2];
-      int iR2 = abs(i1 - (xpt[5].y + i2));
+      int iR2 = abs(i1 - (xpt[5].y + i2 / 2)); // 'i2 / 2' is 3/7 of the height...
 
-//      iR2 *= iR2;
       iR2 = icos(iR2 * 232 / i2); // 255 would be pi/2, so go slightly less than that
-//      iR2 = isqrt(iR2);
+      iR2 = ((int)iR2 * (int)iR2) / 256; // use cos^2 - 'icos' returns a value between 0 and 255
+//      iR2 *= iR2;  old way, squared it
+//      iR2 = isqrt(iR2); old way, square root
 
-      clrTemp.pixel = lHighlightColor;
-      PXM_PixelToRGB(NULL, &clrTemp);
+      iY = iY0; // grab cached YUV values for highlight color
+      iU = iU0;
+      iV = iV0;
 
-      iR = clrTemp.red >> 8;
-      iG = clrTemp.green >> 8;
-      iB = clrTemp.blue >> 8;
+      // NOTE:  'iY' is the brightness of the highlight color, 'iYBG' the brightness of the background (averaged with white)
 
-      PXM_RGBToYUV(iR, iG, iB, &iY, &iU, &iV);
-
-      iY = iYBG * 3 / 4 + ((384 - iYBG) * iR2) / 384; // allows brightness to drop to a bit less than the background's brightness
+//      iY = iYBG * 3 / 4 + ((384 - iYBG) * iR2) / 384; // allows brightness to drop to a bit less than the background's brightness
+      iY = (iYBG - iY + iY / 2) * iR2 / 256 + iY + iY / 2 + 4;
 
       if(iY > 255)
       {

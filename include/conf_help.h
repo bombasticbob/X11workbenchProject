@@ -92,9 +92,13 @@ extern "C" {
 #endif // GLOBAL_PATH
 
 #ifndef GLOBAL_XPATH /* this can be defined by the config script */
-#warning "GLOBAL_XPATH not defined, assuming /usr/X11R6/etc"
-#define GLOBAL_XPATH "/usr/X11R6/etc"
-// NOTE:  on some systems, like freebsd, /usr/X11R6 is a symlink matching GLOBAL_PATH
+#ifdef __FreeBSD__
+#warning "GLOBAL_XPATH not defined, assuming /usr/local/etc/X11"
+#define GLOBAL_XPATH "/usr/local/etc/X11"
+#else // others whose distros don't consider 'X11' to be in '/usr/local'
+#warning "GLOBAL_XPATH not defined, assuming /etc/X11"
+#define GLOBAL_XPATH "/etc/X11"
+#endif // __FreeBSD__, others
 #endif // GLOBAL_XPATH
 
 #define LOCAL_PATH  "~/"
@@ -109,6 +113,10 @@ extern "C" {
 #define CH_FLAGS_DEFAULT 0    /**< default flags for \ref CHOpenConfFile() */
 #define CH_FLAGS_GLOBAL  0x1  /**< set this for 'global only' for \ref CHOpenConfFile() */
 #define CH_FLAGS_WRITE   0x2  /**< set this to enable GLOBAL write (local write automatically enabled) for \ref CHOpenConfFile() */
+
+#define CHPARSEXML_DEFAULT 0  /**< Default behavior for 'CHFindNextXMLTag()' (just look for '<') */
+#define CHPARSEXML_PAREN   1  /**< For 'CHFindNextXMLTag()', stop parsing on detection of '(' or ')' */
+#define CHPARSEXML_BRACKET 2  /**< For 'CHFindNextXMLTag()', stop parsing on detection of '[' or ']' */
 /**
   @}
 **/
@@ -553,17 +561,28 @@ int CHGetCursorBlinkTime(Display *pDisplay);
   *
   * You can construct an array of CHXMLEntry structures from XML data using \ref CHParseXML()
   *
+  * This structure deliberately uses integer offsets instead of pointers.  The offsets refer
+  * to the starting pointer of the CHXMLEntry array, so you'll always need to pass the index
+  * along with the origin pointer to refer to a particular element.  The basic reason for
+  * doing this is to allow the array to be relocateable without any pointer fixups.
+  *
+  * If you want to create a C++ object to wrap it, you could return pointers by using
+  * 'GetXXX()' methods, particularly those that can operate on const objects.  Then you would
+  * store the origin pointer along with the index inside of the C++ object, and calculate
+  * the correct addresses in the 'GetXXX()' methods as required by the application.
+  *
   * \code
 
   typedef struct _CHXMLEntry_
   {
-    int iNextIndex;      // index for next item at this level; -1 for none
-    int iContentsIndex;  // first array index for 'contents' for this entry; -1 for none
+    int iNextIndex;      // 0-based index for next item at this level; <= 0 for none.  0 marks "end of list" for top level
+    int iContainer;      // 0-based index for container; <= 0 for none.
+    int iContentsIndex;  // 0-based first array index for 'contents' for this entry; <= 0 for none
 
-    int nLabelOffset;    // offset to label (zero-byte-terminated) string (from beginning of array)
-                         // for this entry; -1 for 'no label'
-    int nDataOffset;     // offset to data (zero-byte-terminated) string (from beginning of array)
-                         // for the entry data; -1 for 'no data'
+    int nLabelOffset;    // BYTE offset to label (zero-byte-terminated) string (from beginning of array)
+                         // for this entry; <= 0 for 'no label'
+    int nDataOffset;     // BYTE offset to data (zero-byte-terminated) string (from beginning of array)
+                         // for the entry data; <= 0 for 'no data'
 
   } CHXMLEntry;
 
@@ -572,11 +591,12 @@ int CHGetCursorBlinkTime(Display *pDisplay);
 **/
 typedef struct _CHXMLEntry_
 {
-  int iNextIndex;      ///< index for next item at this level; -1 for none
-  int iContentsIndex;  ///< first array index for 'contents' for this entry; -1 for none
+  int iNextIndex;      ///< 0-based index for next item at this level; <= 0 for none.  0 marks "end of list" for top level
+  int iContainer;      ///< 0-based index for container; <= 0 for none.
+  int iContentsIndex;  ///< 0-based first array index for 'contents' for this entry; <= 0 for none
 
-  int nLabelOffset;    ///< offset to label (zero-byte-terminated) string (from beginning of array) for this entry; -1 for 'no label'
-  int nDataOffset;     ///< offset to data (zero-byte-terminated) string (from beginning of array) for the entry data; -1 for 'no data'
+  int nLabelOffset;    ///< BYTE offset to label (zero-byte-terminated) string (from beginning of array) for this entry; <= 0 for 'no label'
+  int nDataOffset;     ///< BYTE offset to data (zero-byte-terminated) string (from beginning of array) for the entry data; <= 0 for 'no data'
 
 } CHXMLEntry;
 
@@ -594,9 +614,54 @@ typedef struct _CHXMLEntry_
   * structures are with respet to the beginning of the array (in bytes).  Caller must free any
   * non-NULL pointer returned by this function, using WBFree()
   *
+  * XML data contents can take 2 basic forms.  One of them stores name/value pairs within a tag
+  * \code
+
+       <example name="value" name2="value2" />
+
+  * \endcode
+  * Another stores name/value pairs as embedded content, NOT within the tag
+  * \code
+
+       <example><name>value</name><name2>value2</name2></example>
+
+  * \endcode
+  * Both formats are recognized and parsed equivalently with this function.  In fact, they can be combined.
+  *
+  * Note that if there is no closing tag or self-closing '/' mark, subsequent tags will be parsed as if
+  * they are embedded content, without any error messages for missing closing tags.  This function does
+  * not check whether or not all tags have been properly closed.  Instead, if it finds the end of the XML
+  * text before all closing tags are found, it "closes" them all and returns without an error.
+  *
+  * This function attempts to comply with the XML standard as best at it can, with respect to the use of
+  * 'CDATA', and substitution of '&amp;' '&gt;' and others. '<![CDATA[ ]]>' tags will be parsed somewhat
+  * differently as they will never contain things that should be parsed anyway, and the entire tag will be
+  * stored as if it were embedded data [basically if you want to accept these, parse them yourself, and all
+  * that goes with it].  Typically it will be used within <script> tags for HTML, as one example.
+  *
+  * data that is surrounded by tags will have a single '=' prepended to it, and it will be de-quoted following
+  * the '='.  Multiple '=' and other special characters can appear in the text data.  '&amp;' '&lt;' and '&gt;'
+  * will be translated in the data value so that they can be included in the value.
+  *
+  * Additionally, outside of CDATA, a "raw" '<' or '&' can NOT even appear in a quoted string.  That is part
+  * of the XML spec, and HTML is treated the same way.
+  *
+  * \sa https://www.w3.org/TR/REC-xml/ for additional information on XML
+  *
   * Header File:  conf_help.h
 **/
 CHXMLEntry *CHParseXML(const char *pXMLData, int cbLength);
+
+/** \ingroup text_xml
+  * \brief Parses contents of an XML tag, returning as WBAlloc'd string list similar to environment strings
+  *
+  * \param pEntry A pointer to an XML data entry as returned by CHParseXML
+  *
+  * Call this function to do a 'debug dump' of XML contents using the debug I/O function 'WBDebugPrint()'.
+  *
+  * Header File:  conf_help.h
+**/
+void CHDebugDumpXML(CHXMLEntry *pEntry); // dumps XML using debug I/O functions
 
 /** \ingroup text_xml
   * \brief Parses contents of a single XML tag, returning as WBAlloc'd string list similar to environment strings
@@ -604,7 +669,7 @@ CHXMLEntry *CHParseXML(const char *pXMLData, int cbLength);
   * \param pTagContents A pointer to the string position just past the tag name
   * \param cbLength The length of the tag contents up the trailing '>'.  Preceding characters (such as '-->' or '/>') will be ignored, as well as the trailing '>'
   *
-  * \returns A WBAlloc'd string list, similar in format to 'environ'; i.e. "VALUE=xxxx xxxx xxxx\0", with the possibility of embedded quotes (not doubled nor '\'d), and ending in a zero byte.  The end of the list is marked with an additional '\0'.  Returns NULL on error.
+  * \returns A WBAlloc'd string list, similar in format to 'environ'; i.e. "VALUE=xxxx xxxx xxxx\0" (or an embedded XML section), with the possibility of embedded quotes (not doubled nor '\'d). and ending in a zero byte.  The end of the list is marked with an additional '\0'.  Returns NULL on error.
   *
   * Generic XML tag parsing.  Parse the tag to 'just past the tag name', find the ending '>',
   * and pass that length as 'cbLength'.  Caller must free any non-NULL pointer returned
@@ -619,30 +684,88 @@ char *CHParseXMLTagContents(const char *pTagContents, int cbLength);
   *
   * \param pTagContents A pointer to the string position just past the tag name
   * \param cbLength The (maximum) length of the XML data to parse
+  * \param nNestingFlags A bit flag indicating whether or not this tag is nested within another tag
   * \return A pointer to the '<' at the beginning of the XML tag, or 'one byte past the end' if no tag found.  Returns NULL on error.
   *
-  * Generic XML tag parsing.  Parse past the end of a tag to find the next tag.  The returned pointer will
+  * Generic XML tag parsing.  Parse XML text to find the next tag.  The returned pointer will
   * either be the end of the string, or a pointer to the '<'.  The end of the string is defined
   * by either a 0-byte terminator, or 'cbLength' bytes.
   *
+  * NOTE:  this function assumes that you are parsing outside of a tag.  If you are parsing within
+  *        a tag, use 'CHFindEndOfXMLTag()' to find the end of the tag first, then use THIS function
+  *        to search for the next tag beyond that point.
+  *
+  * Values of 'nNestingFlags' can be as follows:
+  *
+  *     CHPARSEXML_DEFAULT  0   Default behavior (just look for '<')
+  *     CHPARSEXML_PAREN    1   Stop on detection of '(' or ')'
+  *     CHPARSEXML_BRACKET  2   Stop on detection of '[' or ']'
+  *
+  * According to the XML spec, a '<' or '>' can ONLY be considered as part of a tag if it's
+  * outside of a 'CDATA' section, quoted string, or a comment as defined in section 2.4 of the XML spec.
+  * Additionally, special characters can appear inside of a quoted string that's part of a tag,
+  * A 'CDATA' section is marked with '<![CDATA[' and ends with ']]>' outside of '( )' nesting.
+  * Values within tags include the use of '[' and ']' to allow embedding tags within a tag,
+  * and so this function will consider the 'nesting' to find the next tag.
+  *
+  * \sa https://www.w3.org/TR/REC-xml/ for additional information on XML
+  *
   * Header File:  conf_help.h
 **/
-const char *CHFindNextXMLTag(const char *pTagContents, int cbLength);
+const char *CHFindNextXMLTag(const char *pTagContents, int cbLength, int nNestingFlags);
 
 /** \ingroup text_xml
   * \brief Parses contents of an XML tag to find the end of it
   *
   * \param pTagContents A pointer to the string position just past the tag name
+  * \param cbLength The (maximum) length of the XML data to parse
   * \return A pointer to the '>' at the end of the XML tag, or 'one byte past the end' if no end-of-tag found.
   *
   * Generic XML tag parsing.  Parse the tag to find its end.  The returned pointer will
   * either be the end of the string, or a pointer to the ending '>'.  The end of the string is defined
   * by either a 0-byte terminator, or 'cbLength' bytes.
   *
+  * According to the XML spec, a '<' or '>' can ONLY be considered as part of a tag if it's
+  * outside of a 'CDATA' section, quoted string, or a comment as defined in section 2.4 of the XML spec.
+  * Additionally, special characters can appear inside of a quoted string that's part of a tag,
+  * A 'CDATA' section is marked with '<![CDATA[' and ends with ']]>' outside of '( )' nesting.
+  * Values within tags include the use of '[' and ']' to allow embedding tags within a tag,
+  * and so this function will consider the 'nesting' to find the end of the tag.
+  *
+  * \sa https://www.w3.org/TR/REC-xml/ for additional information on XML
+  *
   * Header File:  conf_help.h
 **/
 const char *CHFindEndOfXMLTag(const char *pTagContents, int cbLength);
 
+
+/** \ingroup text_xml
+  * \brief Parses XML text for the end of a 'section', typically ending in '>' ')' or ']'
+  *
+  * \param pTagContents A pointer to the string position just past the tag name
+  * \param cbLength The (maximum) length of the XML data to parse
+  * \param cEndChar The ASCII character that the section ends with, typically '>' ')' or ']'
+  * \param bUseQuotes A flag that is non-zero to ignore content within quoted strings, zero to ignore quote marks
+  * \return A pointer to the 'cEndChar' at the end of the XML section, or 'one byte past the end' if not found.
+  *
+  * Generic XML parsing.  Parse the XML to find the end of the section, which can be a tag or a block
+  * of text that is delimited using '[]' or '()' or a character of your own choosing.  The returned
+  * pointer will either be the end of the string, or a pointer to the ending character 'cEndChar'.
+  * The end of the string is defined by either a 0-byte terminator, or 'cbLength' bytes.
+  *
+  * According to the XML spec, a '<' or '>' can ONLY be considered as part of a tag if it's
+  * outside of a 'CDATA' section, quoted string, or a comment as defined in section 2.4 of the XML spec.
+  * Additionally, special characters can appear inside of a quoted string that's part of a tag,
+  * A 'CDATA' section is marked with '<![CDATA[' and ends with ']]>' outside of '( )' nesting.
+  * Values within tags include the use of '[' and ']' to allow embedding tags within a tag,
+  * and so this function will consider the 'nesting' to find the end of the section as marked
+  * by 'cEndChar'.
+  *
+  * \sa https://www.w3.org/TR/REC-xml/ for additional information on XML
+  *
+  * Header File:  conf_help.h
+**/
+const char *CHFindEndOfXMLSection(const char *pTagContents, int cbLength, char cEndChar, int bUseQuotes);
 
 
 // MIME type help

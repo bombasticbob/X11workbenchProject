@@ -164,6 +164,9 @@ static void __internal_cursor_end(struct _text_object_ *pThis);
 static void __internal_cursor_top(struct _text_object_ *pThis);
 static void __internal_cursor_bottom(struct _text_object_ *pThis);
 
+static void __internal_scroll_vertical(struct _text_object_ *pThis, int nRows);
+static void __internal_scroll_horizontal(struct _text_object_ *pThis, int nCols);
+
 static void __internal_do_expose(struct _text_object_ *pThis, Display *pDisplay, Window wID,
                                  GC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
                                  XFontSet rFontSet);
@@ -232,6 +235,9 @@ const TEXT_OBJECT_VTABLE WBDefaultTextObjectVTable =
   __internal_cursor_top,
   __internal_cursor_bottom,
 
+  __internal_scroll_vertical,
+  __internal_scroll_horizontal,
+
   __internal_do_expose,
   __internal_cursor_blink
 };
@@ -284,6 +290,8 @@ int cbLen;
   if(pBuf && (cbBufSize || *pBuf))
   {
     nLines = WBStringLineCount(pBuf, cbBufSize);
+
+    WBDebugPrint("TEMPORARY:  WBAllocTextBuffer %d lines\n", nLines);
   }
 
   if(nLines < DEFAULT_TEXT_BUFFER_LINES)
@@ -321,15 +329,12 @@ int cbLen;
       int cbLen;
       char *p2, *p3;
 
+      cbLen = cbBufSize; // size before I begin
       p1 = WBStringNextLine(pBuf, &cbBufSize);
 
       if(p1) // another line remains
       {
-        cbLen = p1 - pBuf;
-      }
-      else
-      {
-        cbLen = cbBufSize;
+        cbLen = p1 - pBuf; // re-calc length based on new pointer
       }
 
       p2 = WBAlloc(cbLen + 2);
@@ -341,7 +346,10 @@ int cbLen;
         break;
       }
 
-      memcpy(p2, pBuf, cbLen); // copy the data
+      if(cbLen) // it's possible it may be zero
+      {
+        memcpy(p2, pBuf, cbLen); // copy the data
+      }
 
       p3 = p2 + cbLen; // the end of the string
       *p3 = 0; // always zero-byte terminate it first
@@ -351,16 +359,20 @@ int cbLen;
         // TODO:  handle <FF> or <VT> differently?
         // TODO:  leave white space to mark 'extent' of line?  naaw, probably not
 
-        *(p3--) = 0; // for now just trim it all
+        *(--p3) = 0; // for now just trim it all (p3 always points past end of string)
       }
 
       pRval->aLines[nL++] = p2;
+
+//      WB_ERROR_PRINT("TEMPORARY - %s - %4d: %s\n", __FUNCTION__, nL, p2);
 
       pBuf = p1;
 
     } while(pBuf && cbBufSize && nL < nLines);
 
     pRval->nEntries = nL; // NOTE:  on error, this will be needed for cleanup
+
+//    WB_ERROR_PRINT("TEMPORARY - %s - %ld lines\n", __FUNCTION__, pRval->nEntries);
 
     WBTextBufferRefreshCache(pRval);
   }
@@ -378,6 +390,8 @@ int cbLen;
 //
 //    WB_ERROR_PRINT("END TEMPORARY - %s\n\n", __FUNCTION__);
 //  }
+
+  WB_ERROR_PRINT("TEMPORARY - %s returns %p\n", __FUNCTION__, pRval);
 
   return pRval;
 }
@@ -615,7 +629,7 @@ char *p1;
 
   // the big loop
 
-  for(iLine=0; iLine < pBuf->nEntries; i1++)
+  for(iLine=0; iLine < pBuf->nEntries; iLine++)
   {
     // do not consider blank lines or lines with zero length
     p1 = pBuf->aLines[iLine];
@@ -1103,6 +1117,8 @@ const char *szLineFeed = NULL;
 TEXT_BUFFER *pTB;
 int iIsBoxMode, iIsLineMode;
 
+
+  WBDebugPrint("TEMPORARY:  __internal_get_selected_text(%d,%d,%d,%d)\n", iRow, iCol, iEndRow, iEndCol);
 
   if(WBIsValidTextObject(pThis))
   {
@@ -1890,16 +1906,32 @@ WB_RECT rctSel;
 
   if(WBIsValidTextObject(pThis))
   {
-    if(SEL_RECT_EMPTY(pThis))
+    if(pRct)
     {
-      return NULL;
-    }
-    else if(SEL_RECT_ALL(pThis))
-    {
-      return __internal_get_selected_text(pThis, -1, -1, -1, -1);
-    }
+      if(pRct->left == pRct->right && pRct->top == pRct->bottom)
+      {
+        return NULL; // empty
+      }
+      else if(pRct->left < 0) // a flag for 'select all'
+      {
+        return __internal_get_selected_text(pThis, -1, -1, -1, -1);
+      }
 
-    memcpy(&rctSel, &(pThis->rctSel), sizeof(rctSel));
+      memcpy(&rctSel, pRct, sizeof(rctSel));
+    }
+    else
+    {
+      if(SEL_RECT_EMPTY(pThis))
+      {
+        return NULL;
+      }
+      else if(SEL_RECT_ALL(pThis))
+      {
+        return __internal_get_selected_text(pThis, -1, -1, -1, -1);
+      }
+
+      memcpy(&rctSel, &(pThis->rctSel), sizeof(rctSel));
+    }
 
     NORMALIZE_SEL_RECT(rctSel);
 
@@ -2959,44 +2991,72 @@ WB_RECT rctInvalid;
           }
           else
           {
-            pTemp = pBuf->aLines[pThis->iRow];
+            pL = NULL; // a flag for success-testing
 
-            i1 = strlen(pTemp); // the actual length
-            iLen = WBGetMBLength(pTemp); // # of columns
-
-            if(iLen < pThis->iCol)
+            if(WBCheckReAllocTextBuffer(&pBuf, 1) || !pBuf)
             {
-              i1 += pThis->iCol - iLen; // the necessary alloc length
+              WB_ERROR_PRINT("ERROR:  %s - not enough memory to add line\n", __FUNCTION__);
             }
-
-            if(pThis->iInsMode == InsertMode_OVERWRITE
-               && iLen > pThis->iCol)
+            else
             {
-              if(iLen < pThis->iCol + (p2 - p1))
+              pThis->pText = pBuf; // re-assign in case there's a new ptr
+
+              pTemp = pBuf->aLines[pThis->iRow];
+
+              // pTemp may be NULL if I'm at the end...
+              if(pTemp)
               {
-                i1 += (p2 - p1) - (iLen - pThis->iCol); // estimated extent of the text I'm adding
+                i1 = strlen(pTemp); // the actual length
+                iLen = WBGetMBLength(pTemp); // # of columns
               }
-            }
-            else
-            {
-              i1 += p2 - p1; // extending string length
-            }
+              else
+              {
+                i1 = iLen = 0;
+              }
 
-            pL = WBReAlloc(pTemp, i1
-                                  + nTabs * pThis->iTab // extra space for tabs
-                                  +  2); // re-allocate to fit (plus 2 extra chars)
+              if(iLen < pThis->iCol)
+              {
+                i1 += pThis->iCol - iLen; // the necessary alloc length
+              }
 
-            if(pL)
-            {
-              pBuf->aLines[pThis->iRow] = pL;
-            }
-            else
-            {
-              WB_ERROR_PRINT("ERROR:  %s - not enough memory\n", __FUNCTION__);
+              if(pThis->iInsMode == InsertMode_OVERWRITE
+                 && iLen > pThis->iCol)
+              {
+                if(iLen < pThis->iCol + (p2 - p1))
+                {
+                  i1 += (p2 - p1) - (iLen - pThis->iCol); // estimated extent of the text I'm adding
+                }
+              }
+              else
+              {
+                i1 += p2 - p1; // extending string length
+              }
+
+              if(pTemp)
+              {
+                pL = WBReAlloc(pTemp, i1
+                                      + nTabs * pThis->iTab // extra space for tabs
+                                      +  2); // re-allocate to fit (plus 2 extra chars)
+              }
+              else
+              {
+                pL = WBAlloc(i1
+                             + nTabs * pThis->iTab // extra space for tabs
+                             +  2); // allocate to fit (plus 2 extra chars)
+              }
+
+              if(pL)
+              {
+                pBuf->aLines[pThis->iRow] = pL;
+              }
+              else
+              {
+                WB_ERROR_PRINT("ERROR:  %s - not enough memory\n", __FUNCTION__);
+              }
             }
           }
 
-          if(pL)
+          if(pL) // only if above section worked properly
           {
             if(iLen < pThis->iCol)
             {
@@ -3421,7 +3481,7 @@ int iPageHeight;
     {
       __internal_invalidate_rect(pThis, NULL, 1); // scrolling invalidates all
 
-
+#if 0 /* it was the way I did it, but no longer */
       iPageHeight = pThis->rctView.bottom - pThis->rctView.top - 1;
 
       // scroll up/down to expose the cursor
@@ -3439,6 +3499,19 @@ int iPageHeight;
           pThis->rctView.top += iPageHeight;
           pThis->rctView.bottom += iPageHeight;
         }
+      }
+#endif // 0
+
+      // scroll right/left so that I have one additional white space visible
+      if(pThis->rctView.top > pThis->iRow)
+      {
+        pThis->rctView.bottom -= (pThis->rctView.top - pThis->iRow);
+        pThis->rctView.top = pThis->iRow; // new top row
+      }
+      else if(pThis->rctView.bottom <= pThis->iRow)
+      {
+        pThis->rctView.top += pThis->iRow + 1 - pThis->rctView.bottom;
+        pThis->rctView.bottom = pThis->iRow + 1;
       }
     }
     else // re-calculate cursor metrics
@@ -3524,7 +3597,7 @@ int iPageHeight;
     {
       __internal_invalidate_rect(pThis, NULL, 1); // scrolling invalidates all
 
-
+#if 0 /* it was the way I did it, but no longer */
       iPageHeight = pThis->rctView.bottom - pThis->rctView.top - 1;
 
       // scroll up/down to expose the cursor
@@ -3542,6 +3615,19 @@ int iPageHeight;
           pThis->rctView.top += iPageHeight;
           pThis->rctView.bottom += iPageHeight;
         }
+      }
+#endif // 0
+
+      // scroll right/left so that I have one additional white space visible
+      if(pThis->rctView.top > pThis->iRow)
+      {
+        pThis->rctView.bottom -= (pThis->rctView.top - pThis->iRow);
+        pThis->rctView.top = pThis->iRow; // new top row
+      }
+      else if(pThis->rctView.bottom <= pThis->iRow)
+      {
+        pThis->rctView.top += pThis->iRow + 1 - pThis->rctView.bottom;
+        pThis->rctView.bottom = pThis->iRow + 1;
       }
     }
     else // re-calculate cursor metrics
@@ -3618,6 +3704,7 @@ TEXT_BUFFER *pBuf;
       if(pThis->rctView.right <= pThis->iCol ||
          pThis->rctView.left > pThis->iCol)
       {
+#if 0 /* this method works better with page right/left and not arrow */
         int iAutoScrollWidth = AUTO_HSCROLL_SIZE;
 
         while(iAutoScrollWidth > 1 && iAutoScrollWidth >= pThis->rctView.right - pThis->rctView.left)
@@ -3636,6 +3723,19 @@ TEXT_BUFFER *pBuf;
         {
           pThis->rctView.left += iAutoScrollWidth;
           pThis->rctView.right += iAutoScrollWidth;
+        }
+#endif // 0
+
+        // scroll right/left so that I have one additional white space visible
+        if(pThis->rctView.left > pThis->iCol)
+        {
+          pThis->rctView.right -= (pThis->rctView.left - pThis->iCol);
+          pThis->rctView.left = pThis->iCol;
+        }
+        else if(pThis->rctView.right <= pThis->iCol)
+        {
+          pThis->rctView.left += pThis->iCol + 1 - pThis->rctView.right;
+          pThis->rctView.right = pThis->iCol + 1;
         }
 
         __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
@@ -3743,6 +3843,7 @@ TEXT_BUFFER *pBuf;
       if(pThis->rctView.right <= pThis->iCol ||
          pThis->rctView.left > pThis->iCol)
       {
+#if 0 /* this method works better with page right/left and not arrow */
         int iAutoScrollWidth = AUTO_HSCROLL_SIZE;
 
         while(iAutoScrollWidth > 1 && iAutoScrollWidth >= pThis->rctView.right - pThis->rctView.left)
@@ -3761,6 +3862,19 @@ TEXT_BUFFER *pBuf;
         {
           pThis->rctView.left += iAutoScrollWidth;
           pThis->rctView.right += iAutoScrollWidth;
+        }
+#endif // 0
+
+        // scroll right/left so that I have one additional white space visible
+        if(pThis->rctView.left > pThis->iCol)
+        {
+          pThis->rctView.right -= (pThis->rctView.left - pThis->iCol);
+          pThis->rctView.left = pThis->iCol;
+        }
+        else if(pThis->rctView.right <= pThis->iCol)
+        {
+          pThis->rctView.left += pThis->iCol + 1 - pThis->rctView.right;
+          pThis->rctView.right = pThis->iCol + 1;
         }
 
         __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
@@ -3919,6 +4033,7 @@ TEXT_BUFFER *pBuf;
 
         while(pThis->rctView.left > pThis->iCol)
         {
+
           pThis->rctView.left -= iAutoScrollWidth;
           pThis->rctView.right -= iAutoScrollWidth;
         }
@@ -4171,6 +4286,178 @@ int iPageHeight;
       {
         pThis->rctView.top += iPageHeight;
         pThis->rctView.bottom += iPageHeight;
+      }
+    }
+  }
+}
+
+static void __internal_scroll_vertical(struct _text_object_ *pThis, int nRows)
+{
+TEXT_BUFFER *pBuf;
+
+  if(!WBIsValidTextObject(pThis))
+  {
+    WB_ERROR_PRINT("ERROR:  %p - invalid text object %p\n", __FUNCTION__, pThis);
+  }
+  else
+  {
+    int iOldRow = pThis->iRow;
+
+    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+
+    if(!nRows)
+    {
+      return; // do nothing
+    }
+
+    pBuf = (TEXT_BUFFER *)(pThis->pText);
+
+    if(!pBuf)
+    {
+      pThis->iRow = 0;
+      pThis->iCol = 0;
+
+      pThis->rctView.bottom -= pThis->rctView.top; // assuming it's right
+      pThis->rctView.top = 0;
+      pThis->rctView.right -= pThis->rctView.left; // assuming it's right
+      pThis->rctView.left = 0;
+    }
+    else if(nRows < 0)
+    {
+      if(pThis->rctView.top + nRows < 0)
+      {
+        pThis->rctView.bottom -= pThis->rctView.top;
+        pThis->rctView.top = 0;
+      }
+      else
+      {
+        pThis->rctView.bottom += nRows;
+        pThis->rctView.top += nRows;
+      }
+    }
+    else // if(nRows > 0)
+    {
+      if(pThis->rctView.bottom + nRows > pBuf->nEntries)
+      {
+        pThis->rctView.top += pBuf->nEntries - pThis->rctView.bottom;
+        pThis->rctView.bottom = pBuf->nEntries;
+      }
+      else
+      {
+        pThis->rctView.bottom += nRows;
+        pThis->rctView.top += nRows;
+      }
+    }
+  }
+}
+
+static void __internal_scroll_horizontal(struct _text_object_ *pThis, int nCols)
+{
+TEXT_BUFFER *pBuf;
+
+  if(!WBIsValidTextObject(pThis))
+  {
+    WB_ERROR_PRINT("ERROR:  %p - invalid text object %p\n", __FUNCTION__, pThis);
+  }
+  else
+  {
+    int iOldRow = pThis->iRow;
+
+    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+
+    if(!nCols)
+    {
+      return; // do nothing
+    }
+
+    pBuf = (TEXT_BUFFER *)(pThis->pText);
+
+    if(!pBuf)
+    {
+      pThis->iRow = 0;
+      pThis->iCol = 0;
+
+      pThis->rctView.bottom -= pThis->rctView.top; // assuming it's right
+      pThis->rctView.top = 0;
+      pThis->rctView.right -= pThis->rctView.left; // assuming it's right
+      pThis->rctView.left = 0;
+    }
+    else if(pThis->iCol < 0)
+    {
+      pThis->iCol = 0; // always
+
+      pThis->rctView.right -= pThis->rctView.left; // assuming it's right
+      pThis->rctView.left = 0;
+    }
+    else if(pThis->iCol + nCols > -INT_MAX && pThis->iCol + nCols < INT_MAX) // for now, ignore scroll on overflow
+    {
+      if(pThis->iLineFeed == LineFeed_NONE) // single line
+      {
+        if(pBuf->nEntries <= 0 || !pBuf->aLines[0])
+        {
+          pThis->iCol = 0;
+
+          pThis->rctView.right -= pThis->rctView.left; // assuming it's right
+          pThis->rctView.left = 0;
+        }
+        else
+        {
+          int iLen = WBGetMBLength(pBuf->aLines[0]);
+
+          if(pThis->iRow != 0)
+          {
+            pThis->iRow = 0; // force it
+          }
+
+          // no 'virtual space' for single-line but trailing white space OK
+          if(nCols > 0)
+          {
+            if(pThis->rctView.right + nCols > iLen + 1)
+            {
+              pThis->rctView.left += (iLen + 1 - nCols - pThis->rctView.right);
+              pThis->rctView.right = iLen + 1;
+            }
+            else
+            {
+              pThis->rctView.left += nCols;
+              pThis->rctView.right += nCols;
+            }
+          }
+          else
+          {
+            if(pThis->rctView.left + nCols < 0)
+            {
+              pThis->rctView.right -= pThis->rctView.left;
+              pThis->rctView.left = 0;
+            }
+            else
+            {
+              pThis->rctView.left += nCols;
+              pThis->rctView.right += nCols;
+            }
+          }
+        }
+      }
+      else
+      {
+        if(nCols > 0)
+        {
+          pThis->rctView.left += nCols; // scroll right always
+          pThis->rctView.right += nCols;
+        }
+        else
+        {
+          if(pThis->rctView.left + nCols < 0)
+          {
+            pThis->rctView.right -= pThis->rctView.left;
+            pThis->rctView.left = 0;
+          }
+          else
+          {
+            pThis->rctView.left += nCols;
+            pThis->rctView.right += nCols;
+          }
+        }
       }
     }
   }

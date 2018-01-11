@@ -130,12 +130,8 @@ int i_xcall_line = 0;
 XFontStruct *pDefaultFont = NULL;  // default font
 XFontSet fontsetDefault = None;    // default font set, derived from default font
 Display *pDefaultDisplay = NULL;
-int bQuitFlag = FALSE;             // defined here, used globally
 
-// within this file debug level is writable.  outside of this file, it's (technically) read-only
-unsigned int iWBDebugLevel = 0; // no debug except errors, all subsystems
 int iStartupMinMax = 0; // main window open min/max/normal flag
-
 
 
 /**********************************************************************/
@@ -391,7 +387,7 @@ Atom aSET_FOCUS=None;
   * type == ClientMessage\n
   * message_type == aWM_CHAR\n
   * format == 32 (always)\n
-  * data.l[0] is return frmo WBKeyEventProcessKey\n
+  * data.l[0] is return from WBKeyEventProcessKey\n
   * data.l[1] is *piAltCtrlShift from WBKeyEventProcessKey\n
   * data.l[2] is # of characters decoded into data.l[3..4]\n
   * data.l[3..4] (as char[]) is decode buffer (at least 8 chars long, possibly 16 for 64-bit)\n
@@ -901,9 +897,38 @@ static WB_GEOM geomStartup
 static char szStartupDisplayName[512]=":0.0";  // NOTE:  new values must be UTF-8
 static char szDefaultDisplayName[512]= "";  // copy the "default" display name from WBInit() here
 
-// application name (from argv[0])
-static char szAppName[PATH_MAX * 2]="";
 
+// helpers called by WBParseStandardArguments()
+
+void __internal_startup_display(const char *szVal)
+{
+  strncpy(szStartupDisplayName, szVal, sizeof(szStartupDisplayName));
+
+  szStartupDisplayName[sizeof(szStartupDisplayName) - 1] = 0;
+}
+
+
+void __internal_startup_minimize(void)
+{
+  iStartupMinMax = -1;
+}
+
+
+void __internal_startup_maximize(void)
+{
+  iStartupMinMax = 1;
+}
+
+
+void __internal_startup_geometry(const char *szVal)
+{
+  sscanf(szVal, "%dx%d+%d+%d",
+         &geomStartup.width, &geomStartup.height, &geomStartup.x, &geomStartup.y);
+}
+
+
+// MAIN WINDOW INITIALIZATION FUNCTION - call this after WBParseStandardArguments() to be
+// fully compliant with X11 command line standards.
 
 Display *WBInit(const char *szDisplayName) // NOTE:  this is 'single instance' only...
 {
@@ -917,7 +942,7 @@ Display *pRval;
 
   WBPlatformOnInit(); // initialize a few important 'platform helper' things
 
-  bQuitFlag = FALSE; // in case I re-init an app
+  bQuitFlag = FALSE; // in case I re-init an app.  note the variable is in 'platform_helper.c'
 
   // ********************************************************************************
   //                      HACK ALERT - HACK ALERT - HACK ALERT
@@ -1189,6 +1214,7 @@ int WBInitDisplay(Display *pDisplay)
 
   return 0;  // success
 }
+
 
 XFontStruct *WBGetDefaultFont(void)
 {
@@ -1520,6 +1546,25 @@ int i1;
   }
 }
 
+const char *GetStartupDisplayName(void)
+{
+  return szStartupDisplayName;
+}
+
+void GetStartupGeometry(WB_GEOM *pGeom)
+{
+  if(pGeom)
+  {
+    memcpy(pGeom, &geomStartup, sizeof(WB_GEOM));
+  }
+}
+
+int GetStartupMinMax(void)
+{
+  return iStartupMinMax;
+}
+
+
 Display *WBThreadInitDisplay(void)
 {
 Display *pDisplay;
@@ -1556,352 +1601,6 @@ void WBThreadFreeDisplay(Display *pThreadDisplay)
     XCloseDisplay(pThreadDisplay); // display is to be destroyed now
     END_XCALL_DEBUG_WRAPPER
   }
-}
-
-
-
-// if this function is called first, the arguments will be parsed in order to obtain
-// information needed by WBInit and WBInitDisplay.  Otherwise, default values are used.
-
-int WBParseStandardArguments(int *pargc, char ***pargv, char ***penvp)
-{
-int argc = *pargc;
-char **argv = *pargv;
-char **envp = *penvp;
-char **p1;
-char **argvNew = NULL;
-int argcNew = 0;
-int i1, i2;
-int iDebugLevelSeen = 0;
-
-static const char * const aszCmdLineOptions[]=
-{
-  "debug","subsys","display","minimize","maximize","geometry",
-  NULL // marks end of list
-};
-
-static const char * const aszDebugSubSys[]=
-{
-  "init","application","window","menu","event",
-  "dialog","dialogctrl","frame","keyboard",
-  "mouse","font","settings","clipboard",
-  NULL
-};
-
-enum
-{
-    option_debug=0,
-    option_subsys,
-    option_display,
-    option_minimize,
-    option_maximize,
-    option_geometry
-};
-
-  // grab the name of the program and cache it.  I'll need the path info.
-
-  strncpy(szAppName, argv[0], sizeof(szAppName));
-  szAppName[sizeof(szAppName) - 1] = 0; // make sure
-
-  // search for DISPLAY environment variable, pre-assign to szStartupDisplayName
-  p1 = envp;
-
-  if(p1)
-  {
-    while(*p1)
-    {
-      if(!strncmp(*p1, "DISPLAY=", 8))
-      {
-        strncpy(szStartupDisplayName, *p1 + 8, sizeof(szStartupDisplayName));
-
-        szStartupDisplayName[sizeof(szStartupDisplayName) - 1] = 0;
-        break;  // I am done
-      }
-
-      p1++;
-    }
-  }
-  else // with no environment pointers, use the 'getenv' C language function
-  {
-    char *p1a = getenv("DISPLAY");
-
-    if(p1a)
-    {
-      strncpy(szStartupDisplayName, p1a, sizeof(szStartupDisplayName));
-
-      szStartupDisplayName[sizeof(szStartupDisplayName) - 1] = 0;
-    }
-  }
-
-  // parse arg list and make copy as needed
-
-  while(argc > 1)
-  {
-    int argc0 = argc;  // value at start of loop iteration
-    int iFlag = 0;
-
-    if(argv[1][0] != '-' || !argv[1][1])
-    {
-      // end of arguments is a '-' by itself or something not starting with '-'
-      break;
-    }
-
-    if(argv[1][1] != '-') // double '-' is what I'm looking for
-    {
-      if(!argvNew) // aren't making copies yet
-      {
-        argv++; // keep looking but don't touch anything yet
-        argc--;
-        continue;
-      }
-    }
-    else
-    {
-      // options here start with two '-' and are followed by
-      // text=value or text [space] value
-
-      for(i1=0; aszCmdLineOptions[i1]; i1++)
-      {
-        const char *szOpt = aszCmdLineOptions[i1];
-        int iLen = strlen(szOpt);
-        const char *szArg = argv[1] + 2;
-        const char *szVal = szArg + iLen;
-
-        if(!strncmp(szOpt, szArg, iLen) &&
-           (*szVal == '=' || !*szVal))
-        {
-          if(!*szVal)
-          {
-            if(argc > 2)
-            {
-              // skip over arg for loop
-              argv++;
-              argc--;
-              szVal = argv[1];
-            }
-          }
-
-          switch(i1)
-          {
-            case option_debug:
-              i2 = atoi(szVal);
-
-              if(*szVal < '0' || *szVal > '9' || i2 < 0 || i2 > DebugLevel_Excessive)
-              {
-                WBDebugPrint("Invalid debug level %s\n", szVal);
-
-                if(argvNew)
-                {
-                  WBFree(argvNew);
-                }
-
-                return -1;
-              }
-
-              iDebugLevelSeen = 1;
-              iWBDebugLevel = (iWBDebugLevel & DebugSubSystem_MASK)
-                            | (atoi(szVal) & DebugLevel_MASK);
-              break;
-
-            case option_subsys:
-              for(i2=0; aszDebugSubSys[i2]; i2++)
-              {
-                if(!strcasecmp(aszDebugSubSys[i2], szVal))
-                {
-                  iWBDebugLevel |= 1L << (i2 + DebugSubSystem_BITSHIFT);
-                  break;
-                }
-              }
-              if(!aszDebugSubSys[i2])
-              {
-                i2 = atoi(szVal);
-                if(i2 > 0 && (i2 + DebugSubSystem_BITSHIFT) <= 32)
-                {
-                  iWBDebugLevel |= 1L << (i2 + DebugSubSystem_BITSHIFT - 1);
-                }
-                else
-                {
-                  WBDebugPrint("unrecognized subsystem %s\n", szVal);
-
-                  if(argvNew)
-                  {
-                    WBFree(argvNew);
-                  }
-
-                  return -1;
-                }
-              }
-
-              if(!iDebugLevelSeen)
-              {
-                // assume EXCESSIVE debug level unless otherwise specified
-
-                iWBDebugLevel = (iWBDebugLevel & DebugSubSystem_MASK)
-                              | DebugLevel_Excessive;
-              }
-
-              break;
-
-            case option_display:
-              strncpy(szStartupDisplayName, szVal, sizeof(szStartupDisplayName));
-              break;
-
-            case option_minimize:
-              iStartupMinMax = -1;
-              break;
-            case option_maximize:
-              iStartupMinMax = 1;
-              break;
-            case option_geometry:
-              sscanf(szVal, "%dx%d+%d+%d",
-                     &geomStartup.width, &geomStartup.height, &geomStartup.x, &geomStartup.y);
-              break;
-            default:
-              WBDebugPrint("Unrecognized option: --%s\n", szArg);
-
-              if(argvNew)
-              {
-                WBFree(argvNew);
-              }
-
-              return -1;
-          }
-
-          iFlag = 1;  // skip this entry (I found a match)
-          break;
-        }
-      }
-    }
-
-    // at this point the argument wasn't recognized and so I must
-    // copy it into the destination
-
-    if(!argvNew) // need to allocate copy
-    {
-      argvNew = WBAlloc(sizeof(*argvNew) * (argc + 2));
-      if(!argvNew)
-      {
-        return -1;  // not enough memory
-      }
-
-      i2 = *pargc;  // the original 'argc' value
-      argcNew = 0;
-      while(i2 >= argc0) // I want to do this once on the first pass, etc.
-      {
-        argvNew[argcNew] = argv[argcNew];
-        argcNew++;
-        i2--;
-      }
-    }
-
-    if(!iFlag)
-    {
-      argvNew[argcNew++] = argv[1];
-    }
-
-    argv++;
-    argc--;
-  }
-
-  if(argvNew)
-  {
-    while(argc > 1)
-    {
-      argvNew[argcNew++] = argv[1];
-      argv++;
-      argc--;
-    }
-
-    *pargv = argvNew;
-    *pargc = argcNew;
-  }
-
-  if((iWBDebugLevel & DebugLevel_MASK) > 0)
-  {
-    WBDebugPrint("DebugLevel set to %d\n", (int)(iWBDebugLevel & DebugLevel_MASK));
-  }
-
-  if((iWBDebugLevel & DebugSubSystem_MASK) != 0)
-  {
-    i2 = 0;
-    for(i1=0; aszDebugSubSys[i1]; i1++)
-    {
-      if(iWBDebugLevel & (1L << (i1 + DebugSubSystem_BITSHIFT)))
-      {
-        if(!i2)
-        {
-          WBDebugPrint("Debug SubSystem: %s", aszDebugSubSys[i1]);
-          i2 = 1;
-        }
-        else
-        {
-          WBDebugPrint(", %s", aszDebugSubSys[i1]);
-        }
-      }
-    }
-
-    for(; (i1 + DebugSubSystem_BITSHIFT) < 32; i1++)
-    {
-      if(iWBDebugLevel & (1L << (i1 + DebugSubSystem_BITSHIFT)))
-      {
-        if(!i2)
-        {
-          WBDebugPrint("Debug SubSystem: %d", i1 + 1);
-          i2 = 1;
-        }
-        else
-        {
-          WBDebugPrint(", %d", i1 + 1);
-        }
-      }
-    }
-
-    WBDebugPrint("\n");
-  }
-
-  return 0;
-}
-
-void WBToolkitUsage(void)
-{
-  fputs("X11 WorkBench Toolkit options (these should precede other options)\n"
-        "--debug n       debug level (default 0, errors only)\n"
-        "                1 = minimal, 7 is maximum debug level\n"
-        "--subsys xx     subsystem to debug (implies --debug 7 if not specified)\n"
-        "                'xx' is a subsystem name or bit value (see window_helper.h)\n"
-        "                A bit value of 1 is equivalent to the lowest subsystem bit\n"
-        "                NOTE:  this option can be specified multiple times\n"
-        "--display xx    X11 display to use (default is DISPLAY env variable)\n"
-        "--minimize      show minimized window on startup\n"
-        "--maximize      show maximized window on startup\n"
-        "--geometry geom specify window geometry on startup\n"
-        "                geometry spec as per X specification (see X man page)\n"
-        "                typical value might be 800x600+100+50\n"
-        "                (default centers window with reasonable size)\n"
-        "\n", stderr);
-}
-
-const char *GetStartupDisplayName(void)
-{
-  return szStartupDisplayName;
-}
-
-const char *GetStartupAppName(void)
-{
-  return szAppName;
-}
-
-void GetStartupGeometry(WB_GEOM *pGeom)
-{
-  if(pGeom)
-  {
-    memcpy(pGeom, &geomStartup, sizeof(WB_GEOM));
-  }
-}
-
-int GetStartupMinMax(void)
-{
-  return iStartupMinMax;
 }
 
 void WBInitWindowAttributes(XSetWindowAttributes *pXSWA, unsigned long lBorderPixel,
@@ -8993,79 +8692,6 @@ static const char * __internal_event_type_string(int iEventType)
 #endif // GenericEvent
   }
   return "*Unknown Event";
-}
-
-
-void WBSetDebugLevel(unsigned int iNew)  // pass level as argument, 0 for none, 1 for minimal, 2 for more, etc. up to 7
-{
-  iWBDebugLevel = iNew;
-}
-
-// query debug level.  Useful in WB_DEBUG_PRINT macro
-#ifdef __GNUC__
-void WBDebugPrint(const char *fmt, ...)
-#else // __GNUC__
-unsigned int WBGetDebugLevel(void)
-{
-  return iWBDebugLevel;
-}
-
-void WBDebugPrint(const char *fmt, ...)
-#endif // __GNUC__
-{
-va_list va;
-
-  va_start(va, fmt);
-
-  vfprintf(stderr, fmt, va);
-  fflush(stderr); // dump NOW before (possibly) crashing
-
-  // TODO:  log file?
-
-  va_end(va);
-}
-
-void WBDebugDump(const char *szTitle, void *pData, int cbData)
-{
-int i1, i2;
-unsigned char *pX = (unsigned char *)pData;
-static const int nCols = 16;
-
-  WBDebugPrint("==========================================================================================\n"
-               "%s\n", szTitle);
-
-  for(i1=0; i1 < cbData; i1 += nCols, pX += nCols)
-  {
-    WBDebugPrint("%06x: ", i1); // assume less than 1Mb for now
-
-    for(i2=0; i2 < nCols && (i1 + i2) < cbData; i2++)
-    {
-      WBDebugPrint("%02x ", pX[i2]);
-    }
-
-    for(; i2 < nCols; i2++)
-    {
-      WBDebugPrint("   ");
-    }
-
-    WBDebugPrint("|");
-
-    for(i2=0; i2 < nCols && (i1 + i2) < cbData; i2++)
-    {
-      if(pX[i2] < ' ' || pX[i2] >= 0x80)
-      {
-        WBDebugPrint(" .");
-      }
-      else
-      {
-        WBDebugPrint(" %c", pX[i2]);
-      }
-    }
-
-    WBDebugPrint("\n");
-  }
-
-  WBDebugPrint("==========================================================================================\n");
 }
 
 

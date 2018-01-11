@@ -709,6 +709,18 @@ typedef struct _text_object_vtable_
   **/
   void (* cursor_bottom)(struct _text_object_ *pThis);
 
+  /** \brief Scroll the viewport up/down by the specified number of rows
+    * \param pThis A pointer to the TEXT_OBJECT structure
+    * \param nRows The number of rows to scroll by; negative scrolls up, positive down
+  **/
+  void (* scroll_vertical)(struct _text_object_ *pThis, int nRows);
+
+  /** \brief Scroll the cursor to the right/left a specified number of columns
+    * \param pThis A pointer to the TEXT_OBJECT structure
+    * \param nCols The number of columns to scroll by; negative scrolls left, positive right
+  **/
+  void (* scroll_horizontal)(struct _text_object_ *pThis, int nCols);
+
 
   // handling expose events for the text area
 

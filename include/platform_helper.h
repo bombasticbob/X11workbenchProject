@@ -6,7 +6,12 @@
 //  | .__/ |_| \__,_| \__||_|   \___/ |_|   |_| |_| |_|_____|_| |_| \___||_|| .__/  \___||_|(_)|_| |_|  //
 //  |_|                                               |_____|               |_|                         //
 //                                                                                                      //
-//                     platform-specific definitions to rectify various issues                          //
+//          Copyright (c) 2010-2017 by 'Big Bad Bombastic Bob' Frazier - all rights reserved.           //
+//         You may use this file in any way you see fit provided that any copy or derived work          //
+//         includes the above copyright notice.                                                         //
+//                                                                                                      //
+//          This header contains platform-specific definitions that rectify various issues.             //
+//          It also contains a lot of the 'core' functionality for strings, startup, etc.               //
 //                                                                                                      //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -226,22 +231,31 @@ typedef struct __WB_UINT64__ { WB_UINT32 dw2; WB_UINT32 dw1; } WB_UINT64;
 
 #endif // _LONGLONG
 
-// pointer to integer conversion without those irritating truncation warnings
-
-#if !defined(__SIZEOF_POINTER__) // TODO find a better way to deal with pointer size if this isn't defined
-#define __SIZEOF_POINTER__ 0
-#endif
-
-#if !defined(__DOXYGEN__) && __SIZEOF_POINTER__ == 4
-typedef unsigned long WB_UINTPTR;
-#else // assume 8-byte 64-bit pointer
+#ifdef __DOXYGEN__
 /** \ingroup platform
   * \brief Platform abstract unsigned integer that matches pointer size
   *
   * Definition for an integer equivalent of a pointer for platform-independent type casting without warnings
 **/
 typedef unsigned long long WB_UINTPTR;
-#endif // __SIZEOF_POINTER__ == 4, 8
+#else /* regular code uses this next part */
+
+#if !defined(__SIZEOF_POINTER__) // TODO find a better way to deal with pointer size if this isn't defined
+#define __SIZEOF_POINTER__ 0
+#endif
+
+#ifdef __LP64__ /* TODO see what WIN32 vs WIN64 does */
+typedef WB_UINT64 WB_UINTPTR;
+#elif __SIZEOF_POINTER__ == 4 /* 4-byte pointer */
+typedef WB_UINT32 WB_UINTPTR;
+#else // assume long pointer
+typedef WB_UINT64 WB_UINTPTR;
+#endif // __LP64__
+#endif // __DOXYGEN__
+
+
+// pointer to integer conversion without those irritating truncation warnings
+
 
 
 
@@ -370,6 +384,121 @@ typedef const char * WB_PCSTR;  ///< pointer to const char string - a convenienc
 /**
   * @}
 **/
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                                                               //
+//   ____   _                _                      _                _   ____   _             _       _                          //
+//  / ___| | |_  __ _  _ __ | |_  _   _  _ __      / \    _ __    __| | / ___| | |__   _   _ | |_  __| |  ___ __      __ _ __    //
+//  \___ \ | __|/ _` || '__|| __|| | | || '_ \    / _ \  | '_ \  / _` | \___ \ | '_ \ | | | || __|/ _` | / _ \\ \ /\ / /| '_ \   //
+//   ___) || |_| (_| || |   | |_ | |_| || |_) |  / ___ \ | | | || (_| |  ___) || | | || |_| || |_| (_| || (_) |\ V  V / | | | |  //
+//  |____/  \__|\__,_||_|    \__| \__,_|| .__/  /_/   \_\|_| |_| \__,_| |____/ |_| |_| \__,_| \__|\__,_| \___/  \_/\_/  |_| |_|  //
+//                                      |_|                                                                                      //
+//                                                                                                                               //
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/** \ingroup startup
+  * \hideinitializer
+  * \var bQuitFlag
+  * \brief 'Quit' Flag - you should check this periodically in your main (message) loop and exit whenever it is TRUE (non-zero)
+  *
+  * \c Quit \c Flag - assign to TRUE (non-zero) when it's time to exit.  This may be done asynchronously at any point in time.\n
+  * Signal procs that terminate the application, as well as the main frame window's 'Destroy' handler,
+  * and any 'Exit' functions, should all set this to TRUE (non-zero) to force the application to exit.
+  *
+  * \code
+
+  extern int bQuitFlag;
+
+  * \endcode
+  *
+**/
+extern int bQuitFlag;
+
+// these functions are internal-only, implemented in window_helper.c, but must be defined here
+void __internal_startup_display(const char *szVal);
+void __internal_startup_minimize(void);
+void __internal_startup_maximize(void);
+void __internal_startup_geometry(const char *szVal);
+
+
+
+// *******************************************
+// STARTUP AND SHUTDOWN (must-call functions)
+// *******************************************
+
+/** \ingroup startup
+  * \brief Resource initialization on startup
+  *
+  * Call this function right before using any 'platform_helper' functions to initialize any global resources
+  * from 'platform_helper.h'.  WBInit() does this automatically.  It should only be called once.  It's ok
+  * to call it before calling WBInit(), however.\n
+  *
+  * Header File:  platform_helper.h
+**/
+void WBPlatformOnInit(void);
+
+/** \ingroup startup
+  * \brief Resource 'free-up' on exit (must call)
+  *
+  * Call this function right before exiting the application if you have made use of any system-specific resources
+  * from 'platform_helper.h'.  WBExit() does this automatically.  Among other things, it will delete any temporary
+  * files that were created via WBTempFile().\n
+  * It should also be safe to call this function from within a 'signal' handler, prior to '__exit()'.
+  *
+  * Header File:  platform_helper.h
+**/
+void WBPlatformOnExit(void);
+
+
+/** \ingroup startup
+  * \brief parses standard C arguments as passed to 'main()'
+  *
+  * In order to support a large number of default switches and parameters that are
+  * supported by the X11workbench Toolkit API, you should pass pointers to the
+  * parameters that were passed to 'main()' by the C startup code to this function.\n
+  * Returns 0 on success, non-zero (or error code) otherwise.\n
+  * The values for 'argc' (as *pargc) 'argv' (as *pargv) and 'envp' (as *penvp) will
+  * likely be modified from their original values as part of the processing.  If you
+  * want to retain the original values, pass 'copies' to this function and use the
+  * copies for normal argument processing (as with 'getarg').
+  *
+  * Header File:  platform_helper.h
+**/
+int WBParseStandardArguments(int *pargc, char ***pargv, char ***penvp);
+
+/** \ingroup startup
+  * \brief Displays 'usage' for toolkit options to stderr
+  *
+  * Header File:  platform_helper.h
+**/
+void WBToolkitUsage(void);
+
+/** \ingroup startup
+  * \brief returns a pointer to a copy of the application name from argv[0]
+  *
+  * \returns A const pointer to a zero-byte terminated string containing a copy of the application name
+  *
+  * This function is only valid if you call WBParseStandardArguments() on startup
+  *
+  * Header File:  platform_helper.h
+**/
+const char *GetStartupAppName(void);
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                                          //
+//   __  __                                           _     _  _                     _    _                 //
+//  |  \/  |  ___  _ __ ___    ___   _ __  _   _     / \   | || |  ___    ___  __ _ | |_ (_)  ___   _ __    //
+//  | |\/| | / _ \| '_ ` _ \  / _ \ | '__|| | | |   / _ \  | || | / _ \  / __|/ _` || __|| | / _ \ | '_ \   //
+//  | |  | ||  __/| | | | | || (_) || |   | |_| |  / ___ \ | || || (_) || (__| (_| || |_ | || (_) || | | |  //
+//  |_|  |_| \___||_| |_| |_| \___/ |_|    \__, | /_/   \_\|_||_| \___/  \___|\__,_| \__||_| \___/ |_| |_|  //
+//                                         |___/                                                            //
+//                                                                                                          //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 // memory allocation (with debug support)
@@ -520,6 +649,20 @@ void WBCatStringN(char **ppDest, const char *pSrc, unsigned int nMaxChars);
 void WBDeQuoteString(char *pszStr);      // de-quote a string in place
 
 /** \ingroup text
+  * \brief De-Quote and 'normalize' an XML string 'in place', that is modifying the original string by removing quotes and translationg things like '&amp;' '&gt;' etc.
+  *
+  * \param pszStr A pointer to a (0-byte terminated) ASCII string that may contain quotes.  Quotes are removed 'in place'
+  *
+  * Often you need to be able to remove quote characters and otherwise 'normalize' an XML string in a standardized
+  * manner.  This function handles just about every standard quoting method available, including the use of
+  * double-quotes, as well as special character indicators like '&amp;' and '&gt;', to indicate a quote or special
+  * character within a quoted string, as well as allowing the the use of either single or double quotes, etc.
+  *
+  * Header File:  platform_helper.h
+**/
+void WBNormalizeXMLString(char *pString);
+
+/** \ingroup text
   * \brief Determine how many 'lines' are in a block of text by counting 'linefeed' characters
   *
   * \param pSrc A const pointer to an ASCII or UTF8 string (may end in zero byte)
@@ -605,6 +748,16 @@ char *WBConvertMultiByteFrom16(const XChar2b *pwzStr);
 #endif // 0
 
 
+//////////////////////////////////////////////////////////////////////////////
+//                                                                          //
+//     __  __ ____   __  __   _      _  _                                   //
+//     \ \/ /|  _ \ |  \/  | | |    (_)| |__   _ __  __ _  _ __  _   _      //
+//      \  / | |_) || |\/| | | |    | || '_ \ | '__|/ _` || '__|| | | |     //
+//      /  \ |  __/ | |  | | | |___ | || |_) || |  | (_| || |   | |_| |     //
+//     /_/\_\|_|    |_|  |_| |_____||_||_.__/ |_|   \__,_||_|    \__, |     //
+//                                                               |___/      //
+//                                                                          //
+//////////////////////////////////////////////////////////////////////////////
 
 
 // XPM library (libXpm) and X11/xpm.h
@@ -868,32 +1021,17 @@ void my_qsort_r(void *base, int nmemb, int size, void *thunk,
 
 #endif
 
-// *******************************************
-// STARTUP AND SHUTDOWN (must-call functions)
-// *******************************************
 
-/** \ingroup startup
-  * \brief Resource initialization on startup
-  *
-  * Call this function right before using any 'platform_helper' functions to initialize any global resources
-  * from 'platform_helper.h'.  WBInit() does this automatically.  It should only be called once.\n
-  *
-  * Header File:  platform_helper.h
-**/
-void WBPlatformOnInit(void);
-
-/** \ingroup startup
-  * \brief Resource 'free-up' on exit (must call)
-  *
-  * Call this function right before exiting the application if you have made use of any system-specific resources
-  * from 'platform_helper.h'.  WBExit() does this automatically.  Among other things, it will delete any temporary
-  * files that were created via WBTempFile().\n
-  * It should also be safe to call this function from within a 'signal' handler.
-  *
-  * Header File:  platform_helper.h
-**/
-void WBPlatformOnExit(void);
-
+//////////////////////////////////////////////////////////////////////////////
+//                                                                          //
+//                ___         _                             _               //
+//               |_ _| _ __  | |_  ___  _ __  _ __    __ _ | |              //
+//                | | | '_ \ | __|/ _ \| '__|| '_ \  / _` || |              //
+//                | | | | | || |_|  __/| |   | | | || (_| || |              //
+//               |___||_| |_| \__|\___||_|   |_| |_| \__,_||_|              //
+//                                                                          //
+//                                                                          //
+//////////////////////////////////////////////////////////////////////////////
 
 
 // *********************************
@@ -985,6 +1123,17 @@ void * WBGetPointerFromHash(WB_UINT32 uiHash);
 
 
 
+//////////////////////////////////////////////////////////////////////////////
+//                                                                          //
+//                        _    _                                            //
+//                       / \  | |_  ___   _ __ ___   ___                    //
+//                      / _ \ | __|/ _ \ | '_ ` _ \ / __|                   //
+//                     / ___ \| |_| (_) || | | | | |\__ \                   //
+//                    /_/   \_\\__|\___/ |_| |_| |_||___/                   //
+//                                                                          //
+//                                                                          //
+//////////////////////////////////////////////////////////////////////////////
+
 //-----------------------------------------
 // ATOM HELPERS (internally-defined atoms)
 //-----------------------------------------
@@ -1069,10 +1218,20 @@ char * WBGetAtomName(Display *pDisplay, Atom aAtom);
 
 
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                                               //
+//   ____         _    _                              _   _____                         _____  _  _              //
+//  |  _ \  __ _ | |_ | |__   ___    __ _  _ __    __| | |_   _|___  _ __ ___   _ __   |  ___|(_)| |  ___  ___   //
+//  | |_) |/ _` || __|| '_ \ / __|  / _` || '_ \  / _` |   | | / _ \| '_ ` _ \ | '_ \  | |_   | || | / _ \/ __|  //
+//  |  __/| (_| || |_ | | | |\__ \ | (_| || | | || (_| |   | ||  __/| | | | | || |_) | |  _|  | || ||  __/\__ \  //
+//  |_|    \__,_| \__||_| |_||___/  \__,_||_| |_| \__,_|   |_| \___||_| |_| |_|| .__/  |_|    |_||_| \___||___/  //
+//                                                                             |_|                               //
+//                                                                                                               //
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 // *******************************************
 // FILE/APPLICATION SEARCH PATH AND TEMP FILES
 // *******************************************
-
 
 /** \ingroup platform
   * \brief Run an application asynchronously
@@ -1129,14 +1288,22 @@ char * WBTempFile0(const char *szExt);
 
 
 
-//////////////////////////////////////////////////////////////////////////////////////////////
-//   ____  ____   ___   ____ _____ ____ ____     ____ ___  _   _ _____ ____   ___  _        //
-//  |  _ \|  _ \ / _ \ / ___| ____/ ___/ ___|   / ___/ _ \| \ | |_   _|  _ \ / _ \| |       //
-//  | |_) | |_) | | | | |   |  _| \___ \___ \  | |  | | | |  \| | | | | |_) | | | | |       //
-//  |  __/|  _ <| |_| | |___| |___ ___) |__) | | |__| |_| | |\  | | | |  _ <| |_| | |___    //
-//  |_|   |_| \_\\___/ \____|_____|____/____/   \____\___/|_| \_| |_| |_| \_\\___/|_____|   //
-//                                                                                          //
-//////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                                                       //
+//   _____        _                             _      _                   _  _              _    _                      //
+//  | ____|__  __| |_  ___  _ __  _ __    __ _ | |    / \    _ __   _ __  | |(_)  ___  __ _ | |_ (_)  ___   _ __   ___   //
+//  |  _|  \ \/ /| __|/ _ \| '__|| '_ \  / _` || |   / _ \  | '_ \ | '_ \ | || | / __|/ _` || __|| | / _ \ | '_ \ / __|  //
+//  | |___  >  < | |_|  __/| |   | | | || (_| || |  / ___ \ | |_) || |_) || || || (__| (_| || |_ | || (_) || | | |\__ \  //
+//  |_____|/_/\_\ \__|\___||_|   |_| |_| \__,_||_| /_/   \_\| .__/ | .__/ |_||_| \___|\__,_| \__||_| \___/ |_| |_||___/  //
+//                                                          |_|    |_|                                                   //
+//                                                                                                                       //
+//                          _                _   ____                                                                    //
+//                         / \    _ __    __| | |  _ \  _ __  ___    ___  ___  ___  ___   ___  ___                       //
+//                        / _ \  | '_ \  / _` | | |_) || '__|/ _ \  / __|/ _ \/ __|/ __| / _ \/ __|                      //
+//                       / ___ \ | | | || (_| | |  __/ | |  | (_) || (__|  __/\__ \\__ \|  __/\__ \                      //
+//                      /_/   \_\|_| |_| \__,_| |_|    |_|   \___/  \___|\___||___/|___/ \___||___/                      //
+//                                                                                                                       //
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // *********************
 // SPAWNING APPLICATIONS

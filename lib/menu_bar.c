@@ -144,7 +144,7 @@ Atom aMENU_RESIZE = 0;
   *
   * To move to the previous or next menu item in the list:
   *   data.l[0] = 0
-  *   data.l[1] = 1 or -1; 1 moves 'next', -1 'previous'.  others undefined.
+  *   data.l[1] = 1 or -1; 1 moves 'next', -1 'previous', 0 'first'.  others undefined.
   *
 **/
 Atom aMENU_ACTIVATE = 0;
@@ -910,7 +910,7 @@ let_parent_process_it:
           WBInvalidateGeom(wID, NULL, TRUE);
         }
       }
-      else if(iMenuItemIndex && !((XClientMessageEvent *)pEvent)->data.l[0])
+      else if(/*iMenuItemIndex &&*/ !((XClientMessageEvent *)pEvent)->data.l[0])
       {
         // select the PREVIOUS or the NEXT menu item
 
@@ -926,11 +926,23 @@ let_parent_process_it:
 
           pItem = NULL;  // initially
 
-          if(iMenuItemIndex > 0)
+          if(iMenuItemIndex == 0)
+          {
+            if(pMenu->nItems > 0) // just in case
+            {
+              pSelf->iSelected = 0;
+
+              goto try_select_next; // a simple way to implement this
+            }
+
+            pItem = NULL; // make sure
+          }
+          else if(iMenuItemIndex > 0)
           {
             while(pSelf->iSelected < (pMenu->nItems - 1))
             {
               pSelf->iSelected++;
+try_select_next:
               pItem = pMenu->ppItems[pSelf->iSelected];
 
               if(pItem->iAction != WBMENU_SEPARATOR)

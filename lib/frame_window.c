@@ -1246,8 +1246,16 @@ const FRAME_WINDOW *pFrameWindow;
   if(iIndex < 0 || // still test for this in case 'nFocusTab' is negative (but unlikely)
      !pFrameWindow->ppChildFrames || iIndex >= pFrameWindow->nChildFrames)
   {
-    WB_ERROR_PRINT("ERROR:  %s - bad index %d - %d frames, array=%p\n",
-                   __FUNCTION__, iIndex, pFrameWindow->nChildFrames, pFrameWindow->ppChildFrames);
+    if(pFrameWindow->ppChildFrames) // only if I have an array of child frames do I do the message
+    {
+      WB_ERROR_PRINT("ERROR:  %s - bad index %d - %d frames, array=%p\n",
+                     __FUNCTION__, iIndex, pFrameWindow->nChildFrames, pFrameWindow->ppChildFrames);
+    }
+    else
+    {
+      WB_DEBUG_PRINT(DebugLevel_Medium, "ERROR:  %s - bad index %d - %d frames, array=%p\n",
+                     __FUNCTION__, iIndex, pFrameWindow->nChildFrames, pFrameWindow->ppChildFrames);
+    }
 
     return NULL;
   }
@@ -2245,6 +2253,7 @@ GC gc0;
     GC gc;
     WB_RECT rct, rctTemp;
     XColor clr;
+    int iDepth;
 
 
     gc = WBGetWindowCopyGC2(pFrameWindow->wbFW.wID, gc0);
@@ -2258,10 +2267,13 @@ GC gc0;
       END_XCALL_DEBUG_WRAPPER
     }
 
+    iDepth = DefaultDepth(pDisplay, DefaultScreen(pDisplay));  // NOTE:  depth may be too small...
+    WB_DEBUG_PRINT((DebugLevel_Heavy | DebugSubSystem_Expose), "InternalPaintTabBar() - depth is %d\n", iDepth);
+
     BEGIN_XCALL_DEBUG_WRAPPER
     dw = (Drawable)XCreatePixmap(pDisplay, pFrameWindow->wbFW.wID,
                                  rct0.right - rct0.left, rct0.bottom - rct0.top,
-                                 DefaultDepth(pDisplay, DefaultScreen(pDisplay)));
+                                 iDepth);
     END_XCALL_DEBUG_WRAPPER
 
     if(gc == None || dw == None)
@@ -2981,7 +2993,7 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 
   // TODO:  message re-direction to children BEFORE 'pFWCallback'
 
-  if(wIDMenu)
+  if(wIDMenu) // only if there's a menu window
   {
     switch(pEvent->type)
     {
@@ -2997,6 +3009,7 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
           return Internal_Tab_Bar_Event(pFrameWindow, pEvent);
         }
 
+        // check for mouse position within menu window 'wIDMenu'
         if(WBPointInWindow(pEvent->xbutton.window, pEvent->xbutton.x, pEvent->xbutton.y, wIDMenu))
         {
           return WBWindowDispatch(wIDMenu, pEvent);  // menu window should handle THESE mousie events
@@ -3277,6 +3290,58 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 
           return 0; // if there's no handler and no UI handler, always return 0 (not handled)
         }
+        else if(pEvent->xclient.message_type == aWM_CHAR) // hotkeys for menu-related things
+        {
+          ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+          //                                                                                                                       //
+          //   _____  _   ___      __  __  _____  _   _  _   _      _     ____  _____  ___ __     __ _   _____  ___  ___   _   _   //
+          //  |  ___|/ | / _ \    |  \/  || ____|| \ | || | | |    / \   / ___||_   _||_ _|\ \   / // \ |_   _||_ _|/ _ \ | \ | |  //
+          //  | |_   | || | | |   | |\/| ||  _|  |  \| || | | |   / _ \ | |      | |   | |  \ \ / // _ \  | |   | || | | ||  \| |  //
+          //  |  _|  | || |_| |   | |  | || |___ | |\  || |_| |  / ___ \| |___   | |   | |   \ V // ___ \ | |   | || |_| || |\  |  //
+          //  |_|    |_| \___/    |_|  |_||_____||_| \_| \___/  /_/   \_\\____|  |_|  |___|   \_//_/   \_\|_|  |___|\___/ |_| \_|  //
+          //                                                                                                                       //
+          //                                                                                                                       //
+          ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+          // looking for F10 [pops up the menu at the first position] and SHIFT+F10 [context menu for child window]
+
+          if(pEvent->xclient.data.l[0] == XK_F10 &&            // keystroke is F10
+             (pEvent->xclient.data.l[1] & WB_KEYEVENT_KEYSYM)) // keystroke is a symbol
+          {
+            int iACS = (int)pEvent->xclient.data.l[1] & WB_KEYEVENT_ACSMASK;
+
+            if(iACS == WB_KEYEVENT_SHIFT)
+            {
+              // send a command to pop up the context menu
+
+              return 1; // handled
+            }
+            else if(!iACS) // no ctrl+alt+shift
+            {
+              // send command to pop up the frame's menu
+
+              XClientMessageEvent evt;
+
+              // post a high-priority message to myself to display the menu
+
+              bzero(&evt, sizeof(evt));
+              evt.type = ClientMessage;
+              evt.display = WBGetWindowDisplay(wIDMenu);
+              evt.window = wIDMenu;
+              evt.message_type = aMENU_ACTIVATE;
+              evt.format = 32;
+              evt.data.l[0] = 0;
+              evt.data.l[1] = 0;
+
+              WBPostPriorityEvent(wIDMenu, (XEvent *)&evt);
+
+              WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_Menu | DebugSubSystem_Frame,
+                              "%s - posting client event message to display menu\n", __FUNCTION__);
+
+              return 1; // handled
+            }
+          }
+        }
 #ifndef NO_DEBUG
         else
         {
@@ -3297,6 +3362,37 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 
       default:
         break;
+    }
+  }
+  else // no main menu, like for a dialog-based or form-based application
+  {
+    if(pEvent->xclient.message_type == aWM_CHAR) // hotkeys for menu-related things
+    {
+      ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+      //                                                                                                                       //
+      //   _____  _   ___      __  __  _____  _   _  _   _      _     ____  _____  ___ __     __ _   _____  ___  ___   _   _   //
+      //  |  ___|/ | / _ \    |  \/  || ____|| \ | || | | |    / \   / ___||_   _||_ _|\ \   / // \ |_   _||_ _|/ _ \ | \ | |  //
+      //  | |_   | || | | |   | |\/| ||  _|  |  \| || | | |   / _ \ | |      | |   | |  \ \ / // _ \  | |   | || | | ||  \| |  //
+      //  |  _|  | || |_| |   | |  | || |___ | |\  || |_| |  / ___ \| |___   | |   | |   \ V // ___ \ | |   | || |_| || |\  |  //
+      //  |_|    |_| \___/    |_|  |_||_____||_| \_| \___/  /_/   \_\\____|  |_|  |___|   \_//_/   \_\|_|  |___|\___/ |_| \_|  //
+      //                                                                                                                       //
+      //                                                                                                                       //
+      ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+      // looking for F10 [pops up the menu at the first position] and SHIFT+F10 [context menu for child window]
+
+      if(pEvent->xclient.data.l[0] == XK_F10 &&            // keystroke is F10
+         (pEvent->xclient.data.l[1] & WB_KEYEVENT_KEYSYM)) // keystroke is a symbol
+      {
+        int iACS = (int)pEvent->xclient.data.l[1] & WB_KEYEVENT_ACSMASK;
+
+        if(iACS == WB_KEYEVENT_SHIFT)
+        {
+          // send a command to the focus window in order to pop up the context menu
+
+          return 1; // handled
+        }
+      }
     }
   }
 

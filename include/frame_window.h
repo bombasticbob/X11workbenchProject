@@ -384,6 +384,8 @@ struct __WBChildFrameUI__; // forward declaration
       // WBAlloc'd resource string for this child frame's menu (NULL = 'use default')
     WBFWMenuHandler *pMenuHandler;
       // WBAlloc'd menu handler for this child frame's menu (NULL = 'use default')
+    int iContextMenuID;
+      // menu ID (from pszMenuResource or owning frame's menu) for context popup, -1 if none
 
     WBWinEvent pUserCallback;
       // message callback function pointer (can be NULL)
@@ -434,6 +436,7 @@ typedef struct __WBChildFrame__
 
   char *pszMenuResource;            ///< resource string for this child frame's menu (NULL = 'use default')
   WBFWMenuHandler *pMenuHandler;    ///< menu handler for this child frame's menu (NULL = 'use default')
+  int iContextMenuID;               ///< menu ID (from pszMenuResource or owning frame's menu) for context popup, -1 if none
 
   WBWinEvent pUserCallback;         ///< message callback function pointer (can be NULL)
   void (*destructor)(struct __WBChildFrame__ *);  ///< pointer to a 'superclass' destructor.  If not NULL, will be called by FWDestroyChildFrame()

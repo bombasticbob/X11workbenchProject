@@ -174,7 +174,9 @@ static XColor         clrGreen;
 
 // application menu and the application menu handler structure 'main_menu_handlers'
 
-// application menu - what I see when there's no open document
+///////////////////////////////////////////////////////////////////////
+// default application menu - what I see when there's no open document
+///////////////////////////////////////////////////////////////////////
 static char szAppMenu[]="1\n"
                         "_File\tpopup\t2\n"
                         "_Tools\tpopup\t5\n"
@@ -198,7 +200,9 @@ static char szAppMenu[]="1\n"
                         "_Options\tIDM_TOOLS_OPTIONS\tDisplay Options Editor\n"
                         "\n";
 
+////////////////////////////////////////////////////////////
 // edit menu - what I see when there's a child frame active
+////////////////////////////////////////////////////////////
 static char szEditMenu[]="1\n"
                         "_File\tpopup\t2\n"
                         "_Edit\tpopup\t4\n"
@@ -254,6 +258,31 @@ static char szEditMenu[]="1\n"
                         "Re-order R_ight\tIDM_TAB_MOVE_RIGHT\tScroll Tab Right\tCtrl+Alt+Shift+PgDown\n"
                         "\tseparator\n" // NOTE:  I can add a list of windows here, with hotkeys
                         "\n";
+
+
+// NOTES ON 'F' KEYS - these were compiled by someone else with respect to winders
+// CTRL+ALT (and +SHIFT) any F key in X11 switches to a virtual desktop in console mode
+//
+// F1 - brings up a help window
+//      Alt - system menu
+// F2 - in winders, rename selected object.
+//      Alt+Ctrl - in MS Orifice, opens documents library (don't do this in X11)
+// F3 - in winders, open search box
+// F4 - in winders XP, display address bar list (or similar)
+//      Alt - close application/window
+// F5 - window refresh/update (such as in Firefox)
+// F6 - cycle through screen elements of a window
+// F7 - turn on/off "caret mode" in Firefox; in MS Weird, spell/grammar checking
+// F8 - extend selection (MS orifice)
+// F9 - update fields (MS orifice, particularly ExHell)
+// F10 - activates the menu
+//       SHIFT - pops up a context menu (in X11 at least) like a right-click would
+//       ALT - in X11, maximize/normal (retaining window decorations)
+// F11 - toggle between "true full-screen" (no window decorations) and normal [works in gnome/mate as well]
+// F12 - opens 'save as' dialog (in MS Orifice)
+
+
+
 
 // menu handler, similar to what MFC does
 // in theory I can swap in a new menu handler when the window focus changes
@@ -791,16 +820,43 @@ WBEditWindow *pEW;
 static int FileOpenHandler(XClientMessageEvent *pEvent)
 {
   Window wIDOwner = pMainFrame ? pMainFrame->wID : -1;
+  WBEditWindow *pEW;
+  char *pFile;
 
-  char *pFile = DLGFileDialog(FileDialog_Open, wIDOwner, ".", "",
-                              ".txt\tText Files\n.*\tAll Files\n");
+  pFile = DLGFileDialog(FileDialog_Open, wIDOwner, ".", "",
+                        ".txt\tText Files\n"
+                        ".c\tC language file\n"
+                        ".cpp\tC language file\n"
+                        ".h\tC language header\n"
+                        "Makefile\tMake Files\n"
+                        ".mk\tMake 'include' Files\n"
+                        ".am\tAutotools File\n"
+                        ".*\tAll Files\n");
 
   if(pFile)
   {
-    DLGMessageBox(MessageBox_OK, wIDOwner,
-                  "File Open", pFile);
-    // TODO:  do something with file name
+//    DLGMessageBox(MessageBox_OK, wIDOwner,
+//                  "File Open", pFile);
+//    // TODO:  do something with file name
 
+    // create a new tab in the frame window
+    // 1st, create a new 'WBEditWindow', attaching it to the frame
+
+    pEW = WBCreateEditWindow(pMainFrame, NULL, szEditMenu, main_menu_handlers, 0);
+
+    if(!pEW)
+    {
+      DLGMessageBox(MessageBox_OK | MessageBox_Error, (Window)-1,
+                    "File Open", "'File _Open' unable to create edit window");
+    }
+
+    // next, load the contents of the file into it
+
+    if(WBEditWindowLoadFile(pEW, pFile))
+    {
+      DLGMessageBox(MessageBox_OK | MessageBox_Error, (Window)-1,
+                    "File Open", "'File _Open' unable to read file into edit window");
+    }
 
     WBFree(pFile);  // required resource cleanup
   }
@@ -1435,9 +1491,10 @@ find_url_opener:
               break;
             }
 
-            // THIS METHOD APPLIES TO Doxygen version 1.8.3.1
+            // THIS METHOD APPLIES TO Doxygen version 1.8.3.1 and later
+            // (it has also been tested with Doxygen 1.8.13.2)
             // If you have an earlier version of doxygen, consider UPGRADING PLEASE!
-            // If you have an OLDER version of doxygen, and this does not work with your
+            // If you cannot upgrade Doxygen, and this API does not work with your
             // generated documentation, consider downloading the pre-built documentation.
 
             if(NULL != (p2 = strstr(szLineBuf, "class=\"el\"")))
@@ -1451,7 +1508,7 @@ find_url_opener:
               {
                 // parse the tag, find 'href'
 
-                p4 = CHFindEndOfXMLTag(p2, -1);
+                p4 = CHFindEndOfXMLTag(p2, -1); // XML parse helper
 
                 if(*p4 == '>')
                 {

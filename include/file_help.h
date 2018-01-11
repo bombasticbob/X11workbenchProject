@@ -396,6 +396,31 @@ file_help_buf_t *pFB;
 
 
 
+/** \ingroup file_help_io
+  * \brief read a file's contents into a buffer, returning the length of the buffer
+  *
+  * \param szFileName A const pointer to a string containing the file name
+  * \param ppBuf A pointer to a 'char *' buffer that is allocated via WBAlloc() and returned by the function
+  * \returns a positive value on success indicating the length of the data in the returned buffer, or negative on error.
+  *  A return value of zero indicates an empty file.
+  *
+  * Use this function to read the entire contents of a file into a memory buffer.
+**/
+size_t WBReadFileIntoBuffer(const char *szFileName, char **ppBuf);
+
+/** \ingroup file_help_io
+  * \brief read a file's contents into a buffer, returning the length of the buffer
+  *
+  * \param szFileName A const pointer to a string containing the file name
+  * \param pBuf A const pointer to a buffer that contains the data to write
+  * \param cbBuf The length of data to write to the file.
+  * \returns a value of zero on success, or non-zero on error (the actual error should be in 'errno')
+  *
+  * Use this function to write the entire contents of a buffer to a file.  The file will be overwritten
+  * if it already exists.
+**/
+int WBWriteFileFromBuffer(const char *szFileName, const char *pBuf, size_t cbBuf);
+
 
 // SYSTEM INDEPENDENT FILE STATUS, LISTINGS, AND INFORMATION
 

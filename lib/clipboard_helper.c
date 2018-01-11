@@ -141,8 +141,13 @@ static void * ClipboardThreadProc(void *);
 int WBInitClipboardSystem(Display *pDisplay, const char *szDisplayName)
 {
 char *pDisplayName;
+//unsigned long long ullTick;
+
+  // for debugging purposes, keep track of how long it takes
 
   // TODO:  check 'hClipboardThread' and/or 'bClipboardQuitFlag'
+
+//  ullTick = WBGetTimeIndex();
 
   if(!szDisplayName ||
      (pDisplay && pDisplay != WBGetDefaultDisplay())) // for now, this param is reserved
@@ -215,6 +220,10 @@ char *pDisplayName;
   }
 
   WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Init, "INFO:  %s - Clipboard Thread started\n",__FUNCTION__);
+
+
+//  ullTick = WBGetTimeIndex() - ullTick;
+//  WBDebugPrint("TEMPORARY:  CLIPBOARD STARTUP took %llu ticks\n", ullTick);
 
   return 0; // everything's ok
 }
@@ -388,6 +397,7 @@ CLIPBOARD_TASK *pT, *pT2;
 
 void * ClipboardThreadProc(void *pParam)
 {
+unsigned long long ullTick;
 int iLen, iFactor;//, iErr;
 const char *pDisplayName = (const char *)pParam;
 Display *pDisplay = NULL;
@@ -413,6 +423,8 @@ Atom aUTF8_STRING;
 //Atom aCOLORMAP  = XA_COLORMAP;
 //Atom aPIXMAP    = XA_PIXMAP;
 
+
+  ullTick = WBGetTimeIndex();
 
   pDisplay = XOpenDisplay(pDisplayName);
 
@@ -513,6 +525,10 @@ Atom aUTF8_STRING;
   pDisplayName = NULL; // no longer valid (TODO:  cache it for multiple display instances?)
 
   WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Init, "INFO:  %s - Clipboard Thread initialization complete\n",__FUNCTION__);
+
+  ullTick = WBGetTimeIndex() - ullTick;
+
+  WBDebugPrint("TEMPORARY:  CLIPBOARD THREAD STARTUP took %llu ticks\n", ullTick);
 
   // main handler loop
   while(!bClipboardQuitFlag)
