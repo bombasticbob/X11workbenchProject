@@ -12,7 +12,7 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2016 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
@@ -126,6 +126,10 @@ static int TabUIHandler(WBMenu *, WBMenuItem *);
 
 static int ToolBoxHandler(XClientMessageEvent *pEvent);
 static int ToolBoxUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem);
+
+int DoFileOpen(WBFrameWindow *pMainFrame, const char *szFileName);
+WBFILE_TYPE GetFileType(const char *szFileName); // return one of the WBFILE_TYPE constants
+
 
 
 int main(int argc, char *argv0[], char *envp0[])
@@ -329,7 +333,7 @@ FW_MENU_HANDLER_END
 
 static void usage(void)
 {
-  fputs("X11workbench - Copyright (c) 2010-2016 by S.F.T. Inc. - all rights reserved\n\n"
+  fputs("X11workbench - Copyright (c) 2010-2018 by S.F.T. Inc. - all rights reserved\n\n"
         "Usage:      X11workbench [options] filename [filename [...]]\n"
         "  where     'filename' represents one or more files or workspaces to be opened on startup\n"
         "\n"
@@ -500,8 +504,8 @@ next_argument:
   if(!bNoSplash)
   {
     DLGSplashScreen(splash_xpm,
-//                    "Copyright " UTF8_COPYRIGHT " 2010-2016 by Big Bad Bombastic Bob\nAll Rights Reserved",  // text string with unicode char in it U+00A9
-                    "Copyright (c) 2010-2016 by Big Bad Bombastic Bob\nAll Rights Reserved", // 1 or 2 lines only
+//                    "Copyright " UTF8_COPYRIGHT " 2010-2018 by Big Bad Bombastic Bob\nAll Rights Reserved",  // text string with unicode char in it U+00A9
+                    "Copyright (c) 2010-2018 by Big Bad Bombastic Bob\nAll Rights Reserved", // 1 or 2 lines only
                     WhitePixel(pX11Display, DefaultScreen(pX11Display))); // white text
   }
 #endif // NO_SPLASH
@@ -553,6 +557,23 @@ next_argument:
   // this is part of the frame window functionality for the DEFAULT menu
 
   FWSetMenuHandlers(pMainFrame, main_menu_handlers);
+
+
+  // open files specifed on command line
+
+  // TODO:  if project file specified, open files based on project state
+  //        Otherwise, open as "single file"
+
+  while(argc > 1)
+  {
+    // TODO:  is it a project file?
+
+    DoFileOpen(pMainFrame, argv[1]);
+
+    argc--;
+    argv++;
+  }
+
 
   //=========================
   //   MAIN MESSAGE LOOP
@@ -772,6 +793,199 @@ int iRval = 0;
 }
 
 
+///////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                           //
+//   _   _  _    _  _  _  _            _____                     _    _                      //
+//  | | | || |_ (_)| |(_)| |_  _   _  |  ___|_   _  _ __    ___ | |_ (_)  ___   _ __   ___   //
+//  | | | || __|| || || || __|| | | | | |_  | | | || '_ \  / __|| __|| | / _ \ | '_ \ / __|  //
+//  | |_| || |_ | || || || |_ | |_| | |  _| | |_| || | | || (__ | |_ | || (_) || | | |\__ \  //
+//   \___/  \__||_||_||_| \__| \__, | |_|    \__,_||_| |_| \___| \__||_| \___/ |_| |_||___/  //
+//                             |___/                                                         //
+//                                                                                           //
+///////////////////////////////////////////////////////////////////////////////////////////////
+
+// 'DoFileOpen()' - API to open a file and create a child frame derived tab for it
+
+int DoFileOpen(WBFrameWindow *pMainFrame, const char *szFileName)
+{
+  WBChildFrame *pCF = NULL;
+
+  if(!pMainFrame || !szFileName || !*szFileName)
+  {
+    return -1;
+  }
+
+  // create a new tab in the frame window using the correct type of child window
+
+//  uint32_t uiFileType = GetFileType(szFileName);
+//
+//  if(uiFileType == WBFILE_PROJECT)
+//  {
+//  }
+//  else if(uiFileType == WBFILE_RESOURCE)
+//  {
+//  }
+//  else
+  {
+    // All other files are assumed to be text files.
+
+    // 1st, create a new 'WBEditWindow', attaching it to the frame
+
+    WBEditWindow *pEW = WBCreateEditWindow(pMainFrame, NULL, szEditMenu, main_menu_handlers, 0);
+
+    if(!pEW)
+    {
+      DLGMessageBox(MessageBox_OK | MessageBox_Error, (Window)-1,
+                    "File Open", "'File _Open' unable to create edit window");
+    }
+    else
+    {
+      // next, load the contents of the file into it
+
+      if(WBEditWindowLoadFile(pEW, szFileName))
+      {
+        DLGMessageBox(MessageBox_OK | MessageBox_Error, (Window)-1,
+                      "File Open", "'File _Open' unable to read file into edit window");
+      }
+
+      pCF = &(pEW->childframe);
+    }
+  }
+
+  if(pCF)
+  {
+    const char *pDisplayName;
+
+    // TODO:  set up a few things based on the file type
+    //        a) default line ending
+    //        b) default unicode/UTF-8 [as required]
+    //        c) default tab handling
+    //        d) color highlighting
+    //        etc.
+
+
+    // display file name with no path info within tab
+    pDisplayName = szFileName + strlen(szFileName);
+
+    while(pDisplayName > szFileName && *(pDisplayName - 1) != '/')
+    {
+      pDisplayName--;
+    }
+
+    FWSetChildFrameDisplayName(pCF, pDisplayName);
+  }
+
+  return pCF ? 0 : -1;
+}
+
+
+WBFILE_TYPE GetFileType(const char *szFileName) // return one of the WBFILE_TYPE constants
+{
+const char *pFN, *pExt;
+
+  pFN = pExt = szFileName + strlen(szFileName);
+
+  while(pFN > szFileName && *(pFN - 1) != '/')
+  {
+    pFN--;
+  }
+
+  while(pExt > szFileName && *(pExt - 1) != '.')
+  {
+    pExt--;
+  }
+
+  if(pExt <= szFileName)
+  {
+    pExt = NULL; // no extension
+  }
+
+  // TODO:  don't just check the extension, read the first few lines, check for
+  //        invalid/unprintable characters, etc.
+
+  if(!pExt && !strcasecmp("makefile", pExt))
+  {
+    return WBFILE_TYPE_MAKEFILE;
+  }
+  else if(!pExt)
+  {
+    // TODO: look for hash-bang
+  }
+  else if(!strcasecmp("mk", pExt)) // '.mk' '.Mk' or '.MK' extension
+  {
+    return WBFILE_TYPE_MAKEFILE;
+  }
+  else if(!strcasecmp("h", pExt)) // '.mk' '.Mk' or '.MK' extension
+  {
+    return WBFILE_TYPE_MAKEFILE;
+  }
+  else if(!strcmp("c", pExt))
+  {
+    return WBFILE_TYPE_CPROG;
+  }
+  else if(!strcmp("g", pExt))
+  {
+    return WBFILE_TYPE_CHEADER;
+  }
+  else if(!strcmp("cpp", pExt))
+  {
+    return WBFILE_TYPE_CPP;
+  }
+  else if(!strcmp("java", pExt))
+  {
+    return WBFILE_TYPE_JAVA;
+  }
+  else if(!strcmp("js", pExt))
+  {
+    return WBFILE_TYPE_JS;
+  }
+  else if(!strcmp("pl", pExt))
+  {
+    return WBFILE_TYPE_PERL;
+  }
+  else if(!strcmp("py", pExt))
+  {
+    return WBFILE_TYPE_PYTHON;
+  }
+  else if(!strcmp("xpm", pExt))
+  {
+    return WBFILE_TYPE_PIXMAP;
+  }
+  else if(!strcmp("xwbrc", pExt))
+  {
+    return WBFILE_TYPE_RESOURCE;
+  }
+  else if(!strcmp("xwbdlg", pExt))
+  {
+    return WBFILE_TYPE_DIALOG;
+  }
+  else if(!strcmp("xwbmenu", pExt))
+  {
+    return WBFILE_TYPE_MENU;
+  }
+  else if(!strcmp("xwbbar", pExt))
+  {
+    return WBFILE_TYPE_TOOLBAR;
+  }
+  else if(!strcmp("sh", pExt))
+  {
+    return WBFILE_TYPE_SHELL;
+  }
+  else if(!strcmp("php", pExt))
+  {
+    return WBFILE_TYPE_PHP;
+  }
+  else if(!strcmp("htm", pExt) || !strcmp("html", pExt))
+  {
+    return WBFILE_TYPE_HTML;
+  }
+
+
+  return WBFILE_TYPE_TEXT; // default
+}
+
+
+
 ////////////////////////////////////////////////////////////////////////////
 //   __  __                     ____      _ _ _                _          //
 //  |  \/  | ___ _ __  _   _   / ___|__ _| | | |__   __ _  ___| | _____   //
@@ -817,6 +1031,7 @@ WBEditWindow *pEW;
   return 1; // handled
 }
 
+
 static int FileOpenHandler(XClientMessageEvent *pEvent)
 {
   Window wIDOwner = pMainFrame ? pMainFrame->wID : -1;
@@ -835,28 +1050,7 @@ static int FileOpenHandler(XClientMessageEvent *pEvent)
 
   if(pFile)
   {
-//    DLGMessageBox(MessageBox_OK, wIDOwner,
-//                  "File Open", pFile);
-//    // TODO:  do something with file name
-
-    // create a new tab in the frame window
-    // 1st, create a new 'WBEditWindow', attaching it to the frame
-
-    pEW = WBCreateEditWindow(pMainFrame, NULL, szEditMenu, main_menu_handlers, 0);
-
-    if(!pEW)
-    {
-      DLGMessageBox(MessageBox_OK | MessageBox_Error, (Window)-1,
-                    "File Open", "'File _Open' unable to create edit window");
-    }
-
-    // next, load the contents of the file into it
-
-    if(WBEditWindowLoadFile(pEW, pFile))
-    {
-      DLGMessageBox(MessageBox_OK | MessageBox_Error, (Window)-1,
-                    "File Open", "'File _Open' unable to read file into edit window");
-    }
+    DoFileOpen(pMainFrame, pFile);
 
     WBFree(pFile);  // required resource cleanup
   }

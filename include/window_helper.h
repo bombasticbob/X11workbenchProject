@@ -8,7 +8,7 @@
 //                                                                                          //
 //                       basic window creation and message handling                         //
 //                                                                                          //
-//    Copyright (c) 2010-2016 by 'Big Bad Bombastic Bob' Frazier - all rights reserved.     //
+//    Copyright (c) 2010-2018 by 'Big Bad Bombastic Bob' Frazier - all rights reserved.     //
 //   You may use this file in any way you see fit provided that any copy or derived work    //
 //   includes the above copyright notice.                                                   //
 //                                                                                          //
@@ -19,7 +19,7 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2016 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied

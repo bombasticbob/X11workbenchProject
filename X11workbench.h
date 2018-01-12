@@ -12,7 +12,7 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2016 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
                              all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
@@ -48,12 +48,64 @@
 #include "window_helper.h"
 
 
-// common application definitions
+typedef enum __WBFILE_TYPE__
+{
+  WBFILE_TYPE_NONE     = 0,
+  WBFILE_TYPE_TEXT     = 1,
+  WBFILE_TYPE_CPROG    = 2,
+  WBFILE_TYPE_CPP      = 3,
+  WBFILE_TYPE_CHEADER  = 4,
+  WBFILE_TYPE_MAKEFILE = 5,
+  WBFILE_TYPE_AUTOCONF = 6,
+  WBFILE_TYPE_RESOURCE = 7,
+  WBFILE_TYPE_PIXMAP   = 8,
+  WBFILE_TYPE_DIALOG   = 9,
+  WBFILE_TYPE_MENU     = 10,
+  WBFILE_TYPE_TOOLBAR  = 11,
+  WBFILE_TYPE_SHELL    = 12,
+  WBFILE_TYPE_PYTHON   = 13,
+  WBFILE_TYPE_PERL     = 14,
+  WBFILE_TYPE_ASM      = 15,
+  WBFILE_TYPE_HTML     = 16,
+  WBFILE_TYPE_XML      = 17,
+  WBFILE_TYPE_JAVA     = 18,
+  WBFILE_TYPE_JS       = 19,
+  WBFILE_TYPE_PHP      = 20,
+  WBFILE_TYPE_LAST     = 20 // update this if I add more types
+} WBFILE_TYPE;
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                                       //
+//   _____        _                             _                          _      _     ____  ___        //
+//  | ____|__  __| |_  ___  _ __  _ __    __ _ | | ___    __ _  _ __    __| |    / \   |  _ \|_ _| ___   //
+//  |  _|  \ \/ /| __|/ _ \| '__|| '_ \  / _` || |/ __|  / _` || '_ \  / _` |   / _ \  | |_) || | / __|  //
+//  | |___  >  < | |_|  __/| |   | | | || (_| || |\__ \ | (_| || | | || (_| |  / ___ \ |  __/ | | \__ \  //
+//  |_____|/_/\_\ \__|\___||_|   |_| |_| \__,_||_||___/  \__,_||_| |_| \__,_| /_/   \_\|_|   |___||___/  //
+//                                                                                                       //
+//                                                                                                       //
+///////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// external types (prototype definitions for functions)
+typedef struct __WB_FRAME_WINDOW__ WBFrameWindow; // see frame_window.h
+
+
+// global variables
 
 extern Display *display;        // X server connection
 extern Window win;              // main window Window ID
 
 
+// general purpose utilities to be called by external things
+
+int DoFileOpen(WBFrameWindow *pMainFrame, const char *szFileName);
+WBFILE_TYPE GetFileType(const char *szFileName);
+
+
+// utilities specific to context-sensitive help
+
 void DoContextSensitiveHelp(const char *szTerm);
 int spawn_async(const char *szApp, ...);
+
+
 
