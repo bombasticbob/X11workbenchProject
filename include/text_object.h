@@ -252,6 +252,9 @@ struct _text_object_; // forward declaration
     void (* cursor_top)(struct _text_object_ *pThis);
     void (* cursor_bottom)(struct _text_object_ *pThis);
 
+    void (* scroll_vertical)(struct _text_object_ *pThis, int nRows);
+    void (* scroll_horizontal)(struct _text_object_ *pThis, int nCols);
+
     // handling expose events for the text area
 
     void (* do_expose)(const struct _text_object_ *pThis, Display *pDisplay, Window wID,

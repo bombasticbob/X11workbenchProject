@@ -1912,18 +1912,8 @@ Time WBGetLastEventTime(void);
       // (alternately, you could use WBWaitForEvent() if you do not need periodic
       //  wake-up for background processing)
 
-// implementations that support 'nanosleep' should use it
-#ifdef HAVE_NANOSLEEP
-      struct timespec tsp;
-      tsp.tv_sec = 0;
-      tsp.tv_nsec = 1000000;  // wait for 1 msec
+      WBDelay(1000);  // 1000 microsecs - 1 millisecond
 
-      nanosleep(&tsp, NULL);
-#else  // HAVE_NANOSLEEP
-
-      usleep(1000);  // 1000 microsecs - a POSIX alternative to 'nanosleep'
-
-#endif // HAVE_NANOSLEEP
       continue;
     }
 
@@ -1933,7 +1923,7 @@ Time WBGetLastEventTime(void);
   * \endcode
   *
   * NOTE:  If you do not want to do any background processing, consider using
-  *        WBWaitForEvent() instead of 'usleep' or 'nanosleep'.
+  *        WBWaitForEvent() instead of WBDelay()
   *
   * To only retrieve 'internally queued' events, see WBNextEvent()
   *
@@ -2717,21 +2707,6 @@ static __inline__ void WBValidateRect(Window wID, WB_RECT *pRCT)
   * a result.  For this reason you should use a worker thread for timing that
   * requires precise accuracy.
 */
-
-/** \ingroup timer
-  * \brief Returns the current 'time index' (in microseconds)
-  *
-  * \return An unsigned 64-bit time index value, in microseconds
-  *
-  * The 'time index' is the master timer that determines when a timer event will be generated.
-  * By design it uses a 64-bit integer that never 'wraps around' to zero.  It is generally
-  * derived from the 'gettimeofday' API call for operating systems such as BSD and Linux that
-  * support the POSIX standard.
-  *
-  * Header File:  window_helper.h
-**/
-WB_UINT64 WBGetTimeIndex(void);  // returns current 'time index' (in microseconds) which never wraps around
-                                 // NOTE:  it is derived from the 'gettimeofday' call on BSD, Linux, etc.
 
 /** \ingroup timer
   * \brief Creates a one-shot or periodic timer

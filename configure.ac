@@ -27,10 +27,22 @@ AC_TYPE_SIGNAL
 AC_PROG_AWK
 AC_PROG_LN_S
 
+# check for presence of doxygen
+ifdef([XORG_WITH_DOXYGEN],
+[
+  XORG_WITH_DOXYGEN([1.7])
+  # this sets have_doxygen to yes if doxygen is present
+],
+[
+  have_doxygen=no
+  AM_CONDITIONAL([HAVE_DOXYGEN], [test x$have_doxygen = xyes])
+])
+
 
 # --enable-release (default has debugging enabled)
 # --enable-noopt (default is optimization enabled)
 # --enable-libXpm (default is NOT to link to libXpm)
+# --enable-libXft (default is to link to libXft)
 # --enable-fatalwarn (default is warnings NOT fatal)
 
 
@@ -61,6 +73,15 @@ AC_ARG_ENABLE(libXpm,
                esac],
               [libXpm=false])
 
+AC_ARG_ENABLE(libXft,
+              [  --disable-libXft        CUSTOM - do NOT use libXft for 'FreeType' font support and rendering],
+              [case "${enableval}" in
+               yes)  libXft=true ;;
+               no)   libXft=false ; AC_MSG_WARN([NOT linking with libXft]) ;;
+               *) AC_MSG_ERROR(bad value ${enableval} for --enable-libXft) ;;
+               esac],
+              [libXft=true])
+
 AC_ARG_ENABLE(fatalwarn,
               [  --enable-fatalwarn      CUSTOM - cause warnings to be treated as errors],
               [case "${enableval}" in
@@ -89,9 +110,8 @@ fi
 CPPFLAGS="$CPPFLAGS $X_CFLAGS -I$local_incdir -I$local_xpmdir"
 CXXFLAGS="$CXXFLAGS $X_CFLAGS -I$local_incdir -I$local_xpmdir"
 
-AC_SUBST([CFLAGS])
-AC_SUBST([CPPFLAGS])
-AC_SUBST([CXXFLAGS])
+
+# TODO:  do I need AC_SUBST for CFLAGS, etc. here?
 
 
 #################################################################
@@ -157,6 +177,32 @@ test_have_xpm=false
 if test x$libXpm = xtrue ; then
   AC_CHECK_HEADER([X11/xpm.h],test_have_xpm=true,AC_MSG_WARN([missing xpm.h - you should consider installing libXpm]))
 fi
+
+
+# This is where I check for libXft - the header will be X11/Xft/Xft.h
+# First, make sure freetype2 is available.  this also modifies CFLAGS and LDFLAGS
+
+test_have_xft=false
+ifdef([AC_CHECK_FT2],
+[
+  if test x$libXft = xtrue ; then
+    AC_CHECK_FT2([7.0.1],,[libXft=false; AC_MSG_WARN([freetype missing or incompatible version; will not link with libXft])])
+  fi
+
+  if test x$libXft = xtrue ; then
+    my_save_CFLAGS="$CFLAGS"
+    CFLAGS="$CFLAGS $FT2_CFLAGS"
+    AC_CHECK_HEADER([X11/Xft/Xft.h],test_have_xft=true,
+    [
+      AC_MSG_WARN([***************************************************************************])
+      AC_MSG_WARN([missing Xft.h - will not be building the toolkit with libXft])
+      AC_MSG_WARN([                you should consider installing the developer libXft package])
+      AC_MSG_WARN([***************************************************************************])
+    ])
+    CFLAGS="$my_save_CFLAGS"
+  fi
+],[AC_MSG_WARN([Freetype M4 macros not installed - do you need the developer package?])])
+
 
 # check for a few functions that I want to verify exist
 AC_CHECK_FUNCS([printf])
@@ -290,7 +336,17 @@ case $host in
 esac
 
 if test x$test_have_xpm = xtrue ; then
-  AC_DEFINE([X11WORKBENCH_TOOLKIT_HAVE_XPM],[1],[whether or not XPM header and libraries are available])
+  AC_DEFINE([X11WORKBENCH_TOOLKIT_HAVE_XPM],[1],[whether or not libXpm should be used])
+fi
+
+if test x$test_have_xft = xtrue ; then
+  AC_DEFINE([X11WORKBENCH_TOOLKIT_HAVE_XFT],[1],[whether or not libXft should be used])
+  # NOTE:  the AC_CHECK_FT2 macro SHOULD HAVE already modified CFLAGS and LIBS
+  #        however, whenever I look at the output, I don't see it.  So...
+  CFLAGS="$CFLAGS $FT2_CFLAGS"
+  CXXFLAGS="$CXXFLAGS $FT2_CFLAGS"
+  CPPFLAGS="$CPPFLAGS $FT2_CFLAGS"
+  LIBS="$LIBS $FT2_LIBS"
 fi
 
 
@@ -316,6 +372,9 @@ AM_CONDITIONAL(NOT_CYGWIN, test x$is_cygwin = xfalse)
 # note that this conditional defines the linkage, not the library include symbols
 AM_CONDITIONAL(HAVE_XPM_LIB, test x$test_have_xpm = xtrue )
 
+# XFT library - use libXft for certain rendering operations when available
+AM_CONDITIONAL(HAVE_XFT_LIB, test x$test_have_xft = xtrue )
+
 # additional library linkages
 AM_CONDITIONAL(NEED_LRT, test x$test_need_lrt = xtrue)
 AM_CONDITIONAL(NEED_LDL, test x$test_need_ldl = xtrue)
@@ -331,6 +390,12 @@ AC_SUBST([GLOBAL_XPATH])
 AC_SUBST([IS_CYGWIN])
 AC_SUBST([NOT_CYGWIN])
 AC_SUBST([HAVE_XPM_LIB])
+AC_SUBST([HAVE_XFT_LIB])
+
+AC_SUBST([CFLAGS])
+AC_SUBST([CPPFLAGS])
+AC_SUBST([CXXFLAGS])
+AC_SUBST([LIBS])
 
 
 # the end

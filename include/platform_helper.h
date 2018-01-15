@@ -65,6 +65,7 @@
 #define _PLATFORM_HELPER_H_INCLUDED_
 
 #include <stdarg.h> /* stdarg to make sure I have va_list and other important stuff */
+#include <stdint.h> /* for standard integer types like uint32_t */
 
 // X11 header files (TODO:  use 'ifdef' blocks around this as needed for non-X platforms)
 
@@ -94,6 +95,7 @@
 #endif // X11WORKBENCH_PROJECT_BUILD
 
 // TESTING THE CONFIGURATION - TODO:  for some, provide alternates?
+// NOTE that for 'WIN32' defined, certain features won't be checked
 
 #if !defined( HAVE_ALARM ) || !defined( HAVE_CHOWN ) || \
     !defined( HAVE_CLOCK_GETTIME ) || !defined( HAVE_DUP2 ) || !defined( HAVE_FORK ) || \
@@ -103,8 +105,9 @@
     !defined( HAVE_PRINTF ) || !defined( HAVE_REALLOC ) || \
     !defined( HAVE_SELECT ) || !defined( HAVE_SETLOCALE ) || !defined( HAVE_STRCASECMP ) || \
     !defined( HAVE_STRCHR ) || !defined( HAVE_STRNCASECMP ) || !defined( HAVE_STRRCHR ) || \
-    !defined( HAVE_STRSTR ) || !defined( HAVE_VFORK ) || !defined( HAVE_WORKING_FORK ) || \
-    !defined( HAVE_WORKING_VFORK ) || !defined( HAVE__BOOL ) || !defined( LSTAT_FOLLOWS_SLASHED_SYMLINK )
+    !defined( HAVE_STRSTR ) || !defined( HAVE__BOOL ) || \
+    ( !defined(WIN32) && ( !defined( LSTAT_FOLLOWS_SLASHED_SYMLINK ) || !defined( HAVE_VFORK ) || \
+                          !defined( HAVE_WORKING_FORK ) || !defined( HAVE_WORKING_VFORK ) ))
 #error
 #error configure script feature check 1 fail
 #error critical features missing
@@ -118,8 +121,9 @@
     !( HAVE_PRINTF ) || !( HAVE_REALLOC ) || \
     !( HAVE_SELECT ) || !( HAVE_SETLOCALE ) || !( HAVE_STRCASECMP ) || \
     !( HAVE_STRCHR ) || !( HAVE_STRNCASECMP ) || !( HAVE_STRRCHR ) || \
-    !( HAVE_STRSTR ) || !( HAVE_VFORK ) || !( HAVE_WORKING_FORK ) || \
-    !( HAVE_WORKING_VFORK ) || !( HAVE__BOOL ) || !( LSTAT_FOLLOWS_SLASHED_SYMLINK )
+    !( HAVE_STRSTR ) || !( HAVE__BOOL ) || \
+    ( !defined(WIN32) && ( !( LSTAT_FOLLOWS_SLASHED_SYMLINK ) || !( HAVE_VFORK ) || \
+                           !( HAVE_WORKING_FORK ) || !( HAVE_WORKING_VFORK ) ))
 #error
 #error configure script feature check 2 fail
 #error critical features missing
@@ -128,8 +132,12 @@
 #endif // all that prior stuff
 
 #ifndef HAVE_BZERO
-#define bzero(X,Y) memset((X),0,(Y))
+  #define HAVE_BZERO 0
 #endif // !HAVE_BZERO
+
+#if !( HAVE_BZERO )
+  #define bzero(X,Y) memset((X),0,(Y))
+#endif
 
 
 // DEBUG vs RELEASE code
@@ -485,6 +493,53 @@ void WBToolkitUsage(void);
   * Header File:  platform_helper.h
 **/
 const char *GetStartupAppName(void);
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////
+//                                                                          //
+//      ____               _                     _   _  _    _  _           //
+//     / ___|  _   _  ___ | |_  ___  _ __ ___   | | | || |_ (_)| | ___      //
+//     \___ \ | | | |/ __|| __|/ _ \| '_ ` _ \  | | | || __|| || |/ __|     //
+//      ___) || |_| |\__ \| |_|  __/| | | | | | | |_| || |_ | || |\__ \     //
+//     |____/  \__, ||___/ \__|\___||_| |_| |_|  \___/  \__||_||_||___/     //
+//             |___/                                                        //
+//                                                                          //
+//////////////////////////////////////////////////////////////////////////////
+
+
+/** \ingroup platform
+  * \brief Returns the current 'time index' (in microseconds)
+  *
+  * \return An unsigned 64-bit time index value, in microseconds
+  *
+  * The 'time index' is the master timer that determines when a timer event will be generated.
+  * By design it uses a 64-bit integer that never 'wraps around' to zero.  It is generally
+  * derived from the 'gettimeofday' API call for operating systems such as BSD and Linux that
+  * support the POSIX standard.
+  *
+  * Header File:  platform_helper.h
+**/
+WB_UINT64 WBGetTimeIndex(void);  // returns current 'time index' (in microseconds) which never wraps around
+                                 // NOTE:  it is derived from the 'gettimeofday' call on BSD, Linux, etc.
+
+
+/** \ingroup platform
+  * \brief Delay for a specified period in microseconds
+  *
+  * \param uiDelay The delay period, in microseconds
+  *
+  * A generic delay utility that will use 'nanosleep' (when available), or some other
+  * means (such as 'usleep') when it is not.  On systems that do not support microsecond
+  * resolution on delays, this function will always delay at least one millisecond.
+  * On some systems, this delay may be interruptible.
+  * For exact timing, a non-interruptible loop that times execution by counting CPU
+  * instructions shyould be used instead.  This function is approximate only.
+  *
+  * Header File:  platform_helper.h
+**/
+void WBDelay(uint32_t uiDelay);  // approximate delay for specified period (in microseconds).  may be interruptible
 
 
 

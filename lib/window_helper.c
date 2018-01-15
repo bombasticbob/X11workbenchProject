@@ -73,7 +73,7 @@
 #include <time.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <sys/time.h>
+#include <sys/time.h> // for 'gettimeofday'
 
 // TODO:  determine if pthread is available, optionally use for timers
 #include <pthread.h> /* currently required */
@@ -1014,7 +1014,7 @@ Display *pRval;
 //  XFlush(pRval);
   XSync(pRval, 0); // make sure that the display is "in sync"
 
-  usleep(100000); // wait 0.1 seconds for everything to stabilize (shorter times not good enough)
+  WBDelay(100000); // wait 0.1 seconds for everything to stabilize (shorter times not good enough)
   // sometimes the window manager will get caught in a race condition and
   // forward along keystrokes that belong to the OLD application, such
   // as the last <RETURN> keystroke release, which could cause a dialog box
@@ -1401,16 +1401,7 @@ destroy_without_wm:
     {
       XEvent evt;
 
-#ifdef HAVE_NANOSLEEP
-      struct timespec tsp;
-      tsp.tv_sec = 0;
-      tsp.tv_nsec = 100000;  // wait for .1 msec
-
-      nanosleep(&tsp, NULL);
-#else  // HAVE_NANOSLEEP
-
-      usleep(100); // wait 0.1 msec
-#endif // HAVE_NANOSLEEP
+      WBDelay(100); // wait 0.1 msec
 
       // look for (and dispatch) destroy notify messages for my window
       if(XCheckTypedEvent(pDisp, DestroyNotify, &evt))
@@ -1769,17 +1760,7 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
     if(!__InternalCheckGetEvent(pEntry->pDisplay, &event, wID))
     {
-#ifdef HAVE_NANOSLEEP
-      struct timespec tsp;
-      tsp.tv_sec = 0;
-      tsp.tv_nsec = 100000;  // wait for .1 msec
-
-      nanosleep(&tsp, NULL);
-#else  // HAVE_NANOSLEEP
-
-      usleep(100);  // 100 microsecs - a POSIX alternative to 'nanosleep'
-
-#endif // HAVE_NANOSLEEP
+      WBDelay(100);  // 100 microsecs (0.1 milliseconds)
       continue;
     }
 
@@ -2085,7 +2066,7 @@ void WBDestroyWindow(Window wID)
 
   while(XCheckWindowEvent(pDisplay, wID, EVENT_ALL_MASK, &event))
   {
-//      usleep(1000);  // force sleep during loop?
+//      WBDelay(1000);  // force sleep during loop?
   }
 
   if(!pEntry)
@@ -3112,25 +3093,6 @@ _WINDOW_ENTRY_ *pEntry;
 //static TIMER_ENTRY *pTimerEntryActive = NULL, *pTimerEntryFree = NULL;
 //  // pointers for two linked lists.  entries must be in either 'active' or 'free' list.
 
-WB_UINT64 WBGetTimeIndex(void)
-{
-struct timeval tv;
-
-  gettimeofday(&tv, NULL);
-
-#ifdef HAS_WB_UINT64_BUILTIN /* meaning that the WB_UINT64 data type is a 'built-in' */
-
-  return (WB_UINT64)tv.tv_sec * (WB_UINT64)1000000
-         + (WB_UINT64)tv.tv_usec;
-
-#else // it's a structure typedef
-
-// TODO:  convert to double, do the math, then convert to struct using floor, frac
-#error not implemented (yet)
-
-#endif // WB_UINT64
-}
-
 int CreateTimer(Display *pDisplay, Window wID, unsigned long lInterval, long lID, int iPeriodic)
 {
 int i1;
@@ -3584,19 +3546,7 @@ int iTemp;
       return; // I have events waiting!
     }
 
-#ifdef HAVE_NANOSLEEP
-    {
-      struct timespec tsp;
-      tsp.tv_sec = 0;
-      tsp.tv_nsec = 1000000;  // wait for 1 msec
-
-      nanosleep(&tsp, NULL);
-    }
-#else  // HAVE_NANOSLEEP
-
-    usleep(1000);  // 1000 microsecs - a POSIX alternative to 'nanosleep'
-
-#endif // HAVE_NANOSLEEP
+    WBDelay(1000);  // 1000 microsecs - 1 millisecond
   }
 }
 

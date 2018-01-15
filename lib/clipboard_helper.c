@@ -202,7 +202,7 @@ char *pDisplayName;
     while(WBThreadRunning(hClipboardThread) &&
           bClipboardQuitFlag > 0)
     {
-      usleep(100); // wait for my thread to initialize
+      WBDelay(100); // wait for my thread to initialize
     }
 
     WBFree(pDisplayName);  // ok to free it now
@@ -520,7 +520,7 @@ Atom aUTF8_STRING;
 
   bClipboardQuitFlag = 0;  // to trigger "I am done initializing" and it's ok
 
-  usleep(100000); // wait 0.1 seconds for everything to stabilize (TODO: is this needed here?)
+  WBDelay(100000); // wait 0.1 seconds for everything to stabilize (TODO: is this needed here?)
 
   pDisplayName = NULL; // no longer valid (TODO:  cache it for multiple display instances?)
 
@@ -537,7 +537,7 @@ Atom aUTF8_STRING;
     {
       // well looks like I could NOT own the mutex
 
-      usleep(100); // make sure I do this at least once in this loop
+      WBDelay(100); // make sure I do this at least once in this loop
     }
     else
     {
@@ -1616,16 +1616,7 @@ null_data_me_own:
 
 //      XFlush(pDisplay);  // force flush just in case
 
-#ifdef HAVE_NANOSLEEP
-      struct timespec tsp;
-      tsp.tv_sec = 0;
-      tsp.tv_nsec = 1000;  // wait for 1 msec
-
-      nanosleep(&tsp, NULL);
-#else  // HAVE_NANOSLEEP
-
-      usleep(1000); // but if I'm not busy, use a sleep state to limit CPU utilization in the thread
-#endif // HAVE_NANOSLEEP
+      WBDelay(1000); //if I'm not busy, use a sleep state to limit CPU utilization in the thread
 
       ullTemp = WBGetTimeIndex();
       if((ullTemp - ullLastTime) > 50000) // make sure it's more than 0.05 seconds, so I don't "spin"

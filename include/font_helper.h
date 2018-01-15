@@ -188,7 +188,7 @@ XFontStruct *WBLoadModifyFont(Display *pDisplay, const XFontStruct *pOriginal,
   * \param iFlags Various \ref WBFontFlags that specify font characteristics.  The existing font
   * is modified according to these flags.  If the font size is zero, flags that modify the font size
   * will be ignored.
-  * \return An XFontStruct pointer for the desired font, or None on error  The returned value (if not NOne) must be free'd using XFreeFontSet()
+  * \return An XFontSet for the desired font set, or None on error  The returned value (if not None) must be free'd using XFreeFontSet()
   *
   * use this function to select a similar font that differs only by whatever is specified
   * in 'iFontSize' or 'iFlags'.  If a matching font is NOT available, a copy of the original

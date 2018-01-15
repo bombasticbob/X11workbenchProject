@@ -162,19 +162,19 @@
   * \par Minimal dependencies
   * You shouldn't have to install a bozillian libraries or development files.\n
   * \par Ease of use
-  * the basic toolkit should be SO simple that even a 'Newbie' can do it.\n
+  * The basic toolkit should be SO simple that even a 'Newbie' can do it.\n
   * \par Customizable
-  * well, open source HELPS, but the design must be FLEXIBLE enough to allow easy customization.\n
+  * Well, open source HELPS, but the design must be FLEXIBLE enough to allow easy customization.\n
   * \par Practical
-  * unnecessary functionality, with the exception of certain icons, is to be avoided.\n
+  * Unnecessary functionality, with the exception of certain icons, is to be avoided.\n
   * \par Logical
-  * no convoluted ideas belong here, like the bass-ackwards programming style you find in _CERTAIN_ languages.\n
+  * No convoluted ideas belong here, like the bass-ackwards programming style you find in _CERTAIN_ languages.\n
   * \par C language
-  * for maximum compatibility, the C language is almost universally supported, so that's what I use.\n
+  * For maximum compatibility, the C language is almost universally supported, so that's what I use.\n
   * \par Bulletproof
   * Even if there is a problem, the code should NEVER be 'fragile'.  Validation happens a lot, whenever practical.\n
   * \par Debug Friendly
-  * lots of built-in debug, needed by me to even write the thing after all.\n
+  * Lots of built-in debug, needed by me to even write the thing after all.\n
   * \par Small (and simple) 'hello world' application
   * The 'hello world' application should be reasonable AND SMALL, and not because special things
   * were written JUST TO MAKE THAT HAPPEN (that is called 'engineering for the demo' and I don't like doing that)\n
@@ -296,7 +296,7 @@
   * parameters, and structure members.  They should also be members of functional groups.
   * No exceptions.  You should also test the resulting documentation to make sure it's properly
   * formatted and that all of the links work correctly.
-  * 
+  *
   * Code should be as self-documenting as possible.  Non-trivial variables should be declared
   * using descriptive names.  Hungarian notation is encouraged, but not required.  Single-character
   * variable names are DIFFICULT TO CHANGE without manual effort and should be AVOIDED, ALWAYS!\n
@@ -312,7 +312,7 @@
   * is NOT a 'hard' rule, but it DOES help minimize confusion and name collisions.\n
   * It is also typical to prefix '_' or '__' on alias names or internal-use functions.  Such names and
   * functions should not be publically used except as part of a typedef.  Example, a structure name
-  * of '_my_struct_' typedef'd as MY_STRUCT.  Members of 'MY_STRUCT' (such as linked list pointers) are 
+  * of '_my_struct_' typedef'd as MY_STRUCT.  Members of 'MY_STRUCT' (such as linked list pointers) are
   * likely to refer to the structure name itself, and not the typedef name, so both names are needed.
   *
   * 'Magic numbers' are a necessary evil sometimes.  Either document where the number came from,
@@ -378,7 +378,7 @@
     // sloppy error handling ('a' may be un-initialized)
 
     // no return value specified
-  }  
+  }
 
   * \endcode
   *
@@ -440,18 +440,7 @@
             // SLEEP if no event while in message loop (function returns without blocking)
             // otherwise I can do background tasks during this loop iteration.
 
-  // the configure script should determine if your OS supports 'nanosleep'
-  #ifdef HAVE_NANOSLEEP
-            struct timespec tsp;
-            tsp.tv_sec = 0;
-            tsp.tv_nsec = 100000;  // wait for .1 msec
-
-            nanosleep(&tsp, NULL);
-  #else  // HAVE_NANOSLEEP
-
-            usleep(100);  // 100 microsecs - a POSIX alternative to 'nanosleep'
-
-  #endif // HAVE_NANOSLEEP
+            WBDelay(100); // 100 microseconds (0.1 milliseconds)
 
             continue; // skip the 'WBDispatch' since there was no event
           }
@@ -466,12 +455,12 @@
 
       if(envp && envp != envp0)
       {
-        free(envp);
+        WBFree(envp);
       }
 
       if(argv && argv != argv0)
       {
-        free(argv);
+        WBFree(argv);
       }
     }
     else
@@ -530,7 +519,7 @@
                           "5\n"
                           "_Options\tIDM_TOOLS_OPTIONS\tDisplay Options Editor\n"
                           "\n";
-  
+
 
   * \endcode
   *
@@ -686,7 +675,7 @@
   * \li Edit:  A single or multi-line text edit control.
   *
   * Button controls.  Mouse and keystroke activated (using hotkeys corresponding to underlined
-  * characters).  Can have focus.  Buttons are activated by 'space bar' when they have the input focus 
+  * characters).  Can have focus.  Buttons are activated by 'space bar' when they have the input focus
   * (pushbuttons are also activated by &lt;ENTER&gt; when the button has input focus).  Default
   * buttons are automatically 'activated' when the user presses &lt;ENTER&gt;, unless the control 'owns'
   * the '&lt;ENTER&gt;' key press event (such as with an 'edit' control, or a pushbutton with the input focus).
@@ -748,7 +737,7 @@
   * required when embedded white space is present.
   *
   * VISIBLE:  This property has no value, and its presence carries with it an implied value of TRUE for 'visibility'.
-  * 
+  *
   *
   * DIALOG RESOURCE SUMMARY\n
   *
@@ -780,7 +769,7 @@
   *
   * Other text keywords and identifiers are reserved.\n
   *
-  * Internally defined controls - see also 
+  * Internally defined controls - see also
   *
   * \code
 
@@ -810,7 +799,7 @@
   #define TAB_CONTROL_STR              "Tab"
 
   * \endcode
-  *  
+  *
 **/
 
 
@@ -916,7 +905,7 @@
 **/
 
 /** \defgroup threads Threads and Synchronization
-  * 
+  *
   * These functions and data types help to abstract the various thread and synchronization
   * functions that are necessary to properly implement threads.
 **/

@@ -1459,7 +1459,6 @@ long lBG, lFG;
   XSetBackground(pDisplay, gc, lBG); // restore color context
 }
 
-
 void WBDraw3DBorderTab(Display *pDisplay, Drawable dw, GC gc, WB_GEOM *pgeomOutline,
                        int fFocus, unsigned long lFGColor, unsigned long lBGColor,
                        unsigned long lBorderColor1, unsigned long lBorderColor2,
@@ -1469,6 +1468,7 @@ void WBDraw3DBorderTab(Display *pDisplay, Drawable dw, GC gc, WB_GEOM *pgeomOutl
 {
 XPoint xpt[13];
 XColor clrAvg, clrTemp;
+unsigned long lHighlightColor2;
 int iFontHeight, bFocus;
 int i1, i2, iR, iG, iB, iY, iU, iV, iYBG, iY0, iU0, iV0;
 Region rgnClip;
@@ -1571,41 +1571,54 @@ WB_RECT rctTemp;
     // if the background Y is less than 'pure white', split the difference
     if(iYBG < 255)
     {
-      iYBG = (iYBG + 256) / 2;
+      iYBG = (iYBG + 256) / 2; // halfway between white and background luminocity
     }
-
-    i2 = 6 * (xpt[0].y - xpt[5].y - 2) / 7; // calculate 6/7 of the height
-
-
-//    WB_ERROR_PRINT("TEMPORARY:  %s - i2 is %d, from %d and %d\n", __FUNCTION__,
-//                   i2, xpt[0].y, xpt[5].y);
 
     iY0 = iYBG; // initialize this way
 
     clrTemp.pixel = lHighlightColor;
     PXM_PixelToRGB(NULL, &clrTemp);
 
-    iR = clrTemp.red >> 8;
+    iR = clrTemp.red >> 8;  // convert to 8-bit colors
     iG = clrTemp.green >> 8;
     iB = clrTemp.blue >> 8;
 
     PXM_RGBToYUV(iR, iG, iB, &iY0, &iU0, &iV0); // cache YUV as iY0, iU0, iV0
 
-    if(iY0 > 3 * iYBG / 4) // restrict the range of the brightness of the highlight color vs background
+    // restrict the range of the brightness of the highlight color vs background
+
+    if(iY0 > 5 * iYBG / 8)      // no more than 5/8 of backgroun luma
     {
-      iY0 = 3 * iYBG / 4;
+      iY0 = 5 * iYBG / 8;
     }
-    else if(iY0 < 3 * iYBG / 7)
+    else if(iY0 < 3 * iYBG / 8) // at least 3/8 of background luma
     {
-      iY0 = 3 * iYBG / 7;
+      iY0 = 3 * iYBG / 8;
     }
+
+    PXM_YUVToRGB(iY0, iU0, iV0, &iR, &iG, &iB); // convert back from YUV to RGB
+
+    clrTemp.red = (iR << 8) + 128; // convert to 16-bit colors
+    clrTemp.green = (iG << 8) + 128;
+    clrTemp.blue = (iB << 8) + 128;
+
+    PXM_RGBToPixel(NULL, &clrTemp); // fix 'pixel' entry
+
+    lHighlightColor2 = clrTemp.pixel; // and store it for later (this is the shadow color now)
+
+
+    i2 = 6 * (xpt[0].y - xpt[5].y - 2) / 7; // calculate 6/7 of the tab height, what I deem to be the 'white' point
+
+//    WB_ERROR_PRINT("TEMPORARY:  %s - i2 is %d, from %d and %d\n", __FUNCTION__,
+//                   i2, xpt[0].y, xpt[5].y);
 
     for(i1=xpt[5].y; i1 < xpt[0].y - 2; i1++)
     {
       XPoint xpt2[2];
       int iR2 = abs(i1 - (xpt[5].y + i2 / 2)); // 'i2 / 2' is 3/7 of the height...
 
-      iR2 = icos(iR2 * 232 / i2); // 255 would be pi/2, so go slightly less than that
+      iR2 = icos(iR2 * 240 / i2); // 255 would be pi/2, so go slightly less than that for 'full range' on the cosine
+                                  // NOTE:  a value closer to '255' will darken the darkest part of the shadow
       iR2 = ((int)iR2 * (int)iR2) / 256; // use cos^2 - 'icos' returns a value between 0 and 255
 //      iR2 *= iR2;  old way, squared it
 //      iR2 = isqrt(iR2); old way, square root
@@ -1621,14 +1634,16 @@ WB_RECT rctTemp;
 
       if(iY > 255)
       {
-        iU = 128 + (iU - 128) * 255 / iY * 255 / iY;
-        iV = 128 + (iV - 128) * 255 / iY * 255 / iY;
+        // 'U' and 'V' are actually signed values, +127,-128 so must subtract 128 before calc, add after
+        // and in this case, we fade to white as luminocity adjusts to a value of 'pure white'
+        iU = 128 + (iU - 128) * 255 / iY * 255 / iY;   // this will make the color "fade to white"
+        iV = 128 + (iV - 128) * 255 / iY * 255 / iY;   // by reducing U and V by the amount in excess of '255' the luma goes
         iY = 255;
       }
 
       PXM_YUVToRGB(iY, iU, iV, &iR, &iG, &iB);
 
-      clrTemp.red = (iR << 8) + 128;
+      clrTemp.red = (iR << 8) + 128;    // convert to 16-bit color - adding 128 is for the roundoff
       clrTemp.green = (iG << 8) + 128;
       clrTemp.blue = (iB << 8) + 128;
       clrTemp.flags = DoRed | DoGreen | DoBlue;
@@ -1753,14 +1768,53 @@ WB_RECT rctTemp;
 
   // TAB TEXT (TODO: image atom)
 
-  rctTemp.left = pgeomOutline->x;
-  rctTemp.top = pgeomOutline->y;
-  rctTemp.right = rctTemp.left + pgeomOutline->width;
-  rctTemp.bottom = rctTemp.top + pgeomOutline->height;
+  rctTemp.left = pgeomOutline->x + 1;
+  rctTemp.top = pgeomOutline->y + 1;
+  rctTemp.right = rctTemp.left + pgeomOutline->width - 1;
+  rctTemp.bottom = rctTemp.top + pgeomOutline->height - 1;
 
   if(!szText)
   {
     szText = "{untitled}";
+  }
+
+  // for now just do centered text.  it's 3D text, shifted up-left and bottom-right for 3D effect
+
+  if(bFocus) // 3D "sunken" text if I have the focus
+  {
+    rctTemp.left--;
+    rctTemp.top--;
+    rctTemp.right--;
+    rctTemp.bottom--;
+
+    XSetBackground(pDisplay, gc2, lFGColor);
+    XSetForeground(pDisplay, gc2, lHighlightColor2);
+
+    DTDrawSingleLineText(fontSet, szText, pDisplay, gc2, dw, 0, 0, &rctTemp,
+                         DTAlignment_HCENTER | DTAlignment_VCENTER);
+
+    rctTemp.left += 2;
+    rctTemp.top += 2;
+    rctTemp.right += 2;
+    rctTemp.bottom += 2;
+
+    XSetForeground(pDisplay, gc2, lBGColor);
+
+    // for now just do centered text
+    DTDrawSingleLineText(fontSet, szText, pDisplay, gc2, dw, 0, 0, &rctTemp,
+                         DTAlignment_HCENTER | DTAlignment_VCENTER);
+
+
+    rctTemp.left--;
+    rctTemp.top--;
+    rctTemp.right--;
+    rctTemp.bottom--;
+
+    XSetBackground(pDisplay, gc2, lHighlightColor2);
+  }
+  else
+  {
+    XSetBackground(pDisplay, gc2, lBGColor);
   }
 
   XSetForeground(pDisplay, gc2, lFGColor);

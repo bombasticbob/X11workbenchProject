@@ -27,8 +27,9 @@ libX11workbenchToolkit_a_SOURCES += ../xpm/icon_death.xpm ../xpm/icon_finger.xpm
 libX11workbenchToolkit_a_SOURCES += ../xpm/icon_stop.xpm ../xpm/icon_triangle.xpm ../xpm/icon_warn.xpm ../xpm/icon_what.xpm ../xpm/icon_what_bold.xpm
 libX11workbenchToolkit_a_SOURCES += ../xpm/icon_wtf.xpm ../xpm/icon_thumbup.xpm ../xpm/icon_thumbdown.xpm
 
-
+# NOTE:  GLOBAL_XPATH and GLOBAL_PATH need the embedded escaped quotes
 AM_CPPFLAGS = $(X_CFLAGS) -DGLOBAL_XPATH="\"$(GLOBAL_XPATH)/etc\"" -DGLOBAL_PATH="\"$(sysconfdir)\""
+
 
 if NO_OPT
   NO_OPT_FLAGS = -O0
@@ -57,7 +58,7 @@ AM_CFLAGS = $(NO_OPT_FLAGS) -DX11WORKBENCH_PROJECT_BUILD
 if NO_DEBUG
 
 libX11workbenchToolkit_a_CFLAGS = \
-   $(CFLAGS) $(AM_CFLAGS) -DNO_DEBUG -Wall -fno-strict-aliasing
+   $(CFLAGS) $(AM_CFLAGS) $(AM_CPPFLAGS) -DNO_DEBUG -Wall -fno-strict-aliasing
 
 if FATAL_WARN
 
@@ -68,7 +69,7 @@ endif
 else
 
 libX11workbenchToolkit_a_CFLAGS = \
-   $(CFLAGS) $(AM_CFLAGS) $(EXTRA_WARN_FLAGS) -Wimplicit-int \
+   $(CFLAGS) $(AM_CFLAGS) $(AM_CPPFLAGS) $(EXTRA_WARN_FLAGS) -Wimplicit-int \
    -Wimplicit-function-declaration -Wformat -Wmissing-braces \
    -Wnonnull -Wparentheses -Wreturn-type \
    -Wsequence-point -Wswitch -Wtrigraphs \

@@ -54,6 +54,21 @@
 
 #include <limits.h>
 
+// including the global configure script information
+#ifdef X11WORKBENCH_PROJECT_BUILD
+
+// Globally include the output of the configure script for GNUC compiles for "the project"
+#include "X11workbenchToolkit_config.h" // the 'generated' version'
+
+#else // X11WORKBENCH_PROJECT_BUILD
+
+// This is for the installed version, a subset of the things defined by the configure output script.
+// NOTE:  this must be installed in the appropriate package directory along with platform_helper.h
+#include "X11workbenchToolkit_install_config.h"
+
+#endif // X11WORKBENCH_PROJECT_BUILD
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -86,6 +101,8 @@ extern "C" {
   *
   * An abstracted set of API functions that allow you to manage line-based text editing
   * using a basic structure as a 'File Buffer' object.
+  *
+  * header file:  file_help.h
 **/
 
 /** \defgroup file_help_io File I/O 'helper' functions
@@ -94,11 +111,15 @@ extern "C" {
   *
   * File helper utilities that enable you to more easily enumerate the contents of a directory,
   * make a backup copy of an existing file, get a file's type or permissions, or canonicalize a file name.\n
+  *
+  * header file:  file_help.h
 **/
 
 /** \ingroup file_help_buf
   * \struct __file_help_buf__
   * \copydoc file_help_buf_t
+  *
+  * header file:  file_help.h
 **/
 /** \ingroup file_help_buf
   * \typedef file_help_buf_t
@@ -136,6 +157,7 @@ extern "C" {
   * As it would become fragmented, it would also be a good idea to re-build the structure
   * periodically using FBParseFileBuf()
   *
+  * header file:  file_help.h
 **/
 typedef struct __file_help_buf__
 {
@@ -156,6 +178,8 @@ typedef struct __file_help_buf__
   * \brief bit flags for \ref file_help_buf_t 'iFlags' member
   *
   * These are the bit flag definitions for the \ref file_help_buf_t 'iFlags' member
+  *
+  * header file:  file_help.h
 **/
 enum __file_help_buf_flags__
 {
@@ -180,6 +204,8 @@ enum __file_help_buf_flags__
   *
   * Use this function (in lieu of directly checking iFlags) to determine if the
   * contents of the \ref file_help_buf_t is 'dirty' and needs to be written to disk.
+  *
+  * header file:  file_help.h
 **/
 static __inline__ int FBIsFileBufDirty(const file_help_buf_t *pBuf)
 {
@@ -196,6 +222,8 @@ static __inline__ int FBIsFileBufDirty(const file_help_buf_t *pBuf)
   * On success the function returns a valid pointer, that must be subsequently
   * destroyed using \ref FBDestroyFileBuf().\n
   * On error, this function returns a NULL pointer.
+  *
+  * header file:  file_help.h
 **/
 file_help_buf_t *FBGetFileBufViaHandle(int iHandle);
 
@@ -211,6 +239,8 @@ file_help_buf_t *FBGetFileBufViaHandle(int iHandle);
   * On success the function returns a valid pointer, that must be subsequently
   * destroyed using \ref FBDestroyFileBuf().\n
   * On error, this function returns a NULL pointer.
+  *
+  * header file:  file_help.h
 **/
 file_help_buf_t *FBGetFileBufFromBuffer(const char *pBuf, long cbBuf);
 
@@ -224,6 +254,8 @@ file_help_buf_t *FBGetFileBufFromBuffer(const char *pBuf, long cbBuf);
   * On success the function returns a valid pointer, that must be subsequently
   * destroyed using \ref FBDestroyFileBuf().\n
   * On error, this function returns a NULL pointer.
+  *
+  * header file:  file_help.h
 **/
 file_help_buf_t *FBGetFileBuf(const char *szFileName);
 
@@ -236,6 +268,8 @@ file_help_buf_t *FBGetFileBuf(const char *szFileName);
   * Use this function to destroy a \ref file_help_buf_t constructured by one of the
   * 'FB' constructor utilities \ref FBGetFileBufViaHandle(), \ref FBGetFileBufFromBuffer(),
   * or \ref FBGetFileBuf().
+  *
+  * header file:  file_help.h
 **/
 void FBDestroyFileBuf(file_help_buf_t *pFB);
 
@@ -250,6 +284,8 @@ void FBDestroyFileBuf(file_help_buf_t *pFB);
   * object.  This will re-allocate memory as needed to accomplish the desired goal.\n
   * The function returns 0 on success, non-zero on error.\n
   * The resulting parsed data is placed into the 'ppLineBuf' member.
+  *
+  * header file:  file_help.h
 **/
 int FBParseFileBuf(file_help_buf_t *pFB);
   // parses or re-parses buffer, populating ppLineBuf
@@ -264,6 +300,8 @@ int FBParseFileBuf(file_help_buf_t *pFB);
   * Use this function to write the text data for a \ref file_help_buf_t object into a
   * file using the filename.  This also clears the 'dirty' flag.\n
   * The function returns 0 on success, non-zero on error.\n
+  *
+  * header file:  file_help.h
 **/
 int FBWriteFileBuf(const char *szFileName, const file_help_buf_t *pFB);
 
@@ -277,6 +315,8 @@ int FBWriteFileBuf(const char *szFileName, const file_help_buf_t *pFB);
   * Use this function to write the text data for a \ref file_help_buf_t object into a
   * file using an open file handle.  This also clears the 'dirty' flag.\n
   * The function returns 0 on success, non-zero on error.\n
+  *
+  * header file:  file_help.h
 **/
 int FBWriteFileBufHandle(int iHandle, const file_help_buf_t *pFB);
 
@@ -293,6 +333,8 @@ int FBWriteFileBufHandle(int iHandle, const file_help_buf_t *pFB);
   * Use this function to insert a specific number of bytes of text into a \ref file_help_buf_t object
   * at a specific byte offset.\n
   * This function sets the 'dirty' flag.
+  *
+  * header file:  file_help.h
 **/
 void FBInsertIntoFileBuf(file_help_buf_t **ppBuf, long cbOffset, const void *pData, long cbData);
 
@@ -306,6 +348,8 @@ void FBInsertIntoFileBuf(file_help_buf_t **ppBuf, long cbOffset, const void *pDa
   * Use this function to delete a specified number of bytes of text from a \ref file_help_buf_t object
   * at a specific byte offset\n
   * This function sets the 'dirty' flag.
+  *
+  * header file:  file_help.h
 **/
 void FBDeleteFromFileBuf(file_help_buf_t *pBuf, long cbOffset, long cbDelFrom);
 
@@ -323,6 +367,8 @@ void FBDeleteFromFileBuf(file_help_buf_t *pBuf, long cbOffset, long cbDelFrom);
   * at a specific 0-based line number.\n
   * This function sets the 'dirty' flag.\n
   * NOTE: this is a line-based abstraction for \ref FBInsertIntoFileBuf().  Automatically re-parses as needed
+  *
+  * header file:  file_help.h
 **/
 void FBInsertLineIntoFileBuf(file_help_buf_t **ppBuf, long lLineNum, const char *szLine);
 
@@ -338,6 +384,8 @@ void FBInsertLineIntoFileBuf(file_help_buf_t **ppBuf, long lLineNum, const char 
   * at a specific 0-based line number.\n
   * This function sets the 'dirty' flag.\n
   * NOTE: this is a line-based abstraction for FBDeleteFromFileBuf().  Automatically re-parses as needed
+  *
+  * header file:  file_help.h
 **/
 void FBDeleteLineFromFileBuf(file_help_buf_t *pBuf, long lLineNum);
 
@@ -356,6 +404,8 @@ void FBDeleteLineFromFileBuf(file_help_buf_t *pBuf, long lLineNum);
   * This function sets the 'dirty' flag.\n
   * NOTE: this is a line-based abstraction for both \ref FBInsertIntoFileBuf() and \ref FBDeleteFromFileBuf().
   * Automatically re-parses as needed.
+  *
+  * header file:  file_help.h
 **/
 void FBReplaceLineInFileBuf(file_help_buf_t **ppBuf, long lLineNum, const char *szLine);
 
@@ -367,6 +417,8 @@ void FBReplaceLineInFileBuf(file_help_buf_t **ppBuf, long lLineNum, const char *
   * \param pBuf A const pointer to a buffer containing data to write, or NULL if no data is to be written
   * \param cbBuf The byte count to write from 'pBuf'.
   * \returns A value of zero if successful, non-zero on error
+  *
+  * header file:  file_help.h
 **/
 static __inline__ int FBWriteFileFromBuffer(const char *szFileName, const char *pBuf, unsigned int cbBuf)
 {
@@ -405,6 +457,8 @@ file_help_buf_t *pFB;
   *  A return value of zero indicates an empty file.
   *
   * Use this function to read the entire contents of a file into a memory buffer.
+  *
+  * header file:  file_help.h
 **/
 size_t WBReadFileIntoBuffer(const char *szFileName, char **ppBuf);
 
@@ -418,6 +472,8 @@ size_t WBReadFileIntoBuffer(const char *szFileName, char **ppBuf);
   *
   * Use this function to write the entire contents of a buffer to a file.  The file will be overwritten
   * if it already exists.
+  *
+  * header file:  file_help.h
 **/
 int WBWriteFileFromBuffer(const char *szFileName, const char *pBuf, size_t cbBuf);
 
@@ -435,6 +491,8 @@ int WBWriteFileFromBuffer(const char *szFileName, const char *pBuf, size_t cbBuf
   * Use this function to replicate the permissions of one file onto another.  Useful when
   * making a backup of an original file, and/or creating a new file with the same name/characteristics
   * as the old file, but not necessarily 'written in place'.
+  *
+  * header file:  file_help.h
 **/
 int WBReplicateFilePermissions(const char *szProto, const char *szTarget);
 
@@ -445,6 +503,8 @@ int WBReplicateFilePermissions(const char *szProto, const char *szTarget);
   *
   * A convenience function that wraps the 'getcwd()' API and returns a 'WBAlloc'd pointer to a string.
   * The caller must free any non-NULL return values using WBFree()
+  *
+  * header file:  file_help.h
 **/
 char *WBGetCurrentDirectory(void);
 
@@ -456,6 +516,8 @@ char *WBGetCurrentDirectory(void);
   *
   * Use this function to determine if the specified file is a directory, or is a symbolic
   * link that points to a directory.
+  *
+  * header file:  file_help.h
 **/
 int WBIsDirectory(const char *szName);
 
@@ -471,6 +533,8 @@ int WBIsDirectory(const char *szName);
   * a directory (or a symlink to a directory), the function will return NULL indicating an error.
   *
   * The caller must free any non-NULL return values using WBFree()
+  *
+  * header file:  file_help.h
 **/
 char *WBGetCanonicalPath(const char *szFileName);
 
@@ -491,6 +555,8 @@ char *WBGetCanonicalPath(const char *szFileName);
   * for the file name that you are searching for within its parent directory.  The directory name
   * must also exist or the function will return a NULL (error).  If the specified path name ends
   * in a '/' the file spec will be assumed to be '*'.
+  *
+  * header file:  file_help.h
 **/
 void *WBAllocDirectoryList(const char *szDirSpec);
 
@@ -500,6 +566,8 @@ void *WBAllocDirectoryList(const char *szDirSpec);
   * \param pDirectoryList A pointer to a 'Directory List' object allocated by \ref WBAllocDirectoryList()
   *
   * Use this function to destroy a 'Directory List' object allocated by \ref WBAllocDirectoryList()
+  *
+  * header file:  file_help.h
 **/
 void WBDestroyDirectoryList(void *pDirectoryList);
 
@@ -514,6 +582,8 @@ void WBDestroyDirectoryList(void *pDirectoryList);
   *
   * Use this function to get the next file name from the contents of a directory listing that is
   * specified by a 'Directory List' object created by \ref WBAllocDirectoryList()
+  *
+  * header file:  file_help.h
 **/
 int WBNextDirectoryEntry(void *pDirectoryList, char *szNameReturn,
                          int cbNameReturn, unsigned long *pdwModeAttrReturn);
@@ -528,6 +598,8 @@ int WBNextDirectoryEntry(void *pDirectoryList, char *szNameReturn,
   * Use this function to get a canonical file name for a file within a directory listing.
   *
   * The caller must free any non-NULL return values using WBFree()
+  *
+  * header file:  file_help.h
 **/
 char *WBGetDirectoryListFileFullPath(const void *pDirectoryList, const char *szFileName);
 
@@ -541,6 +613,8 @@ char *WBGetDirectoryListFileFullPath(const void *pDirectoryList, const char *szF
   * For a canonical equivalent, use WBGetCanonicalPath()
   *
   * The caller must free any non-NULL return values using WBFree()
+  *
+  * header file:  file_help.h
 **/
 char *WBGetSymLinkTarget(const char *szFileName);
 
@@ -556,6 +630,8 @@ char *WBGetSymLinkTarget(const char *szFileName);
   * For a canonical equivalent, use WBGetCanonicalPath()
   *
   * The caller must free any non-NULL return values using WBFree()
+  *
+  * header file:  file_help.h
 **/
 char *WBGetDirectoryListSymLinkTarget(const void *pDirectoryList, const char *szFileName);
 
@@ -567,6 +643,8 @@ char *WBGetDirectoryListSymLinkTarget(const void *pDirectoryList, const char *sz
   * \returns A zero value if successful, non-zero otherwise (same return as 'stat()')
   *
   * Use this function to retrieve flags for a regular file, directory, or the target of a symbolic link
+  *
+  * header file:  file_help.h
 **/
 int WBStat(const char *szFileName, unsigned long *pdwModeAttrReturn);
 
@@ -580,9 +658,52 @@ int WBStat(const char *szFileName, unsigned long *pdwModeAttrReturn);
   *
   * Use this function to retrieve flags for a regular file, directory, or the target of a symbolic link with
   * respect to a 'Directory List' object (for relative paths)
+  *
+  * header file:  file_help.h
 **/
 int WBGetDirectoryListFileStat(const void *pDirectoryList, const char *szFileName,
                                unsigned long *pdwModeAttrReturn);
+
+
+#if defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
+
+/** \ingroup file_help_io
+  * \brief Obtain the 'time_t' value for a file's modification date/time (unix time, seconds since the epoch)
+  *
+  * \param szFileName A pointer to the file name (must be fully qualified or relative to the current directory)
+  * \returns A 64-bit unsigned integer value indicating the file's date/time as a UNIX integer time_t value.
+  *
+  * Use this function to obtain the modification date/time of a file.  useful to check if it was modified outside
+  * of the current process, or by something else within the process.
+  *
+  * header file:  file_help.h
+**/
+unsigned long long WBGetFileModDateTime(const char *szFileName);                // return file mod date/time as time_t (seconds since epoch)
+
+
+/** \ingroup file_help_io
+  * \brief Compare a 64-bit unsigned integer value against a file's modification date/time (unix time, seconds since the epoch)
+  *
+  * \param szFileName A pointer to the file name (must be fully qualified or relative to the current directory)
+  * \param tVal An unsigned 64-bit integer value representing the file's previous modification date/time value
+  * \returns An integer value indicating the comparison result of 'tVal' vs the current modification date/time of the file.
+  *
+  * Use this function to compare a previously obtained modification date/time value (via 'WBGetFileModDateTime()')
+  * against the current value, which is obtained internally by calling the same function.
+  *
+  * This is mostly a convenience function, to make checking mod times look a lot cleaner in the code.
+  *
+  * header file:  file_help.h
+**/
+int WBCheckFileModDateTime(const char *szFileName, unsigned long long tVal);    // check time_t value against file mod date/time, return comparison
+
+#else  // defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
+
+// use a 32-bit integer or whatever 'long' is defined as
+unsigned long WBGetFileModDateTime(const char *szFileName);
+int WBCheckFileModDateTime(const char *szFileName, unsigned long tVal);
+
+#endif // defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
 
 
 #ifdef __cplusplus

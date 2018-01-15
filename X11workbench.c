@@ -594,17 +594,7 @@ next_argument:
       }
       else
       {
-#ifdef HAVE_NANOSLEEP
-        struct timespec tsp;
-        tsp.tv_sec = 0;
-        tsp.tv_nsec = 500000;  // wait for .5 msec
-
-        nanosleep(&tsp, NULL);
-#else  // HAVE_NANOSLEEP
-
-        usleep(500);  // 100 microsecs - a POSIX alternative to 'nanosleep'
-
-#endif // HAVE_NANOSLEEP
+        WBDelay(100); // delay 100 microseconds (0.1 milliseconds)
       }
 
       continue; // skip the 'WBDispatch' since there was no event
@@ -1612,10 +1602,17 @@ find_url_opener:
     {
       if(p1)
       {
+        WB_ERROR_PRINT("%s - \"%s\" - No default browser available!\n", __FUNCTION__, p1);
+
         WBFree(p1);
       }
+      else
+      {
+        WB_ERROR_PRINT("%s - No default browser available!\n", __FUNCTION__);
+      }
 
-      WB_ERROR_PRINT("%s - No default browser available!\n", __FUNCTION__);
+      DLGMessageBox(MessageBox_OK | MessageBox_Error, (Window)-1,
+                    "Context Help", "No default browser available for displaying help");
       return;
     }
   }

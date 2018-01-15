@@ -627,7 +627,7 @@ int iFile;
         {
           if(errno == EAGAIN) // allow this
           {
-            usleep(100);
+            WBDelay(100);
             continue; // for now just do this
           }
 
@@ -687,7 +687,7 @@ int iFile, iRval, iChunk;
     {
       if(errno == EAGAIN)
       {
-        usleep(100);
+        WBDelay(100);
 
         // TODO:  time limit?  for now, no
 
@@ -1603,11 +1603,71 @@ int iRval;
     return -1;
   }
 
-//  WB_ERROR_PRINT("TEMPORARY:  stat on '%s' - \"%s\"\n", szFileName, pTemp);
-
   iRval = WBStat(pTemp, pdwModeAttrReturn);
   WBFree(pTemp);
 
   return iRval;
 }
+
+#if defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
+unsigned long long WBGetFileModDateTime(const char *szFileName)
+#else  // defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
+unsigned long WBGetFileModDateTime(const char *szFileName)
+#endif // defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
+{
+int iRval;
+struct stat sF;
+
+
+  iRval = stat(szFileName, &sF);
+
+  if(iRval)
+  {
+#if defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
+    return (unsigned long long)((long long)-1);
+#else  // defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
+    return (unsigned long)((long)-1);
+#endif // defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
+  }
+
+  // TODO:  see whether st_mtime or st_ctime is larger, in case of total screwup by something else
+
+  return sF.st_mtime; // mod time (as UNIX time_t value)
+}
+
+#if defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
+int WBCheckFileModDateTime(const char *szFileName, unsigned long long tVal)
+#else  // defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
+int WBCheckFileModDateTime(const char *szFileName, unsigned long tVal)
+#endif // defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
+{
+#if defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
+unsigned long long tNewVal;
+#else  // defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
+unsigned long tNewVal;
+#endif // defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
+
+
+  tNewVal = WBGetFileModDateTime(szFileName);
+
+  if(
+#if defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
+     tNewVal == (unsigned long long)((unsigned long)-1)
+#else  // defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
+     tNewVal == (unsigned long)((long)-1)
+#endif // defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
+     || tNewVal > tVal)
+  {
+    return 1;
+  }
+  else if(tNewVal < tVal)
+  {
+    return -1;
+  }
+  else
+  {
+    return 0;
+  }
+}
+
 

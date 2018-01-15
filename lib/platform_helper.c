@@ -65,6 +65,8 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <signal.h>
+#include <time.h>
+#include <sys/time.h>
 #include <dlfcn.h> /* dynamic library support */
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -593,6 +595,64 @@ static const int nCols = 16;
   }
 
   WBDebugPrint("==========================================================================================\n");
+}
+
+
+
+//////////////////////////////////////////////////////////////////////////////
+//                                                                          //
+//      ____               _                     _   _  _    _  _           //
+//     / ___|  _   _  ___ | |_  ___  _ __ ___   | | | || |_ (_)| | ___      //
+//     \___ \ | | | |/ __|| __|/ _ \| '_ ` _ \  | | | || __|| || |/ __|     //
+//      ___) || |_| |\__ \| |_|  __/| | | | | | | |_| || |_ | || |\__ \     //
+//     |____/  \__, ||___/ \__|\___||_| |_| |_|  \___/  \__||_||_||___/     //
+//             |___/                                                        //
+//                                                                          //
+//////////////////////////////////////////////////////////////////////////////
+
+WB_UINT64 WBGetTimeIndex(void)
+{
+struct timeval tv;
+
+  gettimeofday(&tv, NULL);
+
+#ifdef HAS_WB_UINT64_BUILTIN /* meaning that the WB_UINT64 data type is a 'built-in' */
+
+  return (WB_UINT64)tv.tv_sec * (WB_UINT64)1000000
+         + (WB_UINT64)tv.tv_usec;
+
+#else // it's a structure typedef
+
+// TODO:  convert to double, do the math, then convert to struct using floor, frac
+#error not implemented (yet)
+
+#endif // WB_UINT64
+}
+
+void WBDelay(uint32_t uiDelay)  // approximate delay for specified period (in microseconds).  may be interruptible
+{
+#ifdef HAVE_NANOSLEEP
+struct timespec tsp;
+
+  if(WB_UNLIKELY(uiDelay >= 1000000L))
+  {
+    tsp.tv_sec = uiDelay / 1000000L;
+    uiDelay = uiDelay % 1000000L; // number of microseconds converted to nanoseconds
+  }
+  else
+  {
+    tsp.tv_sec = 0; // it's assumed that this method is slightly faster
+  }
+
+  tsp.tv_sec = 0;
+  tsp.tv_nsec = uiDelay * 1000;  // wait for .1 msec
+
+  nanosleep(&tsp, NULL);
+#else  // HAVE_NANOSLEEP
+
+  usleep(uiDelay);  // 100 microsecs - a POSIX alternative to 'nanosleep'
+
+#endif // HAVE_NANOSLEEP
 }
 
 
@@ -1367,7 +1427,7 @@ WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros
 
   while(WBInterlockedExchange(&uiPointerHashSpinlock, 1))
   {
-    usleep(100);
+    WBDelay(100);
   }
 
   if(!pPointerHashes)
@@ -1522,7 +1582,7 @@ WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros
 
   while(WBInterlockedExchange(&uiPointerHashSpinlock, 1))
   {
-    usleep(100);
+    WBDelay(100);
   }
 
   for(i1=0; i1 < nPointerHash; i1++)
@@ -1590,7 +1650,7 @@ WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros
 
   while(WBInterlockedExchange(&uiPointerHashSpinlock, 1))
   {
-    usleep(100);
+    WBDelay(100);
   }
 
   for(i1=0; i1 < nPointerHash; i1++)
@@ -1644,7 +1704,7 @@ void *pRval = NULL;
 
   while(WBInterlockedExchange(&uiPointerHashSpinlock, 1))
   {
-    usleep(100);
+    WBDelay(100);
   }
 
   for(i1=0; i1 < nPointerHash; i1++)
@@ -1757,7 +1817,7 @@ int iLen;
 
   while(WBInterlockedExchange(&lInternalAtomSpinner, 1)) // THIS MUST BE SPIN-LOCKED
   {
-    usleep(100); // by convention just do THIS
+    WBDelay(100); // by convention just do THIS
   }
 
   if(!ppInternalAtoms)
@@ -1871,7 +1931,7 @@ unsigned int i1;
 
   while(WBInterlockedExchange(&lInternalAtomSpinner, 1)) // THIS MUST BE SPIN-LOCKED
   {
-    usleep(100); // by convention just do THIS
+    WBDelay(100); // by convention just do THIS
   }
 
   if(ppInternalAtoms && pszAtomNames && nInternalAtoms > 0)
@@ -1942,7 +2002,7 @@ unsigned int nAtom;
 
   while(WBInterlockedExchange(&lInternalAtomSpinner, 1)) // THIS MUST BE SPIN-LOCKED
   {
-    usleep(100); // by convention just do THIS
+    WBDelay(100); // by convention just do THIS
   }
 
   if(ppInternalAtoms && pszAtomNames && nInternalAtoms > 0)
@@ -3079,7 +3139,7 @@ static const char szH[16]="0123456789ABCDEF";
 
         if(errno == EEXIST)
         {
-          usleep(499);
+          WBDelay(499);
           continue; // try again with a different name
         }
 
@@ -3811,7 +3871,7 @@ unsigned int cbBuf;
 
       if(errno == EAGAIN)
       {
-        usleep(500); // wait 1/2 msec
+        WBDelay(500); // wait 1/2 msec
       }
       else
       {
@@ -3851,11 +3911,11 @@ unsigned int cbBuf;
          WIFEXITED(iStat))                   // so test if process exits also.
       {
         iRunning = 0; // my flag that it's not running
-        usleep(5000); // wait for a bit to make sure the I/O completes
+        WBDelay(5000); // wait for a bit to make sure the I/O completes
       }
       else
       {
-        usleep(500); // so I don't 'spin'
+        WBDelay(500); // so I don't 'spin'
       }
 #endif // WIN32
     }
@@ -3864,7 +3924,7 @@ unsigned int cbBuf;
   // always kill the process at this point (in case there was an error)
 
   kill(idRval, SIGKILL); // not so nice way but oh well
-  usleep(5000); // wait 5msec
+  WBDelay(5000); // wait 5msec
 
   close(hP[0]); // done with the pipe - close it now
 
@@ -4160,7 +4220,7 @@ void *pParam2;
   // do a spinlock, rather than owning a global mutex
   while(WBInterlockedExchange(&dwThreadParmSpinLock, 1))
   {
-    usleep(100);
+    WBDelay(100);
   }
 
   // spin lock ok, mess with aTP
@@ -4407,7 +4467,7 @@ WB_UINT64 ullTemp;
       return 1; // timed out
     }
 
-    usleep(83 + (ullTemp / 13) % 37); // sleep a 'sort of' random wait time
+    WBDelay(83 + (ullTemp / 13) % 37); // sleep a 'sort of' random wait time
   }
 #endif // WIN32
 
@@ -4496,14 +4556,14 @@ int iRval = -1;
         break;
       }
 
-      usleep(37 + tsNow.tv_nsec % 29); // a slightly random ~0.05 msec delay
+      WBDelay(37 + tsNow.tv_nsec % 29); // a slightly random ~0.05 msec delay
     }
   }
   else
   {
     while(!WBInterlockedExchange(pCond, 0)) // if return is zero, it wasn't 'signaled'
     {
-      usleep(100); // for now, it's the same time period (TODO:  adjust like above?)
+      WBDelay(100); // for now, it's the same time period (TODO:  adjust like above?)
     }
   }
 

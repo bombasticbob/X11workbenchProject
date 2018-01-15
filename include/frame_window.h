@@ -240,8 +240,14 @@ typedef struct __WB_FW_MENU_HANDLER__
   * one tab will always be visible unless there are no 'contents'.  The contained windows will be re-sized
   * automatically as needed.  Contained windows may also register their own menus and/or menu handlers.
   *
-  * The WBFrameWindow structure maintains the basic window state information.
-  * You should not manipulate this structure directly.  Use the appropriate API functions.
+  * The WBFrameWindow structure maintains the basic window state information, and contains additional
+  * data members that are not declared in WBFrameWindow.  You should not create any derived 'superclass'
+  * versions that contain this structure as an embedded member.  Instead, you should use a pointer to
+  * a WBFrameWindow structure within your implementation, and not rely on any data members within the
+  * structure that are not accessible through the use of an API function.
+  *
+  * This structure is created using FWCreateFrameWindow(), and destroyed using either
+  * FWDestroyFrameWindow() (using the Window ID) or FWDestroyFrameWindow2() (using the structure pointer).
   *
   * \code
 
@@ -259,6 +265,8 @@ typedef struct __WB_FW_MENU_HANDLER__
   } WBFrameWindow;
 
   * \endcode
+  *
+  * \sa \ref frame_window "Frame Window APIs and Structures"
   *
 **/
 typedef struct __WB_FRAME_WINDOW__
@@ -311,6 +319,9 @@ enum WBStatusTabInfo_FLAGS
 };
 
 
+// NOTE:  WBChildFrame and WBChildFrameUI are defined HERE to avoid circular header file dependencies
+// (also defining supporting structs for same reason)
+
 struct __WBChildFrameUI__; // forward declaration
 
 /** \struct __WBChildFrame__
@@ -321,13 +332,19 @@ struct __WBChildFrameUI__; // forward declaration
   * \ingroup child_frame
   * \brief Structure that defines a Child Frame within a Frame Window
   *
-  * The WBFWMenuHandler structure is designed to be initialized via macros, so
-  * that a set of callback functions can then be easily used to handle menu events.
-  * If no menu handler is present for a menu item, or if the menu UI handler is
-  * NOT NULL and returns a non-zero value, the menu item will be disabled and
-  * displayed accordingly.  It will not be possible to use its hotkey nor select it.
-  * Otherwise, the menu will be displayed normally and be selectable, and its hotkey
-  * will be able to activate it.
+  * This structure represents a generic 'child frame' within a Frame Window.  You should
+  * not use the default implementation, but rather derive something from it, aka a 'superclass'.
+  * The callback function array 'vtable' (WBChildFrameUI *) will be assigned to the 'pUI'
+  * member so that the correct functions will be called for the many possible UI events.
+  *
+  * In this way, you can derive many types of 'child frames', from text to graphic display
+  * and/or edit windows.  For a sample implementation, see WBEditWindow
+  *
+  * Additionally, you should not modify the member variables of this structure without using
+  * one of the API functions.  In some cases, you might have to make additional function calls
+  * that result from modifying their values.  The API functions will do that correctly.
+  *
+  * The WBChildFrame structure is as follows:
   *
   * \code
 
@@ -403,8 +420,6 @@ struct __WBChildFrameUI__; // forward declaration
   *
   * \sa \ref frame "Frame Windows"
   *
-  * NOTE:  you should not attempt to modify any of these structure members directly.  Use the appropriate
-  *        API functions to modify their values.  If this were C++, these members would be marked 'protected'.
 **/
 typedef struct __WBChildFrame__
 {
@@ -445,9 +460,6 @@ typedef struct __WBChildFrame__
   struct __WBChildFrame__ *pNext;   ///< 'Next Object' pointer in an internally stored linked list (do not alter or use this)
 } WBChildFrame;
 
-
-// WBChildFrame is defined HERE to avoid circular header file dependencies
-// (also defining supporting structs for same reason)
 
 /** \struct __WBChildFrameUI__
   * \ingroup child_frame

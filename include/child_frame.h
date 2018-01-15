@@ -115,6 +115,7 @@ extern "C" {
 #define FW_EDIT_DELETE_MENU       "IDM_EDIT_DELETE"      /**< standard menu item identifier for 'Edit Delete' functionality **/
 #define FW_EDIT_SELECT_ALL_MENU   "IDM_EDIT_SELECT_ALL"  /**< standard menu item identifier for 'Edit Select All' functionality **/
 #define FW_EDIT_SELECT_NONE_MENU  "IDM_EDIT_SELECT_NONE" /**< standard menu item identifier for 'Edit Select None' functionality **/
+#define FW_EDIT_PROPERTIES_MENU   "IDM_EDIT_PROPERTIES"  /**< standard menu item identifier for 'Edit Properties' functionality **/
 
 #define FW_FILE_NEW_ACCEL         "Ctrl+N"               /**< standard menu accelerator key for 'File New' functionality **/
 #define FW_FILE_CLOSE_ACCEL       "Ctrl+F4"              /**< standard menu accelerator key for 'File Close' functionality **/
@@ -126,9 +127,9 @@ extern "C" {
 #define FW_EDIT_CUT_ACCEL         "Ctrl+X"               /**< standard menu accelerator key for 'Edit Cut' functionality **/
 #define FW_EDIT_COPY_ACCEL        "Ctrl+C"               /**< standard menu accelerator key for 'Edit Copy' functionality **/
 #define FW_EDIT_PASTE_ACCEL       "Ctrl+V"               /**< standard menu accelerator key for 'Edit Paste' functionality **/
-#define FW_EDIT_SELECT_ALL_ACCEL  "Ctrl+A"               /**< standard menu item identifier for 'Edit Select All' functionality **/
-#define FW_EDIT_SELECT_NONE_ACCEL "Ctrl+Shift+A"         /**< standard menu item identifier for 'Edit Select None' functionality **/
-
+#define FW_EDIT_SELECT_ALL_ACCEL  "Ctrl+A"               /**< standard menu accelerator key for 'Edit Select All' functionality **/
+#define FW_EDIT_SELECT_NONE_ACCEL "Ctrl+Shift+A"         /**< standard menu accelerator key for 'Edit Select None' functionality **/
+#define FW_EDIT_PROPERTIES_ACCEL  "Alt+Enter"            /**< standard menu accelerator key for 'Edit Properties' functionality **/
 
 /**
   * @}

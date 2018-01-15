@@ -3057,6 +3057,9 @@ char *CHGetMimeDefaultApp(const char *szMimeType)
 {
 char *pRval, *p2;
 
+  // this function uses xdg-mime to obtain the correct default application
+  // for handling whatever mime type has been passed to the function
+
   pRval = WBRunResult("xdg-mime","query","default",szMimeType,NULL);
 
   // right-trim the result (always)
@@ -3069,6 +3072,20 @@ char *pRval, *p2;
       *(--p2) = 0;
     }
   }
+
+//  if(pRval && *pRval) // make sure the thing exists
+//  {
+//    if(WBStat(pRval, NULL));
+//    {
+//      WB_ERROR_PRINT("%s - unable to stat \"%s\"\n", __FUNCTION__, pRval);
+//
+//      // if the file does not exist or does not resolve, then I'm
+//      // more or less "b0ned" and must return NULL to indicate the error...
+//
+//      WBFree(pRval);
+//      pRval = NULL;
+//    }
+//  }
 
   return pRval;
 }
@@ -3096,29 +3113,46 @@ int i1;
 
     if(*szDesktopFile != '/')
     {
-      p1 = WBAlloc(PATH_MAX + strlen(szDesktopFile));
+      p1 = WBAlloc(PATH_MAX * 2 + strlen(szDesktopFile));
       if(p1)
       {
         // NOTE:  there may be some system config var that tells me whether to use "/usr/share" or "/usr/local/share"
         //        may ALSO want to look in '/usr/local/share/applications/*' (xdg-open does)
+        //        additionally, '~/.local/share/applications
         static const char * const aszPaths[]=
           { "/usr/local/share/applications/", "/usr/share/applications/",
             "/usr/local/share/app-install/desktop/", "/usr/share/app-install/desktop/"  };
 
-        for(i1=0; i1 < sizeof(aszPaths)/sizeof(aszPaths[0]); i1++)
+        char *p2 = WBGetCanonicalPath("~/.local/share/applications/");
+        if(p2)
         {
-          strcpy(p1, aszPaths[i1]);
+          strcpy(p1, p2);
+          WBFree(p2); // keep non-NULL as a flag for later
+
           strcat(p1, szDesktopFile);
-          if(!WBStat(p1, NULL)) // file exists?
+          if(WBStat(p1, NULL))
           {
-            break;
+            p2 = NULL; // as a flag, i.e. NOT found
           }
         }
 
-        if(i1 >= sizeof(aszPaths)/sizeof(aszPaths[0]))
+        if(!p2) // did not find file in '~/.local/share/applications'
         {
-          WBFree(p1);
-          p1 = NULL;
+          for(i1=0; i1 < sizeof(aszPaths)/sizeof(aszPaths[0]); i1++)
+          {
+            strcpy(p1, aszPaths[i1]);
+            strcat(p1, szDesktopFile);
+            if(!WBStat(p1, NULL)) // file exists?
+            {
+              break;
+            }
+          }
+
+          if(i1 >= sizeof(aszPaths)/sizeof(aszPaths[0]))
+          {
+            WBFree(p1);
+            p1 = NULL;
+          }
         }
       }
     }
