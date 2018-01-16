@@ -61,6 +61,9 @@
 #include "file_help.h"
 #include "draw_text.h"
 
+#include "dialog_window.h" // for message boxen
+#include "dialog_controls.h" // for 'aDIALOG_INIT'
+
 
 #if 1 // assign to 0 to disable this trace-style debugging ALL of the time
 #define CALLBACK_TRACKER WBDebugPrint("TEMPORARY - edit_window.c:  %s - callback tracker\n", __FUNCTION__);
@@ -69,6 +72,14 @@
 #endif // 0,1
 
 #define  EDIT_WINDOW_LINE_SPACING 4  /* 4 spaces between each line */
+
+
+struct _PROPERTY_DLG_
+{
+  WBEditWindow *pEditWindow;
+};
+
+
 
 
 int FWEditWindowEvent(Window wID, XEvent *pEvent);
@@ -83,6 +94,7 @@ static void internal_bkspace(WBChildFrame *, int iACS);                // 'backs
 static void internal_del(WBChildFrame *, int iACS);                    // 'delete' char under cursor (WBChildFrame *, delete equivalent).  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
 static void internal_tab(WBChildFrame *, int iACS);                    // 'tab' char, or tab navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
 static void internal_enter(WBChildFrame *, int iACS);                  // 'enter' char, or 'enter' for navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+static void internal_properties(WBChildFrame *);                       // display the property sheet for the displayed document (optional)
 static void internal_uparrow(WBChildFrame *, int iACS);                // 'up' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
 static void internal_downarrow(WBChildFrame *, int iACS);              // 'down' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
 static void internal_leftarrow(WBChildFrame *, int iACS);              // 'left' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
@@ -132,6 +144,9 @@ static int internal_is_empty(WBChildFrame *);                          // return
 static void internal_update_status_text(WBEditWindow *); // called whenever status text should change
 static void internal_new_cursor_pos(WBEditWindow *); // called whenever cursor position changes.
 
+static int PropertyDialogCallback(Window wID, XEvent *pEvent);
+
+
 
 static XColor clrFG, clrBG, clrAFG, clrABG;
 static int iInitColorFlag = 0;
@@ -141,7 +156,8 @@ static WBChildFrameUI internal_CFUI =
 {
   CHILD_FRAME_UI_TAG,
   internal_do_char,         internal_scancode,     internal_bkspace,        internal_del,
-  internal_tab,             internal_enter,        internal_uparrow,        internal_downarrow,
+  internal_tab,             internal_enter,        internal_properties,
+  internal_uparrow,         internal_downarrow,
   internal_leftarrow,       internal_rightarrow,   internal_home,           internal_end,
   internal_pgup,            internal_pgdown,       internal_pgleft,         internal_pgright,
   internal_help,            internal_hover_notify, internal_hover_cancel,   internal_is_ins_mode,
@@ -499,6 +515,8 @@ int iRval = -1;
   {
     WBFree(pBuf);
   }
+
+  FWChildFrameRecalcLayout(&(pEditWindow->childframe));
 
   if(pEditWindow->pUserCallback)
   {
@@ -1026,6 +1044,83 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
 
   internal_new_cursor_pos((WBEditWindow *)pC);
+}
+
+static void internal_properties(WBChildFrame *pC)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+WBDialogWindow *pDlg;
+int iX, iY;
+WB_GEOM geomParent;
+Window wIDDlg;
+struct _PROPERTY_DLG_ propdlg;
+static const char szPropertiesDlgBox[]=
+  "BEGIN_DIALOG FONT:Variable HEIGHT:200 WIDTH:300 TITLE:\"Document Properties\"\n"
+  "  CONTROL:CheckButton ID:1001 TITLE:\"Use Hard _Tabs\" X:40 Y:40 WIDTH:80 HEIGHT:10 VISIBLE\n"
+  "  CONTROL:Text TITLE:\"Line ending:\" X:20 Y:52 WIDTH:40 HEIGHT:10 VISIBLE VALIGN_CENTER NOBORDER\n"
+  "  CONTROL:FirstRadioButton ID:1002 TITLE:\"_LF\" X:60 Y:52 WIDTH:40 HEIGHT:10 VISIBLE CHECKED\n"
+  "  CONTROL:RadioButton ID:1003 TITLE:\"C_R\" X:100 Y:52 WIDTH:40 HEIGHT:10 VISIBLE\n"
+  "  CONTROL:RadioButton ID:1004 TITLE:\"_CR+LF\" X:140 Y:52 WIDTH:40 HEIGHT:10 VISIBLE\n"
+  "  CONTROL:DefPushButton ID:IDOK TITLE:Sa_ve X:80 Y:178 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "  CONTROL:CancelButton ID:IDCANCEL TITLE:Cancel X:180 Y:178 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "END_DIALOG\n";
+
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  // TODO:  check for owner-defined property dialog and display default if none
+
+  WBGetWindowGeom0(pC->wID, &geomParent); // parent geometry in absolute coordinates
+
+  iX = geomParent.x + geomParent.border + 50;
+  iY = geomParent.y + geomParent.border - 50;
+
+  propdlg.pEditWindow = pE; // custom data sent to dialog box
+
+  pDlg = DLGCreateDialogWindow("Document Properties", szPropertiesDlgBox, iX, iY,
+                               300, 200, // the values also specified in the resource
+                               PropertyDialogCallback,
+                               WBDialogWindow_VISIBLE, &propdlg);
+
+
+  if(pDlg) // TODO:  manage this stuff as part of 'DLGCreateDialogWindow' instead
+  {
+    wIDDlg = pDlg->wID;
+
+    if(pC->wID != None) // owned dialog box needs certain properties set
+    {
+      Atom a1;
+      unsigned int ai1[3];
+
+      DLGAssignOwner(pDlg, pC->wID);
+
+      a1 = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE", False);
+      ai1[0] = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE_SKIP_TASKBAR", False);
+      ai1[1] = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE_SKIP_PAGER", False);
+
+      XChangeProperty(WBGetWindowDisplay(wIDDlg), wIDDlg, a1, XA_ATOM, 32, PropModeReplace, (unsigned char *)ai1, 2);
+
+      a1 = XInternAtom(WBGetWindowDisplay(wIDDlg), "WM_TRANSIENT_FOR", False);
+      XChangeProperty(WBGetWindowDisplay(wIDDlg), wIDDlg, a1, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&(pC->wID), 1);
+    }
+
+//    WBSetWindowIcon(wIDDlg, );
+//    WB_ERROR_PRINT("TEMPORARY:  %s - calling WBShowModal\n", __FUNCTION__);
+
+    if(WBShowModal(wIDDlg, 0) == IDOK)
+    {
+      FWChildFrameRecalcLayout(pC);
+//      WBInvalidateGeom(pC->wID, NULL, 1); // invalidate and re-paint with new properties, etc. configured
+    }
+  }
+
 }
 
 static void internal_uparrow(WBChildFrame *pC, int iACS)
@@ -2042,5 +2137,83 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
 
   return 1; // empty (for now; later, do I dive directly into xTextObject ???  new API for vtable?)
+}
+
+
+
+// Properties dialog
+
+static int PropertyDialogCallback(Window wID, XEvent *pEvent)
+{
+WBDialogWindow *pDlg = DLGGetDialogWindowStruct(wID);
+//struct _PROPERTY_DLG_ *pUserData = (struct _PROPERTY_DLG_ *)(pDlg ? pDlg->pUserData : NULL);
+
+
+  if(pEvent->type == ClientMessage && pEvent->xclient.message_type == aDIALOG_INIT)
+  {
+    if(!pDlg)
+    {
+      WB_ERROR_PRINT("%s - no WBDialogWindow structure in DIALOG_INIT for %d (%08xH) %p %08xH %08xH\n", __FUNCTION__,
+                     (unsigned int)wID, (unsigned int)wID, WBGetWindowData(wID, 0), DIALOG_WINDOW_TAG, ((WBDialogWindow *)WBGetWindowData(wID, 0))->ulTag);
+      return 0; // can't process any messages now
+    }
+    else
+    {
+//      // assigning the correct icon
+//
+//      Window wIDIcon = DLGGetDialogControl(pDlg, 1000);  // ID 1000 for icon
+//      WBDialogControl *pCtrl = DLGGetDialogControlStruct(wIDIcon);
+//
+//      if(pCtrl)
+//      {
+//        Pixmap pixmap2 = None;
+//        Pixmap pixmap = PXM_GetIconPixmap(GetMessageBoxIconPixmapID(pUserData->iType & MessageBox_ICON_MASK),
+//                                          NULL, &pixmap2);
+//
+//        if(pixmap != None)
+//        {
+//          WBDialogControlSetIconPixmap(pCtrl, pixmap, pixmap2);
+//        }
+//      }
+    }
+
+//    // assign the caption text to the caption window (which varies and must be assigned at run time)
+//
+//    DLGSetControlCaption((WBDialogWindow *)pDlg, 1001, pUserData->szMessage);
+
+    return 1;
+  }
+
+  if(!pDlg)
+  {
+    WB_WARN_PRINT("MessageBoxCallback - no WBDialogWindow structure\n");
+    return 0; // can't process any messages now
+  }
+
+  if(pEvent->type == ClientMessage && pEvent->xclient.message_type == aCONTROL_NOTIFY)
+  {
+    WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Event | DebugSubSystem_Dialog,
+                   "%s - MessageBox ClientMessage CONTROL_NOTIFY\n", __FUNCTION__);
+
+    switch(pEvent->xclient.data.l[1]) // control ID
+    {
+      case IDOK:
+        // TODO:  save data
+
+      case IDCANCEL:
+        if(pEvent->xclient.data.l[0] == aBUTTON_PRESS)
+        {
+          WBEndModal(wID, pEvent->xclient.data.l[1]);
+        }
+
+        break;
+
+      default:
+        WB_WARN_PRINT("%s - MessageBox ClientMessage CONTROL_NOTIFY client id=%lx\n",
+                      __FUNCTION__, pEvent->xclient.data.l[1]);
+    }
+  }
+
+  return 0;
 }
 

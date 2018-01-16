@@ -87,7 +87,7 @@ extern "C" {
 //
 #if defined(X_HAVE_UTF8_STRING) || defined(__DOXYGEN__)
 
-#define WB_TEXT_EXTENTS Xutf8TextExtents        /**< abstraction for Xutf8TextExtents or XmbTextEscapement **/
+#define WB_TEXT_EXTENTS Xutf8TextExtents        /**< abstraction for Xutf8TextExtents or XmbTextExtents **/
 #define WB_TEXT_ESCAPEMENT Xutf8TextEscapement  /**< abstraction for Xutf8TextEscapement or XmbTextEscapement **/
 #define WB_DRAW_STRING Xutf8DrawString          /**< abstraction for Xutf8DrawString or XmbDrawString **/
 #define WB_DRAW_TEXT Xutf8DrawText              /**< abstraction for Xutf8DrawText or XmbDrawText **/
@@ -97,7 +97,7 @@ extern "C" {
 
 #warning UTF8 not supported, using 'MB' equivalents
 
-#define WB_TEXT_EXTENTS XmbTextExtents          /**< abstraction for Xutf8TextExtents or XmbTextEscapement **/
+#define WB_TEXT_EXTENTS XmbTextExtents          /**< abstraction for Xutf8TextExtents or XmbTextExtents **/
 #define WB_TEXT_ESCAPEMENT XmbTextEscapement    /**< abstraction for Xutf8TextEscapement or XmbTextEscapement **/
 #define WB_DRAW_STRING XmbDrawString            /**< abstraction for Xutf8DrawString or XmbDrawString **/
 #define WB_DRAW_TEXT XmbDrawText                /**< abstraction for Xutf8DrawText or XmbDrawText **/

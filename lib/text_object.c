@@ -3411,7 +3411,7 @@ static void __internal_end_mouse_drag(struct _text_object_ *pThis)
 static void __internal_cursor_up(struct _text_object_ *pThis)
 {
 TEXT_BUFFER *pBuf;
-int iPageHeight;
+//int iPageHeight;
 
 
   if(!WBIsValidTextObject(pThis))
@@ -3531,7 +3531,7 @@ int iPageHeight;
 static void __internal_cursor_down(struct _text_object_ *pThis)
 {
 TEXT_BUFFER *pBuf;
-int iPageHeight;
+//int iPageHeight;
 
 
   if(!WBIsValidTextObject(pThis))
@@ -4301,7 +4301,7 @@ TEXT_BUFFER *pBuf;
   }
   else
   {
-    int iOldRow = pThis->iRow;
+    int iOldRow WB_UNUSED = pThis->iRow; // TODO:  do I still need this assignment?  For now, mark 'unused' and leave for reference
 
     pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
 
@@ -4361,7 +4361,7 @@ TEXT_BUFFER *pBuf;
   }
   else
   {
-    int iOldRow = pThis->iRow;
+    int iOldRow WB_UNUSED = pThis->iRow; // TODO:  do I still need this assignment?  For now, mark 'unused' and leave for reference
 
     pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
 
@@ -5026,9 +5026,9 @@ WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
 //                               iLen2, iX - iXDelta, iY - iYDelta, (unsigned char)p1[0], (unsigned char)p1[1]);
 //              }
 
-              WB_DRAW_STRING(pDisplay, pxTemp ? pxTemp : wID, fSet,
-                             gc2 != None ? gc2 : gc,
-                             iX - iXDelta, iY - iYDelta, p1, iLen2);
+              DTDrawString(pDisplay, pxTemp ? pxTemp : wID, fSet,
+                           gc2 != None ? gc2 : gc,
+                           iX - iXDelta, iY - iYDelta, p1, iLen2);
             }
           }
         }
@@ -5051,7 +5051,7 @@ WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
       // 2.  the row has highlighting in it
       // 3.  if 2, the row is either fully or partially highlighted
 
-      // if 1 and 2 are FALSE, paint the string 'as-is' with WB_DRAW_STRING
+      // if 1 and 2 are FALSE, paint the string 'as-is' with DTDrawString
       // if 2 is TRUE, but 3 is false, paint the entire line "highlighted".
       // otherwise, duplicate (for this row) what single-line painting does,
       // dealing with cursor and highlight rectangles as needed, 1 char at a time
@@ -5225,9 +5225,9 @@ WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
 //                               iLen2, iX - iXDelta, iY - iYDelta, (unsigned char)p1[0], (unsigned char)p1[1]);
 //              }
 
-              WB_DRAW_STRING(pDisplay, pxTemp ? pxTemp : wID, fSet,
-                             gc2 != None ? gc2 : gc,
-                             iX - iXDelta, iY - iYDelta, p1, iLen2);
+              DTDrawString(pDisplay, pxTemp ? pxTemp : wID, fSet,
+                           gc2 != None ? gc2 : gc,
+                           iX - iXDelta, iY - iYDelta, p1, iLen2);
             }
           }
         }
@@ -5271,10 +5271,10 @@ WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
 
           if(p1 && p1 && p2 > p1)
           {
-            WB_DRAW_STRING(pDisplay, pxTemp ? pxTemp : wID, fSet,
-                           gc2 != None ? gc2 : gc,
-                           iX - iXDelta, iY - iYDelta,
-                           p1, p2 - p1);
+            DTDrawString(pDisplay, pxTemp ? pxTemp : wID, fSet,
+                         gc2 != None ? gc2 : gc,
+                         iX - iXDelta, iY - iYDelta,
+                         p1, p2 - p1);
           }
 //          else  (this happens when lines are blank)
 //          {

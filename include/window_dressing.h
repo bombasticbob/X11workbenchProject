@@ -359,7 +359,7 @@ void WBPaintVScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable w
 void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable wID,
                        GC gc, WB_GEOM *pgeomClient);
 
-// borders and '3D' rectangle art
+// borders and '3D' rectangle/polygon art
 
 /** \ingroup window_dressing
   * \brief Draw a 'border' rectangle
@@ -393,6 +393,39 @@ void WBDrawBorderRect(Display *pDisplay, Drawable wID, GC gc,
 **/
 void WBDraw3DBorderRect(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomBorder,
                         unsigned long lBorderColor1, unsigned long lBorderColor2);
+
+/** \ingroup window_dressing
+  * \brief Draw a 'border' elipse within a bounding geometry
+  *
+  * \param pDisplay A pointer to the current display (or NULL to use the default Display)
+  * \param wID the Drawable, typically the Window ID for the target window
+  * \param gc The GC (graphics context) to use
+  * \param pgeomBorder A WB_GEOM that identifies the bounding rectangle for the elipse to draw
+  * \param lBorderColor A 'Pixel' color value to use when painting the border
+  *
+  * Use this function to draw a border elipse in the specified window, using the specified geometry.
+  *
+  * Header File:  window_dressing.h
+**/
+void WBDrawBorderElipse(Display *pDisplay, Drawable wID, GC gc,
+                        WB_GEOM *pgeomBorder, unsigned long lBorderColor);
+
+/** \ingroup window_dressing
+  * \brief Draw a 3D 'border' elipse within a bounding geometry
+  *
+  * \param pDisplay A pointer to the current display (or NULL to use the default Display)
+  * \param wID the Drawable, typically the Window ID for the target window
+  * \param gc The GC (graphics context) to use
+  * \param pgeomBorder A WB_GEOM that identifies the bounding rectangle for the elipse to draw
+  * \param lBorderColor1 A 'Pixel' color value to use when painting the border (upper, left)
+  * \param lBorderColor2 A 'Pixel' color value to use when painting the border (lower, right)
+  *
+  * Use this function to draw a border elipse in the specified window, using the specified geometry.
+  *
+  * Header File:  window_dressing.h
+**/
+void WBDraw3DBorderElipse(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomBorder,
+                          unsigned long lBorderColor1, unsigned long lBorderColor2);
 
 /** \ingroup window_dressing
   * \brief Draw a 'dashed' rectangle

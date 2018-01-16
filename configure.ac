@@ -225,6 +225,60 @@ AC_CHECK_FUNC(malloc_usable_size, [AC_DEFINE(HAVE_MALLOC_USABLE_SIZE,[1],[whethe
 
 
 ############################################################################################
+# __builtin_expect - see if compiler supports it
+
+AC_LANG_PUSH([C])
+AC_MSG_CHECKING([if the compiler supports __builtin_expect])
+AC_RUN_IFELSE(
+[AC_LANG_SOURCE([[
+  #include <stdio.h>
+  #include <stdlib.h>
+  int main()
+  {
+    if(__builtin_expect(1 == 1, 1))
+    {
+      return 0;
+    }
+
+    exit(3);
+    return 0;
+  }]] )],
+  [
+    AC_MSG_RESULT([yes])
+    AC_DEFINE([COMPILER_SUPPORTS_BUILTIN_EXPECT],[1],[Compiler supports __builtin_expect])
+  ],
+  [
+    AC_MSG_RESULT([no])
+  ] )
+  AC_LANG_POP([C])
+
+
+############################################################################################
+# __attribute__((unused)) - see if compiler supports it
+
+AC_LANG_PUSH([C])
+AC_MSG_CHECKING([if the compiler supports __attribute__((unused))])
+AC_RUN_IFELSE(
+[AC_LANG_SOURCE([[
+  #include <stdio.h>
+  #include <stdlib.h>
+  int main()
+  {
+    int iTemp __attribute__((unused)) = 0;
+
+    return 0;
+  }]] )],
+  [
+    AC_MSG_RESULT([yes])
+    AC_DEFINE([COMPILER_SUPPORTS_UNUSED_ATTRIBUTE],[1],[Compiler supports __attribute__((unused))])
+  ],
+  [
+    AC_MSG_RESULT([no])
+  ] )
+  AC_LANG_POP([C])
+
+
+############################################################################################
 #    qsort_r - definition for GNU C and BSD differ, other platforms may not have it at all
 #              best to use libc version if available; otherwise, internal implementation
 

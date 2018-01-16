@@ -273,10 +273,15 @@ enum WBDialogWindowFlags
 **/
 enum WBDialogEntryFlags
 {
-  WBDialogEntry_VISIBLE = 0x1,           ///< visible item
-  WBDialogEntry_EDIT = 0x2,              ///< user-editable text
-  WBDialogEntry_MULTILINE = 0x4,         ///< for edit controls, prevents trapping &lt;ENTER&gt;
-  WBDialogEntry_ALLCHARS = 0x8,          ///< prevents trapping &lt;ESC&gt; &lt;ENTER&gt; and anything else
+  WBDialogEntry_VISIBLE         = 0x00000001,  ///< visible item
+  WBDialogEntry_EDIT            = 0x00000002,  ///< user-editable text
+  WBDialogEntry_MULTILINE       = 0x00000004,  ///< for edit controls, prevents trapping &lt;ENTER&gt;
+  WBDialogEntry_ALLCHARS        = 0x00000008,  ///< prevents trapping &lt;ESC&gt; &lt;ENTER&gt; and anything else
+
+  WBDialogEntry_TRISTATE        = 0x00000010,  ///< 'tri-stated' state (overrides 'checked' state)
+  WBDialogEntry_CHECKED         = 0x00000020,  ///< 'checked' state
+  WBDialogEntry_NO_BORDER       = 0x00000040,  ///< 'no border' flag (don't display a border - statics, typically)
+
 
 // TODO:  other user-definable flags
 

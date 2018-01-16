@@ -1541,12 +1541,14 @@ enum DlgResourceStringKeywordIndices
   DlgResourceKW__HARIGHT,
   DlgResourceKW__HACENTER,
   DlgResourceKW__VRESIZE,
-  DlgResourceKW__HRESIZE
+  DlgResourceKW__HRESIZE,
+  DlgResourceKW__NOBORDER,
+  DlgResourceKW__CHECKED
 };
 
 static const char * const aszKeywords[]={ "BEGIN_DIALOG","END_DIALOG","FONT","CONTROL","ID","X","Y","WIDTH","HEIGHT","VISIBLE","TITLE",
                                           "VALIGN_BOTTOM","VALIGN_TOP","VALIGN_CENTER","HALIGN_LEFT","HALIGN_RIGHT","HALIGN_CENTER",
-                                          "VRESIZE","HRESIZE",
+                                          "VRESIZE","HRESIZE","NOBORDER","CHECKED",
                                           NULL };
 
 // some built-in symbols for dialog resources and their corresponding symbol IDs
@@ -1655,10 +1657,10 @@ int i1, iKW, nKids = 0, iRval = 0;
 unsigned int iCurSize = 0, iCurContentSize = 0;
 struct _KIDS_
 {
-  Atom aClass;  // atom 'class' for control entry
-  int iID;      // ID for control entry
+  Atom aClass;    // atom 'class' for control entry
+  int iID;        // ID for control entry
   int iX, iY, iWidth, iHeight;  // that too
-  int iFlags;
+  int iFlags;     // flags to be assigned when control is created
   char *szTitle;  // pointer to WBAlloc'd string with title
   char *szProp;   // pointer to WBAlloc'd string with additional properties
 } *pKids = NULL;
@@ -2044,6 +2046,35 @@ char tbuf[256];
         }
 
         break;
+
+
+
+      case DlgResourceKW__NOBORDER:
+        if(!nKids)
+        {
+          WB_WARN_PRINT("%s - RESERVED:  'noborder' property on dialog box\n", __FUNCTION__);
+        }
+        else
+        {
+          pKids[nKids - 1].iFlags |= WBDialogEntry_NO_BORDER; // for those that have a border, shut it off
+        }
+
+        break;
+
+      case DlgResourceKW__CHECKED:
+        if(!nKids)
+        {
+          WB_WARN_PRINT("%s - RESERVED:  'noborder' property on dialog box\n", __FUNCTION__);
+        }
+        else if(pKids[nKids - 1].aClass == aRADIOBUTTON_CONTROL ||
+                pKids[nKids - 1].aClass == aFIRSTRADIOBUTTON_CONTROL ||
+                pKids[nKids - 1].aClass == aCHECKBUTTON_CONTROL)
+        {
+          pKids[nKids - 1].iFlags |= WBDialogEntry_CHECKED; // for those can be 'checked'
+        }
+
+        break;
+
     }
 
     if(iKW < 0)  // error in control list

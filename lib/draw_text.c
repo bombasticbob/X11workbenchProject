@@ -104,6 +104,72 @@ static void InternalDebugDumpWords(DT_WORDS *pWords); ///< \brief internal debug
 // DRAW TEXT UTILITIES
 // *******************
 
+// abstracting the 'draw text' process
+void DTDrawString(Display *pDisplay, Drawable drawable, XFontSet fontSet,
+                  GC gc, int x, int y, const char *pString, int nLength)
+{
+char tbuf[1024];
+char *pS;
+
+#if defined(X_HAVE_UTF8_STRING)
+#define DO_DRAW_STRING Xutf8DrawString
+#else // use 'multi-byte char' equivalent
+#define DO_DRAW_STRING XmbDrawString
+#endif // UTF8 vs multi-byte
+
+
+  if(!pDisplay || !pString || drawable == None || fontSet == None || gc == None || nLength <= 0)
+  {
+    return; // don't allow this.  just don't.
+  }
+
+//  if(nLength < 0) // negative length - use strlen
+//  {
+//    nLength = strlen(pString);
+//  }
+
+  // do THIS part because 'pString' is 'const char *' and X*DrawString wants 'char *'
+  // and so 'pS' becomes a copy of the string, in writeable memory.
+
+  if(WB_LIKELY(nLength <= sizeof(tbuf)))
+  {
+use_the_stack_buffer:
+
+    // use my temporary buffer for small strings [the most common thing]
+
+    if(WB_LIKELY(nLength > 0))
+    {
+      memcpy(tbuf, pString, nLength);
+    }
+
+    pS = &(tbuf[0]);
+  }
+  else
+  {
+    pS = WBAlloc(nLength);
+    if(!pS)
+    {
+//      pS = (char *)pString; // desperately trying to succeed (is this a security problem?)
+
+      nLength = sizeof(tbuf); // shorten the string and do it anyway, but not all of it.  desperate, yeah.
+      goto use_the_stack_buffer;
+    }
+
+    memcpy(pS, pString, nLength);
+  }
+
+  // TODO:  make a font that is twice as big, render it on large-enough pixmap, and then
+  //        shrink it down onto the display surface with a raster operation that combines
+  //        pixels and (effectively) gives it an anti-aliasing effect.
+
+  DO_DRAW_STRING(pDisplay, drawable, fontSet, gc, x, y, pS, nLength); // for now, just do this
+
+  if(pS && pS != &(tbuf[0]) && pS != (char *)pString)
+  {
+    WBFree(pS);
+  }
+}
+
 int DTGetTextWidth0(XFontStruct *pFont, const char *szUTF8, int nLength)
 {
 //XRectangle rctInk, rctLog;
@@ -1266,7 +1332,7 @@ int iAvgChar
 
             iU1 = DTGetTextWidth(pFont, tbuf, p1 - tbuf);
 
-      WB_DRAW_STRING(pDisplay, wID, fSet, gc, iHPos, iVPos, szText, strlen(szText));
+      DTDrawString(pDisplay, wID, fSet, gc, iHPos, iVPos, szText, strlen(szText));
 
   xgc.font = pOldFont->fid;
   BEGIN_XCALL_DEBUG_WRAPPER
@@ -1293,7 +1359,7 @@ int iAvgChar
 
             iU1 = DTGetTextWidth(pFont, tbuf, p1 - tbuf);
 
-      WB_DRAW_STRING(pDisplay, wID, fSet, gc, iHPos, iVPos, szText, strlen(szText));
+      DTDrawString(pDisplay, wID, fSet, gc, iHPos, iVPos, szText, strlen(szText));
 
   xgc.font = pOldFont->fid;
   BEGIN_XCALL_DEBUG_WRAPPER
@@ -1422,12 +1488,12 @@ XCharStruct xMaxBounds;
         // normal string drawing - no underscores to deal with
 
 //// TEMPORARY
-//        WB_ERROR_PRINT("%s - TEMPORARY (a), WB_DRAW_STRING at %d,%d  %d chars of %s\n",
+//        WB_ERROR_PRINT("%s - TEMPORARY (a), DTDrawString at %d,%d  %d chars of %s\n",
 //                       __FUNCTION__, rcDest.left + pW->iX, rcDest.top + pW->iY, pW->nLength, pW->pText);
 
         // draw the entire string. 'pW->iY' is the BASE of the font
-        WB_DRAW_STRING(pDisplay, dw, fSet, gc, rcDest.left + pW->iX, rcDest.top + pW->iY,
-                       pW->pText, pW->nLength);
+        DTDrawString(pDisplay, dw, fSet, gc, rcDest.left + pW->iX, rcDest.top + pW->iY,
+                     pW->pText, pW->nLength);
       }
       else
       {
@@ -1449,12 +1515,12 @@ XCharStruct xMaxBounds;
             }
 
 //// TEMPORARY
-//            WB_ERROR_PRINT("%s - TEMPORARY (b), WB_DRAW_STRING at %d,%d  %d chars of %s\n",
+//            WB_ERROR_PRINT("%s - TEMPORARY (b), DTDrawString at %d,%d  %d chars of %s\n",
 //                           __FUNCTION__, iH, rcDest.top + pW->iY, pW->nLength - i3, (char *)(pW->pText) + i3);
 
             // print i3 through i2 - 1.  'pW->iY' is the BASE of the font
-            WB_DRAW_STRING(pDisplay, dw, fSet, gc, iH, rcDest.top + pW->iY,
-                           (char *)(pW->pText) + i3, i2 - i3);
+            DTDrawString(pDisplay, dw, fSet, gc, iH, rcDest.top + pW->iY,
+                         (const char *)(pW->pText) + i3, i2 - i3);
 
             // draw the preceding underscore
             if(iH2 >= 0)
@@ -1484,8 +1550,8 @@ XCharStruct xMaxBounds;
         if(i3 < pW->nLength)
         {
           // draw the last part of the string.  'pW->iY' is the BASE of the font
-          WB_DRAW_STRING(pDisplay, dw, fSet, gc, iH, rcDest.top + pW->iY,
-                         (char *)(pW->pText) + i3, pW->nLength - i3);
+          DTDrawString(pDisplay, dw, fSet, gc, iH, rcDest.top + pW->iY,
+                       (const char *)(pW->pText) + i3, pW->nLength - i3);
 
           // draw the preceding underscore
           if(iH >= 0)
@@ -1563,7 +1629,6 @@ void DTRender(Display *pDisplay, XFontSet fontSet, const DT_WORDS *pWords, GC gc
 {
   // TODO:  implement
 }
-
 
 
 

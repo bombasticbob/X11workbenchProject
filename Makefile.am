@@ -13,6 +13,10 @@ endif
 # allow multiple simultaneous jobs to speed up automake process
 AUTOMAKE_JOBS = 4
 
+# This next thing is needed for conf_help.h so it doesn't gripe at me
+# NOTE:  GLOBAL_XPATH and GLOBAL_PATH need the embedded escaped quotes
+AM_CPPFLAGS = $(X_CFLAGS) -DGLOBAL_XPATH="\"$(GLOBAL_XPATH)/etc\"" -DGLOBAL_PATH="\"$(sysconfdir)\""
+
 
 # this allows me to eliminate a few files, like README  Since I have included
 # 'README.md' in EXTRA_DIST (see below), I'll get THAT one and any others

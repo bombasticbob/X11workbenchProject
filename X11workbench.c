@@ -249,6 +249,8 @@ static char szEditMenu[]="1\n"
                         "Find Ne_xt\tIDM_EDIT_FIND_NEXT\tFind next occurence within Document\tCtrl+G\n"
                         "_Project Find\tIDM_EDIT_PROJ_FIND\tFind within entire project\tCtrl+Shift+F\n"
                         "Pro_ject Find Next\tIDM_EDIT_PROJ_FIND_NEXT\tFind next occurrence within entire project\tCtrl+Shift+G\n"
+                        "\tseparator\n"
+                        "Properties\t" FW_EDIT_PROPERTIES_MENU "\tFind next occurrence within entire project\t" FW_EDIT_PROPERTIES_ACCEL "\n"
                         "\n"
                         "5\n"
                         "_Toolbox\tIDM_TOOLBOX\tDisplay (or hide) the Toolbox\n"
@@ -968,6 +970,10 @@ const char *pFN, *pExt;
   else if(!strcmp("htm", pExt) || !strcmp("html", pExt))
   {
     return WBFILE_TYPE_HTML;
+  }
+  else if(!strcmp("xml", pExt))
+  {
+    return WBFILE_TYPE_XML;
   }
 
 

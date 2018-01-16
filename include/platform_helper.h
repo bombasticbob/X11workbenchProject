@@ -164,12 +164,32 @@
   * @{
 **/
 
-//--------------------------------------
-// branch optimization macros - gcc only
-//--------------------------------------
+//-------------------------------------------------
+// branch optimization macros - gcc and clang only
+//-------------------------------------------------
+
+#if defined(COMPILER_SUPPORTS_BUILTIN_EXPECT) || defined(__DOXYGEN__)
 
 #define WB_UNLIKELY(x) (__builtin_expect (!!(x), 0)) /**< optimization for code branching when condition is 'unlikely'.  use within conditionals **/
 #define WB_LIKELY(x) (__builtin_expect (!!(x), 1))   /**< optimization for code branching when condition is 'likely'.  use within conditionals **/
+
+#else // !COMPILER_SUPPORTS_BUILTIN_EXPECT
+
+#define WB_UNLIKELY(x) (x)
+#define WB_LIKELY(x) (x)
+
+#endif // COMPILER_SUPPORTS_BUILTIN_EXPECT
+
+#if defined(COMPILER_SUPPORTS_UNUSED_ATTRIBUTE) || defined(__DOXYGEN__)
+
+#define WB_UNUSED __attribute__((unused))  /**< marks a variable as likely to be 'unused'.  warning abatement.  Place macro directly after the variable name **/
+
+#else // !COMPILER_SUPPORTS_UNUSED_ATTRIBUTE
+
+#define WB_UNUSED
+
+#endif // COMPILER_SUPPORTS_UNUSED_ATTRIBUTE
+
 
 /** \brief The minimum 'internal' Atom value used by the toolkit
   *

@@ -4069,7 +4069,7 @@ static unsigned long long ullLastTime = 0;
           }
           else
           {
-            int iDragThresh = CHGetDragThreshold(pDisplay);
+            int iTemp, iDragThresh = CHGetDragThreshold(pDisplay);
 
             // DRAG DETECT (reserved)
 
@@ -4108,7 +4108,8 @@ static unsigned long long ullLastTime = 0;
               WBXlatCoordPoint(((XButtonEvent *)pEvent)->window, ((XButtonEvent *)pEvent)->x, ((XButtonEvent *)pEvent)->y,
                                ((XButtonEvent *)pEvent)->window, &iX, &iY);
 
-              if(WBWindowDispatch(evt.window, (XEvent *)&evt) == (int)evt.window) // must return window ID
+              iTemp = WBWindowDispatch(evt.window, (XEvent *)&evt);
+              if(iTemp == (int)evt.window) // must return window ID
               {
                 iMouseState = MouseState_LDRAG;
 
@@ -4132,10 +4133,23 @@ static unsigned long long ullLastTime = 0;
 
                   iMouseX = ((XButtonEvent *)pEvent)->x; // keep track of starting drag position
                   iMouseY = ((XButtonEvent *)pEvent)->y;
+
+//                  WB_ERROR_PRINT("TEMPORARY:  %s:%d mouse drag begins: %d  %d,%d\n",
+//                                 __FUNCTION__, __LINE__,
+//                                 iButton1, iMouseX, iMouseY);
                 }
+//                else
+//                {
+//                  WB_ERROR_PRINT("TEMPORARY:  %s:%d mouse drag, but already captured: %d  %d,%d\n",
+//                                 __FUNCTION__, __LINE__,
+//                                 iButton1, iMouseX, iMouseY);
+//                }
               }
               else
               {
+//                WB_ERROR_PRINT("TEMPORARY:  %s:%d mouse drag NOT enabled.  %08xH %08xH\n",
+//                               __FUNCTION__, __LINE__, iTemp, (int)evt.window);
+
                 iMouseState = MouseState_NONE;  // TODO:  check for drag support first
               }
             }
@@ -4151,44 +4165,9 @@ static unsigned long long ullLastTime = 0;
              iMouseDragButtonState != iDragButtonState ||  // button state has changed
              iMouseModShiftCtrl != iModShiftCtrl)          // modifier state change
           {
+//            WB_ERROR_PRINT("TEMPORARY:  %s:%d mouse was dragging, now canceled\n", __FUNCTION__, __LINE__);
+
             WBMouseCancel(pDisplay, ((XButtonEvent *)pEvent)->window); // always call this
-#if 0
-            XClientMessageEvent evt = {
-                                        .type=ClientMessage,
-                                        .serial=0,
-                                        .send_event=0,
-                                        .display=pDisplay,
-                                        .window=((XButtonEvent *)pEvent)->window,
-                                        .message_type=aWM_POINTER,
-                                        .format=32
-                                      };
-
-            evt.data.l[0] = WB_POINTER_CANCEL;
-            evt.data.l[1] = iMouseDragButtonState // send previous button state
-                          | (iButton4 ? 8 : 0)
-                          | (iButton5 ? 16 : 0);
-            evt.data.l[2] = (iMouseModShiftCtrl & ShiftMask ? WB_KEYEVENT_SHIFT : 0) // send previous iACS
-                          | (iMouseModShiftCtrl & ControlMask ? WB_KEYEVENT_CTRL : 0)
-                          | (iMouseModShiftCtrl & Mod1Mask ? WB_KEYEVENT_ALT : 0);
-
-            WBXlatCoordPoint(((XButtonEvent *)pEvent)->window, ((XButtonEvent *)pEvent)->x, ((XButtonEvent *)pEvent)->y,
-                              ((XButtonEvent *)pEvent)->window, &iX, &iY);
-
-            evt.data.l[3] = iX; // TODO:  should this be UN-TRANSLATED or SCREEN coordinates?
-            evt.data.l[4] = iY; //        should I indicate WHICH WINDOW this should be for?
-
-            WBPostPriorityEvent(((XButtonEvent *)pEvent)->window, (XEvent *)&evt);
-
-            iMouseState = MouseState_NONE; // canceled
-
-            if(wMouseCapture != None)
-            {
-              // cancel mouse capture
-
-              XUngrabPointer(pDisplay, CurrentTime);
-              wMouseCapture = None;
-            }
-#endif // 0
           }
           else if(pEvent->type == MotionNotify) // mods and buttons NOT changed
           {
@@ -4207,6 +4186,8 @@ static unsigned long long ullLastTime = 0;
                                           .message_type=aWM_POINTER,
                                           .format=32
                                         };
+
+//              WB_ERROR_PRINT("TEMPORARY:  %s:%d mouse drag motion\n", __FUNCTION__, __LINE__);
 
               evt.data.l[0] = WB_POINTER_MOVE;
               evt.data.l[1] = iDragButtonState
@@ -4227,6 +4208,12 @@ static unsigned long long ullLastTime = 0;
 
               WBPostPriorityEvent(((XButtonEvent *)pEvent)->window, (XEvent *)&evt);
             }
+//            else
+//            {
+//              WB_ERROR_PRINT("TEMPORARY:  %s:%d mouse drag motion NOT handled: %d  %d,%d (%d,%d) \n",
+//                             __FUNCTION__, __LINE__,
+//                             iButton1, iMouseX, iMouseY, ((XButtonEvent *)pEvent)->x, ((XButtonEvent *)pEvent)->y);
+//            }
           }
           else if(pEvent->type == ButtonRelease) // TODO:  check mouse button and key mask match
           {
@@ -4289,16 +4276,6 @@ static unsigned long long ullLastTime = 0;
         // cancel any mouse states due to pressing a key
 
         WBMouseCancel(pDisplay, ((XButtonEvent *)pEvent)->window);
-#if 0
-        if(wMouseCapture != None)
-        {
-          // cancel mouse capture
-          XUngrabPointer(pDisplay, CurrentTime);
-          wMouseCapture = None;
-        }
-
-        iMouseState = MouseState_NONE; // complete
-#endif // 0
       }
     }
   }

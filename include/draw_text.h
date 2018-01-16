@@ -217,6 +217,30 @@ typedef struct __DT_WORDS__
 
 
 /** \ingroup draw_text
+  * \brief Draw text in a platform-independent manner for UTF-8 or multi-byte text
+  *
+  * \param pDisplay A pointer to the display to use for rendering the text
+  * \param drawable The 'Drawable' object upon which to render the text
+  * \param fontSet The Font Set for which to query metrics
+  * \param gc The graphics context 'GC' for rendering the text
+  * \param x The 'x' coordinate for the text alignment
+  * \param y The 'y' coordinate for the text alignment
+  * \param pString A const pointer to a UTF-8 or multi-byte string
+  * \param nLength The BYTE LENGTH of the UTF-8 or mult-byte string (not character length)
+  *
+  * Use this function to 'Draw Text' in a platform-independent manner, using the
+  * specified font set, upon the specified 'Drawable'.  This function is the equivalent
+  * of the X11 library's XmbDrawString() and Xutf8DrawString().
+  *
+  * As an extra added bonus, this function will apply anti-aliasing features, as appropriate
+  *
+  * Header File:  draw_text.h
+**/
+void DTDrawString(Display *pDisplay, Drawable drawable, XFontSet fontSet,
+                  GC gc, int x, int y, const char *pString, int nLength);
+
+
+/** \ingroup draw_text
   * \brief XTextWidth equivalent for MBCS and UTF-8 strings
   *
   * \param fontSet The Font Set for which to query metrics

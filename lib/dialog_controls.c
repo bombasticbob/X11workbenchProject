@@ -101,7 +101,7 @@ static void FileListControlDisplayProc(WBDialogControl *pList, void *pData, int 
                                          int iX, int iY, int iWidth, int iHeight, \
                                          const char *szClassName, const char *szTitle)
 
-#define BEGIN_CREATE_CONTROL(X) Atom aThis = a##X; { aThis = aThis; }
+#define BEGIN_CREATE_CONTROL(X) Atom aThis WB_UNUSED = a##X;
 
 DEFINE_CREATE_CONTROL(FRAME_CONTROL)
 DEFINE_CREATE_CONTROL(TEXT_CONTROL)
@@ -371,6 +371,12 @@ int i1;
 #define DO_CREATE_CONTROL(X) if(aClass == a##X) \
   { return do_create_##X(pRval, iX, iY, iWidth, iHeight, #X, szTitle); }
 
+  if(aClass == None)
+  {
+    WB_ERROR_PRINT("%s - 'aClass' is None (invalid type name?)\n", __FUNCTION__);
+    return NULL;
+  }
+
   pRval = WBAlloc(i1 = GetWBDialogControlStructSize(aClass));
   if(!pRval)
   {
@@ -431,7 +437,20 @@ int i1;
 
   // if I get here the control was unrecognized (would have returned if any of the above matched)
 
-  WB_ERROR_PRINT("%s - Unrecognized control in WBDialogControlCreate\n", __FUNCTION__);
+  {
+    char *pAtomName = WBGetAtomName(WBGetDefaultDisplay(), aClass);
+
+    if(pAtomName)
+    {
+      WB_ERROR_PRINT("%s - Unrecognized control '%s' in WBDialogControlCreate\n", __FUNCTION__, pAtomName);
+
+      WBFree(pAtomName);
+    }
+    else
+    {
+      WB_ERROR_PRINT("%s - Unrecognized control {NULL} in WBDialogControlCreate\n", __FUNCTION__);
+    }
+  }
 
   // unrecognized control
   if(pRval->pPropList)
@@ -617,8 +636,6 @@ BEGIN_CREATE_CONTROL(FRAME_CONTROL);
   Display *pDisplay = dialog_control_get_display(pDialogControl);
   int iBorderWidth = 1;
 
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
-
   pDialogControl->ulFlags &= ~STATIC_TYPEMASK;
   pDialogControl->ulFlags |= STATIC_Frame;
 
@@ -669,8 +686,6 @@ BEGIN_CREATE_CONTROL(TEXT_CONTROL);
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
   int iBorderWidth = 1;
-
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
   pDialogControl->ulFlags &= ~STATIC_TYPEMASK;
   pDialogControl->ulFlags |= STATIC_Text;
@@ -726,8 +741,6 @@ BEGIN_CREATE_CONTROL(ICON_CONTROL);
   Display *pDisplay = dialog_control_get_display(pDialogControl);
   int iBorderWidth = 1;
 
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
-
   pDialogControl->ulFlags &= ~STATIC_TYPEMASK;
   pDialogControl->ulFlags |= STATIC_Icon;
 
@@ -782,8 +795,6 @@ BEGIN_CREATE_CONTROL(IMAGE_CONTROL);
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
   int iBorderWidth = 1;
-
-  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
   pDialogControl->ulFlags &= ~STATIC_TYPEMASK;
   pDialogControl->ulFlags |= STATIC_Image;
@@ -924,8 +935,6 @@ XFontSet fsBold;
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
-//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
-
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_PushButton;
 
@@ -988,8 +997,6 @@ XFontSet fsBold;
 
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
-
-//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_DefPushButton;
@@ -1055,8 +1062,6 @@ XFontSet fsBold;
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
-//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
-
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_CancelButton;
 
@@ -1117,8 +1122,6 @@ BEGIN_CREATE_CONTROL(RADIOBUTTON_CONTROL);
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
-//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
-
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_RadioButton;
 
@@ -1167,8 +1170,6 @@ IMPLEMENT_CREATE_CONTROL(FIRSTRADIOBUTTON_CONTROL)
 BEGIN_CREATE_CONTROL(FIRSTRADIOBUTTON_CONTROL);
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
-
-//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_FirstRadioButton;
@@ -1220,8 +1221,6 @@ BEGIN_CREATE_CONTROL(CHECKBUTTON_CONTROL);
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
-//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
-
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_CheckButton;
 
@@ -1271,8 +1270,6 @@ BEGIN_CREATE_CONTROL(TRISTATEBUTTON_CONTROL);
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
-//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
-
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_TriStateButton;
 
@@ -1320,7 +1317,6 @@ IMPLEMENT_CREATE_CONTROL(HSCROLL_CONTROL)
 {
 BEGIN_CREATE_CONTROL(HSCROLL_CONTROL);
 
-//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
 
   return NULL;  // for now
@@ -1331,7 +1327,6 @@ IMPLEMENT_CREATE_CONTROL(VSCROLL_CONTROL)
 {
 BEGIN_CREATE_CONTROL(VSCROLL_CONTROL);
 
-//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
 
   return NULL;  // for now
@@ -1342,7 +1337,6 @@ IMPLEMENT_CREATE_CONTROL(SLIDER_CONTROL)
 {
 BEGIN_CREATE_CONTROL(SLIDER_CONTROL);
 
-//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
 
   return NULL;  // for now
@@ -1353,7 +1347,6 @@ IMPLEMENT_CREATE_CONTROL(KNOB_CONTROL)
 {
 BEGIN_CREATE_CONTROL(KNOB_CONTROL);
 
-//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
 
   return NULL;  // for now
@@ -1367,8 +1360,6 @@ IMPLEMENT_CREATE_CONTROL(LIST_CONTROL)
 BEGIN_CREATE_CONTROL(LIST_CONTROL);
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
-
-//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
   pDialogControl->ulFlags |= CONTROL_SupportListInfo;
 
@@ -1480,8 +1471,6 @@ BEGIN_CREATE_CONTROL(COMBO_CONTROL);
   WBComboControl *pPrivate = (WBComboControl *)pDialogControl;
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
-//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
-
   pDialogControl->ulFlags |= CONTROL_SupportListInfo;
 
   // focus
@@ -1556,8 +1545,6 @@ BEGIN_CREATE_CONTROL(TREE_CONTROL);
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
 
-//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
-
   pDialogControl->ulFlags |= CONTROL_SupportListInfo;
 
   // focus
@@ -1625,12 +1612,10 @@ IMPLEMENT_CREATE_CONTROL(COMBOTREE_CONTROL)
 {
 BEGIN_CREATE_CONTROL(COMBOTREE_CONTROL);
 
-//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
+  int (*x)(Window wID, XEvent *pEvent) WB_UNUSED = NULL;
 
-  int (*x)(Window wID, XEvent *pEvent) = NULL; // warning avoidance
-  x = combo_tree_callback;                     // warning avoidance
+  x = combo_tree_callback;
 
-  x = x; // more warning avoidance (linux gcc is picky)
 
 
   return NULL;  // for now
@@ -1755,7 +1740,6 @@ IMPLEMENT_CREATE_CONTROL(TAB_CONTROL)
 {
 BEGIN_CREATE_CONTROL(TAB_CONTROL);
 
-//  aThis = aThis; // so BEGIN_CREATE_CONTROL does not cause warnings for unused variables
 
 
   return NULL;  // for now
@@ -1998,11 +1982,14 @@ static int PushButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                                    Window wID, WBDialogControl *pSelf);  // these are different
 static int ButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                                Window wID, WBDialogControl *pSelf);
+static void ManageRadioButtonGroupSelectState(WBDialogControl *pDialogControl);
 
 static int button_callback(Window wID, XEvent *pEvent)
 {
-  Display *pDisplay = WBGetWindowDisplay(wID);
-  WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
+Display *pDisplay = WBGetWindowDisplay(wID);
+WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
+int iType;
+
 
   if(pDialogControl && pEvent->type == Expose)
   {
@@ -2090,7 +2077,52 @@ static int button_callback(Window wID, XEvent *pEvent)
         WBInvalidateRect(wID, NULL, 0);
         WBUpdateWindowImmediately(wID); // make sure I paint it NOW
 
-        return 0;  // not handled - button release will activate these buttons
+        return 0;  // not handled - button release will activate these buttons (is this right?)
+      }
+
+      iType = pDialogControl->ulFlags & BUTTON_TYPEMASK;  // TODO: use the class or the type?
+
+      if(iType == BUTTON_CheckButton || iType == BUTTON_TriStateButton)
+      {
+        if(pDialogControl->pDlgControlEntry &&
+           (iType != BUTTON_TriStateButton || !(pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_TRISTATE)))
+        {
+          pDialogControl->pDlgControlEntry->iFlags ^= WBDialogEntry_CHECKED;
+          // post a notify message
+
+          DLGNotifyOwner(pDialogControl, aBUTTON_PRESS,
+                         (long)(pDialogControl->pDlgControlEntry ? pDialogControl->pDlgControlEntry->iID : pDialogControl->wID),
+                         (unsigned long)pDialogControl->pDlgControlEntry, 0, 0, 0);
+
+          WBInvalidateRect(wID, NULL, 0);
+          WBUpdateWindowImmediately(wID); // make sure I paint it NOW
+
+          return 1; // handled!
+        }
+      }
+      else if(iType == BUTTON_RadioButton || iType == BUTTON_FirstRadioButton)
+      {
+        if(pDialogControl->pDlgControlEntry)
+        {
+          // FIRST, run through all of the radio buttons in this 'group' and fix 'em
+          ManageRadioButtonGroupSelectState(pDialogControl);
+
+          // NEXT, if the check state changed, fix it and notify everyone
+          if(!(pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_CHECKED))
+          {
+            pDialogControl->pDlgControlEntry->iFlags |= WBDialogEntry_CHECKED;
+            // post a notify message
+
+            DLGNotifyOwner(pDialogControl, aBUTTON_PRESS,
+                           (long)(pDialogControl->pDlgControlEntry ? pDialogControl->pDlgControlEntry->iID : pDialogControl->wID),
+                           (unsigned long)pDialogControl->pDlgControlEntry, 0, 0, 0);
+
+            WBInvalidateRect(wID, NULL, 0);
+            WBUpdateWindowImmediately(wID); // make sure I paint it NOW
+          }
+
+          return 1; // handled!
+        }
       }
     }
     else if(pEvent->type == ButtonRelease)
@@ -2145,7 +2177,7 @@ static int button_callback(Window wID, XEvent *pEvent)
         if((iKey == ' ' || iKey == '\n' || iKey == '\r')
             && iACS == 0 && pDialogControl->pDlgControlEntry)
         {
-          WB_ERROR_PRINT("TEMPORARY:  %s - key press\n", __FUNCTION__);
+//          WB_ERROR_PRINT("TEMPORARY:  %s - key press\n", __FUNCTION__);
 
           pDialogControl->pDlgControlEntry->iFlags |= WBDialogEntry_PRESSED;
 
@@ -2156,6 +2188,63 @@ static int button_callback(Window wID, XEvent *pEvent)
         }
 
         return 1;  // handled
+      }
+
+      iType = pDialogControl->ulFlags & BUTTON_TYPEMASK;  // TODO: use the class or the type?
+
+      if(iType == BUTTON_CheckButton || iType == BUTTON_TriStateButton)
+      {
+        int iACS = 0, iKey = WBKeyEventProcessKey((XKeyEvent *)pEvent, NULL, NULL, &iACS);
+
+        if(pDialogControl->pDlgControlEntry &&
+           (iType != BUTTON_TriStateButton || !(pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_TRISTATE)))
+        {
+          if((iKey == ' ' || iKey == '\n' || iKey == '\r')
+              && iACS == 0 && pDialogControl->pDlgControlEntry)
+          {
+            pDialogControl->pDlgControlEntry->iFlags ^= WBDialogEntry_CHECKED;
+            // post a notify message
+
+            DLGNotifyOwner(pDialogControl, aBUTTON_PRESS,
+                           (long)(pDialogControl->pDlgControlEntry ? pDialogControl->pDlgControlEntry->iID : pDialogControl->wID),
+                           (unsigned long)pDialogControl->pDlgControlEntry, 0, 0, 0);
+
+            WBInvalidateRect(wID, NULL, 0);
+            WBUpdateWindowImmediately(wID); // make sure I paint it NOW
+
+            return 1; // handled!
+          }
+        }
+      }
+      else if(iType == BUTTON_RadioButton || iType == BUTTON_FirstRadioButton)
+      {
+        int iACS = 0, iKey = WBKeyEventProcessKey((XKeyEvent *)pEvent, NULL, NULL, &iACS);
+
+        if(pDialogControl->pDlgControlEntry)
+        {
+          if((iKey == ' ' || iKey == '\n' || iKey == '\r')
+              && iACS == 0 && pDialogControl->pDlgControlEntry)
+          {
+            // FIRST, run through all of the radio buttons in this 'group' and fix 'em
+            ManageRadioButtonGroupSelectState(pDialogControl);
+
+            // NEXT, if the check state changed, fix it and notify everyone
+            if(!(pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_CHECKED))
+            {
+              pDialogControl->pDlgControlEntry->iFlags |= WBDialogEntry_CHECKED;
+              // post a notify message
+
+              DLGNotifyOwner(pDialogControl, aBUTTON_PRESS,
+                             (long)(pDialogControl->pDlgControlEntry ? pDialogControl->pDlgControlEntry->iID : pDialogControl->wID),
+                             (unsigned long)pDialogControl->pDlgControlEntry, 0, 0, 0);
+
+              WBInvalidateRect(wID, NULL, 0);
+              WBUpdateWindowImmediately(wID); // make sure I paint it NOW
+            }
+
+            return 1; // handled! (either way, mark it 'handled' whether I changed the state or not
+          }
+        }
       }
     }
     else if(pEvent->type == KeyRelease)
@@ -2200,6 +2289,124 @@ static int button_callback(Window wID, XEvent *pEvent)
 
   return 0;  // not handled
 }
+
+static void ManageRadioButtonGroupSelectState(WBDialogControl *pDialogControl)
+{
+WBDialogWindow *pOwner = pDialogControl->pOwner; // convenience assignment
+WBDialogControl *pDlgC;
+Window wIDFirst, wIDTemp, wIDTemp2;
+Window wIDCurrent = pDialogControl->wID;
+int iType = pDialogControl->ulFlags & BUTTON_TYPEMASK;  // TODO: use the class or the type?
+
+
+  if(!pDialogControl)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - pDialogControl is NULL\n", __FUNCTION__);
+
+    return;
+  }
+
+  // run through all of the radio buttons in this 'group' and fix 'em.  ONLY
+  // the dialog control passed into this function may be 'checked'.  The others
+  // *MUST* be UNchecked.
+
+  // first, find out which dialog control is the 'First' radio button
+  if(iType == BUTTON_FirstRadioButton)
+  {
+    pDlgC = pDialogControl;
+    wIDFirst = pDlgC->wID;
+  }
+  else if(iType != BUTTON_RadioButton)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - pDialogControl is NOT a radio button\n", __FUNCTION__);
+
+    return; // bail out
+  }
+  else
+  {
+    wIDFirst = DLGGetFirstDialogControl(pOwner);
+    wIDTemp2 = pDialogControl->wID; // first known radio button
+
+    wIDTemp = DLGGetPrevDialogControl(pOwner, wIDTemp2);
+    pDlgC = NULL;
+
+    while(wIDTemp != None && wIDTemp != pDialogControl->wID)
+    {
+      pDlgC = DLGGetDialogControlStruct(wIDTemp);
+
+      if(pDlgC)
+      {
+        if((pDlgC->ulFlags & BUTTON_TYPEMASK) == BUTTON_FirstRadioButton)
+        {
+          wIDFirst = wIDTemp; // I found "the first one" for the group
+          break;
+        }
+
+        if((pDlgC->ulFlags & BUTTON_TYPEMASK) == BUTTON_RadioButton)
+        {
+          wIDTemp2 = wIDTemp; // first known radio button [in case no 'first' button, ALL are in the same group]
+        }
+
+        pDlgC = NULL; // set to NULL now, as a flag, mostly
+
+        if(wIDTemp == wIDFirst) // first control in dialog box.  stop searching.
+        {
+          break;
+        }
+      }
+
+      wIDTemp = DLGGetPrevDialogControl(pOwner, wIDTemp); // keep searching backwards
+    }
+
+    // enumeration will begin with 'wIDFirst', so assign that with wIDTemp2
+    // if I did not actually find a 'first' radio button
+    if(!pDlgC && wIDTemp2 != None)
+    {
+      wIDFirst = wIDTemp2; // use the first known radio button as the first in the group
+
+      pDlgC = DLGGetDialogControlStruct(wIDFirst);
+    }
+  }
+
+  while(pDlgC)
+  {
+    if(((pDlgC->ulFlags & BUTTON_TYPEMASK) == BUTTON_FirstRadioButton) ||
+       ((pDlgC->ulFlags & BUTTON_TYPEMASK) == BUTTON_RadioButton))
+    {
+      if(pDlgC->wID != wIDCurrent && pDlgC->pDlgControlEntry)
+      {
+        if(pDlgC->pDlgControlEntry->iFlags & WBDialogEntry_CHECKED)
+        {
+          pDlgC->pDlgControlEntry->iFlags &= ~WBDialogEntry_CHECKED;
+
+          // post a notify message
+
+          DLGNotifyOwner(pDlgC, aBUTTON_PRESS,
+                         (long)(pDlgC->pDlgControlEntry ? pDlgC->pDlgControlEntry->iID : pDlgC->wID),
+                         (unsigned long)pDlgC->pDlgControlEntry, 0, 0, 0);
+
+          WBInvalidateRect(pDlgC->wID, NULL, 0);
+          WBUpdateWindowImmediately(pDlgC->wID); // make sure I paint it NOW
+        }
+      }
+    }
+
+    wIDTemp = DLGGetNextDialogControl(pOwner, pDlgC->wID); // keep searching
+    if(wIDTemp == None || wIDTemp == wIDFirst)
+    {
+      break; // I am done (error or wrap-around)
+    }
+
+    pDlgC = DLGGetDialogControlStruct(wIDTemp);
+
+    if(pDlgC && (pDlgC->ulFlags & BUTTON_TYPEMASK) == BUTTON_FirstRadioButton) // found another 'first'?
+    {
+      break; // start of new group.  end of previous one.  bail.
+    }
+  }
+}
+
+
 
 static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                              Window wID, WBDialogControl *pSelf);
@@ -4039,6 +4246,9 @@ WB_GEOM geomPaint, geomBorder;
 
   if(pSelf->ulFlags & STATIC_3DBorder)
   {
+    // I will continue to allow for a focus border [for some this may be needed]
+    // even if 'NO_BORDER' has been specified.
+
     if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_HAS_FOCUS)
     {
       WBDrawBorderRect(pDisplay, wID, gc, &geomBorder,
@@ -4050,9 +4260,11 @@ WB_GEOM geomPaint, geomBorder;
       geomBorder.width -= 2;
     }
 
-    WBDraw3DBorderRect(pDisplay, wID, gc, &geomBorder,
-                       pSelf->clrBD2.pixel, pSelf->clrBD3.pixel);
-
+    if(!(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_NO_BORDER))
+    {
+      WBDraw3DBorderRect(pDisplay, wID, gc, &geomBorder,
+                         pSelf->clrBD2.pixel, pSelf->clrBD3.pixel);
+    }
   }
 
   // painting the window text
@@ -4286,12 +4498,13 @@ WB_GEOM geomPaint, geomBorder;
 static int ButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                                Window wID, WBDialogControl *pSelf)
 {
-int i2, iHPos;
+int iType, i2, iHPos;
 XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
 XFontSet fontSet;
 XCharStruct xBounds;
 GC gc; // = WBGetWindowDefaultGC(wID);
-WB_GEOM geomPaint, geomBorder;
+WB_GEOM geomPaint, geomBorder, geomBox;
+WB_RECT rctText;
 
 
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
@@ -4324,34 +4537,215 @@ WB_GEOM geomPaint, geomBorder;
 
   WBClearWindow(wID, gc);
 
-  // paint the 3D-looking border
+  iType = pSelf->ulFlags & BUTTON_TYPEMASK;
 
-  geomBorder.x = xwa.border_width;
-  geomBorder.y = xwa.border_width;
-  geomBorder.width = xwa.width - xwa.border_width;
-  geomBorder.height = xwa.height - xwa.border_width;
-
-  if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_HAS_FOCUS)
+  if(iType == BUTTON_CheckButton || iType == BUTTON_TriStateButton)
   {
-    WBDrawBorderRect(pDisplay, wID, gc, &geomBorder,
-                     BlackPixel(pDisplay, DefaultScreen(pDisplay)));
-    geomBorder.x++;
-    geomBorder.y++;
-    geomBorder.height -= 2;
-    geomBorder.width -= 2;
+    geomBorder.x = xwa.border_width;
+    geomBorder.y = xwa.border_width;
+    geomBorder.width = xwa.width - xwa.border_width;
+    geomBorder.height = xwa.height - xwa.border_width;
+
+    if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_HAS_FOCUS)
+    {
+      WBDrawDashedRect(pDisplay, wID, gc, &geomBorder,
+                       BlackPixel(pDisplay, DefaultScreen(pDisplay)));
+    }
+
+    // use the font's ascent value as the size of my 'x' box
+
+    geomBox.x = geomBorder.x + (geomBorder.height - xBounds.ascent) / 2;
+    geomBox.y = geomBorder.y + (geomBorder.height - xBounds.ascent - 2) / 2;
+    geomBox.width = xBounds.ascent + 2;
+    geomBox.height = xBounds.ascent + 2;
+
+    // fill checkbox part with white, or for tri-stated state, use grey (background)
+    if(iType == BUTTON_TriStateButton && (pSelf->pDlgControlEntry->iFlags & WBDialogEntry_TRISTATE))
+    {
+      XSetForeground(pDisplay, gc, WBGetWindowBGColor(wID));
+    }
+    else
+    {
+      if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_PRESSED)
+      {
+        XSetForeground(pDisplay, gc, pSelf->clrAFG.pixel);
+      }
+      else
+      {
+        XSetForeground(pDisplay, gc, WhitePixel(pDisplay, DefaultScreen(pDisplay)));
+      }
+    }
+
+    XFillRectangle(pDisplay, wID, gc, geomBox.x, geomBox.y, geomBox.width, geomBox.height);
+
+    // draw checkbox as an 'innie'
+    WBDraw3DBorderRect(pDisplay, wID, gc, &geomBox, pSelf->clrBD3.pixel, pSelf->clrBD2.pixel);
+
+    geomBox.x ++; // remaining area should be inside of the 3D border now
+    geomBox.y ++;
+    geomBox.width -= 2;
+    geomBox.height -= 2;
+
+    XSetForeground(pDisplay, gc, BlackPixel(pDisplay, DefaultScreen(pDisplay))); // make sure black foreground
+
+    // now draw the 'x' as appropriate, but not for a tri-stated control
+    if(iType != BUTTON_TriStateButton || !(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_TRISTATE))
+    {
+      if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_PRESSED)
+      {
+        XSetForeground(pDisplay, gc, pSelf->clrABG.pixel);
+      }
+      else
+      {
+        XSetForeground(pDisplay, gc, BlackPixel(pDisplay, DefaultScreen(pDisplay)));
+      }
+
+      if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_CHECKED)
+      {
+        XPoint xpt[2];
+        // center a small X within geomBox
+
+        xpt[0].x = geomBox.x + geomBox.width / 4;
+        xpt[0].y = geomBox.y + geomBox.height / 4;
+        xpt[1].x = geomBox.x + 3 * geomBox.width / 4 - 1;
+        xpt[1].y = geomBox.y + 3 * geomBox.height / 4;
+
+        XDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
+
+        xpt[0].x++;
+        xpt[1].x++;
+        XDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
+
+        xpt[0].x = geomBox.x + geomBox.width / 4;
+        xpt[1].y = geomBox.y + geomBox.height / 4;
+        xpt[1].x = geomBox.x + 3 * geomBox.width / 4 - 1;
+        xpt[0].y = geomBox.y + 3 * geomBox.height / 4;
+
+        XDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
+
+        xpt[0].x++;
+        xpt[1].x++;
+        XDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
+
+//        // draw the 'x' as text [why not!]
+//
+//        rctText.left = geomBox.x;
+//        rctText.right = geomBox.x + geomBox.width;
+//        rctText.top = geomBox.y; // + xBounds.ascent / 2
+//                    //- xBounds.descent / 2; // better centering
+//        rctText.bottom = rctText.top + geomBox.height; // - xBounds.ascent;
+//
+//        DTDrawSingleLineText(fontSet, "x", pDisplay, gc, wID, 0, 0, &rctText, // TODO:  use bold font?
+//                             DTAlignment_HCENTER | DTAlignment_VCENTER);
+      }
+    }
+
+    // fix the border so it's "just the text part"
+    geomBorder.x += geomBox.width + (geomBorder.height - xBounds.ascent);  // where the text will be
+    geomBorder.width -= geomBox.width + (geomBorder.height - xBounds.ascent);  // and the adjusted width
   }
-
-  // note - if a button is 'pressed' I draw the colors inverted
-
-  if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_PRESSED)
+  else if(iType == BUTTON_RadioButton || iType == BUTTON_FirstRadioButton)
   {
-    WBDraw3DBorderRect(pDisplay, wID, gc, &geomBorder,
-                       pSelf->clrBD3.pixel, pSelf->clrBD2.pixel);
+    geomBorder.x = xwa.border_width;
+    geomBorder.y = xwa.border_width;
+    geomBorder.width = xwa.width - xwa.border_width;
+    geomBorder.height = xwa.height - xwa.border_width;
+
+    if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_HAS_FOCUS)
+    {
+      WBDrawDashedRect(pDisplay, wID, gc, &geomBorder,
+                       BlackPixel(pDisplay, DefaultScreen(pDisplay)));
+    }
+
+    // use the font's ascent value as the size of my 'x' box
+
+    geomBox.x = geomBorder.x + (geomBorder.height - xBounds.ascent) / 2;
+    geomBox.y = geomBorder.y + (geomBorder.height - xBounds.ascent - 2) / 2;
+    geomBox.width = xBounds.ascent + 2;
+    geomBox.height = xBounds.ascent + 2;
+
+    // set the 'fill' color based on the button state
+    if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_PRESSED)
+    {
+      XSetForeground(pDisplay, gc, pSelf->clrAFG.pixel);
+    }
+    else
+    {
+      XSetForeground(pDisplay, gc, WhitePixel(pDisplay, DefaultScreen(pDisplay)));
+    }
+
+    // fill in the circle bounded by geomBox.
+    BEGIN_XCALL_DEBUG_WRAPPER
+    XFillArc(pDisplay, wID, gc,
+             geomBox.x, geomBox.y,
+             geomBox.width, geomBox.height,
+             0, 360 * 64); // full circle
+    END_XCALL_DEBUG_WRAPPER
+
+
+    if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_PRESSED)
+    {
+      WBDraw3DBorderElipse(pDisplay, wID, gc, &geomBox,
+                           pSelf->clrBD3.pixel, pSelf->clrBD2.pixel);
+    }
+    else
+    {
+      WBDraw3DBorderElipse(pDisplay, wID, gc, &geomBox,
+                           pSelf->clrBD2.pixel, pSelf->clrBD3.pixel);
+    }
+
+    // now, draw a filled-in circle that's half the width of the outer part
+    // if the button is 'checked'
+
+    if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_CHECKED)
+    {
+      XSetForeground(pDisplay, gc, BlackPixel(pDisplay, DefaultScreen(pDisplay)));
+
+      BEGIN_XCALL_DEBUG_WRAPPER
+      XFillArc(pDisplay, wID, gc,
+               geomBox.x + geomBox.width / 4,
+               geomBox.y + geomBox.height / 4,
+               geomBox.width - 2 * (geomBox.width / 4),
+               geomBox.height - 2 * (geomBox.height / 4),
+               0, 360 * 64); // full circle
+      END_XCALL_DEBUG_WRAPPER
+    }
+
+    // fix the border so it's "just the text part"
+    geomBorder.x += geomBox.width + (geomBorder.height - xBounds.ascent);  // where the text will be
+    geomBorder.width -= geomBox.width + (geomBorder.height - xBounds.ascent);  // and the adjusted width
   }
-  else
+  else // uknown button type - paint it like a button, for now
   {
-    WBDraw3DBorderRect(pDisplay, wID, gc, &geomBorder,
-                       pSelf->clrBD2.pixel, pSelf->clrBD3.pixel);
+    // paint the 3D-looking border
+
+    geomBorder.x = xwa.border_width;
+    geomBorder.y = xwa.border_width;
+    geomBorder.width = xwa.width - xwa.border_width;
+    geomBorder.height = xwa.height - xwa.border_width;
+
+    if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_HAS_FOCUS)
+    {
+      WBDrawBorderRect(pDisplay, wID, gc, &geomBorder,
+                       BlackPixel(pDisplay, DefaultScreen(pDisplay)));
+      geomBorder.x++;
+      geomBorder.y++;
+      geomBorder.height -= 2;
+      geomBorder.width -= 2;
+    }
+
+    // note - if a button is 'pressed' I draw the colors inverted
+
+    if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_PRESSED)
+    {
+      WBDraw3DBorderRect(pDisplay, wID, gc, &geomBorder,
+                         pSelf->clrBD3.pixel, pSelf->clrBD2.pixel);
+    }
+    else
+    {
+      WBDraw3DBorderRect(pDisplay, wID, gc, &geomBorder,
+                         pSelf->clrBD2.pixel, pSelf->clrBD3.pixel);
+    }
   }
 
   // painting the window text
@@ -4368,7 +4762,6 @@ WB_GEOM geomPaint, geomBorder;
 
   if(pSelf->pCaption)
   {
-    WB_RECT rctText;
     const char *szText = pSelf->pCaption;
 
     XSetBackground(pDisplay, gc, pSelf->clrABG.pixel);

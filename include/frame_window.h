@@ -505,6 +505,9 @@ typedef struct __WBChildFrame__
       // 'enter' char, or 'enter' for navigation.
       // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
 
+    void (*properties)(WBChildFrame *);
+      // display the property sheet for the displayed document
+
     void (*uparrow)(WBChildFrame *, int iACS);
       // 'up' arrow navigation.
       // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
@@ -680,6 +683,7 @@ typedef struct __WBChildFrameUI__
   void (*del)(WBChildFrame *, int iACS);                    ///< 'delete' char under cursor (delete equivalent), or perform related 'delete' operation via ctrl/alt/shift.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
   void (*tab)(WBChildFrame *, int iACS);                    ///< 'tab' char, or tab navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
   void (*enter)(WBChildFrame *, int iACS);                  ///< 'enter' char, or 'enter' for navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+  void (*properties)(WBChildFrame *);                       ///< display the property sheet for the displayed document (optional)
   void (*uparrow)(WBChildFrame *, int iACS);                ///< 'up' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
   void (*downarrow)(WBChildFrame *, int iACS);              ///< 'down' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
   void (*leftarrow)(WBChildFrame *, int iACS);              ///< 'left' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR

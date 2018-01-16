@@ -161,7 +161,7 @@ static void CheckInitScrollColors(void)
 
 /** \brief integer square root of a value 0-255
 **/
-static unsigned char isqrt(unsigned char iVal)
+static unsigned char WB_UNUSED isqrt(unsigned char iVal) // NOTE:  marked 'unused' for now, reserved for later
 {
 unsigned char aAnswers[256] =
 {
@@ -1012,7 +1012,7 @@ int iX, iY, iDirection, iPosition;
           {
             if(pEvent->xclient.data.l[0] == WB_POINTER_DRAG) // begin drag, return window ID
             {
-              WB_ERROR_PRINT("TEMPORARY - %s Mouse drag in scroll bar (knob)\n", __FUNCTION__);
+              WB_ERROR_PRINT("TEMPORARY - %s Mouse drag in vert scroll bar (knob)\n", __FUNCTION__);
 
               pScrollInfo->iScrollState |= WBScrollState_LDRAG;  // set the state bit for left-drag
               return((int)wID); // enabling the drag
@@ -1038,7 +1038,7 @@ int iX, iY, iDirection, iPosition;
           {
             if(pEvent->xclient.data.l[0] == WB_POINTER_DRAG) // begin drag, return window ID
             {
-              WB_ERROR_PRINT("TEMPORARY - %s Mouse drag in scroll bar (knob)\n", __FUNCTION__);
+              WB_ERROR_PRINT("TEMPORARY - %s Mouse drag in horiz scroll bar (knob)\n", __FUNCTION__);
 
               pScrollInfo->iScrollState |= WBScrollState_HLDRAG;  // set the state bit for left-drag
               return((int)wID); // enabling the drag (window ID cannot be 'None')
@@ -1101,7 +1101,7 @@ int iX, iY, iDirection, iPosition;
     char *pBuf = (char *)&(pEvent->xclient.data.l[3]); // decode buffer (at least 8 chars in length)
 #endif // !NO_DEBUG
 
-
+#warning scroll bar hot keys have not been implemented yet
     // TODO:  scroll bar hotkeys
 
 
@@ -1209,6 +1209,11 @@ void WBDrawBorderRect(Display *pDisplay, Drawable wID, GC gc,
 {
 XPoint xpt[5];
 
+  if(!pgeomBorder || !pDisplay || wID == None || gc == None)
+  {
+    return; // parameter validation
+  }
+
   XSetForeground(pDisplay, gc, lBorderColor);
 
   xpt[0].x=pgeomBorder->x;
@@ -1241,6 +1246,11 @@ XPoint xpt[4];
 XColor clr;
 int iR, iG, iB;
 
+
+  if(!pgeomBorder || !pDisplay || wID == None || gc == None)
+  {
+    return; // parameter validation
+  }
 
   XSetForeground(pDisplay, gc, lBorderColor1);
   xpt[0].x = pgeomBorder->x;
@@ -1315,6 +1325,61 @@ int iR, iG, iB;
 
   XSetForeground(pDisplay, gc, lBorderColor1);
 
+}
+
+void WBDrawBorderElipse(Display *pDisplay, Drawable wID, GC gc,
+                        WB_GEOM *pgeomBorder, unsigned long lBorderColor)
+{
+  if(!pgeomBorder || !pDisplay || wID == None || gc == None)
+  {
+    return; // parameter validation
+  }
+
+  XSetForeground(pDisplay, gc, lBorderColor);
+
+  XDrawArc(pDisplay, wID, gc,
+           pgeomBorder->x, pgeomBorder->y,
+           pgeomBorder->width, pgeomBorder->height,
+           0, 360 * 64); // draw a full circle within the geom bounds
+}
+
+void WBDraw3DBorderElipse(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomBorder,
+                          unsigned long lBorderColor1, unsigned long lBorderColor2)
+{
+  if(!pgeomBorder || !pDisplay || wID == None || gc == None)
+  {
+    return; // parameter validation
+  }
+
+  // use lBorderColor1 from 45 to 225, and lBorderColor2 from 225 back to 45
+  // (positive angles indicate counterclockwise rotation for XDrawArc)
+
+  XSetForeground(pDisplay, gc, lBorderColor2);
+
+  XDrawArc(pDisplay, wID, gc,
+           pgeomBorder->x, pgeomBorder->y,
+           pgeomBorder->width, pgeomBorder->height,
+           0, 360 * 64); // entire circle
+
+  XSetForeground(pDisplay, gc, lBorderColor1);
+
+  XDrawArc(pDisplay, wID, gc,
+           pgeomBorder->x, pgeomBorder->y,
+           pgeomBorder->width, pgeomBorder->height,
+           45 * 64, 180 * 64); // upper half-circle 45 to 180
+
+  XDrawArc(pDisplay, wID, gc,
+           pgeomBorder->x, pgeomBorder->y,
+           pgeomBorder->width, pgeomBorder->height,
+           -135 * 64, -180 * 64); // upper half-circle 180 to 225 (-135)
+
+//  XSetForeground(pDisplay, gc, lBorderColor2);
+//
+//  XDrawArc(pDisplay, wID, gc,
+//           pgeomBorder->x, pgeomBorder->y,
+//           pgeomBorder->width, pgeomBorder->height,
+//           -45 * 64, -225 * 64); // lower half-circle
+////           225 * 64, 45 * 64); // lower half-circle
 }
 
 void WBDrawDashedRect(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect, unsigned long lColor)
