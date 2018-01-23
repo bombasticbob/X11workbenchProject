@@ -1,6 +1,7 @@
 bin_PROGRAMS = X11workbench
 X11workbench_SOURCES = X11workbench.c X11workbench.h refactor.c refactor.h gizzard.c gizzard.h
-X11workbench_SOURCES += gdb_helper.c gdb_helper.h
+X11workbench_SOURCES += gdb_helper.c gdb_helper.h resource_edit.c resource_edit.h
+X11workbench_SOURCES += context_help.c context_help.h
 X11workbench_SOURCES += application_icon.xpm splash.xpm textfiledoc.xpm newdoc.xpm clangdoc.xpm makefiledoc.xpm
 X11workbench_SOURCES += doxy_comments.dox doxy.txt
 

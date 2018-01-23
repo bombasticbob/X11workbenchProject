@@ -246,6 +246,8 @@ typedef struct __WB_DIALOG_CONTROL__
 } WBDialogControl;
 
 
+
+
 /** \ingroup dlgctrl
   * \brief Initialization function for dialog controls
   *
@@ -298,6 +300,7 @@ WBDialogControl * WBDialogControlCreate(Atom aClass, WBDialogWindow *pOwner,
 void DLGRegisterControlCallback(WBDialogControl *pDialogControl, const char *szClassName, WBWinEvent pCallback);
 
 
+
 // generic property list helpers (low level)
 /** \ingroup dlgctrl
   * \brief Low-level dialog control property assignment
@@ -342,6 +345,10 @@ int WBDialogControlSetPropList(WBDialogControl *pCtrl, const char *szPropList); 
 /** \ingroup dlgctrl
   * \brief Mid-level dialog control property assignment (character string)
   *
+  * \param pCtrl A ponter to the WBDialogControl structure for the control
+  * \param aPropName An atom representing the property name to query
+  * \param szPropVal A const pointer to a string representing the property value.  May be NULL
+  *
   * Strings are stored internally within the property list as a memory block allocated via 'WBAlloc()'.
   * If an existing pointer is already present when a new string is assigned, it is destroyed via 'WBFree()'.
   * The assigned value is then copied into a memory block allocated via 'WBAlloc()' and stored in the property list.
@@ -352,10 +359,19 @@ int WBDialogControlSetProperty(WBDialogControl *pCtrl, Atom aPropName, const cha
 /** \ingroup dlgctrl
   * \brief Mid-level dialog control property list assignment (generic pointer)
   *
+  * \param pCtrl A ponter to the WBDialogControl structure for the control
+  * \param aPropName An atom representing the property name to query
+  * \param szPropVal A WBAlloc'd pointer to binary data to be stored as the property, and owned by the control.  May be NULL
+  *
   * Pointers assigned as a property must have been allocated using 'WBAlloc()' (or NULL).  Any existing
   * pointer already assigned to this property will be automatically destroyed using 'WBFree()'.
   * The property itself is considered to be 'owned' by the property list, and will be cleaned up
   * when the control window is destroyed.
+  *
+  * NOTE:  use WBDialogControlSetProperty2 to directly assign WBAlloc'd pointer, and modify the actual data.
+  *        You should make sure you do not re-use the same pointer unless you take this into consideration.
+  *        Assigning different pointer in WBDialogControlGetProperty2() 'WBFree's the existing pointer.
+  *        Destroying property list does the same thing.
   *
   * Header File:  dialog_controls.h
 **/
@@ -364,6 +380,10 @@ void WBDialogControlSetProperty2(WBDialogControl *pCtrl, Atom aPropName, void *s
 /** \ingroup dlgctrl
   * \brief Mid-level dialog control property retrieval (character string)
   *
+  * \param pCtrl A ponter to the WBDialogControl structure for the control
+  * \param aPropName An atom representing the property name to query
+  * \return A const char pointer to the actual property data.  May be NULL.
+
   * This function returns the actual string pointer stored within the property list, and may be NULL.
   * To modify an existing sring value, you should first make a copy of the string (as needed), then modify
   * the copy and re-assign teh value via WBDialogControlSetProperty().
@@ -374,18 +394,23 @@ const char *WBDialogControlGetProperty(WBDialogControl *pCtrl, Atom aPropName);
 /** \ingroup dlgctrl
   * \brief Mid-level dialog control property list retrieval (generic pointer)
   *
+  * \param pCtrl A ponter to the WBDialogControl structure for the control
+  * \param aPropName An atom representing the property name to query
+  * \return The actual pointer stored for the specified property.  May be NULL.
+  *
   * Pointers assigned as a property must have been allocated using 'WBAlloc()'.  Any existing
   * pointer already assigned to this property will be automatically destroyed using 'WBFree()'.
-  * The property itself is considered to be 'owned' by the property list, and will be cleaned up
+  * The memory block itself is considered to be 'owned' by the property list, and will be cleaned up
   * when the control window is destroyed.
+  *
+  * NOTE:  use WBDialogControlSetProperty2() to directly assign WBAlloc'd pointer, and modify actual data returned by above
+  *        Assigning different pointer in WBDialogControlGetProperty2() 'WBFree's the existing pointer.
+  *        Destroying property list does the same thing.
   *
   * Header File:  dialog_controls.h
 **/
 void *WBDialogControlGetProperty2(WBDialogControl *pCtrl, Atom aPropName); // returns actual WBAlloc'd pointer or NULL
 
-// NOTE:  use WBDialogControlSetProperty2 to directly assign WBAlloc'd pointer, and modify actual data returned by above
-//        Assigning different pointer in WBDialogControlGetProperty2 'WBFree's existing pointer
-//        Destroying property list does the same thing.
 
 
 /** \ingroup dlgctrl
@@ -398,7 +423,7 @@ void *WBDialogControlGetProperty2(WBDialogControl *pCtrl, Atom aPropName); // re
   *
   * Header File:  dialog_controls.h
 **/
-static __inline__ WBDialogControl *DLGGetDialogControlStruct(Window wID)  // for frame windows, returns the frame window struct
+static __inline__ WBDialogControl *DLGGetDialogControlStruct(Window wID)  // for dialog controls, returns the dialog control struct
 {
   WBDialogControl *pRval = (WBDialogControl *)WBGetWindowData(wID, 0);  // offset 0 for window-specific structs
 
@@ -411,6 +436,7 @@ static __inline__ WBDialogControl *DLGGetDialogControlStruct(Window wID)  // for
 
 
 // dialog control property management (high level)
+// these have additional implications, which is why they use their own API functions
 
 /** \ingroup dlgctrl
   * \brief Assign text to the 'CAPTION' property of a dialog control
@@ -486,6 +512,38 @@ Pixmap WBDialogControlGetIconPixmap(WBDialogControl *pCtrl, Pixmap *pPixmap2);
 /** \ingroup dlgctrl
   * \brief Assign the TEXT property for a control, which is different from the CAPTION or Title
   *
+  * \param pCtrl A ponter to the WBDialogControl structure for the control
+  * \param iCheck An integer containing a positive number to set the 'check' state, zero to clear it, or a negative number to toggle the check state for "non-radio buttons".  For a radio button, a negative value has the same effect as a positive one.
+  *
+  * The CHECKED property is a special case, not represente by the property list.  Assigning it
+  * carries some specific implications, which are managed by this function.  As an example, whenever
+  * a radio button is checked, all of the other buttons within the group are un-checked.
+  *
+  * Header File:  dialog_controls.h
+**/
+void WBDialogControlSetCheck(WBDialogControl *pCtrl, int iCheck);
+
+/** \ingroup dlgctrl
+  * \brief Retrieve the 'CHECKED' property from a dialog control.  Returns '0' (un-checked) if not applicable.
+  *
+  * \param pCtrl A ponter to the WBDialogControl structure for the control
+  * \return A value of '1' if the dialog box control is 'checked'; otherwise, zero (unchecked)
+  *
+  * The CHECKED property is a special case, not represente by the property list.  Assigning it
+  * carries some specific implications, which are managed by WBDialogControlSetCheck().
+  *
+  * Header File:  dialog_controls.h
+**/
+int WBDialogControlGetCheck(WBDialogControl *pCtrl);
+
+
+
+/** \ingroup dlgctrl
+  * \brief Assign the TEXT property for a control, which is different from the CAPTION or Title
+  *
+  * \param pCtrl A ponter to the WBDialogControl structure for the control
+  * \param szText A const pointer to a string representing the 'TEXT' property value.  May be NULL
+  *
   * The TEXT property is a standard property for a dialog control.  To preserve consistency
   * use this function to assign it, rather than assigning the TEXT property directly.
   *
@@ -495,7 +553,7 @@ static __inline__ void WBDialogControlSetText(WBDialogControl *pCtrl, const char
 {
 #ifdef DIALOG_SUPPORT_C
 extern Atom aDLGC_TEXT;
-#else // DIALOG_SUPPORT_C
+#else  // !DIALOG_SUPPORT_C
 extern const Atom aDLGC_TEXT;
 #endif // DIALOG_SUPPORT_C
 
@@ -507,6 +565,9 @@ extern const Atom aDLGC_TEXT;
 /** \ingroup dlgctrl
   * \brief Obtain the assigned TEXT property for a control, which is different from the CAPTION or Title
   *
+  * \param pCtrl A ponter to the WBDialogControl structure for the control
+  * \return A const char pointer to the text property value.  May be NULL
+  *
   * The TEXT property is a standard property for a dialog control.  To preserve consistency
   * use this function to query it, rather than querying the TEXT property directly.
   *
@@ -516,7 +577,7 @@ static __inline__ const char *WBDialogControlGetText(WBDialogControl *pCtrl)
 {
 #ifdef DIALOG_SUPPORT_C
 extern Atom aDLGC_TEXT;
-#else // DIALOG_SUPPORT_C
+#else  // !DIALOG_SUPPORT_C
 extern const Atom aDLGC_TEXT;
 #endif // DIALOG_SUPPORT_C
 
@@ -882,51 +943,51 @@ extern const Atom aTAB_CONTROL;               // 'tab' container (auto enable/di
 
 
 
-// messages
+// control owner notification messages
 
 // generic control notification - use aCONTROL_NOTIFY (doxygen docs in dialog_controls.c)
-
-//extern const Atom aCONTROL_NOTIFY;
-//    'notify' message - l[0] is notify code, l[1] is control ID, l[2] is pointer to control object
-// others are message-specific
 
 // CONTROL_NOTIFY "NOTIFICATION" CODES (code will be in data.l[0])
 // button-specific notifications
 extern const Atom aBUTTON_PRESS;
-// l[1] is control ID, l[2] is (truncated) pointer to pDlgControlEntry
 
 // list-specific
-extern const Atom aLIST_NOTIFY; // also applies to tab controls, combos, etc.
-// data.l[1] is control ID, data.l[2] is notification, data.l[3] is selection index
-// on receipt default dialog proc will end dialog with 'IDOK'
+extern const Atom aLIST_NOTIFY; // applies to lisbox.  also applies to tab controls, combos, etc.
+                                // on receipt default dialog proc will end dialog with 'IDOK'
 
 // edit-specific, combo-specific
 extern const Atom aTEXT_CHANGED;
 extern const Atom aTEXTSELECT_CHANGE;
 
+// mouse click/drag notifications (for certain controls, where appropriate)
+extern const Atom aMOUSE_CLICK;
+extern const Atom aMOUSE_DBLCLICK;
+extern const Atom aMOUSE_DRAG;
 
+// ---------------------------
 // other notification messages
-
+// ---------------------------
 
 // common to all
 extern const Atom aGOTFOCUS;  // sent as its own message type - data.l[0] = wID, data.l[1] = pDlgControlEntry
 extern const Atom aLOSTFOCUS; // sent as its own message type - data.l[0] = wID, data.l[1] = pDlgControlEntry
 
-
 // low level common (not all return these)
-extern const Atom aMOUSE_DOWN;
-extern const Atom aMOUSE_UP;
-extern const Atom aMOUSE_DRAG;
 extern const Atom aKEY_DOWN;
 extern const Atom aKEY_UP;
 extern const Atom aKEYSTROKE;  // valid key down/up sequence, including repeat
 
-
 // other dialog-related message atoms
 extern const Atom aDIALOG_INIT;
 
-//extern const Atom aDIALOG_SETFOCUS; // l[0] is <,0,> for prev, 'set to', next.  For 'set to' l[1] is item ID
-extern Atom aDLGC_PROP_NOTIFY; // l[0] is the property Atom
+
+// dialog control notification messages (sent to the controls by 'whomever')
+extern const Atom aDLGC_PROP_NOTIFY; // l[0] is the property Atom
+extern const Atom aDLGC_TEXT;        // set the text
+extern const Atom aDLGC_CONTROL_GET; // get a property (specific properties only)
+extern const Atom aDLGC_CONTROL_SET; // set a property (specific properties only)
+
+
 
 // control-specific 'globally known' atoms
 
@@ -990,6 +1051,20 @@ enum ListInfoFlags
 };
 
 
+/** \ingroup dlgctrl
+  * \hideinitializer
+  * \brief Control 'Get/Set' properties used by aDLGC_CONTROL_SET and aDLGC_CONTROL_GET
+*/
+enum ControlGetSetProperties
+{
+  ControlGetSet_CHECK = 1,    ///< 'checked' flag.  when 'setting', -1 'toggles', 1 sets it, 0 clears it.  when 'getting', zero is 'unchecked', non-zero 'checked'
+  ControlGetSet_TRISTATE = 2, ///< 'tristate' flag.  when 'setting', -1 'toggles', 1 sets it, 0 clears it.  when 'getting', zero is 'normal', non-zero 'tristate'
+
+  ControlGetSet_LAST = 2      ///< last one, update as needed when more flags are added
+
+  // others are reserved
+};
+
 
 // 'ulFlags' bits 0000ffff is "common", 00ff0000 is control-specific, ff000000 is 'reserved for custom'
 /** \ingroup dlgctrl
@@ -1002,7 +1077,8 @@ enum ListInfoFlags
 */
 enum CONTROL_FLAGS
 {
-  // COMMON bits (APPLIES TO ALL)
+  // COMMON bits (APPLIES TO ALL) - MASK 0000FFFFH
+
   CONTROL_Reserved00      = 0x00000001,  ///< CONTROL bits, reserved 00
   CONTROL_Reserved01      = 0x00000002,  ///< CONTROL bits, reserved 01
   CONTROL_Reserved02      = 0x00000004,  ///< CONTROL bits, reserved 02
@@ -1022,18 +1098,20 @@ enum CONTROL_FLAGS
   CONTROL_SupportListInfo = 0x00008000,  ///< this control supports a LISTINFO property.\n
                                          // NOTE: A \ref WBListCurSel struct must immediately follow the \ref WBDialogControl members
 
-  // CONTROL TYPE-SPECIFIC bits
+
+  // CONTROL TYPE-SPECIFIC bits (they use the same bits as one another, mask 000F0000H
 
   // STATIC bits
 
+  STATIC_Default      = 0x00000000,     ///< STATIC - default (reserved)
   STATIC_Frame        = 0x00010000,     ///< STATIC - frame control window
   STATIC_Text         = 0x00020000,     ///< STATIC - Text control window
   STATIC_Icon         = 0x00030000,     ///< STATIC - Icon control window
   STATIC_Image        = 0x00040000,     ///< STATIC - Image control window
 
-  STATIC_TYPEMASK     = 0x000f0000,     ///< STATIC - 'type mask' for static controls
+  STATIC_TYPEMASK     = 0x00070000,     ///< STATIC - 'type mask' for static controls
 
-  STATIC_3DBorder     = 0x00100000,     ///< STATIC - display with a 3D-looking border
+  STATIC_3DBorder     = 0x00080000,     ///< STATIC - display with a 3D-looking border
 
 
   // BUTTON bits
@@ -1051,7 +1129,7 @@ enum CONTROL_FLAGS
 
   // others here
 
-  // auto-alignment flags (for resizable dialog boxes)
+  // auto-alignment flags (for resizable dialog boxes)  mask 00F00000H - see WBDialogEntry_xxx flags in dialog_window.h
 
   CONTROL_VAlignFixed     = WBDialogEntry_VAlignFixed,  ///< default position re-alignment with respect to center (as a percentage, no stretching)
   CONTROL_VAlignTop       = WBDialogEntry_VAlignTop,    ///< resize maintains position/size with respect to top

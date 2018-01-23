@@ -247,7 +247,7 @@ int DLGControlDefaultCallback(Window wID, XEvent *pEvent)
 
       DLGNotifyOwner(pDialogControl, aGOTFOCUS,
                      (long)(pDialogControl->pDlgControlEntry ? pDialogControl->pDlgControlEntry->iID : pDialogControl->wID),
-                     (unsigned long)pDialogControl->pDlgControlEntry, 0, 0, 0);
+                     WBCreatePointerHash(pDialogControl->pDlgControlEntry), 0, 0, 0);
 
       // now update myself
       WBInvalidateGeom(wID, NULL, 1);
@@ -261,7 +261,7 @@ int DLGControlDefaultCallback(Window wID, XEvent *pEvent)
 
       DLGNotifyOwner(pDialogControl, aLOSTFOCUS,
                      (long)(pDialogControl->pDlgControlEntry ? pDialogControl->pDlgControlEntry->iID : pDialogControl->wID),
-                     (unsigned long)pDialogControl->pDlgControlEntry, 0, 0, 0);
+                     WBCreatePointerHash(pDialogControl->pDlgControlEntry), 0, 0, 0);
 
       // now update myself
       WBInvalidateGeom(wID, NULL, 1);
@@ -459,6 +459,7 @@ int i1;
     pRval->pPropList = NULL; // as a matter of course
   }
 
+  WBDestroyPointerHashPtr(pRval);
   WBFree(pRval);
 
   return NULL;
@@ -474,11 +475,12 @@ static void alloc_control_colors(WBDialogControl *pDialogControl,
                                  const char *szAFGName, const char *szABGName,
                                  const char *szBDName, int bUseStaticColors)
 {
-  static const char *szBorder2="#FFFFFF", *szBorder2W="#C8C6C0", *szBorder3="#9C9A94"; // for 3D borders
+//  static const char *szBorder2="#FFFFFF", *szBorder3="#9C9A94"; // for 3D borders
   static const char *szHFGDef="#E0E0E0", *szHBGDef="#0000A0";  // highlight FG/BG
   static const char *szAFGDef="#000000", *szABGDef="white";  // active FG/BG
   char szFG[18], szBG[18], szBD[18], szHFG[18], szHBG[18], szAFG[18], szABG[18];
   Colormap colormap = DefaultColormap(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
+  int iY, iU, iV, iR, iG, iB;
 
 
   // TODO:  add some sanity to this, maybe an API for loading colors?  *MOST* of this is now obsolete
@@ -541,18 +543,39 @@ static void alloc_control_colors(WBDialogControl *pDialogControl,
   XAllocColor(WBGetDefaultDisplay(), colormap, &(pDialogControl->clrHBG));
   XParseColor(WBGetDefaultDisplay(), colormap, szBD, &(pDialogControl->clrBD));
 
-  // 3D border colors for now these are hard-coded - later derive them from FG and BG colors
-  if(pDialogControl->clrBG.red >= 60000 && pDialogControl->clrBG.green >= 60000 &&
-     pDialogControl->clrBG.blue >= 60000) // note see man page on XColor, values 0 through 65535 for RGB
+  // ---------------------------------------------------------------------------------------
+  // 3D border colors - determine a decent set of border colors for clrBD2 and clrBD3 using
+  // the background color.  highlight luminocity will average between black and background
+  // for the shaded color (clrBD3) and between white and background for highlight (clrBD2).
+  // ---------------------------------------------------------------------------------------
+
+  if((pDialogControl->clrBG.flags & (DoRed | DoGreen | DoBlue)) != (DoRed | DoGreen | DoBlue))
   {
-    XParseColor(WBGetDefaultDisplay(), colormap, szBorder2W, &(pDialogControl->clrBD2));
+    PXM_PixelToRGB(PXM_StandardColormapFromColormap(NULL,colormap),
+                   &(pDialogControl->clrBG)); // make sure RGB is correctly assigned
   }
-  else
-  {
-    XParseColor(WBGetDefaultDisplay(), colormap, szBorder2, &(pDialogControl->clrBD2));
-  }
+
+  RGB255_FROM_XCOLOR(pDialogControl->clrBG, iR, iG, iB);
+
+  PXM_RGBToYUV(iR, iG, iB, &iY, &iU, &iV);
+
+  // the highlight color should be 1/4 of the way between the background color and white, using the same U and V
+
+  PXM_YUVToRGB((3 * iY + 256) / 4, iU, iV, &iR, &iG, &iB);
+
+  RGB255_TO_XCOLOR(iR, iG, iB, pDialogControl->clrBD2); // assign new RGB values to the XColor struct
+  PXM_RGBToPixel(PXM_StandardColormapFromColormap(NULL,colormap),
+                 &(pDialogControl->clrBD2)); // re-assign pixel element from RGB values
+
+  // the shaded color should be 3/4 of the way between black and the background color, using the same U and V
+
+  PXM_YUVToRGB((3 * iY) / 4, iU, iV, &iR, &iG, &iB);
+
+  RGB255_TO_XCOLOR(iR, iG, iB, pDialogControl->clrBD3); // assign new RGB values to the XColor struct
+  PXM_RGBToPixel(PXM_StandardColormapFromColormap(NULL,colormap),
+                &(pDialogControl->clrBD3)); // re-assign pixel element from RGB values
+
   XAllocColor(WBGetDefaultDisplay(), colormap, &(pDialogControl->clrBD2));
-  XParseColor(WBGetDefaultDisplay(), colormap, szBorder3, &(pDialogControl->clrBD3));
   XAllocColor(WBGetDefaultDisplay(), colormap, &(pDialogControl->clrBD3));
 }
 
@@ -662,8 +685,16 @@ BEGIN_CREATE_CONTROL(FRAME_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
+    WBDestroyPointerHashPtr(pDialogControl);
     WBFree(pDialogControl);
     return NULL;
+  }
+
+  if(pDialogControl->pDlgControlEntry &&
+     pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_CAN_HAVE_FOCUS)
+  {
+    // this type of static control can NOT have the focus.
+    pDialogControl->pDlgControlEntry->iFlags &= ~WBDialogEntry_CAN_HAVE_FOCUS; // turn it off
   }
 
   // now allow certain kinds of input messages (I should be able to handle messages at this point)
@@ -716,8 +747,16 @@ BEGIN_CREATE_CONTROL(TEXT_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
+    WBDestroyPointerHashPtr(pDialogControl);
     WBFree(pDialogControl);
     return NULL;
+  }
+
+  if(pDialogControl->pDlgControlEntry &&
+     pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_CAN_HAVE_FOCUS)
+  {
+    // this type of static control can NOT have the focus.
+    pDialogControl->pDlgControlEntry->iFlags &= ~WBDialogEntry_CAN_HAVE_FOCUS; // turn it off
   }
 
   // now allow certain kinds of input messages (I should be able to handle messages at this point)
@@ -768,13 +807,26 @@ BEGIN_CREATE_CONTROL(ICON_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
+    WBDestroyPointerHashPtr(pDialogControl);
     WBFree(pDialogControl);
     return NULL;
   }
 
   // now allow certain kinds of input messages (I should be able to handle messages at this point)
-  XSelectInput(pDisplay, pDialogControl->wID, WB_STANDARD_INPUT_MASK);
 
+  if(pDialogControl->pDlgControlEntry &&
+     pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_CAN_HAVE_FOCUS)
+  {
+    WB_ERROR_PRINT("TEMPORARY:  %s 'can have focus' and extra input mask thingies\n", __FUNCTION__);
+
+    // now allow certain kinds of input messages (I should be able to handle messages at this point)
+    XSelectInput(pDisplay, pDialogControl->wID,
+                 WB_STANDARD_INPUT_MASK | WB_MOUSE_INPUT_MASK | WB_KEYBOARD_INPUT_MASK);
+  }
+  else
+  {
+    XSelectInput(pDisplay, pDialogControl->wID, WB_STANDARD_INPUT_MASK);
+  }
 
   // TODO:  scan properties for 'ICON' property, load icon, assign to
   //        ((struct _WB_IMAGE_CONTROL_ *)pDialogControl)->pixmap
@@ -823,13 +875,25 @@ BEGIN_CREATE_CONTROL(IMAGE_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
+    WBDestroyPointerHashPtr(pDialogControl);
     WBFree(pDialogControl);
     return NULL;
   }
 
   // now allow certain kinds of input messages (I should be able to handle messages at this point)
-  XSelectInput(pDisplay, pDialogControl->wID, WB_STANDARD_INPUT_MASK);
+  if(pDialogControl->pDlgControlEntry &&
+     pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_CAN_HAVE_FOCUS)
+  {
+    WB_ERROR_PRINT("TEMPORARY:  %s 'can have focus' and extra input mask thingies\n", __FUNCTION__);
 
+    // now allow certain kinds of input messages (I should be able to handle messages at this point)
+    XSelectInput(pDisplay, pDialogControl->wID,
+                 WB_STANDARD_INPUT_MASK | WB_MOUSE_INPUT_MASK | WB_KEYBOARD_INPUT_MASK);
+  }
+  else
+  {
+    XSelectInput(pDisplay, pDialogControl->wID, WB_STANDARD_INPUT_MASK);
+  }
 
   if(pDialogControl->pDlgControlEntry &&
      (pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_VISIBLE))
@@ -896,6 +960,7 @@ BEGIN_CREATE_CONTROL(EDIT_CONTROL);
     // destroy any allocated 'text object' stuff thus far
     WBDestroyInPlaceTextObject(&(pPrivate->xTextObject));
 
+    WBDestroyPointerHashPtr(pDialogControl);
     WBFree(pDialogControl);
     return NULL;
   }
@@ -960,6 +1025,7 @@ XFontSet fsBold;
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
+    WBDestroyPointerHashPtr(pDialogControl);
     WBFree(pDialogControl);
     return NULL;
   }
@@ -1024,6 +1090,7 @@ XFontSet fsBold;
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
+    WBDestroyPointerHashPtr(pDialogControl);
     WBFree(pDialogControl);
     return NULL;
   }
@@ -1087,6 +1154,7 @@ XFontSet fsBold;
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
+    WBDestroyPointerHashPtr(pDialogControl);
     WBFree(pDialogControl);
     return NULL;
   }
@@ -1146,6 +1214,7 @@ BEGIN_CREATE_CONTROL(RADIOBUTTON_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
+    WBDestroyPointerHashPtr(pDialogControl);
     WBFree(pDialogControl);
     return NULL;
   }
@@ -1195,6 +1264,7 @@ BEGIN_CREATE_CONTROL(FIRSTRADIOBUTTON_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
+    WBDestroyPointerHashPtr(pDialogControl);
     WBFree(pDialogControl);
     return NULL;
   }
@@ -1245,6 +1315,7 @@ BEGIN_CREATE_CONTROL(CHECKBUTTON_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
+    WBDestroyPointerHashPtr(pDialogControl);
     WBFree(pDialogControl);
     return NULL;
   }
@@ -1294,6 +1365,7 @@ BEGIN_CREATE_CONTROL(TRISTATEBUTTON_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
+    WBDestroyPointerHashPtr(pDialogControl);
     WBFree(pDialogControl);
     return NULL;
   }
@@ -1384,6 +1456,7 @@ BEGIN_CREATE_CONTROL(LIST_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
+    WBDestroyPointerHashPtr(pDialogControl);
     WBFree(pDialogControl);
     return NULL;
   }
@@ -1400,6 +1473,7 @@ BEGIN_CREATE_CONTROL(LIST_CONTROL);
     }
 
     WBSetWindowData(pDialogControl->wID, 0, NULL);
+    WBDestroyPointerHashPtr(pDialogControl);
     WBFree(pDialogControl);
     return NULL;
   }
@@ -1455,6 +1529,7 @@ static int combo_callback(Window wID, XEvent *pEvent)
       // free up privately allocated stuff
       WBDestroyInPlaceTextObject(&(pPrivate->xTextObject));
 
+      WBDestroyPointerHashPtr(pDialogControl);
       WBFree(pDialogControl);
     }
 
@@ -1502,6 +1577,7 @@ BEGIN_CREATE_CONTROL(COMBO_CONTROL);
     // destroy any allocated stuff thus far
     WBDestroyInPlaceTextObject(&(pPrivate->xTextObject)); // by convention
 
+    WBDestroyPointerHashPtr(pDialogControl);
     WBFree(pDialogControl);
     return NULL;
   }
@@ -1518,6 +1594,7 @@ BEGIN_CREATE_CONTROL(COMBO_CONTROL);
 //      DLGCDestroyProperties(pDialogControl->pPropList);
 //
 //    WBSetWindowData(wID, 0, NULL);
+//    WBDestroyPointerHashPtr(pDialogControl);
 //    WBFree(pDialogControl);
 //    return NULL;
 //  }
@@ -1568,6 +1645,7 @@ BEGIN_CREATE_CONTROL(TREE_CONTROL);
       pDialogControl->pPropList = NULL; // as a matter of course
     }
 
+    WBDestroyPointerHashPtr(pDialogControl);
     WBFree(pDialogControl);
     return NULL;
   }
@@ -1582,6 +1660,7 @@ BEGIN_CREATE_CONTROL(TREE_CONTROL);
     }
 
     WBSetWindowData(pDialogControl->wID, 0, NULL);
+    WBDestroyPointerHashPtr(pDialogControl);
     WBFree(pDialogControl);
     return NULL;
   }
@@ -1762,6 +1841,73 @@ static int static_callback(Window wID, XEvent *pEvent)
     return StaticDoExposeEvent(&(pEvent->xexpose), pDisplay, wID, pDialogControl);
   }
 
+  // special handling for images with mouse click/drag
+
+  if(pEvent->type == ButtonPress ||
+     pEvent->type == ButtonRelease ||
+     pEvent->type == MotionNotify)
+  {
+    return 0; // not handled (use WM_POINTER messages generated by toolkit)
+  }
+  else if(pEvent->type == KeyPress || pEvent->type == KeyRelease)
+  {
+    return 0; // NOT handled (use WM_CHAR messages instead)
+  }
+
+  if(pEvent->type == ClientMessage &&
+     pEvent->xclient.type == aWM_POINTER &&
+     pDialogControl != NULL)
+  {
+    if(pDialogControl->aClass == aIMAGE_CONTROL) // images are 'clickable' and 'draggable'
+    {
+      if(pEvent->xclient.data.l[0] == WB_POINTER_CLICK &&
+         pEvent->xclient.data.l[1] == WB_POINTER_BUTTON1 && // only left-click
+         pEvent->xclient.data.l[2] == 0)                    // no ctrl/alt/shift modifiers
+      {
+        DLGNotifyOwnerAsync(pDialogControl, aCONTROL_NOTIFY, aMOUSE_CLICK,
+                            pDialogControl->pDlgControlEntry->iID,
+                            WBCreatePointerHash(pDialogControl),
+                            pEvent->xclient.data.l[3] - 2,  // X coordinate (offset by 2; see StaticDoExposeEvent)
+                            pEvent->xclient.data.l[4] - 2); // Y coordinate
+
+        return 1; // handled
+      }
+      else if(pEvent->xclient.data.l[0] == WB_POINTER_DBLCLICK &&
+              pEvent->xclient.data.l[1] == WB_POINTER_BUTTON1 && // only left-click
+              pEvent->xclient.data.l[2] == 0)                    // no ctrl/alt/shift modifiers
+      {
+        DLGNotifyOwnerAsync(pDialogControl, aCONTROL_NOTIFY, aMOUSE_DBLCLICK,
+                            pDialogControl->pDlgControlEntry->iID,
+                            WBCreatePointerHash(pDialogControl),
+                            pEvent->xclient.data.l[3] - 2,  // X coordinate (offset by 2; see StaticDoExposeEvent)
+                            pEvent->xclient.data.l[4] - 2); // Y coordinate
+
+        return 1; // handled
+      }
+      else if(pEvent->xclient.data.l[0] == WB_POINTER_MOVE &&
+              pEvent->xclient.data.l[1] == WB_POINTER_BUTTON1 && // only left-click
+              pEvent->xclient.data.l[2] == 0)                    // no ctrl/alt/shift modifiers
+      {
+        DLGNotifyOwnerAsync(pDialogControl, aCONTROL_NOTIFY, aMOUSE_DRAG,
+                            pDialogControl->pDlgControlEntry->iID,
+                            WBCreatePointerHash(pDialogControl),
+                            pEvent->xclient.data.l[3] - 2,  // X coordinate (offset by 2; see StaticDoExposeEvent)
+                            pEvent->xclient.data.l[4] - 2); // Y coordinate
+
+        return 1; // handled
+      }
+      else if(pEvent->xclient.data.l[0] == WB_POINTER_DRAG &&
+              pEvent->xclient.data.l[1] == WB_POINTER_BUTTON1 && // only left-click
+              pEvent->xclient.data.l[2] == 0)                    // no ctrl/alt/shift modifiers
+      {
+        return (int)wID; // to support mouse-dragging
+      }
+
+      return 0; // not handled
+    }
+  }
+
+
   // special handling for 'destroy'
   if(pEvent->type == DestroyNotify &&
      pEvent->xdestroywindow.window == wID)
@@ -1777,7 +1923,12 @@ static int static_callback(Window wID, XEvent *pEvent)
          pDialogControl->aClass == aIMAGE_CONTROL)
       {
 
-        Pixmap pxOld = ((struct _WB_PUSHBUTTON_CONTROL_ *)pDialogControl)->pixmap;
+        Pixmap pxOld = ((struct _WB_IMAGE_CONTROL_ *)pDialogControl)->pixmap;
+        Pixmap pxOld2 = ((struct _WB_IMAGE_CONTROL_ *)pDialogControl)->pixmap2;
+
+        ((struct _WB_IMAGE_CONTROL_ *)pDialogControl)->pixmap = None;
+        ((struct _WB_IMAGE_CONTROL_ *)pDialogControl)->pixmap2 = None;
+
         if(pxOld != None)
         {
           BEGIN_XCALL_DEBUG_WRAPPER
@@ -1788,6 +1939,20 @@ static int static_callback(Window wID, XEvent *pEvent)
           else
           {
             XFreePixmap(pDisplay, pxOld);
+          }
+          END_XCALL_DEBUG_WRAPPER
+        }
+
+        if(pxOld2 != None)
+        {
+          BEGIN_XCALL_DEBUG_WRAPPER
+          if(!pDisplay)
+          {
+            XFreePixmap(WBGetDefaultDisplay(), pxOld2);
+          }
+          else
+          {
+            XFreePixmap(pDisplay, pxOld2);
           }
           END_XCALL_DEBUG_WRAPPER
         }
@@ -1804,6 +1969,7 @@ static int static_callback(Window wID, XEvent *pEvent)
         pDialogControl->pPropList = NULL; // as a matter of course
       }
 
+      WBDestroyPointerHashPtr(pDialogControl);
       WBFree(pDialogControl);
     }
 
@@ -1866,6 +2032,7 @@ static int edit_callback(Window wID, XEvent *pEvent)
       // free up privately allocated stuff
       WBDestroyInPlaceTextObject(&(pPrivate->xTextObject)); // destroy in-place text object
 
+      WBDestroyPointerHashPtr(pDialogControl);
       WBFree(pDialogControl);
     }
 
@@ -1971,7 +2138,7 @@ static int edit_callback(Window wID, XEvent *pEvent)
 
     DLGNotifyOwnerAsync(pDialogControl, aCONTROL_NOTIFY, aNotification,
                         pDialogControl->pDlgControlEntry->iID,
-                        (long)pDialogControl, 0, 0);
+                        WBCreatePointerHash(pDialogControl), 0, 0);
   }
 
   return iRval;  // 0 if not handled, 1 if handled
@@ -1983,6 +2150,60 @@ static int PushButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 static int ButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                                Window wID, WBDialogControl *pSelf);
 static void ManageRadioButtonGroupSelectState(WBDialogControl *pDialogControl);
+
+static int ButtonHandleCheckEvent(Display *pDisplay, Window wID, WBDialogControl *pDialogControl, int iType, int iCheck)
+{
+  // for now, I use the type indicated by 'ulFlags' in case I have a control
+  // of a different class that behaves as one of these kinds of buttons
+
+  if(iType == BUTTON_CheckButton || iType == BUTTON_TriStateButton)
+  {
+    if(pDialogControl->pDlgControlEntry &&
+       (iType != BUTTON_TriStateButton || !(pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_TRISTATE)))
+    {
+      if(iCheck < 0 || // toggle
+         (iCheck > 0 && !(pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_CHECKED)) || // set
+         (iCheck == 0 && (pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_CHECKED)))   // clear
+      pDialogControl->pDlgControlEntry->iFlags ^= WBDialogEntry_CHECKED;
+      // post a notify message
+
+      DLGNotifyOwner(pDialogControl, aBUTTON_PRESS,
+                     (long)(pDialogControl->pDlgControlEntry ? pDialogControl->pDlgControlEntry->iID : pDialogControl->wID),
+                     WBCreatePointerHash(pDialogControl->pDlgControlEntry), 0, 0, 0);
+
+      WBInvalidateRect(wID, NULL, 0);
+      WBUpdateWindowImmediately(wID); // make sure I paint it NOW
+
+      return 1; // handled!
+    }
+  }
+  else if(iType == BUTTON_RadioButton || iType == BUTTON_FirstRadioButton)
+  {
+    if(pDialogControl->pDlgControlEntry)
+    {
+      // FIRST, run through all of the radio buttons in this 'group' and fix 'em
+      ManageRadioButtonGroupSelectState(pDialogControl);
+
+      // NEXT, if the check state changed, fix it and notify everyone
+      if(!(pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_CHECKED))
+      {
+        pDialogControl->pDlgControlEntry->iFlags |= WBDialogEntry_CHECKED;
+        // post a notify message
+
+        DLGNotifyOwner(pDialogControl, aBUTTON_PRESS,
+                       (long)(pDialogControl->pDlgControlEntry ? pDialogControl->pDlgControlEntry->iID : pDialogControl->wID),
+                       WBCreatePointerHash(pDialogControl->pDlgControlEntry), 0, 0, 0);
+
+        WBInvalidateRect(wID, NULL, 0);
+        WBUpdateWindowImmediately(wID); // make sure I paint it NOW
+      }
+
+      return 1; // handled!
+    }
+  }
+
+  return 0; // NOT handled
+}
 
 static int button_callback(Window wID, XEvent *pEvent)
 {
@@ -2024,6 +2245,8 @@ int iType;
       {
         Pixmap pxOld = ((struct _WB_PUSHBUTTON_CONTROL_ *)pDialogControl)->pixmap;
 
+        ((struct _WB_PUSHBUTTON_CONTROL_ *)pDialogControl)->pixmap = None;
+
         if(pxOld != None)
         {
           BEGIN_XCALL_DEBUG_WRAPPER
@@ -2050,6 +2273,7 @@ int iType;
         pDialogControl->pPropList = NULL; // as a matter of course
       }
 
+      WBDestroyPointerHashPtr(pDialogControl);
       WBFree(pDialogControl);
     }
 
@@ -2080,48 +2304,18 @@ int iType;
         return 0;  // not handled - button release will activate these buttons (is this right?)
       }
 
+      // TODO:  ALSO handle pushbutton, defpushbutton, cancelbutton based on
+      //        the type, not the class.
+
       iType = pDialogControl->ulFlags & BUTTON_TYPEMASK;  // TODO: use the class or the type?
 
-      if(iType == BUTTON_CheckButton || iType == BUTTON_TriStateButton)
+      if((iType == BUTTON_CheckButton || iType == BUTTON_TriStateButton ||
+          iType == BUTTON_RadioButton || iType == BUTTON_FirstRadioButton) &&
+         ((XButtonEvent *)pEvent)->button == 1) // left button only
       {
-        if(pDialogControl->pDlgControlEntry &&
-           (iType != BUTTON_TriStateButton || !(pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_TRISTATE)))
+        if(ButtonHandleCheckEvent(pDisplay, wID, pDialogControl, iType, -1)) // flip check state for checkbox; click for radio
         {
-          pDialogControl->pDlgControlEntry->iFlags ^= WBDialogEntry_CHECKED;
-          // post a notify message
-
-          DLGNotifyOwner(pDialogControl, aBUTTON_PRESS,
-                         (long)(pDialogControl->pDlgControlEntry ? pDialogControl->pDlgControlEntry->iID : pDialogControl->wID),
-                         (unsigned long)pDialogControl->pDlgControlEntry, 0, 0, 0);
-
-          WBInvalidateRect(wID, NULL, 0);
-          WBUpdateWindowImmediately(wID); // make sure I paint it NOW
-
-          return 1; // handled!
-        }
-      }
-      else if(iType == BUTTON_RadioButton || iType == BUTTON_FirstRadioButton)
-      {
-        if(pDialogControl->pDlgControlEntry)
-        {
-          // FIRST, run through all of the radio buttons in this 'group' and fix 'em
-          ManageRadioButtonGroupSelectState(pDialogControl);
-
-          // NEXT, if the check state changed, fix it and notify everyone
-          if(!(pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_CHECKED))
-          {
-            pDialogControl->pDlgControlEntry->iFlags |= WBDialogEntry_CHECKED;
-            // post a notify message
-
-            DLGNotifyOwner(pDialogControl, aBUTTON_PRESS,
-                           (long)(pDialogControl->pDlgControlEntry ? pDialogControl->pDlgControlEntry->iID : pDialogControl->wID),
-                           (unsigned long)pDialogControl->pDlgControlEntry, 0, 0, 0);
-
-            WBInvalidateRect(wID, NULL, 0);
-            WBUpdateWindowImmediately(wID); // make sure I paint it NOW
-          }
-
-          return 1; // handled!
+          return 1;
         }
       }
     }
@@ -2139,7 +2333,7 @@ int iType;
       {
         DLGNotifyOwnerAsync(pDialogControl, aCONTROL_NOTIFY, aBUTTON_PRESS,
                             pDialogControl->pDlgControlEntry->iID,
-                            (long)pDialogControl, 0, 0);
+                            WBCreatePointerHash(pDialogControl), 0, 0);
 
         WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
                        "%s:%d - Post Event: %08xH %08xH %08xH %pH\n", __FUNCTION__, __LINE__,
@@ -2190,59 +2384,24 @@ int iType;
         return 1;  // handled
       }
 
+      // TODO:  ALSO handle pushbutton, defpushbutton, cancelbutton based on
+      //        the type, not the class.
+
       iType = pDialogControl->ulFlags & BUTTON_TYPEMASK;  // TODO: use the class or the type?
 
-      if(iType == BUTTON_CheckButton || iType == BUTTON_TriStateButton)
+      if(iType == BUTTON_CheckButton || iType == BUTTON_TriStateButton ||
+         iType == BUTTON_RadioButton || iType == BUTTON_FirstRadioButton)
       {
         int iACS = 0, iKey = WBKeyEventProcessKey((XKeyEvent *)pEvent, NULL, NULL, &iACS);
 
-        if(pDialogControl->pDlgControlEntry &&
-           (iType != BUTTON_TriStateButton || !(pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_TRISTATE)))
+        WB_ERROR_PRINT("TEMPORARY:  %s- keydown event, %d iACS=%d\n", __FUNCTION__, iKey, iACS);
+
+        if((iKey == ' ' || iKey == '\n' || iKey == '\r')
+            && iACS == 0 && pDialogControl->pDlgControlEntry)
         {
-          if((iKey == ' ' || iKey == '\n' || iKey == '\r')
-              && iACS == 0 && pDialogControl->pDlgControlEntry)
+          if(ButtonHandleCheckEvent(pDisplay, wID, pDialogControl, iType, -1)) // flip check state for checkbox; click for radio
           {
-            pDialogControl->pDlgControlEntry->iFlags ^= WBDialogEntry_CHECKED;
-            // post a notify message
-
-            DLGNotifyOwner(pDialogControl, aBUTTON_PRESS,
-                           (long)(pDialogControl->pDlgControlEntry ? pDialogControl->pDlgControlEntry->iID : pDialogControl->wID),
-                           (unsigned long)pDialogControl->pDlgControlEntry, 0, 0, 0);
-
-            WBInvalidateRect(wID, NULL, 0);
-            WBUpdateWindowImmediately(wID); // make sure I paint it NOW
-
-            return 1; // handled!
-          }
-        }
-      }
-      else if(iType == BUTTON_RadioButton || iType == BUTTON_FirstRadioButton)
-      {
-        int iACS = 0, iKey = WBKeyEventProcessKey((XKeyEvent *)pEvent, NULL, NULL, &iACS);
-
-        if(pDialogControl->pDlgControlEntry)
-        {
-          if((iKey == ' ' || iKey == '\n' || iKey == '\r')
-              && iACS == 0 && pDialogControl->pDlgControlEntry)
-          {
-            // FIRST, run through all of the radio buttons in this 'group' and fix 'em
-            ManageRadioButtonGroupSelectState(pDialogControl);
-
-            // NEXT, if the check state changed, fix it and notify everyone
-            if(!(pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_CHECKED))
-            {
-              pDialogControl->pDlgControlEntry->iFlags |= WBDialogEntry_CHECKED;
-              // post a notify message
-
-              DLGNotifyOwner(pDialogControl, aBUTTON_PRESS,
-                             (long)(pDialogControl->pDlgControlEntry ? pDialogControl->pDlgControlEntry->iID : pDialogControl->wID),
-                             (unsigned long)pDialogControl->pDlgControlEntry, 0, 0, 0);
-
-              WBInvalidateRect(wID, NULL, 0);
-              WBUpdateWindowImmediately(wID); // make sure I paint it NOW
-            }
-
-            return 1; // handled! (either way, mark it 'handled' whether I changed the state or not
+            return 1;
           }
         }
       }
@@ -2266,7 +2425,7 @@ int iType;
       {
         DLGNotifyOwnerAsync(pDialogControl, aCONTROL_NOTIFY, aBUTTON_PRESS,
                             pDialogControl->pDlgControlEntry->iID,
-                            (long)pDialogControl, 0, 0);
+                            WBCreatePointerHash(pDialogControl), 0, 0);
 
         WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
                        "%s:%d - Post Event: %08xH %08xH %08xH %pH\n", __FUNCTION__, __LINE__,
@@ -2283,6 +2442,65 @@ int iType;
 
 //        WBEndModal(wID, pItem->iAction);
         return 1;  // handled
+      }
+    }
+    else if(pEvent->type == ClientMessage)
+    {
+      // control notifications are processed here.
+
+      if(pEvent->xclient.message_type == aDLGC_CONTROL_SET)
+      {
+        iType = pDialogControl->ulFlags & BUTTON_TYPEMASK;  // TODO: use the class or the type?
+
+        if(pEvent->xclient.data.l[0] == ControlGetSet_TRISTATE &&
+           iType == BUTTON_TriStateButton)
+        {
+          if((int)(pEvent->xclient.data.l[1]) < 0 ||
+             (pEvent->xclient.data.l[1] == 0 && (pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_TRISTATE)) ||
+             (pEvent->xclient.data.l[1] != 0 && !(pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_TRISTATE)))
+          {
+            pDialogControl->pDlgControlEntry->iFlags ^= WBDialogEntry_TRISTATE;
+
+            WBInvalidateRect(wID, NULL, 0);
+            WBUpdateWindowImmediately(wID); // make sure I paint it NOW
+
+            DLGNotifyOwnerAsync(pDialogControl, aCONTROL_NOTIFY, aBUTTON_PRESS, // notify state change
+                                pDialogControl->pDlgControlEntry->iID,
+                                WBCreatePointerHash(pDialogControl), 0, 0);
+          }
+        }
+        else if(pEvent->xclient.data.l[0] == ControlGetSet_CHECK &&
+                ButtonHandleCheckEvent(pDisplay, wID, pDialogControl, iType,
+                                  (int)(pEvent->xclient.data.l[1])))
+        {
+          // because the state might have changed, notify the owner anyway
+
+          DLGNotifyOwnerAsync(pDialogControl, aCONTROL_NOTIFY, aBUTTON_PRESS,
+                              pDialogControl->pDlgControlEntry->iID,
+                              WBCreatePointerHash(pDialogControl), 0, 0);
+
+          return 1; // handled
+        }
+      }
+      else if(pEvent->xclient.message_type == aDLGC_CONTROL_GET)
+      {
+        iType = pDialogControl->ulFlags & BUTTON_TYPEMASK;  // TODO: use the class or the type?
+
+        // TODO:  should I return this info for *ANY* button ??
+
+        if(pEvent->xclient.data.l[0] == ControlGetSet_TRISTATE &&
+           iType == BUTTON_TriStateButton)
+        {
+          return pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_TRISTATE
+                 ? 1 : 0;
+        }
+        else if(pEvent->xclient.data.l[0] == ControlGetSet_CHECK &&
+                (iType == BUTTON_CheckButton || iType == BUTTON_TriStateButton ||
+                 iType == BUTTON_RadioButton || iType == BUTTON_FirstRadioButton))
+        {
+          return pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_CHECKED
+                 ? 1 : 0;
+        }
       }
     }
   }
@@ -2383,7 +2601,7 @@ int iType = pDialogControl->ulFlags & BUTTON_TYPEMASK;  // TODO: use the class o
 
           DLGNotifyOwner(pDlgC, aBUTTON_PRESS,
                          (long)(pDlgC->pDlgControlEntry ? pDlgC->pDlgControlEntry->iID : pDlgC->wID),
-                         (unsigned long)pDlgC->pDlgControlEntry, 0, 0, 0);
+                         WBCreatePointerHash(pDlgC->pDlgControlEntry), 0, 0, 0);
 
           WBInvalidateRect(pDlgC->wID, NULL, 0);
           WBUpdateWindowImmediately(pDlgC->wID); // make sure I paint it NOW
@@ -2468,6 +2686,7 @@ static int list_callback(Window wID, XEvent *pEvent)
         pDialogControl->pPropList = NULL; // as a matter of course
       }
 
+      WBDestroyPointerHashPtr(pDialogControl);
       WBFree(pDialogControl);
     }
 
@@ -2888,7 +3107,7 @@ static int list_callback(Window wID, XEvent *pEvent)
   {
     DLGNotifyOwnerAsync(pDialogControl, aCONTROL_NOTIFY, aNotification,
                         pDialogControl->pDlgControlEntry->iID,
-                        (long)pDialogControl, 0, 0);
+                        WBCreatePointerHash(pDialogControl), 0, 0);
 
     WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
                    "%s:%d - Post Event: %08xH %08xH %08xH %pH\n", __FUNCTION__, __LINE__,
@@ -3087,6 +3306,7 @@ static int tree_callback(Window wID, XEvent *pEvent)
         pDialogControl->pPropList = NULL; // as a matter of course
       }
 
+      WBDestroyPointerHashPtr(pDialogControl);
       WBFree(pDialogControl);
     }
 
@@ -3112,7 +3332,7 @@ static int tree_callback(Window wID, XEvent *pEvent)
   {
     DLGNotifyOwnerAsync(pDialogControl, aCONTROL_NOTIFY, aNotification,
                         pDialogControl->pDlgControlEntry->iID,
-                        (long)pDialogControl, 0, 0);
+                        WBCreatePointerHash(pDialogControl), 0, 0);
 
     WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
                    "%s:%d - Post Event: %08xH %08xH %08xH %pH\n", __FUNCTION__, __LINE__,
@@ -4274,8 +4494,8 @@ WB_GEOM geomPaint, geomBorder;
   // where I put the text matters based on the control type (see iHPos, iVPos)
   if(iType == STATIC_Icon || iType == STATIC_Image)
   {
-    Pixmap pixmap = ((struct _WB_PUSHBUTTON_CONTROL_ *)pSelf)->pixmap;
-    Pixmap pixmap2 = ((struct _WB_PUSHBUTTON_CONTROL_ *)pSelf)->pixmap2;
+    Pixmap pixmap = ((struct _WB_IMAGE_CONTROL_ *)pSelf)->pixmap;
+    Pixmap pixmap2 = ((struct _WB_IMAGE_CONTROL_ *)pSelf)->pixmap2;
 
     // TODO:  get the image's geometry so I can properly center it (etc.)
 
@@ -4313,13 +4533,48 @@ WB_GEOM geomPaint, geomBorder;
   {
     WB_RECT rctText;
 
-    rctText.left = geomBorder.x + iHPos;
-    rctText.right = rctText.left + geomBorder.width - 2 * iHPos;
-    rctText.top = geomBorder.y + xBounds.ascent / 2;
-    rctText.bottom = rctText.top + geomBorder.height - xBounds.ascent;
+    long iAlign = DTAlignment_UNDERSCORE;
+    int iHAlignFlags = pSelf->pDlgControlEntry->iFlags & WBDialogEntry_HA_TEXT_MASK;
+    int iVAlignFlags = pSelf->pDlgControlEntry->iFlags & WBDialogEntry_VA_TEXT_MASK;
+
+    if(iHAlignFlags == WBDialogEntry_HA_TEXT_LEFT)
+    {
+      iAlign |= DTAlignment_HLEFT;
+    }
+    else if(iHAlignFlags == WBDialogEntry_HA_TEXT_RIGHT)
+    {
+      iAlign |= DTAlignment_HRIGHT;
+    }
+    else if(iHAlignFlags == WBDialogEntry_HA_TEXT_CENTER)
+    {
+      iAlign |= DTAlignment_HCENTER;
+    }
+
+    if(iVAlignFlags == WBDialogEntry_VA_TEXT_TOP)
+    {
+      iAlign |= DTAlignment_VTOP;
+    }
+    else if(iVAlignFlags == WBDialogEntry_VA_TEXT_BOTTOM)
+    {
+      iAlign |= DTAlignment_VBOTTOM;
+    }
+    else if(iVAlignFlags == WBDialogEntry_VA_TEXT_CENTER)
+    {
+      iAlign |= DTAlignment_VCENTER;
+    }
+
+//    rctText.left = geomBorder.x + iHPos;
+//    rctText.right = rctText.left + geomBorder.width - 2 * iHPos;
+//    rctText.top = geomBorder.y + xBounds.ascent / 2;
+//    rctText.bottom = rctText.top + geomBorder.height - xBounds.ascent;
+
+    rctText.left = geomBorder.x;
+    rctText.right = geomBorder.x + geomBorder.width;
+    rctText.top = geomBorder.y;
+    rctText.bottom = geomBorder.y + geomBorder.height;
 
     DTDrawMultiLineText(fontSet, pSelf->pCaption, pDisplay, gc, wID, DEFAULT_STATIC_TAB_WIDTH, 0,
-                        &rctText, DTAlignment_UNDERSCORE | DTAlignment_VCENTER);
+                        &rctText, iAlign); //DTAlignment_UNDERSCORE | DTAlignment_VCENTER);
   }
 
   // by convention, restore original objects/state
@@ -4498,7 +4753,7 @@ WB_GEOM geomPaint, geomBorder;
 static int ButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                                Window wID, WBDialogControl *pSelf)
 {
-int iType, i2, iHPos;
+int iType;
 XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
 XFontSet fontSet;
 XCharStruct xBounds;
@@ -4748,9 +5003,9 @@ WB_RECT rctText;
     }
   }
 
-  // painting the window text
-  i2 = WBFontSetAvgCharWidth(pDisplay, fontSet);  // average char width for text border (TODO:  RTL text ??)
-  iHPos = xwa.border_width + i2;  // position of beginning of text (left side + space)
+//  // painting the window text
+//  i2 = WBFontSetAvgCharWidth(pDisplay, fontSet);  // average char width for text border (TODO:  RTL text ??)
+//  iHPos = xwa.border_width + i2;  // position of beginning of text (left side + space)
 
 #if 0
   iVPos = pFont->max_bounds.ascent + pFont->max_bounds.descent;  // font height
@@ -4763,18 +5018,52 @@ WB_RECT rctText;
   if(pSelf->pCaption)
   {
     const char *szText = pSelf->pCaption;
+    long iAlign = DTAlignment_UNDERSCORE;
+    int iHAlignFlags = pSelf->pDlgControlEntry->iFlags & WBDialogEntry_HA_TEXT_MASK;
+    int iVAlignFlags = pSelf->pDlgControlEntry->iFlags & WBDialogEntry_VA_TEXT_MASK;
+
+    if(iHAlignFlags == WBDialogEntry_HA_TEXT_LEFT)
+    {
+      iAlign |= DTAlignment_HLEFT;
+    }
+    else if(iHAlignFlags == WBDialogEntry_HA_TEXT_RIGHT)
+    {
+      iAlign |= DTAlignment_HRIGHT;
+    }
+    else if(iHAlignFlags == WBDialogEntry_HA_TEXT_CENTER)
+    {
+      iAlign |= DTAlignment_HCENTER;
+    }
+
+    if(iVAlignFlags == WBDialogEntry_VA_TEXT_TOP)
+    {
+      iAlign |= DTAlignment_VTOP;
+    }
+    else if(iVAlignFlags == WBDialogEntry_VA_TEXT_BOTTOM)
+    {
+      iAlign |= DTAlignment_VBOTTOM;
+    }
+    else if(iVAlignFlags == WBDialogEntry_VA_TEXT_CENTER)
+    {
+      iAlign |= DTAlignment_VCENTER;
+    }
 
     XSetBackground(pDisplay, gc, pSelf->clrABG.pixel);
     XSetForeground(pDisplay, gc, pSelf->clrAFG.pixel);
 
-    rctText.left = geomBorder.x + iHPos;
-    rctText.right = rctText.left + geomBorder.width - 2 * iHPos;
-    rctText.top = geomBorder.y + xBounds.ascent / 2
-                - xBounds.descent / 2; // better centering
-    rctText.bottom = rctText.top + geomBorder.height - xBounds.ascent;
+//    rctText.left = geomBorder.x + iHPos;
+//    rctText.right = rctText.left + geomBorder.width - 2 * iHPos;
+//    rctText.top = geomBorder.y + xBounds.ascent / 2
+//                - xBounds.descent / 2; // better centering
+//    rctText.bottom = rctText.top + geomBorder.height - xBounds.ascent;
+
+    rctText.left = geomBorder.x;
+    rctText.right = geomBorder.x + geomBorder.width;
+    rctText.top = geomBorder.y;
+    rctText.bottom = geomBorder.y + geomBorder.height;
 
     DTDrawMultiLineText(fontSet, szText, pDisplay, gc, wID, DEFAULT_BUTTON_TAB_WIDTH, 0,
-                        &rctText, DTAlignment_UNDERSCORE | DTAlignment_VCENTER | DTAlignment_HCENTER);
+                        &rctText, iAlign);
   }
 
   // by convention, restore original objects/state

@@ -1030,12 +1030,28 @@ int FWGetChildFrameIndex(WBFrameWindow *pFrameWindow, WBChildFrame *pCont);
   *
   * \param pFrameWindow A pointer to a WBFrameWindow structure for the frame window
   * \param pCont A pointer to a WBChildFrame structure for the contained window.  Use NULL for the current focus window
-  * \param iIndex The new 'tab order' index to assign to the 'contained' window, or a constant indicating how to adjust the index\n A value of 0 to n assigns the specified tab index.  Positive values greater than the total number of tabs moves it to the end of the tab order.\n A value of -1 moves the tab 1 to the left\n A value of -2 moves the tab 1 to the right\n\n Use a value of '0' to move the tab to the beginning.
+  * \param iIndex The new 'tab order' index to assign to the 'contained' window, or a constant indicating how to adjust the index\n A value of 0 to n assigns the specified tab index.  Positive values greater than the total number of tabs moves it to the end of the tab order.\n A value of MOVE_CHILD_FRAME_TAB_INDEX_LEFT moves the tab 1 to the left\n A value of MOVE_CHILD_FRAME_TAB_INDEX_RIGHT moves the tab 1 to the right\n\n Use a value of MOVE_CHILD_FRAME_TAB_INDEX_BEGINNING (0) to move the tab to the beginning.
   * \returns void
   *
   * Header File:  frame_window.h
 **/
 void FWMoveChildFrameTabIndex(WBFrameWindow *pFrameWindow, WBChildFrame *pCont, int iIndex);
+
+/** \ingroup frame_window
+  * \def MOVE_CHILD_FRAME_TAB_INDEX_BEGINNING
+  * \brief pass as 'iIndex' for FWMoveChildFrameTabIndex() to move the tab index to the beginning
+**/
+#define MOVE_CHILD_FRAME_TAB_INDEX_BEGINNING 0
+/** \ingroup frame_window
+  * \def MOVE_CHILD_FRAME_TAB_INDEX_RIGHT
+  * \brief pass as 'iIndex' for FWMoveChildFrameTabIndex() to move the tab index right
+**/
+#define MOVE_CHILD_FRAME_TAB_INDEX_RIGHT -2
+/** \ingroup frame_window
+  * \def MOVE_CHILD_FRAME_TAB_INDEX_LEFT
+  * \brief pass as 'iIndex' for FWMoveChildFrameTabIndex() to move the tab index left
+**/
+#define MOVE_CHILD_FRAME_TAB_INDEX_LEFT -1
 
 /** \ingroup frame_window
   * \brief Sets the 'status' text for a Frame Window with a status bar, forcing a re-paint

@@ -233,7 +233,8 @@ int MBInitGlobal(void)
   {
     char szMenuFG[16], szMenuBG[16], szMenuActiveFG[16], szMenuActiveBG[16],
          szMenuBorder1[16], szMenuActiveDisabledFG[16], szMenuDisabledFG[16];
-    static const char*szMenuBorder2="#FFFFFF", *szMenuBorder3="#9C9A94";
+//    static const char*szMenuBorder2="#FFFFFF", *szMenuBorder3="#9C9A94";
+    int iY, iU, iV, iR, iG, iB;
 
     colormap = DefaultColormap(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
     LOAD_COLOR("*Menu.foreground",szMenuFG,"#000000");
@@ -268,11 +269,37 @@ int MBInitGlobal(void)
     DEBUG_VALIDATE(XParseColor(WBGetDefaultDisplay(), colormap, szMenuBorder1, &clrMenuBorder1));
     DEBUG_VALIDATE(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuBorder1));
 
-    DEBUG_VALIDATE(XParseColor(WBGetDefaultDisplay(), colormap, szMenuBorder2, &clrMenuBorder2));
-    DEBUG_VALIDATE(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuBorder2));
 
-    DEBUG_VALIDATE(XParseColor(WBGetDefaultDisplay(), colormap, szMenuBorder3, &clrMenuBorder3));
+    if((clrMenuBG.flags & (DoRed | DoGreen | DoBlue)) != (DoRed | DoGreen | DoBlue))
+    {
+      PXM_PixelToRGB(PXM_StandardColormapFromColormap(NULL,colormap),
+                     &(clrMenuBG)); // make sure RGB is correctly assigned
+    }
+
+    RGB255_FROM_XCOLOR(clrMenuBG, iR, iG, iB);
+
+    PXM_RGBToYUV(iR, iG, iB, &iY, &iU, &iV);
+
+    // the highlight color should be 1/3 of the way between the background color and white, using the same U and V
+
+    PXM_YUVToRGB((2 * iY + 256) / 3, iU, iV, &iR, &iG, &iB);
+
+    RGB255_TO_XCOLOR(iR, iG, iB, clrMenuBorder2); // assign new RGB values to the XColor struct
+    PXM_RGBToPixel(PXM_StandardColormapFromColormap(NULL,colormap),
+                   &(clrMenuBorder2)); // re-assign pixel element from RGB values
+
+    // the shaded color should be 2/3 of the way between black and the background color, using the same U and V
+
+    PXM_YUVToRGB((2 * iY) / 3, iU, iV, &iR, &iG, &iB);
+
+    RGB255_TO_XCOLOR(iR, iG, iB, clrMenuBorder3); // assign new RGB values to the XColor struct
+    PXM_RGBToPixel(PXM_StandardColormapFromColormap(NULL,colormap),
+                  &(clrMenuBorder3)); // re-assign pixel element from RGB values
+
+
+    DEBUG_VALIDATE(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuBorder2));
     DEBUG_VALIDATE(XAllocColor(WBGetDefaultDisplay(), colormap, &clrMenuBorder3));
+
 
     // TODO:  make sure I was able to actually allocate these colors
 

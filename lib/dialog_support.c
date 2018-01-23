@@ -189,8 +189,8 @@ Atom aTAB_CONTROL = None;               ///< Standard Dialog Control -'tab' cont
   * message_type == aCONTROL_NOTIFY\n
   * format == 32 (always)\n
   * data.l[0] == aBUTTON_PRESS\n
-  * data.l[1] == Control ID of originating conrol window\n
-  * data.l[2] == truncated (32-bit) pointer to WBDialogControl structure\n
+  * data.l[1] == Control ID of originating control window\n
+  * data.l[2] == the hashed (32-bit) pointer to WBDialogControl structure - see WBGetPointerFromHash()\n
 */
 Atom aBUTTON_PRESS = None;
 /** \ingroup dlgctrl_notify
@@ -202,7 +202,7 @@ Atom aBUTTON_PRESS = None;
   * message_type == aCONTROL_NOTIFY\n
   * format == 32 (always)\n
   * data.l[0] == aLIST_NOTIFY\n
-  * data.l[1] == Control ID of originating conrol window\n
+  * data.l[1] == Control ID of originating control window\n
   * data.l[2] == notification code (one of WB_LIST_NONE, WB_LIST_SELCHANGE, or WB_LIST_DBLCLICK)\n
   * data.l[3] == currently highlighted (selected) item in list, -1 if none
 */
@@ -216,8 +216,8 @@ Atom aLIST_NOTIFY = None;
   * message_type == aCONTROL_NOTIFY\n
   * format == 32 (always)\n
   * data.l[0] == aTEXT_CHANGED\n
-  * data.l[1] == Control ID of originating conrol window\n
-  * data.l[2] == truncated (32-bit) pointer to WBDialogConrol structure
+  * data.l[1] == Control ID of originating control window\n
+  * data.l[2] == hashed (32-bit) pointer to WBDialogConrol structure - see WBGetPointerFromHash()\n
 */
 Atom aTEXT_CHANGED = None;
 /** \ingroup dlgctrl_notify
@@ -229,7 +229,7 @@ Atom aTEXT_CHANGED = None;
   * message_type == aCONTROL_NOTIFY\n
   * format == 32 (always)\n
   * data.l[0] == aTEXTSELECT_CHANGE\n
-  * data.l[1] == Control ID of originating conrol window\n
+  * data.l[1] == Control ID of originating control window\n
   * data.l[2] == reserved (TODO: implement)\n
   * data.l[3] == reserved (TODO: implement)\n
   * data.l[4] == reserved (TODO: implement)\n
@@ -244,8 +244,8 @@ Atom aTEXTSELECT_CHANGE = None;
   * message_type == aCONTROL_NOTIFY\n
   * format == 32 (always)\n
   * data.l[0] == aGOTFOCUS\n
-  * data.l[1] == Control ID of originating conrol window\n
-  * data.l[2] == truncated (32-bit) pointer to WBDialogConrol structure\n
+  * data.l[1] == Control ID of originating control window\n
+  * data.l[2] == hashed (32-bit) pointer to WBDialogConrol structure - see WBGetPointerFromHash()\n
 */
 Atom aGOTFOCUS = None;
 /** \ingroup dlgctrl_notify
@@ -257,36 +257,40 @@ Atom aGOTFOCUS = None;
   * message_type == aCONTROL_NOTIFY\n
   * format == 32 (always)\n
   * data.l[0] == aLOSTFOCUS\n
-  * data.l[1] == Control ID of originating conrol window\n
-  * data.l[2] == truncated (32-bit) pointer to WBDialogConrol structure\n
+  * data.l[1] == Control ID of originating control window\n
+  * data.l[2] == hashed (32-bit) pointer to WBDialogConrol structure - see WBGetPointerFromHash()\n
 */
 Atom aLOSTFOCUS = None;
 /** \ingroup dlgctrl_notify
   * \hideinitializer
-  * \brief CONTROL_NOTIFY ClientMessage for MOUSE_DOWN event
+  * \brief CONTROL_NOTIFY ClientMessage for MOUSE_CLICK event
   *
-  * MOUSE DOWN message format (relative to XEvent.xclient)\n
+  * MOUSE CLICK message format (relative to XEvent.xclient)\n
   * type == ClientMessage\n
   * message_type == aCONTROL_NOTIFY\n
   * format == 32 (always)\n
-  * data.l[0] == aMOUSE_DOWN\n
-  * data.l[1] == Control ID of originating conrol window\n
-  * data.l[2] == reserved (TODO:  implement or remove?)
+  * data.l[0] == aMOUSE_CLICK\n
+  * data.l[1] == Control ID of originating control window\n
+  * data.l[2] == hashed (32-bit) pointer to WBDialogConrol structure - see WBGetPointerFromHash()\n
+  * data.l[3] == window-relative X coordinate of mouse cursor (when applicable)\n
+  * data.l[4] == window-relative Y coordinate of mouse cursor (when applicable)\n
 */
-Atom aMOUSE_DOWN = None;
+Atom aMOUSE_CLICK = None;
 /** \ingroup dlgctrl_notify
   * \hideinitializer
-  * \brief CONTROL_NOTIFY ClientMessage for MOUSE_UP event
+  * \brief CONTROL_NOTIFY ClientMessage for MOUSE_DBLCLICK event
   *
-  * MOUSE UP message format (relative to XEvent.xclient)\n
+  * MOUSE DBLCLICK message format (relative to XEvent.xclient)\n
   * type == ClientMessage\n
   * message_type == aCONTROL_NOTIFY\n
   * format == 32 (always)\n
-  * data.l[0] == aMOUSE_UP\n
-  * data.l[1] == Control ID of originating conrol window\n
-  * data.l[2] == reserved (TODO:  implement or remove?)
+  * data.l[0] == aMOUSE_DBLCLICK\n
+  * data.l[1] == Control ID of originating control window\n
+  * data.l[2] == hashed (32-bit) pointer to WBDialogConrol structure - see WBGetPointerFromHash()\n
+  * data.l[3] == window-relative X coordinate of mouse cursor (when applicable)\n
+  * data.l[4] == window-relative Y coordinate of mouse cursor (when applicable)\n
 */
-Atom aMOUSE_UP = None;
+Atom aMOUSE_DBLCLICK = None;
 /** \ingroup dlgctrl_notify
   * \hideinitializer
   * \brief CONTROL_NOTIFY ClientMessage for MOUSE_DRAG event
@@ -296,8 +300,10 @@ Atom aMOUSE_UP = None;
   * message_type == aCONTROL_NOTIFY\n
   * format == 32 (always)\n
   * data.l[0] == aMOUSE_DRAG\n
-  * data.l[1] == Control ID of originating conrol window\n
-  * data.l[2] == reserved (TODO:  implement or remove?)
+  * data.l[1] == Control ID of originating control window\n
+  * data.l[2] == hashed (32-bit) pointer to WBDialogConrol structure - see WBGetPointerFromHash()\n
+  * data.l[3] == window-relative X coordinate of mouse cursor (when applicable)\n
+  * data.l[4] == window-relative Y coordinate of mouse cursor (when applicable)\n
 */
 Atom aMOUSE_DRAG = None;
 /** \ingroup dlgctrl_notify
@@ -309,8 +315,8 @@ Atom aMOUSE_DRAG = None;
   * message_type == aCONTROL_NOTIFY\n
   * format == 32 (always)\n
   * data.l[0] == aKEY_DOWN\n
-  * data.l[1] == Control ID of originating conrol window\n
-  * data.l[2] == reserved (TODO:  implement or remove?)
+  * data.l[1] == Control ID of originating control window\n
+  * data.l[2] == hashed (32-bit) pointer to WBDialogConrol structure - see WBGetPointerFromHash()\n
 */
 Atom aKEY_DOWN = None;
 /** \ingroup dlgctrl_notify
@@ -322,8 +328,8 @@ Atom aKEY_DOWN = None;
   * message_type == aCONTROL_NOTIFY\n
   * format == 32 (always)\n
   * data.l[0] == aKEY_UP\n
-  * data.l[1] == Control ID of originating conrol window\n
-  * data.l[2] == reserved (TODO:  implement or remove?)
+  * data.l[1] == Control ID of originating control window\n
+  * data.l[2] == hashed (32-bit) pointer to WBDialogConrol structure - see WBGetPointerFromHash()\n
 */
 Atom aKEY_UP = None;
 /** \ingroup dlgctrl_notify
@@ -335,8 +341,8 @@ Atom aKEY_UP = None;
   * message_type == aCONTROL_NOTIFY\n
   * format == 32 (always)\n
   * data.l[0] == aKEYSTROKE\n
-  * data.l[1] == Control ID of originating conrol window\n
-  * data.l[2] == reserved (TODO:  implement or remove?)
+  * data.l[1] == Control ID of originating control window\n
+  * data.l[2] == hashed (32-bit) pointer to WBDialogConrol structure - see WBGetPointerFromHash()\n
 */
 Atom aKEYSTROKE = None;
 
@@ -375,6 +381,40 @@ Atom aDLGC_PROP_NOTIFY = None;
   * data.l[1] == Old selection index\n
 */
 Atom aLIST_SELCHANGE = None;  // list selection has changed (send to self)
+
+// control command messages sent to controls to set/get info
+/** \ingroup dlgctrl
+  * \hideinitializer
+  * \brief CONTROL_SET ClientMessage - use this to set specific supported control properties by sending it to the control's window callback
+  *
+  * CONTROL_SET message format (relative to XEvent.xclient)\n
+  * type == ClientMessage\n
+  * message_type == aCONTROL_SET\n
+  * format == 32 (always)\n
+  * data.l[0] == control property identifier\n
+  * data.l[1] == new value (Atom or 32-bit integer)\n
+  *
+  * \sa ControlGetSetProperties
+*/
+Atom aDLGC_CONTROL_SET = None;
+
+/** \ingroup dlgctrl
+  * \hideinitializer
+  * \brief CONTROL_GET ClientMessage - use this to get specific supported control properties by sending it to the control's window callback
+  *
+  * CONTROL_GET message format (relative to XEvent.xclient)\n
+  * type == ClientMessage\n
+  * message_type == aCONTROL_GET\n
+  * format == 32 (always)\n
+  * data.l[0] == control property identifier\n
+  *
+  * The return value from the message will be the desired property, either as an Atom
+  * or as a 32-bit integer.  A value of '0' or 'None' may be returned if this property
+  * is not supported; control properties should be carefully set up to allow for this.
+  *
+  * \sa ControlGetSetProperties
+*/
+Atom aDLGC_CONTROL_GET = None;
 
 // internal-only properties (still have global scope for inline functions, etc.)
 /** \ingroup dlgctrl
@@ -462,12 +502,15 @@ void WBDialogControlsInit(void)
   INIT_ATOM2(aTEXTSELECT_CHANGE,"TextSelectChange");
   INIT_ATOM2(aGOTFOCUS,"GotFocus");
   INIT_ATOM2(aLOSTFOCUS,"LostFocus");
-  INIT_ATOM2(aMOUSE_DOWN,"MouseDown");
-  INIT_ATOM2(aMOUSE_UP,"MouseUp");
+  INIT_ATOM2(aMOUSE_CLICK,"MouseDown");
+  INIT_ATOM2(aMOUSE_DBLCLICK,"MouseUp");
   INIT_ATOM2(aMOUSE_DRAG,"MouseDrag");
   INIT_ATOM2(aKEY_DOWN,"KeyDown");
   INIT_ATOM2(aKEY_UP,"KeyUp");
   INIT_ATOM2(aKEYSTROKE,"Keystroke");
+
+  INIT_ATOM2(aDLGC_CONTROL_SET,"DLGC_CONTROL_SET");
+  INIT_ATOM2(aDLGC_CONTROL_GET,"DLGC_CONTROL_GET");
 
   INIT_ATOM2(aDLGC_TEXT, "DLGC_TEXT");
   INIT_ATOM2(aDLGC_CAPTION, "DLGC_CAPTION");
@@ -694,6 +737,51 @@ Pixmap WBDialogControlGetIconPixmap(WBDialogControl *pCtrl, Pixmap *pPixmap2)
   }
 
   return None;
+}
+
+void WBDialogControlSetCheck(WBDialogControl *pCtrl, int iCheck)
+{
+  if(!pCtrl || pCtrl->wID == None)
+  {
+    return;
+  }
+
+  XClientMessageEvent evt = {
+                              .type=ClientMessage,
+                              .serial=0,
+                              .send_event=0,
+                              .display=WBGetWindowDisplay(pCtrl->wID),
+                              .window=pCtrl->wID,
+                              .message_type=aDLGC_CONTROL_SET,
+                              .format=32
+                            };
+
+  evt.data.l[0] = ControlGetSet_CHECK;
+  evt.data.l[1] = iCheck;
+
+  WBWindowDispatch(pCtrl->wID, (XEvent *)&evt);  // call the window proc immediately to process it
+}
+
+int WBDialogControlGetCheck(WBDialogControl *pCtrl)
+{
+  if(!pCtrl || pCtrl->wID == None)
+  {
+    return 0;
+  }
+
+  XClientMessageEvent evt = {
+                              .type=ClientMessage,
+                              .serial=0,
+                              .send_event=0,
+                              .display=WBGetWindowDisplay(pCtrl->wID),
+                              .window=pCtrl->wID,
+                              .message_type=aDLGC_CONTROL_GET,
+                              .format=32
+                            };
+
+  evt.data.l[0] = ControlGetSet_CHECK;
+
+  return WBWindowDispatch(pCtrl->wID, (XEvent *)&evt);  // call the window proc immediately to process it
 }
 
 

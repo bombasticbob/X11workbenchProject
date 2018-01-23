@@ -58,6 +58,8 @@
 #include <strings.h>
 #include <signal.h>
 #include <time.h>
+#include <ctype.h>
+
 
 #ifndef XK_Delete /* moslty for interix */
 #define XK_MISCELLANY /* mostly for interix */
@@ -472,11 +474,14 @@ WBDialogWindow *DLGCreateDialogWindow(const char *szTitle, const char *szDialogR
   }
 
   // Last but not least, set the focus for the control that's
-  // first in my list that has the 'CAN_HAVE_FOCUS' bit set.
+  // first in my list that has the 'CAN_HAVE_FOCUS' bit set,
+  // is visible, and is enabled.
 
   for(i1=0; i1 < pNew->nContents; i1++)
   {
-    if(pNew->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS)  // TODO:  check visibility?
+    if((pNew->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS) &&
+       !(pNew->pwContents[i1].iFlags & WBDialogEntry_DISABLED) && // NOT disabled
+       (pNew->pwContents[i1].iFlags & WBDialogEntry_VISIBLE)) // must ALSO be visible
     {
       pNew->pwContents[i1].iFlags |= WBDialogEntry_HAS_FOCUS;
 
@@ -739,7 +744,9 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
       }
       else if(pEvent->xclient.message_type == aGOTFOCUS)   // 'focus change' messages
       {
-        WBDialogEntry *pEntry = (WBDialogEntry *)(((XClientMessageEvent *)pEvent)->data.l[1]);
+        WBDialogEntry *pEntry = (WBDialogEntry *)WBGetPointerFromHash(((XClientMessageEvent *)pEvent)->data.l[1]);
+
+        WBDestroyPointerHash(((XClientMessageEvent *)pEvent)->data.l[1]); // by convention, do this after receiving it
 
         if(pEntry < pDialogWindow->pwContents ||
            pEntry >= pDialogWindow->pwContents + pDialogWindow->nContents ||
@@ -756,7 +763,9 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
                          "%s - INFO:  control already has focus in GOTFOCUS message\n",
                          __FUNCTION__);
         }
-        else if(pEntry->iFlags & WBDialogEntry_CAN_HAVE_FOCUS)
+        else if((pEntry->iFlags & WBDialogEntry_CAN_HAVE_FOCUS) &&
+                (pEntry->iFlags & WBDialogEntry_VISIBLE) &&
+                !(pEntry->iFlags & WBDialogEntry_DISABLED))
         {
           for(i1=0; i1 < pDialogWindow->nContents; i1++)
           {
@@ -781,7 +790,9 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
 
           for(i1 = i2 + 1; i1 < pDialogWindow->nContents; i1++)
           {
-            if(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS)
+            if((pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS) &&
+               (pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_VISIBLE) &&
+               !(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_DISABLED))
             {
               if(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_HAS_FOCUS)
               {
@@ -818,7 +829,9 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
           {
             for(i1 = 0; i1 < i2; i1++)
             {
-              if(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS)
+              if((pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS) &&
+                 (pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_VISIBLE) &&
+                 !(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_DISABLED))
               {
                 if(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_HAS_FOCUS)
                 {
@@ -865,15 +878,41 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
                                       };
             evt.data.l[0] = 0;
             evt.data.l[1] = pDialogWindow->pwContents[i1].iID;
+            evt.data.l[2] = 0; // do not assign 'checked' for button controls
+
+            WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Dialog,
+                           "%s - sending 'DLG_FOCUS notification - control id %d\n",
+                          __FUNCTION__, pDialogWindow->pwContents[i1].iID);
 
             WBPostPriorityEvent(wID, (XEvent *)&evt);  // priority event makes it happen faster
+          }
+          else
+          {
+            WB_WARN_PRINT("%s - received 'GOTFOCUS' for non-input control id %d\n",
+                          __FUNCTION__, pDialogWindow->pwContents[i1].iID);
           }
         }
       }
       else if(pEvent->xclient.message_type == aLOSTFOCUS)   // 'focus change' messages
       {
-        WB_WARN_PRINT("%s - TODO:  handle 'LOST FOCUS' notifications - control id %d\n",
-                      __FUNCTION__, ((WBDialogEntry *)(((XClientMessageEvent *)pEvent)->data.l[1]))->iID);
+        WBDialogEntry *pEntry = (WBDialogEntry *)WBGetPointerFromHash(((XClientMessageEvent *)pEvent)->data.l[1]);
+
+        WBDestroyPointerHash(((XClientMessageEvent *)pEvent)->data.l[1]); // by convention, do this after receiving it
+
+        if(pEntry < pDialogWindow->pwContents ||
+           pEntry >= pDialogWindow->pwContents + pDialogWindow->nContents ||
+           (((unsigned long)pEntry - (unsigned long)pDialogWindow->pwContents) % sizeof(*pEntry)) != 0)
+        {
+          // validity check - if it fails, it's not a valid pointer and I reject it
+
+          WB_WARN_PRINT("%s - WARNING:  invalid dialog entry pointer in GOTFOCUS message (ignored)\n",
+                        __FUNCTION__);
+        }
+        else
+        {
+          WB_WARN_PRINT("%s - TODO:  handle 'LOST FOCUS' notifications - control id %d\n",
+                        __FUNCTION__, pEntry->iID);
+        }
       }
       else if(pEvent->xclient.message_type == aDLG_FOCUS)  // dialog focus change message
       {
@@ -918,7 +957,9 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
             {
               for(i1=pDialogWindow->nContents - 1; i1 >= 0; i1--)
               {
-                if(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS)
+                if((pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS) &&
+                   (pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_VISIBLE) &&
+                   !(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_DISABLED))
                 {
                   pEntry = pDialogWindow->pwContents + i1;
                   break;
@@ -929,7 +970,9 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
             {
               for(i1=0; i1 < pDialogWindow->nContents; i1++)
               {
-                if(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS)
+                if((pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS) &&
+                   (pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_VISIBLE) &&
+                   !(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_DISABLED))
                 {
                   pEntry = pDialogWindow->pwContents + i1;
                   break;
@@ -941,9 +984,11 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
           {
             if(pEvent->xclient.data.l[0] < 0)
             {
-              for(i1=iCurFocus - 1; i1 >= 0; i1++)
+              for(i1=iCurFocus - 1; i1 >= 0; i1--)
               {
-                if(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS)
+                if((pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS) &&
+                   (pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_VISIBLE) &&
+                   !(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_DISABLED))
                 {
                   pEntry = pDialogWindow->pwContents + i1;
                   break;
@@ -954,7 +999,9 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
               {
                 for(i1=pDialogWindow->nContents - 1; i1 > iCurFocus; i1--)
                 {
-                  if(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS)
+                  if((pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS) &&
+                     (pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_VISIBLE) &&
+                     !(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_DISABLED))
                   {
                     pEntry = pDialogWindow->pwContents + i1;
                     break;
@@ -966,7 +1013,9 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
             {
               for(i1=iCurFocus + 1; i1 < pDialogWindow->nContents; i1++)
               {
-                if(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS)
+                if((pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS) &&
+                   (pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_VISIBLE) &&
+                   !(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_DISABLED))
                 {
                   pEntry = pDialogWindow->pwContents + i1;
                   break;
@@ -977,7 +1026,9 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
               {
                 for(i1=0; i1 < iCurFocus; i1++)
                 {
-                  if(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS)
+                  if((pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS) &&
+                     (pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_VISIBLE) &&
+                     !(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_DISABLED))
                   {
                     pEntry = pDialogWindow->pwContents + i1;
                     break;
@@ -994,6 +1045,12 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
                         __FUNCTION__, pEvent->xclient.data.l[0], pEvent->xclient.data.l[1]);
           // no focus - can't do it
           break;  // for now allow it without error
+        }
+        else
+        {
+          WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Dialog,
+                         "%s - setting focus for DLG_FOCUS event, l[0]=%ld, l[1]=%ld\n",
+                        __FUNCTION__, pEvent->xclient.data.l[0], pEvent->xclient.data.l[1]);
         }
 
         // set all of the focus bits correctly
@@ -1037,6 +1094,28 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
           WBSetInputFocus(pEntry->wID);
           WBInvalidateGeom(pEntry->wID, NULL, 1);  // force re-paint
         }
+
+        // Finally, for a control that supports it, set the 'checked' property if
+        // 'data.l[2]' is NOT zero
+
+        if(pEvent->xclient.data.l[2])
+        {
+          WBDialogControl *pCtrl = DLGGetDialogControlStruct(pEntry->wID);
+          if(pCtrl)
+          {
+            // if it's a checkable button, set/toggle the check
+            // for now, I use the type indicated by 'ulFlags' in case I have a control
+            // of a different class that behaves as one of these kinds of buttons
+
+            int iType = pCtrl->ulFlags & BUTTON_TYPEMASK;  // TODO: use the class or the type?
+
+            if(iType == BUTTON_CheckButton || iType == BUTTON_TriStateButton ||
+               iType == BUTTON_RadioButton || iType == BUTTON_FirstRadioButton)
+            {
+              WBDialogControlSetCheck(pCtrl, -1); // flip check on checkbox; set check on radio button
+            }
+          }
+        }
       }
 
       break;
@@ -1061,26 +1140,29 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
       WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Dialog,
                      "%s - FocusIn handler\n", __FUNCTION__);
 
+      // first, check for a window that has the focus
+
       for(i1=0; i1 < pDialogWindow->nContents; i1++)
       {
         if(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_HAS_FOCUS)
         {
-          Display *pDisplay = WBGetWindowDisplay(pDialogWindow->pwContents[i1].wID);
-          Window wID = pDialogWindow->pwContents[i1].wID;
+          Window wIDCtrl = pDialogWindow->pwContents[i1].wID;
+          Display *pDisplay = WBGetWindowDisplay(wIDCtrl);
+          int iCtrlID = pDialogWindow->pwContents[i1].iID;
 
-          if(WBIsValid(pDisplay, wID))
+          if(WBIsValid(pDisplay, wIDCtrl))
           {
 #ifndef NO_DEBUG
             WB_IF_DEBUG_LEVEL(DebugLevel_Heavy | DebugSubSystem_Dialog)
             {
               char *p1 = NULL;
-              if(pDialogWindow->pwContents[i1].iID < WB_MIN_STD_CTRL_ID)
+              if(iCtrlID < WB_MIN_STD_CTRL_ID)
               {
-                p1 = WBGetAtomName(pDisplay, (Atom)pDialogWindow->pwContents[i1].iID);
+                p1 = WBGetAtomName(pDisplay, (Atom)iCtrlID);
               }
 
               WBDebugPrint("%s - me or child has focus, setting to %d (%s), %d (%08xH)\n",
-                           __FUNCTION__, pDialogWindow->pwContents[i1].iID,
+                           __FUNCTION__, iCtrlID,
                            (const char *)(p1 ? p1 : "NULL"),
                            (int)pDialogWindow->pwContents[i1].wID, (int)pDialogWindow->pwContents[i1].wID);
               if(p1)
@@ -1091,7 +1173,23 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
 #endif // NO_DEBUG
 
             //XSetInputFocus(pDisplay, wID, RevertToParent, CurrentTime);
-            WBSetInputFocus(wID);
+//            WBSetInputFocus(wID);
+            {
+              XClientMessageEvent evt = {
+                                          .type=ClientMessage,
+                                          .serial=0,
+                                          .send_event=0,
+                                          .display=pDisplay,
+                                          .window=wID,
+                                          .message_type=aDLG_FOCUS,
+                                          .format=32
+                                        };
+              evt.data.l[0] = 0;
+              evt.data.l[1] = iCtrlID; // set focus to this one
+              evt.data.l[2] = 0;       // do not assign 'checked' to button controls
+
+              WBPostEvent(wID, (XEvent *)&evt);  // send a regular event so things happen in the right order
+            }
 
             break;
           }
@@ -1107,25 +1205,27 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
       {
         for(i1=0; i1 < pDialogWindow->nContents; i1++)
         {
-          if(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS)
+          if((pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS) &&
+             (pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_VISIBLE) &&
+             !(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_DISABLED))
           {
-            Display *pDisplay = WBGetWindowDisplay(pDialogWindow->pwContents[i1].wID);
-            Window wID = pDialogWindow->pwContents[i1].wID;
+            Window wIDCtrl = pDialogWindow->pwContents[i1].wID;
+            Display *pDisplay = WBGetWindowDisplay(wIDCtrl);
+            int iCtrlID = pDialogWindow->pwContents[i1].iID;
 
-            // TODO:  check visibility?
-            if(WBIsValid(pDisplay,wID))
+            if(WBIsValid(pDisplay, wIDCtrl))
             {
 #ifndef NO_DEBUG
               WB_IF_DEBUG_LEVEL(DebugLevel_Heavy | DebugSubSystem_Dialog)
               {
                 char *p1 = NULL;
-                if(pDialogWindow->pwContents[i1].iID < WB_MIN_STD_CTRL_ID)
+                if(iCtrlID < WB_MIN_STD_CTRL_ID)
                 {
-                  p1 = WBGetAtomName(pDisplay, (Atom)pDialogWindow->pwContents[i1].iID);
+                  p1 = WBGetAtomName(pDisplay, (Atom)iCtrlID);
                 }
 
                 WBDebugPrint("%s - me or child has focus, setting to %d (%s), %d (%08xH)\n",
-                             __FUNCTION__, pDialogWindow->pwContents[i1].iID,
+                             __FUNCTION__, iCtrlID,
                              (const char *)(p1 ? p1 : "NULL"),
                              (int)pDialogWindow->pwContents[i1].wID, (int)pDialogWindow->pwContents[i1].wID);
                 if(p1)
@@ -1135,10 +1235,25 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
               }
 #endif // NO_DEBUG
 
-              pDialogWindow->pwContents[i1].iFlags |= WBDialogEntry_HAS_FOCUS;
+//              pDialogWindow->pwContents[i1].iFlags |= WBDialogEntry_HAS_FOCUS;
+//
+//              //XSetInputFocus(pDisplay, wID, RevertToParent, CurrentTime);
+//              WBSetInputFocus(wID);
+              {
+                XClientMessageEvent evt = {
+                                            .type=ClientMessage,
+                                            .serial=0,
+                                            .send_event=0,
+                                            .display=pDisplay,
+                                            .window=wID,
+                                            .message_type=aDLG_FOCUS,
+                                            .format=32
+                                          };
+                evt.data.l[0] = 0;
+                evt.data.l[1] = iCtrlID; // set focus to this one
 
-              //XSetInputFocus(pDisplay, wID, RevertToParent, CurrentTime);
-              WBSetInputFocus(wID);
+                WBPostEvent(wID, (XEvent *)&evt);  // send a regular event so things happen in the right order
+              }
               break;
             }
             else
@@ -1339,8 +1454,8 @@ int DLGProcessHotKey(WBDialogWindow *pDLG, XEvent *pEvent)
 //char tbuf[16];
 //int cbLen;
 KeySym ks;
-int iACSMask = ShiftMask | ControlMask | Mod1Mask /* | Mod2Mask | Mod3Mask | Mod4Mask | Mod5Mask */;
-int i1, /* iCtrl, iAlt, iShift, */ iNoEnter = 0, iNoEsc = 0, iNoTab = 0;
+int iACSMask = ShiftMask | ControlMask | Mod1Mask;
+int i1, iCurFocus, iCanHaveFocus = 0, iNoEnter = 0, iNoEsc = 0, iNoTab = 0;
 WBDialogEntry *pFocusEntry = NULL, *pDefaultEntry = NULL, *pCancelEntry = NULL;
 Display *pDisplay = WBGetWindowDisplay(pDLG->wID);
 
@@ -1354,11 +1469,22 @@ Display *pDisplay = WBGetWindowDisplay(pDLG->wID);
 //  iAlt = (iACSMask & Mod1Mask) ? 1 : 0;
 
   // find default & current focus control entries
+
+  iCurFocus = -1; // for later; helps make sure things work
+
   for(i1=0; ((DIALOG_WINDOW *)pDLG)->pwContents && i1 < ((DIALOG_WINDOW *)pDLG)->nContents; i1++)
   {
+    if((((DIALOG_WINDOW *)pDLG)->pwContents[i1].iFlags & WBDialogEntry_CAN_HAVE_FOCUS) &&
+       (((DIALOG_WINDOW *)pDLG)->pwContents[i1].iFlags & WBDialogEntry_VISIBLE) &&
+       !(((DIALOG_WINDOW *)pDLG)->pwContents[i1].iFlags & WBDialogEntry_DISABLED))
+    {
+      iCanHaveFocus = 1;
+    }
+
     if(((DIALOG_WINDOW *)pDLG)->pwContents[i1].iFlags & WBDialogEntry_HAS_FOCUS)
     {
       pFocusEntry = ((DIALOG_WINDOW *)pDLG)->pwContents + i1;
+      iCurFocus = i1; // store here also
     }
 
     if(((DIALOG_WINDOW *)pDLG)->pwContents[i1].iFlags & WBDialogEntry_DEFAULT)
@@ -1400,7 +1526,15 @@ Display *pDisplay = WBGetWindowDisplay(pDLG->wID);
     {
       const char *pKey = XKeysymToString(ks);
 
-      if(!pKey)
+      if(!pKey
+#ifdef XK_Alt_L  // key symbol for left Alt button
+         || ks == XK_Alt_L
+#endif // XK_Alt_L
+#ifdef XK_Alt_R  // key symbol for right Alt button
+         || ks == XK_Alt_R
+#endif // XK_Alt_R
+         || ks == XK_Return // don't translate this one, either - the string is 'Return' - oops
+         || strlen(pKey) > 1) // final test, multi-byte chars don't compare with this algorith - TODO:  fix it!
       {
         // alt key is non-printing - this code will skip it
         return 0;
@@ -1408,16 +1542,74 @@ Display *pDisplay = WBGetWindowDisplay(pDLG->wID);
 
       WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Event | DebugSubSystem_Dialog | DebugSubSystem_Keyboard,
                      "%s - user pressed Alt+%s %d (%xH)\n",
-                     __FUNCTION__, pKey, (int)ks, (int)ks);
+                     __FUNCTION__, pKey,
+                     (unsigned int)ks, (unsigned int)ks); // KeySym is a 'CARD32', which is an unsigned 32-bit value
 
-      if(pEvent->type == KeyRelease)
+      if(pEvent->type == KeyRelease && iCanHaveFocus)
       {
         // who gets this alt key?  Keystroke is ALT + *pKey
         // search everyone's caption until I find one.  Start with the control that
         // currently has the focus, then wrap around.  That way duplicate underscores
         // will bounce from one to the other in dialog order.
 
+        if(iCurFocus < 0 || iCurFocus >= ((DIALOG_WINDOW *)pDLG)->nContents) // safety valve anyway
+        {
+          iCurFocus = -1; // force it to this value if corrupt or not assigned
+        }
 
+        // this 'clever' loop will stop when it reaches 'iCurFocus' or the end of the list
+        // and will wrap around if 'iCurFocus' is NOT negative.  Above code forces it to be in range
+        for(i1=iCurFocus + 1; i1 != iCurFocus && i1 < ((DIALOG_WINDOW *)pDLG)->nContents;
+            i1 = iCurFocus < 0 || (i1 + 1) < ((DIALOG_WINDOW *)pDLG)->nContents ? i1 + 1 : 0)
+        {
+          // look at the caption, see if it contains an underscore - first one is hotkey
+          WBDialogEntry *pEntry = ((DIALOG_WINDOW *)pDLG)->pwContents + i1;
+
+          if((pEntry->iFlags & WBDialogEntry_CAN_HAVE_FOCUS) &&
+             (pEntry->iFlags & WBDialogEntry_VISIBLE) &&
+             !(pEntry->iFlags & WBDialogEntry_DISABLED))
+          {
+            WBDialogControl *pCtrl = (WBDialogControl *)DLGGetDialogControlStruct(pEntry->wID);
+
+            if(pCtrl)
+            {
+              const char *pCaption = WBDialogControlGetCaption(pCtrl);
+              Window wIDOwner = pCtrl->pOwner ? pCtrl->pOwner->wID : WBGetParentWindow(pEntry->wID);
+
+              if(pCaption)
+              {
+                const char *p1 = strchr(pCaption, '_'); // find underscore
+                if(p1 && p1[1])
+                {
+                  if(toupper(p1[1]) == toupper(*pKey)) // compare as upper case
+                  {
+                    WB_ERROR_PRINT("TEMPORARY:  %s - key release, key=\"%s\", ks=%d\n", __FUNCTION__, pKey, (int)ks);
+
+                    // switch focus to THIS control
+
+                    XClientMessageEvent evt = {
+                                                .type=ClientMessage,
+                                                .serial=0,
+                                                .send_event=0,
+                                                .display=pDisplay,
+                                                .window=wIDOwner,
+                                                .message_type=aDLG_FOCUS,
+                                                .format=32
+                                              };
+                    evt.data.l[0] = 0;
+                    evt.data.l[1] = pEntry->iID;
+                    evt.data.l[2] = 1; // to indicate that it should be 'checked' if it's a button
+
+                    WBPostPriorityEvent(wIDOwner, (XEvent *)&evt);  // priority event makes it happen faster
+                    return 1; // handled!
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        return 0; // did NOT handle it
       }
     }
     else if(!iNoEnter
@@ -1442,7 +1634,7 @@ Display *pDisplay = WBGetWindowDisplay(pDLG->wID);
                                   };
         evt.data.l[0] = aBUTTON_PRESS;
         evt.data.l[1] = pDefaultEntry->iID;
-        evt.data.l[2] = 0;
+        evt.data.l[2] = WBCreatePointerHash(pDefaultEntry);
 
         // simulate a button press of the default button
         WBPostPriorityEvent(pDLG->wID, (XEvent *)&evt);  // priority event makes it happen faster
@@ -1471,7 +1663,7 @@ Display *pDisplay = WBGetWindowDisplay(pDLG->wID);
                                   };
         evt.data.l[0] = aBUTTON_PRESS;
         evt.data.l[1] = pCancelEntry->iID;
-        evt.data.l[2] = 0;
+        evt.data.l[2] = WBCreatePointerHash(pCancelEntry);
 
         // simulate a button press of the default button
         WBPostPriorityEvent(pDLG->wID, (XEvent *)&evt);  // priority event makes it happen faster
@@ -1494,6 +1686,7 @@ Display *pDisplay = WBGetWindowDisplay(pDLG->wID);
                                 };
       evt.data.l[0] = iACSMask == 0 ? 1 : -1;
       evt.data.l[1] = 0;
+      evt.data.l[2] = 0;
 
       WBPostPriorityEvent(pDLG->wID, (XEvent *)&evt);  // priority event makes it happen faster
       return 1;
@@ -1533,22 +1726,38 @@ enum DlgResourceStringKeywordIndices
   DlgResourceKW__WIDTH,
   DlgResourceKW__HEIGHT,
   DlgResourceKW__VISIBLE,
+  DlgResourceKW__INVISIBLE,
   DlgResourceKW__TITLE,
-  DlgResourceKW__VATOP,
-  DlgResourceKW__VABOTTOM,
-  DlgResourceKW__VACENTER,
-  DlgResourceKW__HALEFT,
-  DlgResourceKW__HARIGHT,
-  DlgResourceKW__HACENTER,
+  DlgResourceKW__VA_DLGTOP,     // control alignment flags with respect to dialog
+  DlgResourceKW__VA_DLGBOTTOM,
+  DlgResourceKW__VA_DLGCENTER,
+  DlgResourceKW__HA_DLGLEFT,
+  DlgResourceKW__HA_DLGRIGHT,
+  DlgResourceKW__HA_DLGCENTER,
   DlgResourceKW__VRESIZE,
   DlgResourceKW__HRESIZE,
+  DlgResourceKW__BORDER,
   DlgResourceKW__NOBORDER,
-  DlgResourceKW__CHECKED
+  DlgResourceKW__CLICKABLE,
+  DlgResourceKW__CHECKED,
+  DlgResourceKW__ENABLED,
+  DlgResourceKW__DISABLED,
+  DlgResourceKW__VA_TEXT_TOP,
+  DlgResourceKW__VA_TEXT_BOTTOM,
+  DlgResourceKW__VA_TEXT_CENTER,
+  DlgResourceKW__HA_TEXT_LEFT,
+  DlgResourceKW__HA_TEXT_RIGHT,
+  DlgResourceKW__HA_TEXT_CENTER,
 };
 
-static const char * const aszKeywords[]={ "BEGIN_DIALOG","END_DIALOG","FONT","CONTROL","ID","X","Y","WIDTH","HEIGHT","VISIBLE","TITLE",
-                                          "VALIGN_BOTTOM","VALIGN_TOP","VALIGN_CENTER","HALIGN_LEFT","HALIGN_RIGHT","HALIGN_CENTER",
-                                          "VRESIZE","HRESIZE","NOBORDER","CHECKED",
+static const char * const aszKeywords[]={ "BEGIN_DIALOG","END_DIALOG","FONT","CONTROL","ID",
+                                          "X","Y","WIDTH","HEIGHT","VISIBLE","INVISIBLE","TITLE",
+                                          "VALIGN_DIALOG_BOTTOM","VALIGN_DIALOG_TOP","VALIGN_DIALOG_CENTER",
+                                          "HALIGN_DIALOG_LEFT","HALIGN_DIALOG_RIGHT","HALIGN_DIALOG_CENTER",
+                                          "VRESIZE","HRESIZE","BORDER","NOBORDER","CLICKABLE",
+                                          "CHECKED","ENABLED","DISABLED",
+                                          "VALIGN_TEXT_TOP","VALIGN_TEXT_BOTTOM","VALIGN_TEXT_CENTER",
+                                          "HALIGN_TEXT_LEFT","HALIGN_TEXT_RIGHT","HALIGN_TEXT_CENTER",
                                           NULL };
 
 // some built-in symbols for dialog resources and their corresponding symbol IDs
@@ -1885,7 +2094,7 @@ char tbuf[256];
 
         break;
 
-      case DlgResourceKW__VATOP:
+      case DlgResourceKW__VA_DLGTOP:
         if(!nKids) // visible applied to dialog box is ignored
         {
           WB_WARN_PRINT("%s - RESERVED:  'top aligned' property on dialog box\n", __FUNCTION__);
@@ -1898,10 +2107,10 @@ char tbuf[256];
 
         break;
 
-      case DlgResourceKW__VABOTTOM:
+      case DlgResourceKW__VA_DLGBOTTOM:
         if(!nKids) // visible applied to dialog box is ignored
         {
-          WB_WARN_PRINT("%s - RESERVED:  'top aligned' property on dialog box\n", __FUNCTION__);
+          WB_WARN_PRINT("%s - RESERVED:  'bottom aligned' property on dialog box\n", __FUNCTION__);
         }
         else
         {
@@ -1911,10 +2120,10 @@ char tbuf[256];
 
         break;
 
-      case DlgResourceKW__VACENTER:
+      case DlgResourceKW__VA_DLGCENTER:
         if(!nKids) // visible applied to dialog box is ignored
         {
-          WB_WARN_PRINT("%s - RESERVED:  'top aligned' property on dialog box\n", __FUNCTION__);
+          WB_WARN_PRINT("%s - RESERVED:  'center aligned' property on dialog box\n", __FUNCTION__);
         }
         else
         {
@@ -1924,10 +2133,10 @@ char tbuf[256];
 
         break;
 
-      case DlgResourceKW__HALEFT:
+      case DlgResourceKW__HA_DLGLEFT:
         if(!nKids) // visible applied to dialog box is ignored
         {
-          WB_WARN_PRINT("%s - RESERVED:  'top aligned' property on dialog box\n", __FUNCTION__);
+          WB_WARN_PRINT("%s - RESERVED:  'left aligned' property on dialog box\n", __FUNCTION__);
         }
         else
         {
@@ -1937,10 +2146,10 @@ char tbuf[256];
 
         break;
 
-      case DlgResourceKW__HARIGHT:
+      case DlgResourceKW__HA_DLGRIGHT:
         if(!nKids) // visible applied to dialog box is ignored
         {
-          WB_WARN_PRINT("%s - RESERVED:  'top aligned' property on dialog box\n", __FUNCTION__);
+          WB_WARN_PRINT("%s - RESERVED:  'right aligned' property on dialog box\n", __FUNCTION__);
         }
         else
         {
@@ -1950,15 +2159,99 @@ char tbuf[256];
 
         break;
 
-      case DlgResourceKW__HACENTER:
+      case DlgResourceKW__HA_DLGCENTER:
         if(!nKids) // visible applied to dialog box is ignored
         {
-          WB_WARN_PRINT("%s - RESERVED:  'top aligned' property on dialog box\n", __FUNCTION__);
+          WB_WARN_PRINT("%s - RESERVED:  'center aligned' property on dialog box\n", __FUNCTION__);
         }
         else
         {
           pKids[nKids - 1].iFlags &= ~WBDialogEntry_HAlignMask;
           pKids[nKids - 1].iFlags |= WBDialogEntry_HAlignCenter;
+        }
+
+        break;
+
+      case DlgResourceKW__VA_TEXT_TOP:
+        if(!nKids) // visible applied to dialog box is ignored
+        {
+          WB_WARN_PRINT("%s - RESERVED:  'top text aligned' property on dialog box\n", __FUNCTION__);
+        }
+        else
+        {
+//          WB_ERROR_PRINT("TEMPORARY:  %s - setting VA_TEXT_TOP\n", __FUNCTION__);
+          pKids[nKids - 1].iFlags &= ~WBDialogEntry_VA_TEXT_MASK;
+          pKids[nKids - 1].iFlags |= WBDialogEntry_VA_TEXT_TOP;
+        }
+
+        break;
+
+      case DlgResourceKW__VA_TEXT_BOTTOM:
+        if(!nKids) // visible applied to dialog box is ignored
+        {
+          WB_WARN_PRINT("%s - RESERVED:  'bottom text aligned' property on dialog box\n", __FUNCTION__);
+        }
+        else
+        {
+//          WB_ERROR_PRINT("TEMPORARY:  %s - setting VA_TEXT_BOTTOM\n", __FUNCTION__);
+          pKids[nKids - 1].iFlags &= ~WBDialogEntry_VA_TEXT_MASK;
+          pKids[nKids - 1].iFlags |= WBDialogEntry_VA_TEXT_BOTTOM;
+        }
+
+        break;
+
+      case DlgResourceKW__VA_TEXT_CENTER:
+        if(!nKids) // visible applied to dialog box is ignored
+        {
+          WB_WARN_PRINT("%s - RESERVED:  'vertical center text aligned' property on dialog box\n", __FUNCTION__);
+        }
+        else
+        {
+//          WB_ERROR_PRINT("TEMPORARY:  %s - setting VA_TEXT_CENTER\n", __FUNCTION__);
+          pKids[nKids - 1].iFlags &= ~WBDialogEntry_VA_TEXT_MASK;
+          pKids[nKids - 1].iFlags |= WBDialogEntry_VA_TEXT_CENTER;
+        }
+
+        break;
+
+      case DlgResourceKW__HA_TEXT_LEFT:
+        if(!nKids) // visible applied to dialog box is ignored
+        {
+          WB_WARN_PRINT("%s - RESERVED:  'left text aligned' property on dialog box\n", __FUNCTION__);
+        }
+        else
+        {
+//          WB_ERROR_PRINT("TEMPORARY:  %s - setting HA_TEXT_LEFT\n", __FUNCTION__);
+          pKids[nKids - 1].iFlags &= ~WBDialogEntry_HA_TEXT_MASK;
+          pKids[nKids - 1].iFlags |= WBDialogEntry_HA_TEXT_LEFT;
+        }
+
+        break;
+
+      case DlgResourceKW__HA_TEXT_RIGHT:
+        if(!nKids) // visible applied to dialog box is ignored
+        {
+          WB_WARN_PRINT("%s - RESERVED:  'top text aligned' property on dialog box\n", __FUNCTION__);
+        }
+        else
+        {
+//          WB_ERROR_PRINT("TEMPORARY:  %s - setting HA_TEXT_RIGHT\n", __FUNCTION__);
+          pKids[nKids - 1].iFlags &= ~WBDialogEntry_HA_TEXT_MASK;
+          pKids[nKids - 1].iFlags |= WBDialogEntry_HA_TEXT_RIGHT;
+        }
+
+        break;
+
+      case DlgResourceKW__HA_TEXT_CENTER:
+        if(!nKids) // visible applied to dialog box is ignored
+        {
+          WB_WARN_PRINT("%s - RESERVED:  'center text aligned' property on dialog box\n", __FUNCTION__);
+        }
+        else
+        {
+//          WB_ERROR_PRINT("TEMPORARY:  %s - setting HA_TEXT_CENTER\n", __FUNCTION__);
+          pKids[nKids - 1].iFlags &= ~WBDialogEntry_HA_TEXT_MASK;
+          pKids[nKids - 1].iFlags |= WBDialogEntry_HA_TEXT_CENTER;
         }
 
         break;
@@ -2047,7 +2340,29 @@ char tbuf[256];
 
         break;
 
+      case DlgResourceKW__INVISIBLE:
+        if(!nKids) // visible applied to dialog box is ignored
+        {
+          WB_WARN_PRINT("%s - RESERVED:  'invisible' property on dialog box\n", __FUNCTION__);
+        }
+        else
+        {
+          pKids[nKids - 1].iFlags &= ~WBDialogEntry_VISIBLE;
+        }
 
+        break;
+
+      case DlgResourceKW__BORDER:
+        if(!nKids)
+        {
+          WB_WARN_PRINT("%s - RESERVED:  'noborder' property on dialog box\n", __FUNCTION__);
+        }
+        else
+        {
+          pKids[nKids - 1].iFlags &= ~WBDialogEntry_NO_BORDER; // for those that have a border, shut it off
+        }
+
+        break;
 
       case DlgResourceKW__NOBORDER:
         if(!nKids)
@@ -2061,20 +2376,56 @@ char tbuf[256];
 
         break;
 
+      case DlgResourceKW__CLICKABLE:
+        if(!nKids)
+        {
+          WB_WARN_PRINT("%s - RESERVED:  'clickable' property on dialog box\n", __FUNCTION__);
+        }
+        else
+        {
+          pKids[nKids - 1].iFlags |= WBDialogEntry_CAN_HAVE_FOCUS; // for those that don't normally get focus, allow it
+        }
+
+        break;
+
       case DlgResourceKW__CHECKED:
         if(!nKids)
         {
-          WB_WARN_PRINT("%s - RESERVED:  'noborder' property on dialog box\n", __FUNCTION__);
+          WB_WARN_PRINT("%s - RESERVED:  'checked' property on dialog box\n", __FUNCTION__);
         }
         else if(pKids[nKids - 1].aClass == aRADIOBUTTON_CONTROL ||
                 pKids[nKids - 1].aClass == aFIRSTRADIOBUTTON_CONTROL ||
-                pKids[nKids - 1].aClass == aCHECKBUTTON_CONTROL)
+                pKids[nKids - 1].aClass == aTRISTATEBUTTON_CONTROL ||
+                pKids[nKids - 1].aClass == aCHECKBUTTON_CONTROL) // TODO:  allow others?
         {
           pKids[nKids - 1].iFlags |= WBDialogEntry_CHECKED; // for those can be 'checked'
         }
 
         break;
 
+      case DlgResourceKW__ENABLED:
+        if(!nKids)
+        {
+          WB_WARN_PRINT("%s - RESERVED:  'disabled' property on dialog box\n", __FUNCTION__);
+        }
+        else
+        {
+          pKids[nKids - 1].iFlags &= ~WBDialogEntry_DISABLED; // will be 'disabled' initially
+        }
+
+        break;
+
+      case DlgResourceKW__DISABLED:
+        if(!nKids)
+        {
+          WB_WARN_PRINT("%s - RESERVED:  'disabled' property on dialog box\n", __FUNCTION__);
+        }
+        else
+        {
+          pKids[nKids - 1].iFlags |= WBDialogEntry_DISABLED; // will be 'disabled' initially
+        }
+
+        break;
     }
 
     if(iKW < 0)  // error in control list

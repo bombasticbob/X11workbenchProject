@@ -342,15 +342,17 @@ Display *pDisplay = WBGetDefaultDisplay();
 
 static void InternalCheckFWColors(void)
 {
-  Colormap colormap;
+Colormap colormap;
+int iY, iU, iV, iR, iG, iB;
+
 
   // *Frame.background, *Frame.foreground, *WmFrame.background, *WmFrame.foreground,
   // *Form.background, *Form.foreground, *background, *foreground
 
   if(!iInitColorFlag)
   {
-    static const char szBD2[]="#FFFFFF"; // border colors (TODO:  derive them?)
-    static const char szBD3[]="#9C9A94";
+//    static const char szBD2[]="#FFFFFF"; // border colors (TODO:  derive them?)
+//    static const char szBD3[]="#9C9A94";
     char szFG[16], szBG[16], szBD[16], szABG[16]; // note colors can typically be up to 13 characters + 0 byte
 
     colormap = DefaultColormap(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
@@ -379,13 +381,44 @@ static void InternalCheckFWColors(void)
     XAllocColor(WBGetDefaultDisplay(), colormap, &clrBG);
     XParseColor(WBGetDefaultDisplay(), colormap, szBD, &clrBD);
     XAllocColor(WBGetDefaultDisplay(), colormap, &clrBD);
-    XParseColor(WBGetDefaultDisplay(), colormap, szBD2, &clrBD2);
-    XAllocColor(WBGetDefaultDisplay(), colormap, &clrBD2);
-    XParseColor(WBGetDefaultDisplay(), colormap, szBD3, &clrBD3);
-    XAllocColor(WBGetDefaultDisplay(), colormap, &clrBD3);
-
     XParseColor(WBGetDefaultDisplay(), colormap, szABG, &clrABG);
     XAllocColor(WBGetDefaultDisplay(), colormap, &clrABG);
+
+
+    // ---------------------------------------------------------------------------------------
+    // 3D border colors - determine a decent set of border colors for clrBD2 and clrBD3 using
+    // the background color.  highlight luminocity will average between black and background
+    // for the shaded color (clrBD3) and between white and background for highlight (clrBD2).
+    // ---------------------------------------------------------------------------------------
+
+    if((clrBG.flags & (DoRed | DoGreen | DoBlue)) != (DoRed | DoGreen | DoBlue))
+    {
+      PXM_PixelToRGB(PXM_StandardColormapFromColormap(NULL,colormap),
+                     &clrBG); // make sure RGB is correctly assigned
+    }
+
+    RGB255_FROM_XCOLOR(clrBG, iR, iG, iB);
+
+    PXM_RGBToYUV(iR, iG, iB, &iY, &iU, &iV);
+
+    // the highlight color should be 1/4 of the way between the background color and white, using the same U and V
+
+    PXM_YUVToRGB((3 * iY + 256) / 4, iU, iV, &iR, &iG, &iB);
+
+    RGB255_TO_XCOLOR(iR, iG, iB, clrBD2); // assign new RGB values to the XColor struct
+    PXM_RGBToPixel(PXM_StandardColormapFromColormap(NULL,colormap),
+                   &clrBD2); // re-assign pixel element from RGB values
+
+    // the shaded color should be 3/4 of the way between black and the background color, using the same U and V
+
+    PXM_YUVToRGB((3 * iY) / 4, iU, iV, &iR, &iG, &iB);
+
+    RGB255_TO_XCOLOR(iR, iG, iB, clrBD3); // assign new RGB values to the XColor struct
+    PXM_RGBToPixel(PXM_StandardColormapFromColormap(NULL,colormap),
+                  &clrBD3); // re-assign pixel element from RGB values
+
+    XAllocColor(WBGetDefaultDisplay(), colormap, &clrBD2);
+    XAllocColor(WBGetDefaultDisplay(), colormap, &clrBD3);
 
     iInitColorFlag = 1;
   }

@@ -115,6 +115,71 @@ extern "C" {
 
 
 /** \ingroup pixmap
+  * \brief Simple RGB assignment from pixel, 0-255 RGB
+  *
+  * \param X An XColor structure with valid RGB elements
+  * \param R returned red color, 0-255
+  * \param G returned green color, 0-255
+  * \param B returned blue color, 0-255
+  *
+  * Assigns the R, G, and B parameters based on an XColor structure with 0-255 RGB
+  * This assumes the red, green, and blue elements of the XColor structure are correct.
+  * To assign red, green, and blue elements from the 'pixel' element within the XColor
+  * structure, use PXM_PixelToRGB()
+**/
+#define RGB255_FROM_XCOLOR(X,R,G,B) { R = (((X).flags) & DoRed) ? (((unsigned int)(X).red + 0x80) >> 8) & 0xff : 0; \
+                                      G = (((X).flags) & DoGreen) ? (((unsigned int)(X).green + 0x80) >> 8) & 0xff : 0; \
+                                      B = (((X).flags) & DoBlue) ? (((unsigned int)(X).blue + 0x80) >> 8) & 0xff : 0; }
+
+/** \ingroup pixmap
+  * \brief Simple RGB assignment from pixel, 0-65535 RGB
+  *
+  * \param X An XColor structure with valid RGB elements
+  * \param R returned red color, 0-65535
+  * \param G returned green color, 0-65535
+  * \param B returned blue color, 0-65535
+  *
+  * Assigns the R, G, and B parameters based on an XColor structure with 0-65535 RGB
+  * This assumes the red, green, and blue elements of the XColor structure are correct.
+  * To assign red, green, and blue elements from the 'pixel' element within the XColor
+  * structure, use PXM_PixelToRGB()
+**/
+#define RGB_FROM_XCOLOR(X,R,G,B) { R = (((X).flags) & DoRed) ? ((unsigned int)(X).red) & 0xffff : 0; \
+                                   G = (((X).flags) & DoGreen) ? ((unsigned int)(X).green) & 0xffff : 0; \
+                                   B = (((X).flags) & DoBlue) ? ((unsigned int)(X).blue) & 0xffff : 0; }
+
+
+/** \ingroup pixmap
+  * \brief create temporary XStandardColormap from a Colormap
+  *
+  * \param pDisplay The Display * associated with the color map (or NULL for default)
+  * \param colormap The Colormap value (NOTE:  it must be of the same type as the default colormap for the associated Display)
+  * \returns A pointer to an internal (static) XStandardColormap structure.  This value should not be cached.
+  *
+  * This function returns a pointer to a static XStandardColormap structure assigned to a specified Colormap,
+  * using the specified Display (or default if NULL is specified for the 'D' parameter) for color-related
+  * parameters that are part of the XStandardColormap structure.
+  *
+  * This is a convenience function for things like PXM_PixelToRGB() and PXM_RGBToPixel(), where you may
+  * have a Colormap but you need an XStandardColormap.
+**/
+static __inline XStandardColormap *PXM_StandardColormapFromColormap(Display *pDisplay, Colormap colormap)
+{
+extern XStandardColormap PXM_StandardColormapFromColormap_rval; // declare extern rather than static, for single mem spot
+
+  if(!pDisplay)
+  {
+    pDisplay = WBGetDefaultDisplay();
+  }
+
+  WBDefaultStandardColormap(pDisplay, &PXM_StandardColormapFromColormap_rval);
+
+  PXM_StandardColormapFromColormap_rval.colormap = colormap;
+
+  return &PXM_StandardColormapFromColormap_rval;
+}
+
+/** \ingroup pixmap
   * \brief Convert R, G, B values to Y, U, V with 0-255 range
   *
   * \param iR the Red value (0-255)
@@ -157,7 +222,7 @@ void PXM_RGBToYUV(int iR, int iG, int iB, int *piY, int *piU, int *piV);
   *
   * Translate colors from RGB to HSV.  Often this is desirable when doing color conversions,
   * where you want to alter the brightness or saturation, but leave the color 'tone' as-is.\n
-  * The 'hue' (H) information determines the color tone, the 'S' the saturatio, and the value (V)
+  * The 'hue' (H) information determines the color tone, the 'S' the saturation, and the value (V)
   * determines the brightness.
   *
   * Header File:  pixmap_helper.h
@@ -222,7 +287,8 @@ void PXM_HSVToRGB(int iH, int iS, int iV, int *piR, int *piG, int *piB);
   * \param pMap A pointer to the XStandardColormap for conversion
   * \param pColor A pointer to the XColor structure.  The 'pixel' member must be a valid pixel value
   *
-  * This function reads the pixel member from 'pColor' and calculates the RGB values between 0 and 65535
+  * This function reads the pixel member from 'pColor' and calculates the RGB values between 0 and 65535,
+  * assigning them to the red, green, and blue members of the XColor structure along with appropriate flags.
   *
   * Header File:  pixmap_helper.h
 **/
@@ -236,7 +302,7 @@ void PXM_PixelToRGB(XStandardColormap *pMap, XColor *pColor);
   * \param pColor A pointer to the XColor structure.  The 'red' 'green' and 'blue' members must be a valid RGB value
   *
   * This function reads the red, green, and blue members from 'pColor' and calculates the pixel value.  RGB
-  * entries are between 0 and 65535, for each of the red, green, and blue members.
+  * entries are assumed to be between 0 and 65535, for each of the red, green, and blue members.
   *
   * Header File:  pixmap_helper.h
 **/

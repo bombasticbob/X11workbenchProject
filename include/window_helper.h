@@ -96,34 +96,34 @@
 extern "C" {
 #endif // __cplusplus
 
-/** \ingroup core
+/** \ingroup defaults
   * \brief The default window cursor (this is what xterm uses)
 */
 #define WB_DEFAULT_CURSOR XC_left_ptr
-/** \ingroup core
+/** \ingroup defaults
   * \brief The 'wait' cursor (this is what xterm uses)
 **/
 #define WB_WAIT_CURSOR XC_watch /*XC_clock*/
-/** \ingroup font
+/** \ingroup defaults
   * \brief The default X11 font name (currently "fixed")
 **/
 #define WB_DEFAULT_FONT    "fixed"
-/** \ingroup font
+/** \ingroup defaults
   * \brief The default X11 font size (currently 13)
 **/
 #define WB_DEFAULT_FONT_SIZE 13 /* override via settings */
-/** \ingroup font
+/** \ingroup defaults
   * \brief The 'window data' array size (currently 4 void pointers)
 **/
 #define WINDOW_DATA_SIZE 4 /* size of a 'void *' array that stores per-window data */
 
-/** \ingroup font
+/** \ingroup defaults
   * \brief An event mask for ALL events, with bits 0 through 24 set - see X.h which only defines bits 0 to 24 for an event mask
 **/
 #define EVENT_ALL_MASK 0x01ffffffL /* 2^24 | 2^23 ... 2^0 - see X.h */
 
 
-/** \ingroup core
+/** \ingroup defaults
   * \brief A bit mask for ALL GC properties (used when copying a GC)
 **/
 #define GCAll (GCFunction | GCPlaneMask | GCForeground | GCBackground | GCLineWidth | \
@@ -134,7 +134,7 @@ extern "C" {
 
 
 
-// debug helpers (to be eliminated at some point)
+// debug helpers (may be eliminated at some point)
 
 /** \ingroup debug
   * \brief debug helper variable tracking the function calling into the X11 library
@@ -183,11 +183,11 @@ typedef int (* WBWinEvent)(Window wID, XEvent *pEvent);
 typedef int (* WBAppEvent)(XEvent *pEvent);
 
 /** \struct _WBPoint_
-  * \ingroup core
+  * \ingroup core_struct
   * \copydoc WB_POINT
 **/
 /** \typedef WB_POINT
-  * \ingroup core
+  * \ingroup core_struct
   * \brief internal wrapper struct for 'point' definition
   *
   * The point structure has been defined primarily for convenience,
@@ -223,11 +223,11 @@ typedef struct _WBPoint_
 } WB_POINT;
 
 /** \struct _WBExtent_
-  * \ingroup core
+  * \ingroup core_struct
   * \copydoc WB_EXTENT
 **/
 /** \typedef WB_EXTENT
-  * \ingroup core
+  * \ingroup core_struct
   * \brief internal wrapper struct for 'extent' definition
   *
   * The extent structure has been defined primarily for convenience,
@@ -253,11 +253,11 @@ typedef struct _WBExtent_
 } WB_EXTENT;
 
 /** \struct _WBRect_
-  * \ingroup core
+  * \ingroup core_struct
   * \copydoc WB_RECT
 **/
 /** \typedef WB_RECT
-  * \ingroup core
+  * \ingroup core_struct
   * \brief internal wrapper struct for 'rectangle' definition
   *
   * The rectangle structure has been defined primarily for convenience,
@@ -296,11 +296,11 @@ typedef struct _WBRect_
 } WB_RECT;
 
 /** \struct _WBGeom_
-  * \ingroup core
+  * \ingroup core_struct
   * \copydoc WB_GEOM
 **/
 /** \typedef WB_GEOM
-  * \ingroup core
+  * \ingroup core_struct
   * \brief internal wrapper struct for X11 'geometry' definition
   *
   * The geometry structure is a wrapper for the X11 functions that specify
@@ -551,11 +551,6 @@ void WBInitSizeHints(XSizeHints *pSH, Display *pDisplay, int iMinHeight, int iMi
 //                                                        //
 ////////////////////////////////////////////////////////////
 
-/** \ingroup core
-  * \defgroup defaults Default Parameters
-  * Functions and variables associated with default parameters
-**/
-
 /** \ingroup defaults
   * \brief Returns the default Display
   *
@@ -727,40 +722,6 @@ enum
 //   \____|\___/ |_| \_\|_____|  /_/   \_\|_|   |___|  //
 //                                                     //
 /////////////////////////////////////////////////////////
-
-/** \ingroup core
-  * \defgroup wcore Window 'Core'
-  *
-  * These functions and definitions comprise the CORE WINDOW HANDLING functionality
-  * for the X11workbench Toolkit API.  This includes information and initialization
-  * functions, but not event nor class-specific functionality.
-**/
-
-/** \ingroup core
-  * \defgroup events Event Handling
-  *
-  * Event handling in X11 involves an event handler loop and methods by which
-  * the various events can be dispatched to window callback functions, or to the
-  * application's event handler. The X11workbench Toolkit API has provisinos for
-  * event prioritization, asynchronous processing, and the generation of 'internal
-  * events' (see \ref aWM_CHAR, \ref aWM_POINTER, \ref aWM_TIMER).
-**/
-
-/** \ingroup core
-  * \defgroup keyboard Keyboard event handling
-  *
-  * The X11workbench Toolkit API provides for mid-level keyboard event handling via
-  * WM_CHAR ClientMessage notification events.\n
-  * See \ref aWM_CHAR for more info.
-**/
-
-/** \ingroup core
-  * \defgroup pointer Mouse Pointer event handling
-  *
-  * The X11workbench Toolkit API provides for mid-level pointer event handling via
-  * WM_POINTER ClientMessage notification events.\n
-  * See \ref aWM_POINTER for more info.
-**/
 
 /** \ingroup wcore
   * \brief 'Standard' input mask, bit flag for window creation
@@ -1978,12 +1939,13 @@ int WBAppDispatch(XEvent *pEvent);
   *
   * \param wID The Window ID that will be 'dispatched' the event, regardless of the event structure contents
   * \param pEvent A pointer to an XEvent structure to process
+  * \returns The integer value returned by the window's event callback
   *
   * Dispatches an XEvent for the specified window.  Normally, WBDispatch will
   * call this function using the window ID from the XEvent itself, and pass
   * that ID as the first parameter.  A caller may choose to send the event
   * to a different window, specifying its window ID instead.  This is similar
-  * to a modal 'Event Send' and can be useful to have a parent or child widnow
+  * to a modal 'Event Send' and can be useful to have a parent or child window
   * handle a particular type of event (rather than the destined window).
   *
   * Header File:  window_helper.h
@@ -2132,7 +2094,7 @@ int WBPostAppEvent(XEvent *pEvent);
   *
   * Causes (reliable) 'Set Active' 'Set Input Focus' 'Raise Window' and 'Map Window' events to be
   * applied to a particular window.  In many cases window managers may differ in their handling
-  * of things like 'XSetFocus' to set focus to a window.  By handling this in the application event
+  * of things like 'XSetInputFocus' to set focus to a window.  By handling this in the application event
   * queue, it is possible to delay events asynchronously in a manner that avoids a race condition from
   * the window manager.  Clicking on a window, or using ALT+Tab, or switching desktops may cause unexpected
   * 'things' to take place.  By forcing the window to be ACTIVE and also using the normal 'XSetInputFocus'
@@ -2204,17 +2166,6 @@ void WBMouseCancel(Display *pDisplay, Window wID);
 //   \____|_____|___|_|   |____/ \___/_/   \_\_| \_\____/    //
 //                                                           //
 ///////////////////////////////////////////////////////////////
-
-/** \defgroup clipboard Clipboard and Selections
-  * \ingroup core
-  *
-  * Clipboard and generic 'Selection' helper functions.  Use these
-  * to copy data to/from the clipboard or other 'selection'.  They
-  * will process the requests asynchronously in a thread, returning
-  * results in a convenient format.  This avoids the unnecessary
-  * complexity of processing inner message loops and allows for
-  * completion callback functions and messages.
-**/
 
 /** \ingroup clipboard
   * \brief Get clipboard data of requested type
@@ -2305,48 +2256,6 @@ int WBSetSelectionData(Display *pDisplay, Atom aSelection, Atom aType, int iForm
 //  |_____|/_/\_\|_|     \___/ |____/  \___/ |_| \_\|_____|  //
 //                                                           //
 ///////////////////////////////////////////////////////////////
-
-/** \ingroup core
-  * \defgroup expose Exposure and Mapping/Visibility
-  *
-  * Proper handling of Expose events is a performance-critical component
-  * of graphical interfaces.  To simplify the handling and processing of
-  * Expose events there are a set of APIs and internal states that assist
-  * you in determining when to re-draw a window, and what portion of the
-  * window needs to be re-drawn.
-  *
-  * A typical Expose event handler might look like this:\n
-  * \code
-  // parameters to function are XExposeEvent *pEvent, Window wID
-
-  void MyExposeHandler(Window wID, XExposeEvent *pEvent)
-  {
-    Display *pDisplay = WBGetWindowDisplay(wID);
-    GC gc;
-    WB_GEOM geomPaint;
-
-    gc = WBBeginPaint(wID, pEvent, &geomPaint);
-    if(!gc)
-    {
-      return;
-    }
-
-    // here is where you modify the GC, change foreground/background colors, drawing modes, etc.
-    // and perform necessary erasing within the geometry specified by geomPaint.
-    // ideally your code will NOT attempt to draw anything outside of geomPaint.
-
-    XSetForeground(pDisplay, gc, WBGetWindowFGColor(wID)); // example
-    XSetBackground(pDisplay, gc, WBGetWindowBGColor(wID)); // example
-
-    XClearArea(pDisplay, wID, geomPaint.x, geomPaint.y, geomPaint.width, geomPaint.height, 0);
-
-    // perform any drawing here
-
-    WBEndPaint(wID, gc);
-  }
-
-  * \endcode
-*/
 
 /** \ingroup expose
   * \brief Wrapper for XMapWindow, makes window visible
@@ -2693,21 +2602,6 @@ static __inline__ void WBValidateRect(Window wID, WB_RECT *pRCT)
 //                                             //
 /////////////////////////////////////////////////
 
-/** \ingroup core
-  * \defgroup timer Timer Functions
-  *
-  * The X11workbench Toolkit API has support for one-shot and periodic timer
-  * events that are generated via XClientEvent using \ref aWM_TIMER.\n
-  * These timer events are NOT hyper-accurate, although the timer event time
-  * is expressed in microseconds (for math efficiency and convenience).  The
-  * message loop will check for 'crossing an event time' and generate events
-  * whenever a limit has been crossed.  This means that event processing time
-  * can easily affect timer accuracy.  Additionally, if a timer's period is
-  * less than the processing time of an event, a timer may be 'missed' as a
-  * a result.  For this reason you should use a worker thread for timing that
-  * requires precise accuracy.
-*/
-
 /** \ingroup timer
   * \brief Creates a one-shot or periodic timer
   *
@@ -2804,6 +2698,7 @@ static __inline__ void WBSupressErrorOutput(void)
 {
 extern int bIgnoreXErrors;
 
+  // TODO:  serialize this with a mutex or other sync object?
   bIgnoreXErrors++;
 }
 
@@ -2820,6 +2715,7 @@ static __inline__ void WBAllowErrorOutput(void)
 {
 extern int bIgnoreXErrors;
 
+  // TODO:  serialize this with a mutex or other sync object?
   if(bIgnoreXErrors > 0)
   {
     bIgnoreXErrors--;

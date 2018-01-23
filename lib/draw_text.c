@@ -907,6 +907,7 @@ do_the_tab:
 
   if(iLines > 1)
   {
+//    WB_ERROR_PRINT("TEMPORARY:  %d lines - font height %d, line spacing %d\n", iLines, iFontHeight, iLineSpacing);
     rctBounds.bottom += (iLines - 1) * iLineSpacing; // inter-line spacing
   }
 
@@ -915,6 +916,11 @@ do_the_tab:
   if(rctBounds.top < rctSource.top || rctBounds.bottom > rctSource.bottom)
   {
     WB_ERROR_PRINT("WARNING:  %s - source rectangle too small, alignment flags may not work\n", __FUNCTION__);
+    WB_ERROR_PRINT("          %d,%d,%d,%d bounds  vs  source %d,%d,%d,%d\n",
+                   rctBounds.left, rctBounds.top, rctBounds.right, rctBounds.bottom,
+                   rctSource.left, rctSource.top, rctSource.right, rctSource.bottom);
+    WB_ERROR_PRINT("          Lines: %d  Font ascent=%d, descent=%d, height=%d, line spacing %d\n",
+                   iLines, iFontAscent, iFontDescent, iFontHeight, iLineSpacing);
   }
 
 #endif // NO_DEBUG

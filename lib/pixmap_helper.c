@@ -108,6 +108,7 @@ static int nAtomResourceList = 0, nAtomResourceListMax = 0;
 static char **ppRegAppLarge_Internal = NULL;
 static char **ppRegAppSmall_Internal = NULL;
 
+XStandardColormap PXM_StandardColormapFromColormap_rval; // storage for static var for PXM_StandardColormapFromColormap()
 
 //-------------------------
 // RGB and YUV conversions

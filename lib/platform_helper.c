@@ -205,6 +205,8 @@ char **argvNew = NULL;
 int argcNew = 0;
 int i1, i2;
 int iDebugLevelSeen = 0;
+int argc_orig = argc;
+char **argv_orig = argv;
 
 static const char * const aszCmdLineOptions[]=
 {
@@ -281,8 +283,12 @@ enum
       {
         argv++; // keep looking but don't touch anything yet
         argc--;
+
+//        WB_ERROR_PRINT("TEMPORARY:  skipping argument '%s'\n", argv[0]);
         continue;
       }
+
+//      WB_ERROR_PRINT("TEMPORARY:  unrecognized argument '%s'\n", argv[1]);
     }
     else
     {
@@ -395,28 +401,33 @@ enum
               return -1;
           }
 
-          iFlag = 1;  // skip this entry (I found a match)
+          iFlag = 1;  // merely skip this entry (I found a match for one of those options)
           break;
         }
       }
     }
 
-    // at this point the argument wasn't recognized and so I must
-    // copy it into the destination
+    // at this point the argument may not have been recognized and so I must
+    // copy it into the destination if it wasn't... as PRIOR to this there
+    // should already be one or more unrecognized arguments
 
     if(!argvNew) // need to allocate copy
     {
+//      WB_ERROR_PRINT("TEMPORARY:  allocating argvNew at '%s'\n", argv[1]);
+
       argvNew = WBAlloc(sizeof(*argvNew) * (argc + 2));
       if(!argvNew)
       {
         return -1;  // not enough memory
       }
 
-      i2 = *pargc;  // the original 'argc' value
+      i2 = argc_orig;  // the original 'argc' value
       argcNew = 0;
       while(i2 >= argc0) // I want to do this once on the first pass, etc.
       {
-        argvNew[argcNew] = argv[argcNew];
+//        WB_ERROR_PRINT("TEMPORARY:  copying argv at '%s'\n", argv_orig[argcNew]);
+
+        argvNew[argcNew] = argv_orig[argcNew];
         argcNew++;
         i2--;
       }
@@ -425,6 +436,8 @@ enum
     if(!iFlag)
     {
       argvNew[argcNew++] = argv[1];
+
+//      WB_ERROR_PRINT("TEMPORARY:  (2) copying argv at '%s'\n", argv[1]);
     }
 
     argv++;
@@ -433,8 +446,12 @@ enum
 
   if(argvNew)
   {
+    // copy the rest of the arguments
+
     while(argc > 1)
     {
+//      WB_ERROR_PRINT("TEMPORARY:  (3) copying argv at '%s'\n", argv[1]);
+
       argvNew[argcNew++] = argv[1];
       argv++;
       argc--;
@@ -506,6 +523,8 @@ void WBToolkitUsage(void)
         "                geometry spec as per X specification (see X man page)\n"
         "                typical value might be 800x600+100+50\n"
         "                (default centers window with reasonable size)\n"
+        " NOTE:  application options with separate parameters should appear after\n"
+        "        any X11 Workbench Toolkit options, to avoid confusing the parser.\n"
         "\n", stderr);
 }
 
@@ -1985,7 +2004,11 @@ unsigned int nAtom;
 
   if((unsigned int)aAtom < WB_INTERNAL_ATOM_MIN_VAL)
   {
+    WBSupressErrorOutput();
+
     pTemp = XGetAtomName(pDisplay, aAtom);
+
+    WBAllowErrorOutput();
 
     if(pTemp)
     {

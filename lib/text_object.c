@@ -600,6 +600,10 @@ void WBTextBufferRefreshCache(TEXT_BUFFER *pBuf)
 int iLine, i1, i2, i3;
 char *p1;
 
+  if(!pBuf)
+  {
+    return;
+  }
 
   // zero out the cache arrays
   memset(pBuf->aLineCache, 0, sizeof(pBuf->aLineCache));
@@ -716,10 +720,9 @@ char *p1;
   }
 }
 
-
-// ************************
-// TEXT OBJECT CONSTRUCTION
-// ************************
+// *********************************
+// TEXT OBJECT CONSTRUCTION AND APIs
+// *********************************
 
 TEXT_OBJECT *WBTextObjectConstructor(unsigned long cbStructSize, const char *szText, unsigned long cbLen, Window wIDOwner)
 {
@@ -771,6 +774,25 @@ int iFontHeight;
 
   return iFontHeight;
 }
+
+void WBTextObjectSetColorContextCallback(TEXT_OBJECT *pThis,
+                                         unsigned long (*callback)(TEXT_OBJECT *pThis, int nX, int nY),
+                                         void *pColorContextPointer)
+{
+  if(!pThis)
+  {
+    return;
+  }
+
+  pThis->pColorContext = pColorContextPointer;
+  pThis->pColorContextCallback = callback;
+
+  if(pThis->pColorContextCallback)
+  {
+    pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
+  }
+}
+
 
 
 
@@ -1643,6 +1665,11 @@ static void __internal_init(struct _text_object_ *pThis)
   }
 
   // TODO:  do I re-initialize the owner-maintained values?  for now, NO!
+
+  if(pThis->pColorContextCallback)
+  {
+    pThis->pColorContextCallback(pThis, -1, -1); // to refresh it (or in this case, erase it)
+  }
 }
 
 static void __internal_highlight_colors(struct _text_object_ *pThis, XColor clrHFG, XColor clrHBG)
@@ -1677,6 +1704,11 @@ TEXT_BUFFER *pTemp;
       }
 
       pThis->pText = pTemp; // and I'm spent
+
+      if(pThis->pColorContextCallback)
+      {
+        pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
+      }
     }
     else
     {
@@ -1768,6 +1800,11 @@ static void __internal_set_filetype(struct _text_object_ *pThis, int iFileType)
   if(WBIsValidTextObject(pThis))
   {
     pThis->iFileType = iFileType;
+
+    if(pThis->pColorContextCallback)
+    {
+      pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
+    }
   }
 }
 static int __internal_get_linefeed(const struct _text_object_ *pThis)
@@ -2274,6 +2311,11 @@ WB_RECT rctSel;
       pThis->iCol = rctSel.left;
     }
 
+    if(pThis->pColorContextCallback)
+    {
+      pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
+    }
+
     __internal_invalidate_rect(pThis, NULL, 1); // TODO:  optimize this
   }
 }
@@ -2350,6 +2392,11 @@ int iSelAll;
     // todo:  mark a NEW selection using the inserted text?  this might mean replicating code for
     //        __internal_del_select and __internal_ins_chars and processing undo here
 
+
+    if(pThis->pColorContextCallback)
+    {
+      pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
+    }
 
     __internal_invalidate_rect(pThis, NULL, 1); // TODO:  optimize this
   }
@@ -2675,10 +2722,20 @@ WB_RECT rctInvalid;
           pThis->rctView.right += iAutoScrollWidth;
         }
 
+        if(pThis->pColorContextCallback) // TODO: if I only need to invalidate one line, should I just do that?
+        {
+          pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
+        }
+
         __internal_invalidate_rect(pThis, NULL, 1); // scrolling, so invalidate everything
       }
       else
       {
+        if(pThis->pColorContextCallback) // TODO: if I only need to invalidate one line, should I just do that?
+        {
+          pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
+        }
+
         // for now, always do this
         __internal_invalidate_rect(pThis, NULL, 1); // scrolling, so invalidate everything
 //        __internal_invalidate_rect(pThis, &rctInvalid, 1); // invalidate bounding rectangle
@@ -2686,6 +2743,11 @@ WB_RECT rctInvalid;
     }
     else
     {
+      if(pThis->pColorContextCallback) // assume multi-line
+      {
+        pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
+      }
+
       // for now, always do this
         __internal_invalidate_rect(pThis, NULL, 1); // scrolling, so invalidate everything
 
@@ -2898,6 +2960,11 @@ WB_RECT rctInvalid;
 
           pThis->iCol += WBGetMBColIndex(p1, p2); // always advance the cursor to this point (overwrite OR insert)
         }
+      }
+
+      if(pThis->pColorContextCallback)
+      {
+        pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
       }
     }
     else // multi-line text
@@ -3157,6 +3224,11 @@ WB_RECT rctInvalid;
         }
       }
 
+      if(pThis->pColorContextCallback) // TODO: if I only need to invalidate one line, should I just do that?
+      {
+        pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
+      }
+
       __internal_invalidate_rect(pThis, NULL, 1); // so invalidate everything (for NOW)
     }
 
@@ -3213,6 +3285,7 @@ static int __internal_can_undo(struct _text_object_ *pThis)
   if(WBIsValidTextObject(pThis))
   {
   }
+
   return 0; // for now
 }
 static void __internal_undo(struct _text_object_ *pThis)
@@ -3227,6 +3300,7 @@ static int __internal_can_redo(struct _text_object_ *pThis)
   if(WBIsValidTextObject(pThis))
   {
   }
+
   return 0; // for now
 }
 static void __internal_redo(struct _text_object_ *pThis)

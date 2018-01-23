@@ -233,63 +233,63 @@ int DLGMessageBox(int iType, Window wIDOwner, const char *szTitle, const char *s
 static const char szOKBox[]=
   "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"OK Box\"\n"
   "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
-  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE HALIGN_TEXT_CENTER\n"
   "  CONTROL:DefPushButton ID:IDOK TITLE:OK X:80 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "END_DIALOG\n";
 static const char szNoBox[]=
   "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"OK Box\"\n"
   "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
-  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE HALIGN_TEXT_CENTER\n"
   "  CONTROL:DefPushButton ID:IDCANCEL TITLE:No X:80 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "END_DIALOG\n";
 static const char szYesBox[]=
   "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"OK Box\"\n"
   "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
-  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE HALIGN_TEXT_CENTER\n"
   "  CONTROL:DefPushButton ID:IDYES TITLE:Yes X:80 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "END_DIALOG\n";
 static const char szCancelBox[]=
   "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"OK Box\"\n"
   "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
-  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE HALIGN_TEXT_CENTER\n"
   "  CONTROL:DefPushButton ID:IDCANCEL TITLE:Cancel X:80 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "END_DIALOG\n";
 static const char szAbortBox[]=
   "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"OK Box\"\n"
   "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
-  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE HALIGN_TEXT_CENTER\n"
   "  CONTROL:DefPushButton ID:IDABORT TITLE:Abort X:80 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "END_DIALOG\n";
 static const char szRetryBox[]=
   "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"OK Box\"\n"
   "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
-  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE HALIGN_TEXT_CENTER\n"
   "  CONTROL:DefPushButton ID:IDRETRY TITLE:Retry X:80 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "END_DIALOG\n";
 static const char szIgnoreBox[]=
   "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"OK Box\"\n"
   "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
-  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE HALIGN_TEXT_CENTER\n"
   "  CONTROL:DefPushButton ID:IDIGNORE TITLE:Ignore X:80 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "END_DIALOG\n";
 static const char szOKCancelBox[]=
   "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"OK/Cancel Box\"\n"
   "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
-  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE HALIGN_TEXT_CENTER\n"
   "  CONTROL:DefPushButton ID:IDOK TITLE:OK X:40 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "  CONTROL:CancelButton ID:IDCANCEL TITLE:Cancel X:120 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "END_DIALOG\n";
 static const char szYesNoBox[]=
   "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"Yes/No Box\"\n"
   "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
-  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE HALIGN_TEXT_CENTER\n"
   "  CONTROL:DefPushButton ID:IDYES TITLE:_Yes X:40 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "  CONTROL:CancelButton ID:IDNO TITLE:_No X:120 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "END_DIALOG\n";
 static const char szYesNoCancelBox[]=
   "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"Yes/No Box\"\n"
   "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
-  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE HALIGN_TEXT_CENTER\n"
   "  CONTROL:DefPushButton ID:IDYES TITLE:_Yes X:20 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "  CONTROL:PushButton ID:IDNO TITLE:_No X:80 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "  CONTROL:CancelButton ID:IDCANCEL TITLE:Cancel X:140 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
@@ -297,14 +297,14 @@ static const char szYesNoCancelBox[]=
 static const char szAbortRetryBox[]=
   "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"Yes/No Box\"\n"
   "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
-  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE HALIGN_TEXT_CENTER\n"
   "  CONTROL:DefPushButton ID:IDABORT TITLE:_Abort X:40 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "  CONTROL:CancelButton ID:IDRETRY TITLE:_Retry X:120 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "END_DIALOG\n";
 static const char szAbortRetryIgnoreBox[]=
   "BEGIN_DIALOG FONT:Variable HEIGHT:50 WIDTH:200 TITLE:\"Yes/No Box\"\n"
   "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
-  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE HALIGN_TEXT_CENTER\n"
   "  CONTROL:DefPushButton ID:IDYES TITLE:_Abort X:20 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "  CONTROL:PushButton ID:IDRETRY TITLE:_Retry X:80 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "  CONTROL:CancelButton ID:IDIGNORE TITLE:_Ignore X:140 Y:28 WIDTH:40 HEIGHT:18 VISIBLE\n"
@@ -561,7 +561,7 @@ char *DLGInputBox(Window wIDOwner, const char *szTitle, const char *szPrompt, co
 static const char szInputDialogRes[]=
   "BEGIN_DIALOG FONT:Variable HEIGHT:60 WIDTH:200 TITLE:\"User Input\"\n"
   "  CONTROL:Icon ID:1000 X:2 Y:2 HEIGHT:20 WIDTH:20 VISIBLE\n"
-  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE\n"
+  "  CONTROL:Text ID:1001 X:24 Y:2 HEIGHT:20 WIDTH:172 VISIBLE HALIGN_TEXT_CENTER\n"
   "  CONTROL:Edit ID:1002 X:2 Y:22 WIDTH:196 HEIGHT:16 VISIBLE\n"
   "  CONTROL:DefPushButton ID:IDOK TITLE:OK X:40 Y:40 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "  CONTROL:CancelButton ID:IDCANCEL TITLE:Cancel X:120 Y:40 WIDTH:40 HEIGHT:18 VISIBLE\n"
@@ -1030,6 +1030,370 @@ Window wIDDlg;
 
   return NULL;
 }
+
+
+///////////////
+// COLOR DIALOG
+///////////////
+
+struct _COLOR_DIALOG_
+{
+  int iLuma, iChroma, iSaturation;
+  int iR, iG, iB; // 0-255 RGB values
+  unsigned long lPixel; // XColor pixel value
+  XStandardColormap stdColorMap;
+  XColor *pColor; // to be assigned on exit
+
+  // TODO:  additional cached internal values for image and pixmap
+
+  int iChromaLumaSat, iXLumaSat, iYLumaSat, iXChroma;
+  XImage *pimgLumaSat, *pimgChroma;
+  Pixmap pixmapLumaSat, pixmapChroma;
+};
+
+#define LUMA_SAT_PICKER 1001
+#define CHROMA_PICKER   1002
+#define LUMA_BOX        1003
+#define CHROMA_BOX      1004
+#define SAT_BOX         1005
+#define RED_BOX         1006
+#define GREEN_BOX       1007
+#define BLUE_BOX        1008
+#define COLORBOX        1009
+#define COLORBOX_VALUE  1010
+
+#define COLOR_IMAGE_SIZE 128 /* was 256 */
+#define CHROMA_RIBBON_HEIGHT 12 /* was 16 */
+#define COLOR_IMAGE_COLOR_FACTOR 2 /* multiply by this to get 0-255 [effectively] */
+
+static XImage * CreateLumaSaturationImage(Display *pDisplay, XStandardColormap *pSCM, int nChroma)
+{
+int iR, iG, iB, iSat, iLum;
+XImage *pImage;
+
+
+  pImage = XGetImage(WBGetDefaultDisplay(), None, 0, 0, COLOR_IMAGE_SIZE, COLOR_IMAGE_SIZE,
+                     0xffffffff, XYPixmap);
+
+  if(pImage == None)
+  {
+    return None;
+  }
+
+//  pData->cbImageData = PXM_GetImageDataLength(pI);
+//  pData->pImageData = WBAlloc(pData->cbImageData + 4);
+//
+//  if(pData->pImageData)
+//  {
+//    memcpy(pData->pImageData, PXM_GetImageDataPtr(pI), pData->cbImageData);
+//  }
+
+//  PXM_RGBToHSV(iR, iG, iB, &nChroma, &iSat, &iLum);
+
+  for(iSat = COLOR_IMAGE_SIZE - 1; iSat >= 0; iSat--)
+  {
+    for(iLum = 0; iLum < COLOR_IMAGE_SIZE; iLum++)
+    {
+      XColor clr;
+
+      PXM_HSVToRGB(nChroma,
+                   iSat * COLOR_IMAGE_COLOR_FACTOR,
+                   iLum * COLOR_IMAGE_COLOR_FACTOR,
+                   &iR, &iG, &iB);
+
+      RGB255_TO_XCOLOR(iR, iG, iB, clr);
+      PXM_RGBToPixel(pSCM, &clr); // make sure the RGB members are correct
+
+      // use XPutPixel to put the pixel at row 'iSat', column 'iLum'
+
+      XPutPixel(pImage, iLum, iSat, clr.pixel); // this should actually be VERY fast
+    }
+  }
+
+  return pImage;
+}
+
+static XImage * CreateChromaImage(Display *pDisplay, XStandardColormap *pSCM)
+{
+int iR, iG, iB, iChroma, iRow;
+XImage *pImage;
+
+
+  pImage = XGetImage(WBGetDefaultDisplay(), None, 0, 0, COLOR_IMAGE_SIZE, CHROMA_RIBBON_HEIGHT,
+                     0xffffffff, XYPixmap);
+
+  if(pImage == None)
+  {
+    return None;
+  }
+
+  for(iChroma=0; iChroma < COLOR_IMAGE_SIZE; iChroma++)
+  {
+    XColor clr;
+
+    PXM_HSVToRGB(iChroma * COLOR_IMAGE_COLOR_FACTOR,
+                 255, 255, &iR, &iG, &iB);
+
+    RGB255_TO_XCOLOR(iR, iG, iB, clr);
+    PXM_RGBToPixel(pSCM, &clr); // make sure the RGB members are correct
+
+    // use XPutPixel to put the pixel at row 'iSat', column 'iLum'
+    for(iRow=0; iRow < CHROMA_RIBBON_HEIGHT; iRow++)
+    {
+      XPutPixel(pImage, iChroma, iRow, clr.pixel); // this should actually be VERY fast
+    }
+  }
+
+  return pImage;
+}
+
+static int ColorDialogCallback(Window wID, XEvent *pEvent)
+{
+WBDialogWindow *pDlg = DLGGetDialogWindowStruct(wID);
+struct _COLOR_DIALOG_ *pUserData = (struct _COLOR_DIALOG_ *)(pDlg ? pDlg->pUserData : NULL);
+//Display *pDisplay = WBGetWindowDisplay(wID);
+char *p1, *p2;
+
+
+  if(!pDlg)
+    return 0; // can't process any messages now
+
+  if(pEvent->type == ClientMessage && pEvent->xclient.message_type == aDIALOG_INIT)
+  {
+    // TODO:  initialize dialog box
+
+    return 1;
+  }
+
+  if(pEvent->type != ClientMessage)
+  {
+    return 0; // unhandled at this time
+  }
+
+  // EVERYTHING AT THIS POINT IS A CLIENT MESSAGE
+
+  if(pEvent->xclient.message_type == aCONTROL_NOTIFY)
+  {
+    // l[0] == message
+    // l[1] == control ID
+    // l[2] ==
+    switch(pEvent->xclient.data.l[1])
+    {
+      case IDOK:
+      case IDCANCEL:
+        if(pEvent->xclient.data.l[0] == aBUTTON_PRESS)
+        {
+          if(pEvent->xclient.data.l[1] == IDOK)
+          {
+            // do any data copying that's necessary on 'OK'
+          }
+
+          WBEndModal(wID, pEvent->xclient.data.l[1]); // all buttons close the dialog box
+          return 1; // handled!
+        }
+        break;
+
+
+      default:
+        {
+#ifndef NO_DEBUG
+          char *p1 = WBGetAtomName(WBGetWindowDisplay(wID), (Atom)pEvent->xclient.data.l[0]);
+
+          WB_WARN_PRINT("%s - TODO:  control notification message %ld (%s)  %ld (%08lxH), %ld (%08lxH)\n",
+                        __FUNCTION__, pEvent->xclient.data.l[0], p1,
+                        pEvent->xclient.data.l[1], pEvent->xclient.data.l[1],
+                        pEvent->xclient.data.l[2], pEvent->xclient.data.l[2]);
+
+          if(p1)
+          {
+            WBFree(p1);
+          }
+#endif // NO_DEBUG
+        }
+    }
+  }
+  else if(pEvent->xclient.message_type == aGOTFOCUS)
+  {
+    return 0; // for now
+  }
+  else if(pEvent->xclient.message_type == aLOSTFOCUS)
+  {
+    return 0; // for now
+  }
+  else
+  {
+#ifndef NO_DEBUG
+    char *p1 = WBGetAtomName(WBGetWindowDisplay(wID), (Atom)pEvent->xclient.message_type);
+    char *p2 = WBGetAtomName(WBGetWindowDisplay(wID), (Atom)pEvent->xclient.data.l[0]);
+
+    WB_WARN_PRINT("%s - unhandled notification %s %ld (%s)  %ld (%08lxH), %ld (%08lxH)\n",
+                  __FUNCTION__, p1,
+                  pEvent->xclient.data.l[0], p2,
+                  pEvent->xclient.data.l[1], pEvent->xclient.data.l[1],
+                  pEvent->xclient.data.l[2], pEvent->xclient.data.l[2]);
+
+    if(p1)
+    {
+      WBFree(p1);
+    }
+    if(p2)
+    {
+      WBFree(p2);
+    }
+#endif // NO_DEBUG
+  }
+
+  return 0;
+}
+
+int DLGColorDialog(Window wIDOwner, XStandardColormap *pColorMap, XColor *pColor)
+{
+static const char szColorDialogRes[]=
+  "BEGIN_DIALOG FONT:Variable HEIGHT:182 WIDTH:280 TITLE:\"Color Chooser\"\n"
+
+  // these controls are first in the tab order
+  "  CONTROL:Image ID:1009          X:150 Y:120 WIDTH:50 HEIGHT:16 VISIBLE\n"
+  "  CONTROL:Text  TITLE:\"Value:\" X:200 Y:120 WIDTH:24 HEIGHT:16 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
+  "  CONTROL:Edit  ID:1010          X:228 Y:120 WIDTH:40 HEIGHT:16 VISIBLE\n"
+
+  // then the buttons
+  "  CONTROL:DefPushButton ID:IDOK     TITLE:OK     X:60 Y:160 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "  CONTROL:CancelButton  ID:IDCANCEL TITLE:Cancel X:180 Y:160 WIDTH:40 HEIGHT:18 VISIBLE\n"
+
+  // then the images
+  "  CONTROL:Image ID:1001 X:2 Y:2   HEIGHT:132 WIDTH:132 VISIBLE CLICKABLE\n" // 128x128 image, luma/saturation
+  "  CONTROL:Image ID:1002 X:2 Y:136 HEIGHT:16  WIDTH:132 VISIBLE CLICKABLE\n" // 128x12 image, chroma
+
+  // then the rest
+  "  CONTROL:Text  TITLE:\"Lum:\"  X:140 Y:22 WIDTH:22 HEIGHT:14 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
+  "  CONTROL:Edit  ID:1003         X:164 Y:22 WIDTH:28 HEIGHT:14 VISIBLE\n"
+  "  CONTROL:Text  TITLE:\"Chr:\"  X:140 Y:44 WIDTH:22 HEIGHT:14 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
+  "  CONTROL:Edit  ID:1004         X:164 Y:44 WIDTH:28 HEIGHT:14 VISIBLE\n"
+  "  CONTROL:Text  TITLE:\"Sat:\"  X:140 Y:66 WIDTH:22 HEIGHT:14 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
+  "  CONTROL:Edit  ID:1005         X:164 Y:66 WIDTH:28 HEIGHT:14 VISIBLE\n"
+
+  "  CONTROL:Text  TITLE:\"Red:\"  X:210 Y:22 WIDTH:22 HEIGHT:14 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
+  "  CONTROL:Edit  ID:1006         X:234 Y:22 WIDTH:28 HEIGHT:14 VISIBLE\n"
+  "  CONTROL:Text  TITLE:\"Grn:\"  X:210 Y:44 WIDTH:22 HEIGHT:14 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
+  "  CONTROL:Edit  ID:1007         X:234 Y:44 WIDTH:28 HEIGHT:14 VISIBLE\n"
+  "  CONTROL:Text  TITLE:\"Blu:\"  X:210 Y:66 WIDTH:22 HEIGHT:14 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
+  "  CONTROL:Edit  ID:1008         X:234 Y:66 WIDTH:28 HEIGHT:14 VISIBLE\n"
+
+  "END_DIALOG\n";
+WBDialogWindow *pDlg;
+Display *pDisplay;
+struct _COLOR_DIALOG_ data;
+int iRval = IDCANCEL; // default return is 'cancel'
+Window wIDDlg;
+
+
+  if(!pColor)
+  {
+    return -1; // not valid
+  }
+
+  if(wIDOwner)
+  {
+    pDisplay = WBGetWindowDisplay(wIDOwner);
+  }
+  else
+  {
+    pDisplay = WBGetDefaultDisplay();
+  }
+
+  memset(&data, 0, sizeof(data));
+
+  if(WB_LIKELY(pColorMap)) // should always be the case
+  {
+    memcpy(&(data.stdColorMap), pColorMap, sizeof(data.stdColorMap));
+  }
+  else
+  {
+    WBDefaultStandardColormap(pDisplay, &(data.stdColorMap));
+  }
+
+  data.pColor = pColor;
+  data.iChromaLumaSat = -1; // double-ensure it always re-builds
+  data.pimgLumaSat = NULL;
+  data.pimgChroma = NULL;
+  data.pixmapLumaSat = None;
+  data.pixmapChroma = None;
+
+  data.lPixel = pColor->pixel; // cache it
+  // now calculate the other things
+
+  if((pColor->flags & (DoRed | DoGreen | DoBlue)) != (DoRed | DoGreen | DoBlue))
+  {
+    PXM_PixelToRGB(&(data.stdColorMap), pColor); // make sure the RGB members are correct
+  }
+
+  RGB255_FROM_XCOLOR(*pColor, data.iR, data.iG, data.iB); // assign RGB
+
+  // now get the luma/chroma/saturation info - H = 'Hue' S = 'Saturation' and V = 'value' (luma)
+  // for the conversion, but the variables in the structure use 'Luma' 'Chroma' and 'Saturation'
+
+  PXM_RGBToHSV(data.iR, data.iG, data.iB, &data.iChroma, &data.iSaturation, &data.iLuma);
+
+
+  // now that all of THAT is done, do the dialog box
+
+  pDlg = DLGCreateDialogWindow("Color Chooser",szColorDialogRes,
+                               100,100,300,100,ColorDialogCallback,
+                               WBDialogWindow_VISIBLE,&data);
+
+  if(pDlg) // TODO:  manage this stuff as part of 'DLGCreateDialogWindow' instead
+  {
+    wIDDlg = pDlg->wID;
+
+    if(wIDOwner != None)
+    {
+      Atom a1;
+      unsigned int ai1[3];
+
+      DLGAssignOwner(pDlg, wIDOwner);
+
+      a1 = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE", False);
+      ai1[0] = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE_SKIP_TASKBAR", False);
+      ai1[1] = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE_SKIP_PAGER", False);
+
+      XChangeProperty(WBGetWindowDisplay(wIDDlg), wIDDlg, a1, XA_ATOM, 32, PropModeReplace, (unsigned char *)ai1, 2);
+
+      a1 = XInternAtom(WBGetWindowDisplay(wIDDlg), "WM_TRANSIENT_FOR", False);
+      XChangeProperty(WBGetWindowDisplay(wIDDlg), wIDDlg, a1, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&wIDOwner, 1);
+    }
+
+    iRval = WBShowModal(pDlg->wID, 0);
+
+    if(iRval == IDOK)
+    {
+      // check pColor assigned via data.pColor?
+    }
+  }
+
+  // free up any resources here
+
+
+  return iRval;
+}
+
+
+///////////////
+// COLOR DIALOG
+///////////////
+
+
+XFontSet DLGFontDialog(Display *pDisplay, Window wIDOwner, XFontSet fsDefault)
+{
+  return None;
+}
+
+
+
+
+////////////////
+// SPLASH SCREEN
+////////////////
+
 
 // construct a splash screen based on the size of the pixmap and position
 // the copyright text in the lower 1/3 of the splash screen, centered, then

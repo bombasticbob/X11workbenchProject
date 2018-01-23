@@ -282,6 +282,17 @@ enum WBDialogEntryFlags
   WBDialogEntry_CHECKED         = 0x00000020,  ///< 'checked' state
   WBDialogEntry_NO_BORDER       = 0x00000040,  ///< 'no border' flag (don't display a border - statics, typically)
 
+  // text alignment (in caption or body of control, when applicable)
+  WBDialogEntry_VA_TEXT_CENTER  = 0x00000000,  ///< Vertically align text center (default)
+  WBDialogEntry_VA_TEXT_TOP     = 0x00000100,  ///< Vertically align text top
+  WBDialogEntry_VA_TEXT_BOTTOM  = 0x00000200,  ///< Vertically align text bottom
+  WBDialogEntry_VA_TEXT_MASK    = 0x00000300,  ///< Vertical text alignment bits
+  WBDialogEntry_HA_TEXT_LEFT    = 0x00000000,  ///< Horizontally align text left (default)
+  WBDialogEntry_HA_TEXT_CENTER  = 0x00000400,  ///< Horizontally align text center
+  WBDialogEntry_HA_TEXT_RIGHT   = 0x00000800,  ///< Horizontally align text right
+  WBDialogEntry_HA_TEXT_MASK    = 0x00000c00,  ///< Horizontal text alignment bits
+  WBDialogEntry_ALIGN_TEXT_MASK = 0x00000f00,  ///< All text alignment bits
+
 
 // TODO:  other user-definable flags
 
@@ -290,7 +301,7 @@ enum WBDialogEntryFlags
 
   // TODO:  others
 
-  // alignment flags - these match the 'CONTROL_' bit flags in dialgo_controls.h
+  // control alignment flags - these match the 'CONTROL_' bit flags in dialog_controls.h
 
   WBDialogEntry_HResize         = 0x00040000, ///< dialog box flag, can be resized horizontally
   WBDialogEntry_VResize         = 0x00080000, ///< dialog box flag, can be resized vertically
@@ -312,7 +323,7 @@ enum WBDialogEntryFlags
 
   WBDialogEntry_Reserved24      = 0x01000000, ///< reserved bit 24
   WBDialogEntry_Reserved25      = 0x02000000, ///< reserved bit 25
-  WBDialogEntry_Reserved26      = 0x04000000, ///< reserved bit 26
+  WBDialogEntry_DISABLED        = 0x04000000, ///< causes the control to be drawn 'disabled' and NOT be selectable for focus
   WBDialogEntry_PRESSED         = 0x08000000, ///< for pushbuttons, causes it to be drawn 'pressed'
 
   // focus and 'default' flags
@@ -762,7 +773,7 @@ enum FileDialogEnum
 /** \ingroup dialog_api
   * \brief Display a modal File Dialog window, returning a WBAlloc'd pointer to a null-byte terminated string containing a fully qualified file or path name
   *
-  * \param iType See the \ref MessageBoxEnum enumeration for a list of possible values
+  * \param iType See the \ref FileDialogEnum enumeration for a list of possible values
   * \param wIDOwner The owner's Window ID (or None)
   * \param szDefPath A null-byte terminated string containing the default path name (may be NULL for current directory)
   * \param szDefName A null-byte terminated string contianing the default file name (may be NULL, no path specifiers allowed)
@@ -793,6 +804,44 @@ enum FileDialogEnum
 **/
 char *DLGFileDialog(int iType, Window wIDOwner, const char *szDefPath, const char *szDefName,
                     const char *szExtAndDescList);
+
+
+/** \ingroup dialog_api
+  * \brief Display a modal Color Dialog window, returning the selected color in the XColor structure pointed to by 'pColor'
+  *
+  * \param wIDOwner The owner's Window ID (or None)
+  * \param pColorMap The XStandardColormap to use, or NULL to use the default colormap
+  * \param pColor A pointer to the XColor structure into which the chosen color is returned.
+  * \returns A value of -1 on cancel/error, a 0 if the color was not changed, or 1 if it was changed
+  *
+  * Use this function to display a 'color choice' dialog box, and return the chosen color within an 'XColor' structure.
+  * Before calling this function, you need to assign a valid pixel value to the structure pointed to by 'pColor'.  Typically
+  * it will be a color reference that was loaded using one of the applicable methods (such as 'XParseColor()').
+  *
+  * This function does not call XAllocColor(), nor will it free the old color with XFreeColors() if it is changed.
+  * The responsibility for allocating and freeing colors lies with the caller.
+  *
+**/
+int DLGColorDialog(Window wIDOwner, XStandardColormap *pColorMap, XColor *pColor);
+
+
+/** \ingroup dialog_api
+  * \brief Display a modal Font Dialog window, returning the selected font in the XColor structure pointed to by 'pColor'
+  *
+  * \param pDisplay The Display pointer for which to query font information (NULL implies default display)
+  * \param wIDOwner The owner's Window ID (or None)
+  * \param fsDefault A default font set that specifies the initial font to be displayed. 'None' causes the dialog handler to choose an apropriate font set, most likely a system default.
+  * \returns A valid XFontSet on OK, or 'None' on cancel/error.  The result must be free'd using XFreeFontSet()
+  *
+  * Use this function to display a 'font choice' dialog box, that will allow the user to chose the font face, size, weight,
+  * and other characteristics from a list of available fonts.
+  *
+  * The returned value (if not None) will need to be free'd using XFreeFontSet()
+  *
+  * See Also:  WBCopyModifyFontSet(), WBFontFromFontSet()
+  *
+**/
+XFontSet DLGFontDialog(Display *pDisplay, Window wIDOwner, XFontSet fsDefault);
 
 
 /** \ingroup dialog_api

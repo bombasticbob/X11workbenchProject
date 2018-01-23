@@ -70,18 +70,20 @@ extern "C" {
 **/
 enum _FileType_
 {
-  FileType_MAKEFILE      = -1,
-  FileType_PLAIN_TEXT    = 0,
-  FileType_CLANG         = 1,
-  FileType_JAVA          = 2, // sample
-  FileType_PERL          = 3, // sample
-  FileType_PHP           = 4, // sample
-  FileType_SHELL         = 5, // sample
+  FileType_PLAIN_TEXT    = 0,  // no special handling, no source decorations
+  FileType_PROGRAM       = 1,  // program source
+  FileType_RESOURCE      = 2,  // 'resource' file, text-based format
+  FileType_XML           = 3,  // XML data (includes HTML)
+  FileType_MAKEFILE      = 4,  // Make Files with special handling (implies 'hard tab', always)
 
-  FileType_MASK          = 0x7fff,
+  FileType_CUSTOM_FLAG   = 0x80, // 'custom' file types - 'or' with custom definition (0-0x7f)
+
+  FileType_MASK          = 0xff,
+
+  // additional bits are reserved (for now)
 
   // and now the bit flags
-  FileType_HARDTAB       = 0x10000,
+  FileType_HARDTAB       = 0x10000, // hard tabs - implied by 'FileType_MAKEFILE', otherwise explicit
   FileType_RESERVED2     = 0x20000,
   FileType_RESERVED3     = 0x40000,
   FileType_RESERVED4     = 0x80000
@@ -98,7 +100,7 @@ enum _LineFeed_
   LineFeed_RETURN        = 2,   ///< OSX return 0DH
   LineFeed_CRLF          = 3,   ///< CRLF 0DH,0AH
   LineFeed_LFCR          = 4,   ///< LFCR 0AH,0DH
-  LineFeed_ENTRYCOUNT    = 5    ///< size of array containing values, excluding negative indices
+  LineFeed_ENTRYCOUNT    = 5    ///< reserved - specifies custom array, indicating the size of the array containing the character values, excluding negative indices
 };
 
 /** \ingroup text_object
@@ -258,8 +260,8 @@ struct _text_object_; // forward declaration
     // handling expose events for the text area
 
     void (* do_expose)(const struct _text_object_ *pThis, Display *pDisplay, Window wID,
-                     GC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
-                     XFontSet rFontSet);
+                       GC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
+                       XFontSet rFontSet);
 
     void (* cursor_blink)(struct _text_object_ *pThis, int bHasFocus);
 
@@ -758,8 +760,7 @@ typedef struct _text_object_vtable_
     * buffered text data might have color information associated with it and as such the text
     * will be rendered using the appropriate color.  Color information is object-specific.\n
     *
-    * TODO:  a 'context text color' callback function that can be assigned either to the vtable,
-    * or as a function pointer, in which the default text color would be the GC foreground color.
+    * See Also: WBTextObjectSetColorContextCallback()
   **/
   void (* do_expose)(struct _text_object_ *pThis, Display *pDisplay, Window wID,
                      GC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
@@ -855,6 +856,10 @@ extern const TEXT_OBJECT_VTABLE WBDefaultTextObjectVTable;
     void *pUndo;               // pointer to 'undo' buffer.  NULL if empty.
     void *pRedo;               // pointer to 'redo' buffer.  NULL if empty.
 
+    void *pColorContext;       // a user-controlled 'color context' pointer - can be anything, however
+    unsigned long (*pColorContextCallback)(struct _text_object_ *,
+                                           int, int); // callback function to get the context color of a character.  default is NULL.
+
   } TEXT_OBJECT;
 
   * \endcode
@@ -907,6 +912,11 @@ typedef struct _text_object_
 
   void *pUndo;               ///< pointer to 'undo' buffer.  NULL if empty.
   void *pRedo;               ///< pointer to 'redo' buffer.  NULL if empty.
+
+  // special callback entries
+  void *pColorContext;       ///< a user-controlled 'color context' pointer - can be anything, however
+  unsigned long (*pColorContextCallback)(struct _text_object_ *,
+                                         int, int); ///< callback function to get the context color of a character.  default is NULL.
 
 } TEXT_OBJECT;
 
@@ -1089,7 +1099,44 @@ void WBTextBufferLineChange(TEXT_BUFFER *pBuf, unsigned long nLine, int nNewLen)
 **/
 void WBTextBufferRefreshCache(TEXT_BUFFER *pBuf);
 
-
+/** \ingroup text_object
+  * \brief assign callback function for 'color context' for a given character
+  * \param pThis A pointer to the TEXT_OBJECT structure
+  * \param callback A function pointer to a 'color context' callback function (see below).  This value may be NULL.
+  * \param pColorContextPointer A pointer to non-specific user-maintained data.  Its value will be stored in pColorContext.  May be NULL.
+  *
+  * Use 'WBTextObjectSetColorContextCallback()' to assign a color context callback function that returns the correct
+  * color of a character, given its row ('nRow') and column ('nCol') values, as a pixel (unsigned long) color value.
+  * The color context callback function should use the 'text object' pointer 'pThis' to perform whatever operations
+  * it needs to do in order to determine the correct color.
+  *
+  * The color callback function should return the 'default' color (from the TEXT_OBJECT) when no specific color is
+  * to be assigned to a particular character.  Otherwise it returns the correct 'XColor' pixel value based on
+  * the context-related color assignment.
+  *
+  * The 'pColorContextPointer' value is stored directly as-is in the pColorContext member of the TEXT_OBJECT structure.
+  * It does not have to be a valid pointer (it can be a 'Window' cast to a pointer, for example).  The value is simply
+  * available to the callback function whenever it is invoked, through the TEXT_OBJECT.
+  *
+  * The callback function 'callback' will be invoked internally by passing a pointer to the TEXT_OBJECT as the first
+  * parameter, followed by the row and column values.  The callback function must assume that a multi-byte character
+  * qualifies as a single column, and handle character spacing accordingly.
+  *
+  * To notify the callback function that something has changed, it can be invoked with an 'nCol' value of -1.  This
+  * should force the re-evaluation of all context colors starting with row 'nRow'.  'nRow' can also be a negative value
+  * to indicate that the entire file should be re-evaluated.  Once completed, it should invalidate the window
+  * that is displaying the text, so that the correct colors will be painted.  Additionally, any background thread
+  * that might be re-evaluating the context color should be re-startable (whenever the callback is re-invoked), and
+  * cause the window displaying the text object to be re-painted when complete.
+  *
+  * Upon assignment, the callback will be evoked with 'nRow' and 'nCol' as -1, so that the re-evaluation will happen
+  * immediately.  As such, it's usually important to assign the callback function before assigning any data.
+  *
+  * See Also:  RGB_TO_XCOLOR(), RGB255_TO_XCOLOR(), PXM_RGBToPixel(), PXM_PixelToRGB()
+**/
+void WBTextObjectSetColorContextCallback(TEXT_OBJECT *pThis,
+                                         unsigned long (*callback)(TEXT_OBJECT *pThis, int nRow, int nCol),
+                                         void *pColorContextPointer);
 
 
 /** \ingroup text_object
