@@ -74,6 +74,7 @@
 
 // project includes
 #include "X11workbench.h"
+#include "dialog_window.h"
 #include "platform_helper.h"
 #include "debug_helper.h"
 #include "file_help.h"
@@ -519,9 +520,7 @@ fail_to_run_help:
 
   if(p1)
   {
-    Window wIDOwner = pMainFrame ? pMainFrame->wID : -1;
-
-    DLGMessageBox(MessageBox_OK | MessageBox_MiddleFinger, wIDOwner,
+    DLGMessageBox(MessageBox_OK | MessageBox_MiddleFinger, GetFrameWindowID(),
                   "Context Help", p1);
 
     WBFree(p1);

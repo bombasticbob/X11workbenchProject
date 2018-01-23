@@ -63,6 +63,9 @@
 #include "window_helper.h"
 
 
+#define APP_NAME "X11workbench" /* for dialog boxes and similar things */
+
+
 typedef enum __WBFILE_TYPE__
 {
   WBFILE_TYPE_NONE     = 0,
@@ -108,9 +111,10 @@ typedef struct __WB_FRAME_WINDOW__ WBFrameWindow; // see frame_window.h
 
 // global variables
 
-extern Display *display;        // X server connection
-extern Window win;              // main window Window ID
+// TODO:  any globals?  get/set methods are better, like GetFrameWindowID() below
 
+
+Window GetFrameWindowID(); // get the frame window's window ID (for dialog boxen and such)
 
 // general purpose utilities to be called by external things
 
@@ -120,7 +124,6 @@ WBFILE_TYPE GetFileType(const char *szFileName);
 
 // utilities specific to context-sensitive help
 
-void DoContextSensitiveHelp(const char *szTerm);
 int spawn_async(const char *szApp, ...);
 
 
