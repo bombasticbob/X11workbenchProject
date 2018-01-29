@@ -927,10 +927,12 @@ char *p1, *p2;
   }
   else if(pEvent->xclient.message_type == aGOTFOCUS)
   {
+    // control ID is in pEvent->xclient.data.l[0]
     return 0; // for now
   }
   else if(pEvent->xclient.message_type == aLOSTFOCUS)
   {
+    // control ID is in pEvent->xclient.data.l[0]
     return 0; // for now
   }
   else
@@ -1039,14 +1041,18 @@ Window wIDDlg;
 struct _COLOR_DIALOG_
 {
   int iLuma, iChroma, iSaturation;
-  int iR, iG, iB; // 0-255 RGB values
+  int iRed, iGreen, iBlue; // 0-255 RGB values
   unsigned long lPixel; // XColor pixel value
   XStandardColormap stdColorMap;
   XColor *pColor; // to be assigned on exit
 
+  // 'old' control values for when values change
+  int iOldL, iOldC, iOldS, iOldR, iOldG, iOldB;
+  unsigned long lOldP;
+
   // TODO:  additional cached internal values for image and pixmap
 
-  int iChromaLumaSat, iXLumaSat, iYLumaSat, iXChroma;
+  int iXLumaSat, iYLumaSat, iXChroma, iOldXLS, iOldYLS, iOldXC;
   XImage *pimgLumaSat, *pimgChroma;
   Pixmap pixmapLumaSat, pixmapChroma;
 };
@@ -1062,9 +1068,42 @@ struct _COLOR_DIALOG_
 #define COLORBOX        1009
 #define COLORBOX_VALUE  1010
 
-#define COLOR_IMAGE_SIZE 128 /* was 256 */
-#define CHROMA_RIBBON_HEIGHT 12 /* was 16 */
-#define COLOR_IMAGE_COLOR_FACTOR 2 /* multiply by this to get 0-255 [effectively] */
+#define COLOR_IMAGE_SIZE 256 /* note that dialog units are 2 pixels each */
+#define CHROMA_RIBBON_HEIGHT 24 /* note that dialog units are 2 pixels each */
+#define COLOR_IMAGE_COLOR_FACTOR 1 /* multiply by this to get 0-255 [effectively] */
+#define COLORBOX_PIXMAP_WIDTH  96 /* width of 'colorbox' pixmap */
+#define COLORBOX_PIXMAP_HEIGHT 24 /* height of 'colorbox' pixmap */
+
+static void ColorDialogDumpData(const char *szCaption, struct _COLOR_DIALOG_ *pData)
+{
+  WBDebugPrint("ColorDialogDumpData - %s\n", szCaption);
+  WBDebugPrint("  iLuma=%-3d  iChroma=%-3d  iSaturation=%-3d\n",
+               pData->iLuma, pData->iChroma, pData->iSaturation);
+  WBDebugPrint("  iRed=%-3d   iGreen=%-3d   iBlue=%-3d\n",
+               pData->iRed, pData->iGreen, pData->iBlue);
+
+  WBDebugPrint("  iOldL=%-3d  iOldC=%-3d    iOldS=%-3d\n",
+               pData->iOldL, pData->iOldC, pData->iOldS);
+  WBDebugPrint("  iOldR=%-3d  iOldG=%-3d    iOldB=%-3d\n",
+               pData->iOldR, pData->iOldG, pData->iOldB);
+
+  WBDebugPrint("  lPixel = %-8lu \"#%-6.6lX\"\n", pData->lPixel, pData->lPixel);
+  WBDebugPrint("  lOldP  = %-8lu \"#%-6.6lX\"\n\n", pData->lOldP, pData->lOldP);
+
+  WBDebugPrint("  iXLumaSat = %-3d  iYLumaSat = %-3d  iXChroma = %-3d\n"
+               "  iOldXLS   = %-3d  iOldYLS   = %-3d  iOldXC   = %-3d\n\n",
+               pData->iXLumaSat, pData->iYLumaSat, pData->iXChroma,
+               pData->iOldXLS, pData->iOldYLS, pData->iOldXC);
+
+  WBDebugPrint("  pimgLumaSat   = %p\n", pData->pimgLumaSat);
+  WBDebugPrint("  pimgChroma    = %p\n", pData->pimgChroma);
+
+  WBDebugPrint("  pixmapLumaSat = %lu (%lxH)\n",
+               (unsigned long)pData->pimgLumaSat, (unsigned long)pData->pimgLumaSat);
+  WBDebugPrint("  pixmapChroma  = %lu (%lxH)\n",
+               (unsigned long)pData->pimgChroma, (unsigned long)pData->pimgChroma);
+  WBDebugPrint("**********************************************************************\n");
+}
 
 static XImage * CreateLumaSaturationImage(Display *pDisplay, XStandardColormap *pSCM, int nChroma)
 {
@@ -1119,7 +1158,7 @@ int iR, iG, iB, iChroma, iRow;
 XImage *pImage;
 
 
-  pImage = XGetImage(WBGetDefaultDisplay(), None, 0, 0, COLOR_IMAGE_SIZE, CHROMA_RIBBON_HEIGHT,
+  pImage = XGetImage(pDisplay, None, 0, 0, COLOR_IMAGE_SIZE, CHROMA_RIBBON_HEIGHT,
                      0xffffffff, XYPixmap);
 
   if(pImage == None)
@@ -1147,20 +1186,297 @@ XImage *pImage;
   return pImage;
 }
 
+static void ColorDialogImagesFromData(Display *pDisplay, WBDialogControl *pctrlLumaSat,
+                                      WBDialogControl *pctrlChroma, struct _COLOR_DIALOG_ *pUserData)
+{
+//  int iXLumaSat, iYLumaSat, iXChroma, iOldXLS, iOldYLS, iOldXC;
+
+
+
+}
+
+static void ColorDialogDataFromPixel(struct _COLOR_DIALOG_ *pUserData)
+{
+XColor clr;
+
+  clr.pixel = pUserData->lPixel;
+
+  PXM_PixelToRGB(&(pUserData->stdColorMap), &clr); // make sure the RGB members are correct
+
+  RGB255_FROM_XCOLOR(clr, pUserData->iRed, pUserData->iGreen, pUserData->iBlue);
+
+  PXM_RGBToHSV(pUserData->iRed, pUserData->iGreen, pUserData->iBlue,
+               &pUserData->iChroma,
+               &pUserData->iSaturation,
+               &pUserData->iLuma);
+
+
+  // fix all of the 'old' values to match
+  pUserData->iOldR = pUserData->iRed;
+  pUserData->iOldG = pUserData->iGreen;
+  pUserData->iOldB = pUserData->iBlue;
+
+  pUserData->iOldC = pUserData->iChroma;
+  pUserData->iOldL = pUserData->iLuma;
+  pUserData->iOldS = pUserData->iSaturation;
+
+  pUserData->lOldP = pUserData->lPixel;
+}
+
+static int ColorDialogRGBFromHSV(struct _COLOR_DIALOG_ *pUserData)
+{
+XColor clr;
+int iRval;
+
+  PXM_HSVToRGB(pUserData->iChroma, pUserData->iSaturation, pUserData->iLuma,
+               &pUserData->iRed,
+               &pUserData->iGreen,
+               &pUserData->iBlue);
+
+  RGB255_TO_XCOLOR(pUserData->iRed, pUserData->iGreen, pUserData->iBlue, clr);
+  PXM_RGBToPixel(&(pUserData->stdColorMap), &clr); // make sure the pixel is correct
+
+  pUserData->lPixel = clr.pixel; // and now I'm consistent!
+
+  iRval = pUserData->lOldP != pUserData->lPixel ||
+          pUserData->iOldR != pUserData->iRed ||
+          pUserData->iOldG != pUserData->iGreen ||
+          pUserData->iOldB != pUserData->iBlue ||
+          pUserData->iOldC != pUserData->iChroma ||
+          pUserData->iOldL != pUserData->iLuma ||
+          pUserData->iOldS != pUserData->iSaturation;
+
+  // fix all of the 'old' values to match
+  pUserData->iOldR = pUserData->iRed;
+  pUserData->iOldG = pUserData->iGreen;
+  pUserData->iOldB = pUserData->iBlue;
+
+  pUserData->iOldC = pUserData->iChroma;
+  pUserData->iOldL = pUserData->iLuma;
+  pUserData->iOldS = pUserData->iSaturation;
+
+  pUserData->lOldP = pUserData->lPixel;
+
+  return iRval;
+}
+
+static int ColorDialogHSVFromRGB(struct _COLOR_DIALOG_ *pUserData)
+{
+XColor clr;
+int iRval;
+
+  PXM_RGBToHSV(pUserData->iRed, pUserData->iGreen, pUserData->iBlue,
+               &pUserData->iChroma,
+               &pUserData->iSaturation,
+               &pUserData->iLuma);
+
+  RGB255_TO_XCOLOR(pUserData->iRed, pUserData->iGreen, pUserData->iBlue, clr);
+  PXM_RGBToPixel(&(pUserData->stdColorMap), &clr); // make sure the pixel is correct
+
+  pUserData->lPixel = clr.pixel; // and now I'm consistent!
+
+  iRval = pUserData->lOldP != pUserData->lPixel ||
+          pUserData->iOldR != pUserData->iRed ||
+          pUserData->iOldG != pUserData->iGreen ||
+          pUserData->iOldB != pUserData->iBlue ||
+          pUserData->iOldC != pUserData->iChroma ||
+          pUserData->iOldL != pUserData->iLuma ||
+          pUserData->iOldS != pUserData->iSaturation;
+
+  // fix all of the 'old' values to match
+  pUserData->iOldR = pUserData->iRed;
+  pUserData->iOldG = pUserData->iGreen;
+  pUserData->iOldB = pUserData->iBlue;
+
+  pUserData->iOldC = pUserData->iChroma;
+  pUserData->iOldL = pUserData->iLuma;
+  pUserData->iOldS = pUserData->iSaturation;
+
+  pUserData->lOldP = pUserData->lPixel;
+
+  return iRval;
+}
+
+static void ColorDialogAssignColorboxPixmap(Display *pDisplay, WBDialogControl *pCtrl, unsigned long lPixel)
+{
+GC gc;
+Pixmap pxTemp;
+XGCValues xgcv;
+int iW = COLORBOX_PIXMAP_WIDTH;
+int iH = COLORBOX_PIXMAP_HEIGHT;
+//WB_GEOM geom;
+
+
+//  // TEMPORARY - to make sure I fill the thing...
+//  WBGetWindowGeom(pCtrl->wID, &geom);
+//
+//  if((geom.width - 4) > iW || (geom.height - 4) > iH)
+//  {
+//    WB_ERROR_PRINT("TEMPORARY:  %s - re-assign width/height from %d,%d to %d,%d\n",
+//                   __FUNCTION__, iW, iH, geom.width - 4, geom.height - 4);
+//
+//    iW = geom.width - 4;
+//    iH = geom.height - 4;
+//  }
+
+  // step 1: a simple graphics context to fill the rectangle with
+
+  bzero(&xgcv, sizeof(xgcv));
+  xgcv.foreground = lPixel;
+  xgcv.background = lPixel;
+  xgcv.line_width = 1;
+  xgcv.function = GXcopy; // copy
+  xgcv.cap_style = CapProjecting;
+
+  gc = XCreateGC(pDisplay, pCtrl->wID,
+                 (GCForeground | GCBackground | GCCapStyle | GCFunction | GCLineWidth),
+                 &xgcv);
+
+  if(gc == None)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - unable to create gc for pixmap\n", __FUNCTION__);
+    return;
+  }
+
+//  XSetForeground(pDisplay, gc, lPixel);
+//  XSetBackground(pDisplay, gc, lPixel); // assign to the same color
+
+  // step 2:  create a pixmap that's the right size
+
+  pxTemp = XCreatePixmap(pDisplay, pCtrl->wID, iW, iH,
+                         DefaultDepth(pDisplay, DefaultScreen(pDisplay)));
+
+  if(pxTemp == None)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - unable to create pixmap\n", __FUNCTION__);
+  }
+  else
+  {
+    XFillRectangle(pDisplay, pxTemp, gc, 0, 0, iW, iH);
+
+    // set pixmap for control now - control will own it.
+
+    WBDialogControlSetPixmap(pCtrl, pxTemp); // and done!
+  }
+
+  WBDialogControlInvalidateGeom(pCtrl, NULL, 1); // paints immediately
+
+  XFreeGC(pDisplay, gc);
+}
+
+static void ColorDialogAssignLumaSatPixmap(Display *pDisplay, WBDialogControl *pCtrl, int iS, int iV)
+{
+}
+
+static void ColorDialogAssignChromaPixmap(Display *pDisplay, WBDialogControl *pCtrl, int iH)
+{
+}
+
+static unsigned long ColorDialogGetPixelValueFromControl(WBDialogControl *pCtrl)
+{
+const char *pTemp;
+const char *p3;
+unsigned long lPixel;
+
+
+  lPixel = 0; // pre-assign to zero
+
+  pTemp = WBDialogControlGetCaption(pCtrl);
+
+  if(pTemp && *pTemp)
+  {
+    p3 = pTemp;
+    while(*p3 && *p3 <= ' ') // skip leading white space
+    {
+      p3++;
+    }
+    if(*p3 == '#')
+    {
+      sscanf(p3 + 1, "%lX", &lPixel);
+    }
+    else if(!strncasecmp("0x", p3, 2))
+    {
+      sscanf(p3, "%lX", &lPixel);
+    }
+    else
+    {
+      sscanf(p3, "%ld", &lPixel);
+    }
+
+    lPixel &= 0xffffffff; // for now, limit to a 32-bit value (later, allow 64-bit colors?)
+  }
+
+  return lPixel;
+}
+
+
 static int ColorDialogCallback(Window wID, XEvent *pEvent)
 {
+Display *pDisplay = WBGetWindowDisplay(wID);
 WBDialogWindow *pDlg = DLGGetDialogWindowStruct(wID);
 struct _COLOR_DIALOG_ *pUserData = (struct _COLOR_DIALOG_ *)(pDlg ? pDlg->pUserData : NULL);
 //Display *pDisplay = WBGetWindowDisplay(wID);
 char *p1, *p2;
 
 
-  if(!pDlg)
+  if(!pDlg || !pUserData)
+  {
     return 0; // can't process any messages now
+  }
 
   if(pEvent->type == ClientMessage && pEvent->xclient.message_type == aDIALOG_INIT)
   {
-    // TODO:  initialize dialog box
+    // initialize dialog box
+
+    ColorDialogDataFromPixel(pUserData); // make everything in 'pUserData' consistent
+
+    // now, assign correct values to the image coordinates representing color info
+    if(pUserData->lPixel == 0) // black
+    {
+      pUserData->iXLumaSat = 0;
+      pUserData->iYLumaSat = 0;
+    }
+    else
+    {
+      pUserData->iXLumaSat = (pUserData->iLuma + (COLOR_IMAGE_COLOR_FACTOR - 1))
+                           / COLOR_IMAGE_COLOR_FACTOR;
+      pUserData->iYLumaSat = COLOR_IMAGE_SIZE
+                           - (pUserData->iSaturation + (COLOR_IMAGE_COLOR_FACTOR - 1))
+                             / COLOR_IMAGE_COLOR_FACTOR;
+    }
+
+    pUserData->iXChroma = (pUserData->iChroma + (COLOR_IMAGE_COLOR_FACTOR - 1))
+                        / COLOR_IMAGE_COLOR_FACTOR;
+
+    pUserData->iOldXLS = pUserData->iOldYLS = pUserData->iOldXC = -1; // force re-initialization, just in case
+
+    ColorDialogImagesFromData(pDisplay, WBGetDialogEntryControlStruct(pDlg, LUMA_SAT_PICKER),
+                              WBGetDialogEntryControlStruct(pDlg, CHROMA_PICKER), pUserData);
+
+    WBDialogControlSetCaptionInt(WBGetDialogEntryControlStruct(pDlg, LUMA_BOX),
+                                 pUserData->iLuma, NULL);
+    WBDialogControlSetCaptionInt(WBGetDialogEntryControlStruct(pDlg, CHROMA_BOX),
+                                 pUserData->iChroma, NULL);
+    WBDialogControlSetCaptionInt(WBGetDialogEntryControlStruct(pDlg, SAT_BOX),
+                                 pUserData->iSaturation, NULL);
+
+    WBDialogControlSetCaptionInt(WBGetDialogEntryControlStruct(pDlg, RED_BOX),
+                                 pUserData->iRed, NULL);
+    WBDialogControlSetCaptionInt(WBGetDialogEntryControlStruct(pDlg, GREEN_BOX),
+                                 pUserData->iGreen, NULL);
+    WBDialogControlSetCaptionInt(WBGetDialogEntryControlStruct(pDlg, BLUE_BOX),
+                                 pUserData->iBlue, NULL);
+
+    WBDialogControlSetCaptionLong(WBGetDialogEntryControlStruct(pDlg, COLORBOX_VALUE),
+                                  pUserData->lPixel, "#%-08.8lX");
+
+    ColorDialogAssignColorboxPixmap(pDisplay, WBGetDialogEntryControlStruct(pDlg, COLORBOX_VALUE),
+                                    pUserData->lPixel);
+
+    ColorDialogAssignLumaSatPixmap(pDisplay, WBGetDialogEntryControlStruct(pDlg, LUMA_SAT_PICKER),
+                                   pUserData->iSaturation, pUserData->iLuma);
+    ColorDialogAssignChromaPixmap(pDisplay, WBGetDialogEntryControlStruct(pDlg, CHROMA_PICKER),
+                                  pUserData->iChroma);
 
     return 1;
   }
@@ -1176,48 +1492,284 @@ char *p1, *p2;
   {
     // l[0] == message
     // l[1] == control ID
-    // l[2] ==
-    switch(pEvent->xclient.data.l[1])
+    // l[2] == hashed pointer to control's structure
+    // [the rest are event dependent]
+
+    if(pEvent->xclient.data.l[0] == aBUTTON_PRESS)
     {
-      case IDOK:
-      case IDCANCEL:
-        if(pEvent->xclient.data.l[0] == aBUTTON_PRESS)
-        {
+      switch(pEvent->xclient.data.l[1])
+      {
+        case IDOK:
+        case IDCANCEL:
           if(pEvent->xclient.data.l[1] == IDOK)
           {
             // do any data copying that's necessary on 'OK'
+
+            pUserData->iRed = WBDialogControlGetCaptionInt(WBGetDialogEntryControlStruct(pDlg, RED_BOX));
+            pUserData->iGreen = WBDialogControlGetCaptionInt(WBGetDialogEntryControlStruct(pDlg, GREEN_BOX));
+            pUserData->iBlue = WBDialogControlGetCaptionInt(WBGetDialogEntryControlStruct(pDlg, BLUE_BOX));
+
+            if(pUserData->iRed != pUserData->iOldR ||
+               pUserData->iGreen != pUserData->iOldG ||
+               pUserData->iBlue != pUserData->iOldB)
+            {
+              ColorDialogHSVFromRGB(pUserData);
+            }
+            else
+            {
+              pUserData->lPixel = ColorDialogGetPixelValueFromControl(WBGetDialogEntryControlStruct(pDlg, COLORBOX_VALUE));
+
+              if(pUserData->lPixel != pUserData->lOldP)
+              {
+                ColorDialogDataFromPixel(pUserData); // make everything in 'pUserData' consistent with 'lPixel'
+              }
+              else
+              {
+                pUserData->iLuma = WBDialogControlGetCaptionInt(WBGetDialogEntryControlStruct(pDlg, LUMA_BOX));
+                pUserData->iChroma = WBDialogControlGetCaptionInt(WBGetDialogEntryControlStruct(pDlg, CHROMA_BOX));
+                pUserData->iSaturation = WBDialogControlGetCaptionInt(WBGetDialogEntryControlStruct(pDlg, SAT_BOX));
+
+                if(pUserData->iLuma != pUserData->iOldL ||
+                   pUserData->iChroma != pUserData->iOldC ||
+                   pUserData->iSaturation != pUserData->iOldS)
+                {
+                  ColorDialogRGBFromHSV(pUserData); // fix it
+                }
+              }
+            }
+
+            if(pUserData->pColor) // if I have an XColor, which I should, then set it up correctly
+            {
+              pUserData->pColor->pixel = pUserData->lPixel;
+              PXM_PixelToRGB(&(pUserData->stdColorMap), pUserData->pColor);
+            }
+            else // the following code won't execute at this time, left for reference later
+            {
+              // TODO:  send a notification event to the owner window??
+            }
           }
 
           WBEndModal(wID, pEvent->xclient.data.l[1]); // all buttons close the dialog box
           return 1; // handled!
+      }
+    }
+    else if((pEvent->xclient.data.l[0] == aMOUSE_CLICK ||
+             pEvent->xclient.data.l[0] == aMOUSE_DBLCLICK ||
+             pEvent->xclient.data.l[0] == aMOUSE_DRAG) &&
+            WB_LIKELY(pEvent->xclient.data.l[1] == LUMA_SAT_PICKER ||
+                      pEvent->xclient.data.l[1] == CHROMA_PICKER))
+    {
+#ifndef NO_DEBUG
+      char *p1 = WBGetAtomName(WBGetWindowDisplay(wID), (Atom)pEvent->xclient.data.l[0]);
+
+      WB_ERROR_PRINT("%s - TODO:  control MOUSE notification message %ld (%s)  %ld (%08lxH), %ld (%08lxH), %ld (%08lxH), %ld (%08lxH)\n",
+                     __FUNCTION__, pEvent->xclient.data.l[0], p1,
+                     pEvent->xclient.data.l[1], pEvent->xclient.data.l[1],
+                     pEvent->xclient.data.l[2], pEvent->xclient.data.l[2],
+                     pEvent->xclient.data.l[3], pEvent->xclient.data.l[3],
+                     pEvent->xclient.data.l[4], pEvent->xclient.data.l[4]);
+
+      if(p1)
+      {
+        WBFree(p1);
+      }
+#endif // NO_DEBUG
+    }
+    else
+    {
+#ifndef NO_DEBUG
+      char *p1 = WBGetAtomName(WBGetWindowDisplay(wID), (Atom)pEvent->xclient.data.l[0]);
+
+      WB_WARN_PRINT("%s - TODO:  control notification message %ld (%s)  %ld (%08lxH), %ld (%08lxH)\n",
+                    __FUNCTION__, pEvent->xclient.data.l[0], p1,
+                    pEvent->xclient.data.l[1], pEvent->xclient.data.l[1],
+                    pEvent->xclient.data.l[2], pEvent->xclient.data.l[2]);
+
+      if(p1)
+      {
+        WBFree(p1);
+      }
+#endif // NO_DEBUG
+    }
+  }
+  else if(pEvent->xclient.message_type == aLOSTFOCUS) // monitor these
+  {
+    switch(pEvent->xclient.data.l[0]) // the control identifier
+    {
+      case IDOK:
+      case IDCANCEL:
+        break; // don't bother here
+
+      case COLORBOX_VALUE:
+        pUserData->lPixel = ColorDialogGetPixelValueFromControl(WBGetDialogEntryControlStruct(pDlg, COLORBOX_VALUE));
+
+        if(pUserData->lPixel != pUserData->lOldP) // value changed?
+        {
+          WB_ERROR_PRINT("TEMPORARY:  %s - Color Value Box Changed from %ld to %ld\n", __FUNCTION__, pUserData->lOldP, pUserData->lPixel);
+
+          ColorDialogDataFromPixel(pUserData); // make everything in 'pUserData' consistent with 'lPixel'
+
+          goto fix_rgb_hsv_and_colors;
         }
+
+        break; // no change so bust out now
+
+      case LUMA_SAT_PICKER:
+      case CHROMA_PICKER:
+
+        // NOTE:  click/drag on color boxen should automatically fix luma/chroma/sat
+        //        while clicking and dragging, so assume it's good now
+        if(ColorDialogRGBFromHSV(pUserData)) // fixes everything
+        {
+fix_rgb_hsv_and_colors:
+          WBDialogControlSetCaptionInt(WBGetDialogEntryControlStruct(pDlg, LUMA_BOX),
+                                       pUserData->iLuma, NULL);
+          WBDialogControlSetCaptionInt(WBGetDialogEntryControlStruct(pDlg, CHROMA_BOX),
+                                       pUserData->iChroma, NULL);
+          WBDialogControlSetCaptionInt(WBGetDialogEntryControlStruct(pDlg, SAT_BOX),
+                                       pUserData->iSaturation, NULL);
+
+          WBDialogControlSetCaptionInt(WBGetDialogEntryControlStruct(pDlg, RED_BOX),
+                                       pUserData->iRed, NULL);
+          WBDialogControlSetCaptionInt(WBGetDialogEntryControlStruct(pDlg, GREEN_BOX),
+                                       pUserData->iGreen, NULL);
+          WBDialogControlSetCaptionInt(WBGetDialogEntryControlStruct(pDlg, BLUE_BOX),
+                                       pUserData->iBlue, NULL);
+
+          // ALWAYS do this one - it reformats the text in 'COLORBOX_VALUE' to standard color designator
+          WBDialogControlSetCaptionLong(WBGetDialogEntryControlStruct(pDlg, COLORBOX_VALUE),
+                                        pUserData->lPixel, "#%-08.8lX");
+
+          ColorDialogAssignColorboxPixmap(pDisplay, WBGetDialogEntryControlStruct(pDlg, COLORBOX), pUserData->lPixel);
+
+          if(pEvent->xclient.data.l[1] == COLORBOX_VALUE) // for color value, do the next part
+          {
+            ColorDialogAssignLumaSatPixmap(pDisplay, WBGetDialogEntryControlStruct(pDlg, LUMA_SAT_PICKER),
+                                           pUserData->iSaturation, pUserData->iLuma);
+            ColorDialogAssignChromaPixmap(pDisplay, WBGetDialogEntryControlStruct(pDlg, CHROMA_PICKER),
+                                          pUserData->iChroma);
+          }
+        }
+
+        break;
+
+      case LUMA_BOX:
+        pUserData->iLuma = WBDialogControlGetCaptionInt(WBGetDialogEntryControlStruct(pDlg, LUMA_BOX)) & 0xff;
+        if(pUserData->iLuma != pUserData->iOldL) // value changed?
+        {
+          WB_ERROR_PRINT("TEMPORARY:  %s - Luma Box Changed from %d to %d\n", __FUNCTION__, pUserData->iOldL, pUserData->iLuma);
+fix_rgb_and_colors:
+          ColorDialogRGBFromHSV(pUserData);
+
+          WBDialogControlSetCaptionInt(WBGetDialogEntryControlStruct(pDlg, RED_BOX),
+                                       pUserData->iRed, NULL);
+          WBDialogControlSetCaptionInt(WBGetDialogEntryControlStruct(pDlg, GREEN_BOX),
+                                       pUserData->iGreen, NULL);
+          WBDialogControlSetCaptionInt(WBGetDialogEntryControlStruct(pDlg, BLUE_BOX),
+                                       pUserData->iBlue, NULL);
+
+          WBDialogControlSetCaptionLong(WBGetDialogEntryControlStruct(pDlg, COLORBOX_VALUE),
+                                        pUserData->lPixel, "#%-08.8lX");
+
+          ColorDialogAssignColorboxPixmap(pDisplay, WBGetDialogEntryControlStruct(pDlg, COLORBOX), pUserData->lPixel);
+          ColorDialogAssignLumaSatPixmap(pDisplay, WBGetDialogEntryControlStruct(pDlg, LUMA_SAT_PICKER),
+                                         pUserData->iSaturation, pUserData->iLuma);
+          ColorDialogAssignChromaPixmap(pDisplay, WBGetDialogEntryControlStruct(pDlg, CHROMA_PICKER),
+                                        pUserData->iChroma);
+        }
+
+        break;
+
+      case CHROMA_BOX:
+        pUserData->iChroma = WBDialogControlGetCaptionInt(WBGetDialogEntryControlStruct(pDlg, CHROMA_BOX)) & 0xff;
+        if(pUserData->iChroma != pUserData->iOldC) // value changed?
+        {
+          WB_ERROR_PRINT("TEMPORARY:  %s - Chroma Box Changed from %d to %d\n", __FUNCTION__, pUserData->iOldC, pUserData->iChroma);
+          goto fix_rgb_and_colors;
+        }
+
+        break;
+
+      case SAT_BOX:
+        pUserData->iSaturation = WBDialogControlGetCaptionInt(WBGetDialogEntryControlStruct(pDlg, CHROMA_BOX)) & 0xff;
+        if(pUserData->iSaturation != pUserData->iOldS) // value changed?
+        {
+          WB_ERROR_PRINT("TEMPORARY:  %s - Sat Box Changed from %d to %d\n", __FUNCTION__, pUserData->iOldS, pUserData->iSaturation);
+          goto fix_rgb_and_colors;
+        }
+
         break;
 
 
-      default:
+      case RED_BOX:
+        pUserData->iRed = WBDialogControlGetCaptionInt(WBGetDialogEntryControlStruct(pDlg, RED_BOX)) & 0xff;
+        if(pUserData->iRed != pUserData->iOldR) // value changed?
         {
-#ifndef NO_DEBUG
-          char *p1 = WBGetAtomName(WBGetWindowDisplay(wID), (Atom)pEvent->xclient.data.l[0]);
+          WB_ERROR_PRINT("TEMPORARY:  %s - Red Box Changed from %d to %d\n", __FUNCTION__, pUserData->iOldR, pUserData->iRed);
+fix_hsv_and_colors:
+          ColorDialogHSVFromRGB(pUserData);
 
-          WB_WARN_PRINT("%s - TODO:  control notification message %ld (%s)  %ld (%08lxH), %ld (%08lxH)\n",
-                        __FUNCTION__, pEvent->xclient.data.l[0], p1,
-                        pEvent->xclient.data.l[1], pEvent->xclient.data.l[1],
-                        pEvent->xclient.data.l[2], pEvent->xclient.data.l[2]);
+          WBDialogControlSetCaptionInt(WBGetDialogEntryControlStruct(pDlg, LUMA_BOX),
+                                       pUserData->iLuma, NULL);
+          WBDialogControlSetCaptionInt(WBGetDialogEntryControlStruct(pDlg, CHROMA_BOX),
+                                       pUserData->iChroma, NULL);
+          WBDialogControlSetCaptionInt(WBGetDialogEntryControlStruct(pDlg, SAT_BOX),
+                                       pUserData->iSaturation, NULL);
 
-          if(p1)
-          {
-            WBFree(p1);
-          }
-#endif // NO_DEBUG
+          WBDialogControlSetCaptionLong(WBGetDialogEntryControlStruct(pDlg, COLORBOX_VALUE),
+                                        pUserData->lPixel, "#%-08.8lX");
+
+          ColorDialogAssignColorboxPixmap(pDisplay, WBGetDialogEntryControlStruct(pDlg, COLORBOX), pUserData->lPixel);
+          ColorDialogAssignLumaSatPixmap(pDisplay, WBGetDialogEntryControlStruct(pDlg, LUMA_SAT_PICKER),
+                                         pUserData->iSaturation, pUserData->iLuma);
+          ColorDialogAssignChromaPixmap(pDisplay, WBGetDialogEntryControlStruct(pDlg, CHROMA_PICKER),
+                                        pUserData->iChroma);
         }
+
+        break;
+
+      case GREEN_BOX:
+        pUserData->iGreen = WBDialogControlGetCaptionInt(WBGetDialogEntryControlStruct(pDlg, GREEN_BOX)) & 0xff;
+        if(pUserData->iGreen != pUserData->iOldG) // value changed?
+        {
+          WB_ERROR_PRINT("TEMPORARY:  %s - Green Box Changed from %d to %d\n", __FUNCTION__, pUserData->iOldG, pUserData->iGreen);
+          goto fix_hsv_and_colors;
+        }
+
+        break;
+
+      case BLUE_BOX:
+        pUserData->iBlue = WBDialogControlGetCaptionInt(WBGetDialogEntryControlStruct(pDlg, BLUE_BOX)) & 0xff;
+        if(pUserData->iBlue != pUserData->iOldB) // value changed?
+        {
+          WB_ERROR_PRINT("TEMPORARY:  %s - Blue Box Changed from %d to %d\n", __FUNCTION__, pUserData->iOldB, pUserData->iBlue);
+          goto fix_hsv_and_colors;
+        }
+
+        break;
     }
+    return 0; // I want this to happen because it lets other things happen, too
   }
   else if(pEvent->xclient.message_type == aGOTFOCUS)
   {
-    return 0; // for now
-  }
-  else if(pEvent->xclient.message_type == aLOSTFOCUS)
-  {
+//#ifndef NO_DEBUG
+//    {
+//      char *p1 = WBGetAtomName(WBGetWindowDisplay(wID), (Atom)pEvent->xclient.data.l[0]);
+//
+//      WB_WARN_PRINT("TEMPORARY:  %s - GOT FOCUS notification message %ld (%s)  %ld (%08lxH), %ld (%08lxH)\n",
+//                    __FUNCTION__, pEvent->xclient.data.l[0], p1,
+//                    pEvent->xclient.data.l[1], pEvent->xclient.data.l[1],
+//                    pEvent->xclient.data.l[2], pEvent->xclient.data.l[2]);
+//
+//      if(p1)
+//      {
+//        WBFree(p1);
+//      }
+//    }
+//#endif // NO_DEBUG
+
+    // control ID is in pEvent->xclient.data.l[0]
+
     return 0; // for now
   }
   else
@@ -1226,9 +1778,9 @@ char *p1, *p2;
     char *p1 = WBGetAtomName(WBGetWindowDisplay(wID), (Atom)pEvent->xclient.message_type);
     char *p2 = WBGetAtomName(WBGetWindowDisplay(wID), (Atom)pEvent->xclient.data.l[0]);
 
-    WB_WARN_PRINT("%s - unhandled notification %s %ld (%s)  %ld (%08lxH), %ld (%08lxH)\n",
-                  __FUNCTION__, p1,
-                  pEvent->xclient.data.l[0], p2,
+    WB_WARN_PRINT("%s - unhandled ClientMessage %d (%s) %ld (%s)  %ld (%08lxH), %ld (%08lxH)\n",
+                  __FUNCTION__, (int)pEvent->xclient.message_type, (const char *)(p1 ? p1 : "(Null)"),
+                  pEvent->xclient.data.l[0], (const char *)(p2 ? p2 : "(Null)"),
                   pEvent->xclient.data.l[1], pEvent->xclient.data.l[1],
                   pEvent->xclient.data.l[2], pEvent->xclient.data.l[2]);
 
@@ -1252,9 +1804,9 @@ static const char szColorDialogRes[]=
   "BEGIN_DIALOG FONT:Variable HEIGHT:182 WIDTH:280 TITLE:\"Color Chooser\"\n"
 
   // these controls are first in the tab order
-  "  CONTROL:Image ID:1009          X:150 Y:120 WIDTH:50 HEIGHT:16 VISIBLE\n"
-  "  CONTROL:Text  TITLE:\"Value:\" X:200 Y:120 WIDTH:24 HEIGHT:16 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
-  "  CONTROL:Edit  ID:1010          X:228 Y:120 WIDTH:40 HEIGHT:16 VISIBLE\n"
+  "  CONTROL:Image ID:1009          X:150 Y:120 WIDTH:50 HEIGHT:14 VISIBLE\n"
+  "  CONTROL:Text  TITLE:\"Value:\" X:200 Y:122 WIDTH:24 HEIGHT:10 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
+  "  CONTROL:Edit  ID:1010          X:228 Y:122 WIDTH:40 HEIGHT:10 VISIBLE\n"
 
   // then the buttons
   "  CONTROL:DefPushButton ID:IDOK     TITLE:OK     X:60 Y:160 WIDTH:40 HEIGHT:18 VISIBLE\n"
@@ -1265,19 +1817,19 @@ static const char szColorDialogRes[]=
   "  CONTROL:Image ID:1002 X:2 Y:136 HEIGHT:16  WIDTH:132 VISIBLE CLICKABLE\n" // 128x12 image, chroma
 
   // then the rest
-  "  CONTROL:Text  TITLE:\"Lum:\"  X:140 Y:22 WIDTH:22 HEIGHT:14 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
-  "  CONTROL:Edit  ID:1003         X:164 Y:22 WIDTH:28 HEIGHT:14 VISIBLE\n"
-  "  CONTROL:Text  TITLE:\"Chr:\"  X:140 Y:44 WIDTH:22 HEIGHT:14 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
-  "  CONTROL:Edit  ID:1004         X:164 Y:44 WIDTH:28 HEIGHT:14 VISIBLE\n"
-  "  CONTROL:Text  TITLE:\"Sat:\"  X:140 Y:66 WIDTH:22 HEIGHT:14 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
-  "  CONTROL:Edit  ID:1005         X:164 Y:66 WIDTH:28 HEIGHT:14 VISIBLE\n"
+  "  CONTROL:Text  TITLE:\"Lum:\"  X:140 Y:22 WIDTH:22 HEIGHT:10 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
+  "  CONTROL:Edit  ID:1003         X:164 Y:22 WIDTH:28 HEIGHT:10 VISIBLE\n"
+  "  CONTROL:Text  TITLE:\"Chr:\"  X:140 Y:44 WIDTH:22 HEIGHT:10 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
+  "  CONTROL:Edit  ID:1004         X:164 Y:44 WIDTH:28 HEIGHT:10 VISIBLE\n"
+  "  CONTROL:Text  TITLE:\"Sat:\"  X:140 Y:66 WIDTH:22 HEIGHT:10 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
+  "  CONTROL:Edit  ID:1005         X:164 Y:66 WIDTH:28 HEIGHT:10 VISIBLE\n"
 
-  "  CONTROL:Text  TITLE:\"Red:\"  X:210 Y:22 WIDTH:22 HEIGHT:14 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
-  "  CONTROL:Edit  ID:1006         X:234 Y:22 WIDTH:28 HEIGHT:14 VISIBLE\n"
-  "  CONTROL:Text  TITLE:\"Grn:\"  X:210 Y:44 WIDTH:22 HEIGHT:14 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
-  "  CONTROL:Edit  ID:1007         X:234 Y:44 WIDTH:28 HEIGHT:14 VISIBLE\n"
-  "  CONTROL:Text  TITLE:\"Blu:\"  X:210 Y:66 WIDTH:22 HEIGHT:14 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
-  "  CONTROL:Edit  ID:1008         X:234 Y:66 WIDTH:28 HEIGHT:14 VISIBLE\n"
+  "  CONTROL:Text  TITLE:\"Red:\"  X:210 Y:22 WIDTH:22 HEIGHT:10 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
+  "  CONTROL:Edit  ID:1006         X:234 Y:22 WIDTH:28 HEIGHT:10 VISIBLE\n"
+  "  CONTROL:Text  TITLE:\"Grn:\"  X:210 Y:44 WIDTH:22 HEIGHT:10 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
+  "  CONTROL:Edit  ID:1007         X:234 Y:44 WIDTH:28 HEIGHT:10 VISIBLE\n"
+  "  CONTROL:Text  TITLE:\"Blu:\"  X:210 Y:66 WIDTH:22 HEIGHT:10 NOBORDER VISIBLE VALIGN_TEXT_CENTER HALIGN_TEXT_RIGHT\n"
+  "  CONTROL:Edit  ID:1008         X:234 Y:66 WIDTH:28 HEIGHT:10 VISIBLE\n"
 
   "END_DIALOG\n";
 WBDialogWindow *pDlg;
@@ -1312,28 +1864,13 @@ Window wIDDlg;
     WBDefaultStandardColormap(pDisplay, &(data.stdColorMap));
   }
 
-  data.pColor = pColor;
-  data.iChromaLumaSat = -1; // double-ensure it always re-builds
+  data.pColor = pColor; // pixel value will become initial color
   data.pimgLumaSat = NULL;
   data.pimgChroma = NULL;
   data.pixmapLumaSat = None;
   data.pixmapChroma = None;
 
-  data.lPixel = pColor->pixel; // cache it
-  // now calculate the other things
-
-  if((pColor->flags & (DoRed | DoGreen | DoBlue)) != (DoRed | DoGreen | DoBlue))
-  {
-    PXM_PixelToRGB(&(data.stdColorMap), pColor); // make sure the RGB members are correct
-  }
-
-  RGB255_FROM_XCOLOR(*pColor, data.iR, data.iG, data.iB); // assign RGB
-
-  // now get the luma/chroma/saturation info - H = 'Hue' S = 'Saturation' and V = 'value' (luma)
-  // for the conversion, but the variables in the structure use 'Luma' 'Chroma' and 'Saturation'
-
-  PXM_RGBToHSV(data.iR, data.iG, data.iB, &data.iChroma, &data.iSaturation, &data.iLuma);
-
+  data.lPixel = pColor->pixel; // cache it - the rest will take care of itself
 
   // now that all of THAT is done, do the dialog box
 
@@ -1377,9 +1914,10 @@ Window wIDDlg;
 }
 
 
-///////////////
-// COLOR DIALOG
-///////////////
+
+//////////////
+// FONT DIALOG
+//////////////
 
 
 XFontSet DLGFontDialog(Display *pDisplay, Window wIDOwner, XFontSet fsDefault)

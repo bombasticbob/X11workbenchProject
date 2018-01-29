@@ -51,6 +51,7 @@
 #ifndef DIALOG_CONTROLS_H_INCLUDED
 #define DIALOG_CONTROLS_H_INCLUDED
 
+#include <stdlib.h> // for the inline stuff
 #include "window_helper.h"
 #include "dialog_window.h"
 
@@ -300,6 +301,43 @@ WBDialogControl * WBDialogControlCreate(Atom aClass, WBDialogWindow *pOwner,
 void DLGRegisterControlCallback(WBDialogControl *pDialogControl, const char *szClassName, WBWinEvent pCallback);
 
 
+/** \ingroup expose
+  * \brief Convenience function, invalidates a Geom for a dialog box control
+  *
+  * \param pDialogControl A pointer to the WBDialogControl structure that is associated with the dialog control window
+  * \param pGeom A pointer to a WB_GEOM structure specifying the invalid area, or NULL (implying the entire window)
+  * \param bPaintFlag A non-zero value to force re-paint by generating an Expose message.  Zero simply invalidates the specified area
+  *
+  * convenience function for calling WBInvalidateRegion() for a dialog box control
+  *
+  * Header File:  dialog_controls.h
+**/
+static __inline void WBDialogControlInvalidateGeom(WBDialogControl *pDialogControl, const WB_GEOM *pGeom, int bPaintFlag)
+{
+  if(pDialogControl) // TODO:  a 'validate' function?
+  {
+    WBInvalidateGeom(pDialogControl->wID, pGeom, bPaintFlag);
+  }
+}
+
+/** \ingroup expose
+  * \brief Convenience function, invalidates a region for a dialog box control
+  *
+  * \param pDialogControl A pointer to the WBDialogControl structure that is associated with the dialog control window
+  * \param rgn A Region identifier specifying the invalid area, or None (implying the entire window)
+  * \param bPaintFlag A non-zero value to force re-paint by generating an Expose message.  Zero simply invalidates the specified area
+  *
+  * convenience function for calling WBInvalidateRegion() for a dialog box control
+  *
+  * Header File:  dialog_controls.h
+**/
+static __inline void WBDialogControlInvalidateRegion(WBDialogControl *pDialogControl, Region rgn, int bPaintFlag)
+{
+  if(pDialogControl) // TODO:  a 'validate' function?
+  {
+    WBInvalidateRegion(pDialogControl->wID, rgn, bPaintFlag);
+  }
+}
 
 // generic property list helpers (low level)
 /** \ingroup dlgctrl
@@ -425,13 +463,34 @@ void *WBDialogControlGetProperty2(WBDialogControl *pCtrl, Atom aPropName); // re
 **/
 static __inline__ WBDialogControl *DLGGetDialogControlStruct(Window wID)  // for dialog controls, returns the dialog control struct
 {
-  WBDialogControl *pRval = (WBDialogControl *)WBGetWindowData(wID, 0);  // offset 0 for window-specific structs
+  if(wID != None)
+  {
+    WBDialogControl *pRval = (WBDialogControl *)WBGetWindowData(wID, 0);  // offset 0 for window-specific structs
 
-  if(pRval && pRval->ulTag == DIALOG_CONTROL_TAG)
-    return(pRval);
+    if(pRval && pRval->ulTag == DIALOG_CONTROL_TAG)
+      return(pRval);
+  }
 
   return(NULL);
 }
+
+/** \ingroup dlgctrl
+  * \brief Returns a pointer to the WBDialogControl structure for a dialog control based on its ID and containing Dialog Window.  May return NULL.
+  *
+  * \param pDialog A pointer to a WBDialogWindow structure for the dialog window containing the control
+  * \param iControlID An integer value indicating the 'ID' for the contained control
+  * \return Pointer to WBDialogControl structure associated with the dialog control, or NULL if error or nonexistent
+  *
+  * This is the preferred function for obtaining a pointer to the WBDialogControl structure for a dialog control window
+  *
+  * Header File:  dialog_controls.h
+**/
+static __inline WBDialogControl * WBGetDialogEntryControlStruct(WBDialogWindow *pDialog, int iControlID)
+{
+  return DLGGetDialogControlStruct(DLGGetDialogControl(pDialog, iControlID));
+}
+
+
 
 
 
@@ -439,38 +498,255 @@ static __inline__ WBDialogControl *DLGGetDialogControlStruct(Window wID)  // for
 // these have additional implications, which is why they use their own API functions
 
 /** \ingroup dlgctrl
-  * \brief Assign text to the 'CAPTION' property of a dialog control
-  *
-  * The CAPTION property is a standard property for a dialog control.  Since it has
-  * its own data member in the \ref WBDialogControl structure, you should maintain
-  * it using this function.  It is equivalent to the 'Title'.
-  *
-  * Header File:  dialog_controls.h
-**/
-void WBDialogControlSetCaption(WBDialogControl *pCtrl, const char *szCaption); // caption (all, equiv to 'title')
-/** \ingroup dlgctrl
   * \brief Obtain a pointer to the assigned text for the 'CAPTION' property of a dialog control
   *
+  * \param pCtrl A pointer to the WBDialogControl structure for the dialog control
+  * \return A const char pointer to the text  (owned by the WBDialogControl structure)
+  *
   * The CAPTION property is a standard property for a dialog control.  Since it has
-  * its own data member in the \ref WBDialogControl structure, you should only query
-  * it using this function.  It is equivalent to the 'Title'.
+  * its own data member in the \ref WBDialogControl structure, you should only query it
+  * using this function (or similar).  It is equivalent to the 'Title'.
   *
   * Header File:  dialog_controls.h
 **/
 const char *WBDialogControlGetCaption(WBDialogControl *pCtrl);
 
 /** \ingroup dlgctrl
+  * \brief Assign text to the 'CAPTION' property of a dialog control
+  *
+  * \param pCtrl A pointer to the WBDialogControl structure for the dialog control
+  * \param szCaption A const char pointer to the text to assign
+  *
+  * The CAPTION property is a standard property for a dialog control.  Since it has
+  * its own data member in the \ref WBDialogControl structure, you should maintain it
+  * using this function (or similar).  It is equivalent to the 'Title'.
+  *
+  * Header File:  dialog_controls.h
+**/
+void WBDialogControlSetCaption(WBDialogControl *pCtrl, const char *szCaption); // caption (all, equiv to 'title')
+
+
+/** \ingroup dlgctrl
+  * \brief Returns an integer from the text of the 'CAPTION' property of a dialog control
+  *
+  * \param pCtrl A pointer to the WBDialogControl structure for the dialog control
+  * \return An integer value converted from the text using 'atoi()'
+  *
+  * This is a convenience wrapper function around sscanf() and WBDialogControlGetCaption().
+  *
+  * The CAPTION property is a standard property for a dialog control.  Since it has
+  * its own data member in the \ref WBDialogControl structure, you should query it
+  * using this function (or similar).  It is equivalent to the 'Title'.
+  *
+  * Header File:  dialog_controls.h
+**/
+static __inline int WBDialogControlGetCaptionInt(WBDialogControl *pCtrl)
+{
+char tbuf2[4];
+const char *pCaption;
+
+  pCaption = WBDialogControlGetCaption(pCtrl);
+
+  if(!pCaption || !*pCaption)
+  {
+    return 0;
+  }
+
+  return(atoi(pCaption));
+}
+
+/** \ingroup dlgctrl
+  * \brief Assign an integer as text to the 'CAPTION' property of a dialog control
+  *
+  * \param pCtrl A pointer to the WBDialogControl structure for the dialog control
+  * \param iValue An integer value that is to be assigned as the caption using 'szFormat'
+  * \param szCaption A const char pointer to the 'printf' style format string (NULL assumes '%d')
+  *
+  * This is a convenience wrapper function around snprintf() and WBDialogControlSetCaption().
+  *
+  * The CAPTION property is a standard property for a dialog control.  Since it has
+  * its own data member in the \ref WBDialogControl structure, you should maintain it
+  * using this function (or similar).  It is equivalent to the 'Title'.
+  *
+  * Header File:  dialog_controls.h
+**/
+static __inline void WBDialogControlSetCaptionInt(WBDialogControl *pCtrl, int iValue, const char *szFormat)
+{
+char tbuf[64], tbuf2[4];
+const char *pF = szFormat;
+
+  if(!pF || !*pF)
+  {
+    tbuf2[0] = '%';
+    tbuf2[1] = 'd';
+    tbuf2[2] = 0;
+    tbuf2[3] = 0; // this is to tickle the code optimizer into doing a single 32-bit assignment
+
+    pF = &(tbuf2[0]);
+  }
+
+  snprintf(tbuf, sizeof(tbuf), pF, iValue);
+  WBDialogControlSetCaption(pCtrl, tbuf);
+}
+
+/** \ingroup dlgctrl
+  * \brief Returns a long integer from the text of the 'CAPTION' property of a dialog control
+  *
+  * \param pCtrl A pointer to the WBDialogControl structure for the dialog control
+  * \return A long integer value converted from the text using 'atol()'
+  *
+  * This is a convenience wrapper function around sscanf() and WBDialogControlGetCaption().
+  *
+  * The CAPTION property is a standard property for a dialog control.  Since it has
+  * its own data member in the \ref WBDialogControl structure, you should query it
+  * using this function (or similar).  It is equivalent to the 'Title'.
+  *
+  * Header File:  dialog_controls.h
+**/
+static __inline long WBDialogControlGetCaptionLong(WBDialogControl *pCtrl)
+{
+char tbuf2[4];
+const char *pCaption;
+
+  pCaption = WBDialogControlGetCaption(pCtrl);
+
+  if(!pCaption || !*pCaption)
+  {
+    return 0;
+  }
+
+  return(atol(pCaption));
+}
+
+/** \ingroup dlgctrl
+  * \brief Assign a long integer as text to the 'CAPTION' property of a dialog control
+  *
+  * \param pCtrl A pointer to the WBDialogControl structure for the dialog control
+  * \param lValue An integer value that is to be assigned as the caption using 'szFormat'
+  * \param szCaption A const char pointer to the 'printf' style format string (NULL assumes '%ld')
+  *
+  * This is a convenience wrapper function around snprintf() and WBDialogControlSetCaption().
+  *
+  * The CAPTION property is a standard property for a dialog control.  Since it has
+  * its own data member in the \ref WBDialogControl structure, you should maintain it
+  * using this function (or similar).  It is equivalent to the 'Title'.
+  *
+  * Header File:  dialog_controls.h
+**/
+static __inline void WBDialogControlSetCaptionLong(WBDialogControl *pCtrl, long lValue, const char *szFormat)
+{
+char tbuf[64], tbuf2[4];
+const char *pF = szFormat;
+
+  if(!pF || !*pF)
+  {
+    tbuf2[0] = '%';
+    tbuf2[1] = 'l';
+    tbuf2[2] = 'd';
+    tbuf2[3] = 0;
+
+    pF = &(tbuf2[0]);
+  }
+
+  snprintf(tbuf, sizeof(tbuf), pF, lValue);
+  WBDialogControlSetCaption(pCtrl, tbuf);
+}
+
+#ifdef WB_INT64
+/** \ingroup dlgctrl
+  * \brief Returns a WB_INT64 from the text of the 'CAPTION' property of a dialog control
+  *
+  * \param pCtrl A pointer to the WBDialogControl structure for the dialog control
+  * \return A long integer value converted from the text using 'atoll()'
+  *
+  * This is a convenience wrapper function around sscanf() and WBDialogControlGetCaption().
+  *
+  * The CAPTION property is a standard property for a dialog control.  Since it has
+  * its own data member in the \ref WBDialogControl structure, you should query it
+  * using this function (or similar).  It is equivalent to the 'Title'.
+  *
+  * Header File:  dialog_controls.h
+**/
+static __inline WB_INT64 WBDialogControlGetCaptionLong(WBDialogControl *pCtrl)
+{
+char tbuf2[4];
+const char *pCaption;
+
+  pCaption = WBDialogControlGetCaption(pCtrl);
+
+  if(!pCaption || !*pCaption)
+  {
+    return 0;
+  }
+
+  return(atoll(pCaption));
+}
+
+/** \ingroup dlgctrl
+  * \brief Assign a 64-bit integer as text to the 'CAPTION' property of a dialog control
+  *
+  * \param pCtrl A pointer to the WBDialogControl structure for the dialog control
+  * \param llValue A 64-bit integer value that is to be assigned as the caption using 'szFormat'
+  * \param szCaption A const char pointer to the 'printf' style format string (NULL assumes '%lld')
+  *
+  * This is a convenience wrapper function around snprintf() and WBDialogControlSetCaption().
+  *
+  * The CAPTION property is a standard property for a dialog control.  Since it has
+  * its own data member in the \ref WBDialogControl structure, you should maintain it
+  * using this function (or similar).  It is equivalent to the 'Title'.
+  *
+  * Header File:  dialog_controls.h
+**/
+static __inline void WBDialogControlSetCaptionLongLong(WBDialogControl *pCtrl, WB_INT64 llValue, const char *szFormat)
+{
+char tbuf[128], tbuf2[8];
+const char *pF = szFormat;
+
+  if(!pF || !*pF)
+  {
+    tbuf2[0] = '%';
+    tbuf2[1] = 'l';
+    tbuf2[2] = 'l';
+    tbuf2[3] = 'd';
+    tbuf2[4] = 0;
+    tbuf2[5] = 0;
+    tbuf2[6] = 0;
+    tbuf2[7] = 0; // encourages the optimizer to use a 64-bit or two 32-bit assignments
+
+    pF = &(tbuf2[0]);
+  }
+
+  snprintf(tbuf, sizeof(tbuf), pF, llValue);
+  WBDialogControlSetCaption(pCtrl, tbuf);
+}
+#endif // WB_INT64
+
+
+/** \ingroup dlgctrl
   * \brief Assign the PIXMAP (image) property for a control
+  *
+  * \param pCtrl A pointer to the WBDialogControl structure for this control
+  * \param pixmap A Pixmap to be assigned (may be None).  It must be for the same Display as the control.
   *
   * The PIXMAP property is a standard property for a dialog control.  Since it has
   * its own data member in the \ref WBDialogControl structure, you should only
   * maintain it using this function.  It is equivalent to the IMAGE or ICON property.
+  *
+  * Assigning the Pixmap causes the existing Pixmap to be free'd using XFreePixmap().
+  * Additionally, you should only assign a Pixmap that was allocated for the same Display
+  * as the control.
   *
   * Header File:  dialog_controls.h
 **/
 void WBDialogControlSetPixmap(WBDialogControl *pCtrl, Pixmap pixmap);  // pixmaps (image, icon, button?)
 /** \ingroup dlgctrl
   * \brief Obtain the assigned PIXMAP (image) property for a control
+  *
+  * \param pCtrl A pointer to the WBDialogControl structure for this control
+  * \returns The Pixmap that has been assigned to the control.  May be 'None'.
+  *
+  * The returned Pixmap is owned by the control and should NOT be manipulated nor free'd.
+  * If you need to manipulate the Pixmap, make a copy and assign the copy as the new Pixmap.
   *
   * The PIXMAP property is a standard property for a dialog control.  Since it has
   * its own data member in the \ref WBDialogControl structure, you should only
@@ -484,12 +760,16 @@ Pixmap WBDialogControlGetPixmap(WBDialogControl *pCtrl);
   * \brief Assign the ICON (image) property for a control, which consists of 2 pixmaps
   *
   * \param pCtrl A ponter to the WBDialogControl structure for the control
-  * \param pixmap The foreground pixmap for the ICON image
-  * \param pixmap2 The transparency (mask) pixmap for the ICON image
+  * \param pixmap The foreground Pixmap for the ICON image (may be None).  It must be for the same Display as the control.
+  * \param pixmap2 The transparency (mask) Pixmap for the ICON image (may be None).  It must be for the same Display as the control.
   *
   * The ICON property is a standard property for a dialog control.  Since it has
   * its own data member in the \ref WBDialogControl structure, you should only
   * maintain it using this function.  It is equivalent to the IMAGE or PIXMAP property.
+  *
+  * Assigning the Pixmaps causes the existing Pixmaps to be free'd using XFreePixmap().
+  * Additionally, you should only assign Pixmaps that were allocated for the same Display
+  * as the control.
   *
   * Header File:  dialog_controls.h
 **/
@@ -498,8 +778,11 @@ void WBDialogControlSetIconPixmap(WBDialogControl *pCtrl, Pixmap pixmap, Pixmap 
   * \brief Obtain the assigned ICON (image) property for a control, which consists of 2 pixmaps
   *
   * \param pCtrl A ponter to the WBDialogControl structure for the control
-  * \param pPixmap2 A pointer to the storage for the returned transparency (mask) pixmap for the ICON image.  May be NULL
-  * \return The foreground pixmap for the ICON image.  May be None if no pixmap has been assigned.
+  * \param pPixmap2 A pointer to the storage for the returned transparency (mask) Pixmap for the ICON image.  May be NULL
+  * \return The foreground Pixmap for the ICON image.  May be None if no Pixmap has been assigned.
+  *
+  * The returned Pixmaps are owned by the control and should NOT be manipulated nor free'd.
+  * If you need to manipulate the Pixmaps, make copies and assign the copies as the new Pixmaps.
   *
   * The ICON property is a standard property for a dialog control.  Since it has
   * its own data member in the \ref WBDialogControl structure, you should only

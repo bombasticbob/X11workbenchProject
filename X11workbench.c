@@ -110,6 +110,19 @@
 #endif // NO_SPLASH
 
 
+// copyright string '(c)' or the UTF8 symbol - if I support UTF8, use the circle-c version
+#ifdef X_HAVE_UTF8_STRING
+
+// 11 bits    U+07FF      110xxxxx 10xxxxxx
+// A9 --> 10101001 --> 11000010 10101001 --> C2 A9
+#define UTF8_COPYRIGHT "\xc2""\xa9"
+
+// TODO:  any other UTF8-specific strings can be defined here
+#endif // X_HAVE_UTF8_STRING
+
+
+
+
 // function prototypes
 
 static int do_main(int argc, char *argv[], char *envp[]);
@@ -145,12 +158,16 @@ int DoFileOpen(WBFrameWindow *pMainFrame, const char *szFileName);
 WBFILE_TYPE GetFileType(const char *szFileName); // return one of the WBFILE_TYPE constants
 
 
+// global vars
+int nCPU = 0;
+
 
 int main(int argc, char *argv0[], char *envp0[])
 {
 int iRval = 1;
 char **argv = argv0; // re-define as char ** so I can re-allocate it as needed
 char **envp = envp0;
+
 
   if(!WBParseStandardArguments(&argc, &argv, &envp))
   {
@@ -513,6 +530,9 @@ next_argument:
   PXM_RegisterAppIcons(icon_app_xpm, application_icon_xpm);
 
 
+  nCPU = WBCPUCount(); // get # of CPUs
+
+
 #ifndef NO_DEBUG
   // This DEBUG section dumps the config data when theh '-d' option was specified on the command line.
   // it requires a Display object so I must do it HERE.  Then I can call WBExit and bail out.
@@ -542,17 +562,44 @@ next_argument:
   XParseColor(pX11Display, colormap, szGreen, &clrGreen);
   XAllocColor(pX11Display, colormap, &clrGreen);  // NOTE:  do I need 'XFreeColors' for 'clrGreen' ?
 
-// 11 bits    U+07FF      110xxxxx 10xxxxxx
-// A9 --> 10101001 --> 11000010 10101001 --> C2 A9
-#define UTF8_COPYRIGHT "\xc2""\xa9"
-
 #ifndef NO_SPLASH
+
+
   if(!bNoSplash)
   {
-    DLGSplashScreen(splash_xpm,
-//                    "Copyright " UTF8_COPYRIGHT " 2010-2018 by Big Bad Bombastic Bob\nAll Rights Reserved",  // text string with unicode char in it U+00A9
+    char *pCopyright = WBCopyString(
+#ifdef UTF8_COPYRIGHT
+                                    "Copyright " UTF8_COPYRIGHT " 2010-2018 by Big Bad Bombastic Bob\nAll Rights Reserved"  // text string with unicode char in it U+00A9
+#else // UTF8_COPYRIGHT
+                                    "Copyright (c) 2010-2018 by Big Bad Bombastic Bob\nAll Rights Reserved"
+#endif // UTF8_COPYRIGHT
+                                   );
+
+    if(pCopyright && nCPU > 0)
+    {
+      char tbuf[32];
+
+      snprintf(tbuf, sizeof(tbuf), "%d **", nCPU);
+      WBCatString(&pCopyright, "\n** CPU Count: ");
+      if(pCopyright)
+      {
+        WBCatString(&pCopyright, tbuf);
+      }
+    }
+
+    if(pCopyright)
+    {
+      DLGSplashScreen(splash_xpm,
+                    pCopyright, WhitePixel(pX11Display, DefaultScreen(pX11Display))); // white text
+
+      WBFree(pCopyright);
+    }
+    else
+    {
+      DLGSplashScreen(splash_xpm,
                     "Copyright (c) 2010-2018 by Big Bad Bombastic Bob\nAll Rights Reserved", // 1 or 2 lines only
                     WhitePixel(pX11Display, DefaultScreen(pX11Display))); // white text
+    }
   }
 #endif // NO_SPLASH
 
@@ -854,26 +901,55 @@ int iRval = 0;
 
 int DoFileOpen(WBFrameWindow *pMainFrame, const char *szFileName)
 {
-  WBChildFrame *pCF = NULL;
+WBFILE_TYPE ft;
+WBChildFrame *pCF;
+int iTab, iLineEnd;
+
 
   if(!pMainFrame || !szFileName || !*szFileName)
   {
     return -1;
   }
 
+  pCF = NULL; // as a flag for later, make sure it's NULL
+
   // create a new tab in the frame window using the correct type of child window
 
-//  uint32_t uiFileType = GetFileType(szFileName);
-//
-//  if(uiFileType == WBFILE_PROJECT)
-//  {
-//  }
-//  else if(uiFileType == WBFILE_RESOURCE)
-//  {
-//  }
-//  else
+  ft = GetFileType(szFileName);
+
+  if(ft == WBFILE_TYPE_PROJECT)
   {
-    // All other files are assumed to be text files.
+    DLGMessageBox(MessageBox_OK | MessageBox_Error, None,
+                  "File Open", "'File _Open' project file not (yet) supported");
+  }
+  else if(ft == WBFILE_TYPE_RESOURCE)
+  {
+    DLGMessageBox(MessageBox_OK | MessageBox_Error, None,
+                  "File Open", "'File _Open' resource file not (yet) supported");
+  }
+  else if(ft == WBFILE_TYPE_PIXMAP)
+  {
+    DLGMessageBox(MessageBox_OK | MessageBox_Error, None,
+                  "File Open", "'File _Open' pixmap file not (yet) supported");
+  }
+  else if(ft == WBFILE_TYPE_DIALOG)
+  {
+    DLGMessageBox(MessageBox_OK | MessageBox_Error, None,
+                  "File Open", "'File _Open' dialog resource file not (yet) supported");
+  }
+  else if(ft == WBFILE_TYPE_MENU)
+  {
+    DLGMessageBox(MessageBox_OK | MessageBox_Error, None,
+                  "File Open", "'File _Open' menu resource file not (yet) supported");
+  }
+  else if(ft == WBFILE_TYPE_TOOLBAR)
+  {
+    DLGMessageBox(MessageBox_OK | MessageBox_Error, None,
+                  "File Open", "'File _Open' toolbar resource file not (yet) supported");
+  }
+  else
+  {
+    // All other files are assumed to be text files and will create a WBEditWindow as a new tab.
 
     // 1st, create a new 'WBEditWindow', attaching it to the frame
 
@@ -898,11 +974,6 @@ int DoFileOpen(WBFrameWindow *pMainFrame, const char *szFileName)
                       "File Open", "'File _Open' unable to read file into edit window");
       }
     }
-  }
-
-  if(pCF)
-  {
-    const char *pDisplayName;
 
     // TODO:  set up a few things based on the file type
     //        a) default line ending
@@ -911,6 +982,76 @@ int DoFileOpen(WBFrameWindow *pMainFrame, const char *szFileName)
     //        d) color highlighting
     //        etc.
 
+    // TODO:  read this info from the config file, with defaults specified
+    //        by the utility functions.
+
+
+    iLineEnd = GetDefaultLineEnding(ft); // read line ending info from config file, default to this
+    iTab = GetDefaultTabSetting(ft);     // read tab info from config file, default to this
+
+    // TODO:  scan file to see what the line endings REALLY are?
+    pEW->xTextObject.vtable->set_linefeed(&(pEW->xTextObject), iLineEnd);
+
+    if(ft == WBFILE_TYPE_MAKEFILE ||
+       ft == WBFILE_TYPE_AUTOCONF)
+    {
+      pEW->xTextObject.vtable->set_filetype(&(pEW->xTextObject),
+                                            FileType_MAKEFILE | FileType_HARDTAB); // always hard tabs
+    }
+    else if(ft == WBFILE_TYPE_CPROG || ft == WBFILE_TYPE_CPP ||
+            ft == WBFILE_TYPE_CHEADER || ft == WBFILE_TYPE_SHELL ||
+            ft == WBFILE_TYPE_PYTHON || ft == WBFILE_TYPE_PERL ||
+            ft == WBFILE_TYPE_ASM || ft == WBFILE_TYPE_JAVA ||
+            ft == WBFILE_TYPE_JS || ft == WBFILE_TYPE_PHP ||
+            ft == WBFILE_TYPE_ARDUINO)
+    {
+      // programming languages
+      if(iTab < 0) // hard tabs
+      {
+        pEW->xTextObject.vtable->set_filetype(&(pEW->xTextObject),
+                                              FileType_PROGRAM | FileType_HARDTAB); // use hard tabs
+      }
+      else
+      {
+        pEW->xTextObject.vtable->set_filetype(&(pEW->xTextObject),
+                                              FileType_PROGRAM); // use spaces
+      }
+    }
+    else if(ft == WBFILE_TYPE_HTML ||
+            ft == WBFILE_TYPE_XML)
+    {
+      // programming languages
+      if(iTab < 0) // hard tabs
+      {
+        pEW->xTextObject.vtable->set_filetype(&(pEW->xTextObject),
+                                              FileType_XML | FileType_HARDTAB); // use hard tabs
+      }
+      else
+      {
+        pEW->xTextObject.vtable->set_filetype(&(pEW->xTextObject),
+                                              FileType_XML); // use spaces
+      }
+    }
+    else // plain text
+    {
+      if(iTab < 0) // hard tabs
+      {
+        pEW->xTextObject.vtable->set_filetype(&(pEW->xTextObject),
+                                              FileType_PLAIN_TEXT | FileType_HARDTAB); // use hard tabs
+      }
+      else
+      {
+        pEW->xTextObject.vtable->set_filetype(&(pEW->xTextObject),
+                                              FileType_PLAIN_TEXT); // use spaces
+      }
+    }
+
+    pEW->xTextObject.vtable->set_tab(&(pEW->xTextObject), abs(iTab));
+  }
+
+  if(pCF) // did I create the new child frame??
+  {
+    const char *pDisplayName;
 
     // display file name with no path info within tab
     pDisplayName = szFileName + strlen(szFileName);
@@ -921,7 +1062,6 @@ int DoFileOpen(WBFrameWindow *pMainFrame, const char *szFileName)
     }
 
     FWSetChildFrameDisplayName(pCF, pDisplayName);
-
 
     WBEndWaitCursor(pCF->wID);
   }
@@ -954,7 +1094,7 @@ const char *pFN, *pExt;
   // TODO:  don't just check the extension, read the first few lines, check for
   //        invalid/unprintable characters, etc.
 
-  if(!pExt && !strcasecmp("makefile", pExt))
+  if(pExt && !strcasecmp("makefile", pExt))
   {
     return WBFILE_TYPE_MAKEFILE;
   }
@@ -962,39 +1102,39 @@ const char *pFN, *pExt;
   {
     // TODO: look for hash-bang
   }
-  else if(!strcasecmp("mk", pExt)) // '.mk' '.Mk' or '.MK' extension
+  else if(!strcasecmp("mk", pExt)) // '.mk' '.Mk' or '.MK' (or even '.mK') extension
   {
     return WBFILE_TYPE_MAKEFILE;
   }
-  else if(!strcasecmp("h", pExt)) // '.mk' '.Mk' or '.MK' extension
+  else if(!strcasecmp("h", pExt)) // also allow case-insensitive naming, in case 'windows'
   {
     return WBFILE_TYPE_MAKEFILE;
   }
-  else if(!strcmp("c", pExt))
+  else if(!strcasecmp("c", pExt)) // also allow case-insensitive naming, in case 'windows'
   {
     return WBFILE_TYPE_CPROG;
   }
-  else if(!strcmp("g", pExt))
+  else if(!strcasecmp("h", pExt)) // also allow case-insensitive naming, in case 'windows'
   {
     return WBFILE_TYPE_CHEADER;
   }
-  else if(!strcmp("cpp", pExt))
+  else if(!strcasecmp("cpp", pExt)) // also allow case-insensitive naming, in case 'windows'
   {
     return WBFILE_TYPE_CPP;
   }
-  else if(!strcmp("java", pExt))
+  else if(!strcmp("java", pExt)) // for now I only do the lower-case extension naming here
   {
     return WBFILE_TYPE_JAVA;
   }
-  else if(!strcmp("js", pExt))
+  else if(!strcmp("js", pExt)) // for now I only do the lower-case extension naming here
   {
     return WBFILE_TYPE_JS;
   }
-  else if(!strcmp("pl", pExt))
+  else if(!strcmp("pl", pExt)) // for now I only do the lower-case extension naming here
   {
     return WBFILE_TYPE_PERL;
   }
-  else if(!strcmp("py", pExt))
+  else if(!strcasecmp("py", pExt)) // also allow case-insensitive naming, in case 'windows'
   {
     return WBFILE_TYPE_PYTHON;
   }
@@ -1006,23 +1146,23 @@ const char *pFN, *pExt;
   {
     return WBFILE_TYPE_AUTOCONF;
   }
-  else if(!strcmp("xwb", pExt))
+  else if(!strcasecmp("xwb", pExt)) // also allow case-insensitive naming, in case 'windows'
   {
     return WBFILE_TYPE_PROJECT;
   }
-  else if(!strcmp("xwbrc", pExt))
+  else if(!strcasecmp("xwbrc", pExt)) // also allow case-insensitive naming, in case 'windows'
   {
     return WBFILE_TYPE_RESOURCE;
   }
-  else if(!strcmp("xwbdlg", pExt))
+  else if(!strcasecmp("xwbdlg", pExt)) // also allow case-insensitive naming, in case 'windows'
   {
     return WBFILE_TYPE_DIALOG;
   }
-  else if(!strcmp("xwbmenu", pExt))
+  else if(!strcasecmp("xwbmenu", pExt)) // also allow case-insensitive naming, in case 'windows'
   {
     return WBFILE_TYPE_MENU;
   }
-  else if(!strcmp("xwbbar", pExt))
+  else if(!strcasecmp("xwbbar", pExt)) // also allow case-insensitive naming, in case 'windows'
   {
     return WBFILE_TYPE_TOOLBAR;
   }
@@ -1030,17 +1170,21 @@ const char *pFN, *pExt;
   {
     return WBFILE_TYPE_SHELL;
   }
-  else if(!strcmp("php", pExt))
+  else if(!strcasecmp("php", pExt)) // also allow case-insensitive naming, in case 'windows'
   {
     return WBFILE_TYPE_PHP;
   }
-  else if(!strcmp("htm", pExt) || !strcmp("html", pExt))
+  else if(!strcasecmp("htm", pExt) || !strcasecmp("html", pExt)) // also allow case-insensitive naming, in case 'windows'
   {
     return WBFILE_TYPE_HTML;
   }
-  else if(!strcmp("xml", pExt))
+  else if(!strcasecmp("xml", pExt)) // also allow case-insensitive naming, in case 'windows'
   {
     return WBFILE_TYPE_XML;
+  }
+  else if(!strcasecmp("pde", pExt) || !strcasecmp("ino", pExt)) // also allow case-insensitive naming, in case 'windows'
+  {
+    return WBFILE_TYPE_ARDUINO; // arduino script may require some additional 'special help'
   }
 
 
@@ -1110,7 +1254,8 @@ static const char * const aszDesc[] =
   "XML Data",
   "Java Program Source",
   "JavaScript Program",
-  "PHP Program"
+  "PHP Program",
+  "Arduino Script"
 };
 
 
@@ -1132,7 +1277,8 @@ const char *GetFileTypeHighlightInfo(WBFILE_TYPE nFileType)
 {
   if(nFileType == WBFILE_TYPE_CPROG ||
      nFileType == WBFILE_TYPE_CPP ||
-     nFileType == WBFILE_TYPE_CHEADER)
+     nFileType == WBFILE_TYPE_CHEADER ||
+     nFileType == WBFILE_TYPE_ARDUINO)
   {
     static const char szC[]=        // parameter: keyword list <LF>  where keyword list is one or more words that might need to be quoted
       "Language: C/C++\n"           // text of language style name
@@ -1287,17 +1433,21 @@ const char *GetFileTypeHighlightInfo(WBFILE_TYPE nFileType)
   }
   else if(nFileType == WBFILE_TYPE_PERL)
   {
+    // TODO:  does Perl need syntax highlighting different from shell?
   }
   else if(nFileType == WBFILE_TYPE_PHP)
   {
+    // TODO:  does Perl need syntax highlighting different from shell/Perl?
   }
   else if(nFileType == WBFILE_TYPE_PYTHON)
   {
+    // TODO:  do python syntax highlighting
   }
   else if(nFileType == WBFILE_TYPE_HTML ||
           nFileType == WBFILE_TYPE_XML)
   {
-
+    // TODO:  does XML or HTML need some kind of syntax highlighting?  it would have
+    //        to be different than the normal one...
   }
 
   return ""; // blank (for now, could do NULL instead but I prefer this)
@@ -1325,6 +1475,8 @@ XColor clr; // temporary
                   "Application Properties", "'Properties' and no container window");
     return 1;
   }
+
+  clr.pixel = clrGreen.pixel; // temporary
 
   DLGColorDialog(pMainFrame->wID, NULL, &clr); // for now...
 
@@ -1560,7 +1712,7 @@ static int TabMoveRightHandler(XClientMessageEvent *pEvent)
 
 static int TabUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem)
 {
-  if(FWGetContainedWindowByIndex(pMainFrame, 1) != NULL)
+  if(FWGetNumContWindows(pMainFrame) > 1)
   {
     return 1; // enabled (more than one tab)
   }

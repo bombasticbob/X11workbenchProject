@@ -92,6 +92,13 @@
 //     Does not include preprocessor macro info.
 //
 //
+// To get a list of all files/functions, use 'info function' and then pick a function to load via 'list ,function'
+//
+//
+// **NOTE** - the debugger source path is the canonical one, not necessarily the one for the file(s) being edited,
+//            so use WBGetCanonicalPath() to make sure that I compare the path names correctly for open files.
+//
+//
 // info sources
 //   information on ALL source files.  output similar to this:
 //     Source files for which symbols have been read in:
@@ -158,7 +165,25 @@
 // other commands like list, backtrace, breakpoint, etc. can be applied as needed.
 //
 //
-
+//
+// ------------------------------
+// Server/mouse/keyboard grabbing
+// ------------------------------
+//
+// If XGrabServer() has been called, then everything will appear to freeze up during breakpoint handling.
+// If XGrabKeyoard() or XGrabPointer() have been called, the kb/mouse will appear to freeze up.
+//
+// Additionally, calling XGrabKeyoard() or XGrabPointer() on the application window (for example) would
+// return 'AlreadyGrabbed' if a grab is already in effect.  it might be prudent to grab the keyboard/mouse
+// this way whenever a breakpoint is reached, in order to avoid deadlocking the system.
+//
+// Alternately, a watchdog timer could call XUngrabServer() after a time period, using event handling (in general)
+// to detect that no events are being received.  A watchdog COULD post a client event to the main window via a
+// timer, and then detect whether the event has arrived.
+//
+// Without additional info, the grab won't be "restorable" on return from the breakpoint.  An
+// appropriate warning message should appear if the debugger has to 'Ungrab' something.
+//
 
 
 

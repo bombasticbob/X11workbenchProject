@@ -291,7 +291,7 @@ int cbLen;
   {
     nLines = WBStringLineCount(pBuf, cbBufSize);
 
-    WBDebugPrint("TEMPORARY:  WBAllocTextBuffer %d lines\n", nLines);
+//    WBDebugPrint("TEMPORARY:  WBAllocTextBuffer %d lines\n", nLines);
   }
 
   if(nLines < DEFAULT_TEXT_BUFFER_LINES)
@@ -391,7 +391,7 @@ int cbLen;
 //    WB_ERROR_PRINT("END TEMPORARY - %s\n\n", __FUNCTION__);
 //  }
 
-  WB_ERROR_PRINT("TEMPORARY - %s returns %p\n", __FUNCTION__, pRval);
+//  WB_ERROR_PRINT("TEMPORARY - %s returns %p\n", __FUNCTION__, pRval);
 
   return pRval;
 }

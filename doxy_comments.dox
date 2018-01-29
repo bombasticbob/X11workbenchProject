@@ -112,7 +112,7 @@
   *
 **/
 
-/** \page mainpage_1 Copyright and License Terms
+/** \page mainpage_1 Copyright and License Terms for the X11workbench Toolkit
   * \details
   *
   * <b>COPYRIGHT</b>
@@ -169,7 +169,7 @@
   *
 **/
 
-/** \page mainpage_1a X11workbench Toolkit - Design Goals
+/** \page mainpage_1a Design Goals for the X11workbench Toolkit
   * \details
   *
   * \b Design \b Goals
@@ -417,7 +417,7 @@
   *
 **/
 
-/** \page mainpage_4 X11workbench Toolkit - Hello World sample
+/** \page mainpage_4 'Hello World' sample using the X11workbench Toolkit
   *
   * \code
 
@@ -444,9 +444,9 @@
   // if your application creates a modeless dialog window or frame window, you will
   // need a message loop.  For the sample, it is disabled with an '#if 0' block
   #if 0
-        //=========================
-        //   MAIN MESSAGE LOOP
-        //=========================
+        //=====================
+        //   MAIN EVENT LOOP
+        //=====================
 
         while (!bQuitFlag)
         {
@@ -844,6 +844,42 @@
   * most essential functions, such as the creation and destruction of windows, and the main event
   * loop,  All programs using the API must correctly initialize and make use of these functions
   * in lieu of calling their X11 counterparts.
+  *
+  * Typically, your application will need a basic event handling loop, such as:
+  *
+  * \code
+
+        //=====================
+        //   MAIN EVENT LOOP
+        //=====================
+
+        while (!bQuitFlag)
+        {
+          if(!WBCheckGetEvent(pX11Display, &event))
+          {
+            // SLEEP if no event while in message loop (function returns without blocking)
+            // otherwise I can do background tasks during this loop iteration.
+
+            WBDelay(100); // 100 microseconds (0.1 milliseconds)
+
+            continue; // skip the 'WBDispatch' since there was no event
+          }
+
+          WBDispatch(&event);
+        }
+
+  * \endcode
+  *
+  * The call to WBDispatch will process the retrieved events by passing them to the
+  * appropriate registered callback functions.
+  *
+  * The 'WBDelay()' call is a way of ensuring that your application does not 'spin' with 100%
+  * CPU utilization while waiting for an event.  This can help with battery life, and so on.
+  *
+  * If you have no background processing to perform, you can use
+  *
+  * \sa \ref mainpage_4, \ref events
+  *
 **/
 
 /** \defgroup platform Platform-Helper Functions and Definitions

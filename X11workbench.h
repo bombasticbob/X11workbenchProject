@@ -90,7 +90,9 @@ typedef enum __WBFILE_TYPE__
   WBFILE_TYPE_JAVA     = 19,
   WBFILE_TYPE_JS       = 20,
   WBFILE_TYPE_PHP      = 21,
-  WBFILE_TYPE_LAST     = 21 // update this if I add more types
+  WBFILE_TYPE_ARDUINO  = 22, // PDE or INO file for Arduino script
+
+  WBFILE_TYPE_LAST     = 22 // update this if I add more types
 } WBFILE_TYPE;
 
 
@@ -120,11 +122,12 @@ Window GetFrameWindowID(); // get the frame window's window ID (for dialog boxen
 
 int DoFileOpen(WBFrameWindow *pMainFrame, const char *szFileName);
 WBFILE_TYPE GetFileType(const char *szFileName);
+const char *GetFileTypeDesc(WBFILE_TYPE nFileType);
+int GetDefaultTabSetting(WBFILE_TYPE nFileType);
+int GetDefaultLineEnding(WBFILE_TYPE nFileType);
+const char *GetFileTypeHighlightInfo(WBFILE_TYPE nFileType);
 
 
-// utilities specific to context-sensitive help
-
-int spawn_async(const char *szApp, ...);
 
 
 

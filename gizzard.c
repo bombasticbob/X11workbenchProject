@@ -66,5 +66,27 @@
 #include "X11workbench.h"
 #include "gizzard.h"
 
+//
+// TENTATIVE PLANS ON APPLICATION 'Gizzards' (aka 'wizards' in case of trademarks)
+//
+// 1.  tab-MDI and dialog-based applications for X11 Workbench Toolkit
+// 2.  similar to above, using a "foundation class" wrapper (C++)
+// 3.  MDI and dialog-based applications for wxWidgets (C++)
+// 4.  similar for GTK and/or GTK+ (C++)
+// 5.  alternate platform application wizards (such as Arduino)
+// 6.  possible Android application wizards (would require installing Android SDK)
+//
+// The priority, of course, is to use the X11 Workbench Toolkit.  Once it is able
+// to run under windows, there will be no real need for anything else.  The next
+// priority are the two toolkits that are already cross-platform, namely wxWidgets
+// and GTK.  Qt is also a possibility, though it has its own (pay for) IDE already.
+//
+// Alternate platforms like Arduino might be helpful in that there is no existing
+// 'application gizzard', and I intend to make X11workbench's IDE easier/better to
+// use than the Arduino IDE.  However, without a proper debugging interface to a
+// microcontroller system, it has limited added value (other than the 'gizzard').
+//
+//
+
 
 

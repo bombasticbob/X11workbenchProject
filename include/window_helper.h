@@ -1873,7 +1873,7 @@ Time WBGetLastEventTime(void);
       // (alternately, you could use WBWaitForEvent() if you do not need periodic
       //  wake-up for background processing)
 
-      WBDelay(1000);  // 1000 microsecs - 1 millisecond
+      WBDelay(100);  // 100 microsecs - 0.1 millisecond
 
       continue;
     }

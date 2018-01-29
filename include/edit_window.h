@@ -140,6 +140,8 @@ extern "C" {
 
     char *szFileName;                 // malloc'd name of file associated with this edit window (NULL if none)
 
+    unsigned long long llModDateTime; // file's mod date/time - see WBGetFileModDateTime()
+
     WBWinEvent pUserCallback;         // user callback function to receive notifications and unhandled messages
 
     TEXT_OBJECT xTextObject;          // the 'TEXT_OBJECT' member, that does MOST of the work
@@ -160,6 +162,12 @@ typedef struct __WBEditWindow__
   unsigned int ulTag;               ///< 'Tag' identifying this structure as a WBEditWindow
 
   char *szFileName;                 ///< malloc'd name of file associated with this edit window (NULL if none)
+
+#if defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
+  unsigned long long llModDateTime; ///< file's mod date/time - see WBGetFileModDateTime()
+#else // defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
+  unsigned long llModDateTime;
+#endif // defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
 
   WBWinEvent pUserCallback;         ///< user callback function to receive notifications and unhandled messages
 

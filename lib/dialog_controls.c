@@ -815,10 +815,8 @@ BEGIN_CREATE_CONTROL(ICON_CONTROL);
   // now allow certain kinds of input messages (I should be able to handle messages at this point)
 
   if(pDialogControl->pDlgControlEntry &&
-     pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_CAN_HAVE_FOCUS)
+     (pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_CAN_HAVE_FOCUS))
   {
-    WB_ERROR_PRINT("TEMPORARY:  %s 'can have focus' and extra input mask thingies\n", __FUNCTION__);
-
     // now allow certain kinds of input messages (I should be able to handle messages at this point)
     XSelectInput(pDisplay, pDialogControl->wID,
                  WB_STANDARD_INPUT_MASK | WB_MOUSE_INPUT_MASK | WB_KEYBOARD_INPUT_MASK);
@@ -882,10 +880,8 @@ BEGIN_CREATE_CONTROL(IMAGE_CONTROL);
 
   // now allow certain kinds of input messages (I should be able to handle messages at this point)
   if(pDialogControl->pDlgControlEntry &&
-     pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_CAN_HAVE_FOCUS)
+     (pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_CAN_HAVE_FOCUS))
   {
-    WB_ERROR_PRINT("TEMPORARY:  %s 'can have focus' and extra input mask thingies\n", __FUNCTION__);
-
     // now allow certain kinds of input messages (I should be able to handle messages at this point)
     XSelectInput(pDisplay, pDialogControl->wID,
                  WB_STANDARD_INPUT_MASK | WB_MOUSE_INPUT_MASK | WB_KEYBOARD_INPUT_MASK);

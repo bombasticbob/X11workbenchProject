@@ -639,8 +639,6 @@ int iFile;
           iChunk = cb1; // for now
         }
 
-        WBDebugPrint("TEMPORARY:  read %d bytes\n", (int)iChunk);
-
         cbF -= iChunk;
         pBuf += iChunk;
       }
@@ -648,8 +646,6 @@ int iFile;
   }
 
   close(iFile);
-
-  WBDebugPrint("TEMPORARY WBReadFileIntoBuffer:  return %d  buf=%p\n", (int)cbLen, *ppBuf);
 
   return (size_t) cbLen;
 }

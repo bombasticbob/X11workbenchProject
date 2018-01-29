@@ -127,9 +127,13 @@ extern "C" {
   * To assign red, green, and blue elements from the 'pixel' element within the XColor
   * structure, use PXM_PixelToRGB()
 **/
-#define RGB255_FROM_XCOLOR(X,R,G,B) { R = (((X).flags) & DoRed) ? (((unsigned int)(X).red + 0x80) >> 8) & 0xff : 0; \
-                                      G = (((X).flags) & DoGreen) ? (((unsigned int)(X).green + 0x80) >> 8) & 0xff : 0; \
-                                      B = (((X).flags) & DoBlue) ? (((unsigned int)(X).blue + 0x80) >> 8) & 0xff : 0; }
+#define RGB255_FROM_XCOLOR(X,R,G,B) {register unsigned short __iR,__iG,__iB; RGB_FROM_XCOLOR(X,__iR, __iG, __iB); \
+                                     if(__iR < 0xff80){ __iR += 0x80; } \
+                                     if(__iG < 0xff80){ __iG += 0x80; } \
+                                     if(__iB < 0xff80){ __iB += 0x80; } \
+                                     __iR = __iR >> 8; __iG = __iG >> 8; __iB = __iB >> 8; \
+                                     __iR &= 0xff; __iG &= 0xff; __iB &= 0xff; \
+                                     (R) = __iR; (G) = __iG; (B) = __iB; }
 
 /** \ingroup pixmap
   * \brief Simple RGB assignment from pixel, 0-65535 RGB
@@ -144,9 +148,9 @@ extern "C" {
   * To assign red, green, and blue elements from the 'pixel' element within the XColor
   * structure, use PXM_PixelToRGB()
 **/
-#define RGB_FROM_XCOLOR(X,R,G,B) { R = (((X).flags) & DoRed) ? ((unsigned int)(X).red) & 0xffff : 0; \
-                                   G = (((X).flags) & DoGreen) ? ((unsigned int)(X).green) & 0xffff : 0; \
-                                   B = (((X).flags) & DoBlue) ? ((unsigned int)(X).blue) & 0xffff : 0; }
+#define RGB_FROM_XCOLOR(X,R,G,B) { (R) = (((X).flags) & DoRed) ? ((unsigned int)(X).red) & 0xffff : 0; \
+                                   (G) = (((X).flags) & DoGreen) ? ((unsigned int)(X).green) & 0xffff : 0; \
+                                   (B) = (((X).flags) & DoBlue) ? ((unsigned int)(X).blue) & 0xffff : 0; }
 
 
 /** \ingroup pixmap
@@ -468,6 +472,35 @@ XImage *PXM_PixmapToImage(Display *pDisplay, Pixmap pxImage);
   * Header File:  pixmap_helper.h
 **/
 void PXM_OnExit(void);
+
+
+//-------------------
+// HELPERS FOR XColor
+//-------------------
+
+/** \ingroup debug
+  * \brief Dump XColor members for debugging
+  *
+  * \param szTitle A const pointer to a string, to be displayed as the title for debug output
+  * \param pColor A const pointer to an XColor structure.
+  *
+  * Call this to do a debug dump of XColor information
+  *
+  * Header File:  pixmap_helper.h
+**/
+void WBDebugDumpXColor(const char *szTitle, const XColor *pColor);
+
+/** \ingroup debug
+  * \brief Dump XStandardColormap members for debugging
+  *
+  * \param szTitle A const pointer to a string, to be displayed as the title for debug output
+  * \param pMap A const pointer to an XStandardColormap structure.
+  *
+  * Call this to do a debug dump of XStandardColormap information
+  *
+  * Header File:  pixmap_helper.h
+**/
+void WBDebugDumpColormap(const char *szTitle, const XStandardColormap *pMap);
 
 
 //--------------------

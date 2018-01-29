@@ -70,6 +70,10 @@
 #include <dlfcn.h> /* dynamic library support */
 #include <sys/wait.h>
 #include <sys/types.h>
+#ifdef __FreeBSD__
+#include <sys/sysctl.h> // to use the 'sysctlXXX' APIs
+#endif // __FreeBSD__
+
 #include <time.h> // clock_gettime etc.
 #include <locale.h>
 #endif // !WIN32
@@ -672,6 +676,82 @@ struct timespec tsp;
   usleep(uiDelay);  // 100 microsecs - a POSIX alternative to 'nanosleep'
 
 #endif // HAVE_NANOSLEEP
+}
+
+int WBCPUCount(void)
+{
+// determine # of CPUs to get the default # of jobs during compile
+//    FreeBSD:  sysctl vars:  kern.smp.cpus hw.ncpu  (both have the correct count, even in a VM)
+//    Linux:  /proc/cpuinfo - filter on 'processor:', one line per active core
+//                            (in a VM, only the assigned cores show up, so count them)
+int iCPU = 0;
+
+#if defined(__FreeBSD__)
+// TODO:  a config option to test for 'sysctlbyname' and the sys/sysctl.h file?
+unsigned long cb;
+
+  cb = sizeof(iCPU);
+  iCPU = 0;
+  if(sysctlbyname("hw.ncpu", &iCPU, &cb, NULL, 0)) // could also use MIBs CTL_HW and HW_NCPU
+  {
+//    WB_ERROR_PRINT("ERROR - %s - hw.ncpu, errno=%d  iCPU=%d  cb=%ld\n", __FUNCTION__, errno, iCPU, cb);
+    cb = sizeof(iCPU);
+    iCPU = 0;
+
+    if(sysctlbyname("kern.smp.cpus", &iCPU, &cb, NULL, 0)) // could also use MIBs CTL_HW and HW_NCPU
+    {
+//      WB_ERROR_PRINT("ERROR - %s - kernel.smp.cpus, errno=%d  iCPU=%d  cb=%ld\n", __FUNCTION__, errno, iCPU, cb);
+      return 0;
+    }
+  }
+
+//  WB_ERROR_PRINT("TEMPORARY:  %s - iCPU=%d\n", __FUNCTION__, iCPU);
+
+  return iCPU;
+
+#elif defined(linux)
+
+FILE *pF;
+char tbuf[256];
+char *p1, *p2;
+
+  pF = fopen("/proc/cpuinfo", "r");
+  if(pF)
+  {
+    while(fgets(tbuf, sizeof(tbuf), pF))
+    {
+      // read each line, then scan for 'processor' and cound 'em up
+      // NOTE:  if there's a better way, I'd like to see it...
+
+      p1 = tbuf, *p2;
+      while(*p1 && *p1 <= ' ')
+      {
+        p1++; // skip leadin white space
+      }
+
+      p2 = p1 + strlen(p1);
+      while(p2 > p1 && *(p2 - 1) <= ' ')
+      {
+        *(--p2) = 0; // trim trailing white space
+      }
+
+      if(!strncmp(p1, "processor", 9) &&  // TODO:  check it's unique?
+         p1[9] && p1[9] <= ' ') // typically is followed by a tab then ':'
+      {
+        iCPU++; // count them!
+      }
+    }
+
+    fclose(pF);
+  }
+
+#elif defined(WIN32)
+  iCPU == 0; // just fail (for now)
+#else
+  iCPU == 0; // just fail
+#endif // all of that
+
+  return iCPU;
 }
 
 

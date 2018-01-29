@@ -65,7 +65,7 @@
 #include "dialog_controls.h" // for 'aDIALOG_INIT'
 
 
-#if 1 // assign to 0 to disable this trace-style debugging ALL of the time
+#if 0 // assign to 0 to disable this trace-style debugging ALL of the time
 #define CALLBACK_TRACKER WBDebugPrint("TEMPORARY - edit_window.c:  %s - callback tracker\n", __FUNCTION__);
 #else //
 #define CALLBACK_TRACKER WB_DEBUG_PRINT((DebugLevel_Heavy | DebugSubSystem_EditWindow), "edit_window.c:  %s - callback tracker\n", __FUNCTION__);
@@ -341,7 +341,7 @@ int iRet;
 
   // assign my 'UI' vtable pointer, which will be (intelligently) called by the 'Child Frame' event handler
   // this standardizes the various UI methods and makes coding a complex UI quite a bit easier
-  pRval->childframe.pUI = &internal_CFUI; // UI function vtable
+  pRval->childframe.pUI = &internal_CFUI; // Child Frame UI function vtable
 
   // assign my 'destructor', which will be called by FWDestroyChildFrame
   // THIS must be done LAST, since 'FWInitChildFrame' might call FWDestroyChildFrame on error
@@ -461,7 +461,7 @@ int iRval = -1;
   if(!pEditWindow || !WBIsValidEditWindow(pEditWindow)
      || !pszFileName || !*pszFileName)
   {
-    WBDebugPrint("TEMPORARY:  bad parameters in WBEditWindowLoadFile\n");
+    WBDebugPrint("TEMPORARY:  bad parameters in %s\n", __FUNCTION__);
     return -1;
   }
 
@@ -478,6 +478,7 @@ int iRval = -1;
   WBEditWindowClear(pEditWindow);
 
   pEditWindow->szFileName = WBCopyString(pszFileName);
+  pEditWindow->llModDateTime = WBGetFileModDateTime(pEditWindow->szFileName);
 
   // load the file into a buffer
 
@@ -537,8 +538,6 @@ int iRval = -1;
     pEditWindow->pUserCallback(pEditWindow->childframe.wID, (XEvent *)&evt);
   }
 
-  WBDebugPrint("TEMPORARY WBEditWindowLoadFile() returning %d\n", iRval);
-
   return iRval;
 }
 
@@ -559,8 +558,10 @@ int WBEditWindowSaveFile(WBEditWindow *pEditWindow, const char *pszFileName)
     return -1; // error (no file name)
   }
 
-
   // TODO:  implement 'file save'
+
+  pEditWindow->llModDateTime = WBGetFileModDateTime(pEditWindow->szFileName);
+
 
 
   return -1; // error
@@ -698,6 +699,8 @@ Display *pDisplay = WBGetWindowDisplay(wID);
       }
       else if(pEvent->xclient.message_type == aWM_TIMER)
       {
+        static int iTimerThingy = 0;
+
         // only when this tab is visible do I call the callback.
 
         if(pE->childframe.pOwner && // just in case
@@ -707,6 +710,50 @@ Display *pDisplay = WBGetWindowDisplay(wID);
 //          WB_ERROR_PRINT("TEMPORARY:  %s - timer\n", __FUNCTION__);
 
           pE->xTextObject.vtable->cursor_blink(&(pE->xTextObject), 1);
+
+          if(iTimerThingy >= 0)
+          {
+            iTimerThingy ++; // again, only when I have the focus do I do this
+            iTimerThingy &= 3;
+
+            if(!iTimerThingy && pE->szFileName && pE->szFileName[0])
+            {
+              // see if the file was modified
+
+              int iTemp = WBCheckFileModDateTime(pE->szFileName, pE->llModDateTime);
+
+              if(iTemp != 0)
+              {
+                iTimerThingy = -1; // so I don't recursively do this
+
+                if(iTemp > 0)
+                {
+                  if(DLGMessageBox(MessageBox_YesNo | MessageBox_Question, wID,
+                      "File Modified", "This file has been modified on disk - reload?")
+                     == IDYES)
+                  {
+                    // TODO:  re-load the file
+do_file_reload:
+                    DLGMessageBox(MessageBox_OK | MessageBox_Error, wID,
+                                  "File Modified", "file re-load not (yet) implemented");
+                  }
+                }
+                else if(iTemp < 0)
+                {
+                  if(DLGMessageBox(MessageBox_YesNo | MessageBox_Error, wID,
+                                   "File Modified", "file mod date is OLDER than before - what happened?\n\nDo you want to reload it?")
+                                   == IDYES)
+                  {
+                    goto do_file_reload;
+                  }
+                }
+
+                pE->llModDateTime = WBGetFileModDateTime(pE->szFileName); // re-assign so I don't show 'mod' again
+
+                iTimerThingy = 0; // so I don't eternally BLOCK this
+              }
+            }
+          }
         }
       }
       else if(pEvent->xclient.message_type == aQUERY_CLOSE)

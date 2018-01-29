@@ -85,9 +85,8 @@
 #define DEBUG_DUMP_COLORMAP(X)
 #else
 static void DebugDumpXpmAttributes(const char *szFunction, int nLine, XPM_ATTRIBUTES *pAttr);
-static void DebugDumpColormap(const XStandardColormap *pMap);
 #define DEBUG_DUMP_XPM_ATTRIBUTES(X) DebugDumpXpmAttributes(__FUNCTION__, __LINE__, X)
-#define DEBUG_DUMP_COLORMAP(X) DebugDumpColormap(X)
+#define DEBUG_DUMP_COLORMAP(X) WBDebugDumpColormap("Called from " __FUNCTION__, X)
 #endif // NO_DEBUG
 
 
@@ -185,19 +184,83 @@ int iE = iV - 128;
 
 void PXM_HSVToRGB(int iH, int iS, int iV, int *piR, int *piG, int *piB)
 {
+// this algorithm is similar to what Microsoft uses in their MFC classes, and
+// what wxWidgets uses in their classes.  As such, it's an "open" algorithm,
+// as the licensing of these two code bases appears to be otherwise incompatible.
+// The algorithm has been attributed to A. R. Smith .  It appears to be "a standard"
+// (NOTE:  I shall research to make sure it's use here is not stomping on ownership)
 int iR, iG, iB;
-double dH = iH * _PI_ * 2.0 / 256;
 
-  iR = clip255((int)floor(iV * (1.0 + iS * (cos(dH) - 1.0))));
-  iG = clip255((int)floor(iV * (1.0 + iS * (cos(dH - (_PI_ * 2.0 / 3.0)) - 1.0))));
-  iB = clip255((int)floor(iV * (1.0 + iS * (cos(dH + (_PI_ * 2.0 / 3.0)) - 1.0))));
+double dH, dS, dV, dFracH, dR, dG, dB;
+int iQuadrant;
+double dUnSat, dLinDn, dLinUp;
 
-//    function hsv.torgb(h,s,v)
-//        local r=v*(1+s*(cos(h)-1))
-//        local g=v*(1+s*(cos(h-2.09439)-1))
-//        local b=v*(1+s*(cos(h+2.09439)-1))
-//        return r,g,b
-//    end
+
+  if(!iS) // a simple optimization for B&W
+  {
+    iR = iG = iB = iV; // RGB is equal to the brightness when no color
+  }
+  else
+  {
+    dH = (6.0 / 256.0) * iH;    // convert 0-255 angle to 0-360 angle [for the algorithm] and divide by 60
+    iQuadrant = (int)floor(dH);  // quadrant 0 through 5 for 0-360 angle
+    dFracH = dH - iQuadrant;     // the fractional part of 'dH'
+
+    dS = iS / 255.0; // convert 0-255 saturation to 0-1.0 value
+    dV = iV / 255.0; // convert 0-255 'Volume' (brightness, luminocity) to 0-1.0 value
+
+    dUnSat = dV * (1.0 - dS);                  // linear delta based on saturation value
+    dLinDn = dV * (1.0 - dS * dFracH);         // NOTE:  an improved algorithm would use a cos/sin function
+    dLinUp = dV * (1.0 - dS * (1.0 - dFracH)); // NOTE:  an improved algorithm would use a cos/sin function
+
+    // switch/case is typically slower - using 'if' block instead
+    if(iQuadrant < 3) // bottom half
+    {
+      if(iQuadrant == 0)
+      {
+        dR = dV;       // red is essentially 'saturated' for +/-60 degrees... (this seems wrong to me)
+        dG = dLinUp;   // linear slope increasing
+        dB = dUnSat;   // 'un-saturated' value (as dS increases, this goes down, based on dV)
+      }
+      else if(iQuadrant == 1)
+      {
+        dR = dLinDn;   // linear slope decreasing
+        dG = dV;       // now green is 'saturated'
+        dB = dUnSat;   // still 'un-saturated'
+      }
+      else // 2
+      {
+        dR = dUnSat;   // now red is 'un-saturated'
+        dG = dV;       // green still 'saturated'
+        dB = dLinUp;   // blue is 'on the rise' now
+      }
+    }
+    else
+    {
+      if(iQuadrant == 3)
+      {
+        dR = dUnSat;  // red is 'un-saturated' still
+        dG = dLinDn;  // green is on the way down
+        dB = dV;      // now blue is 'saturated'
+      }
+      else if(iQuadrant == 4)
+      {
+        dR = dLinUp;  // red is 'on the rise' now
+        dG = dUnSat;  // green is 'unsaturated'
+        dB = dV;      // blue is 'saturated' again
+      }
+      else // 5
+      {
+        dR = dV;      // red is 'saturated' again
+        dG = dUnSat;  // green is still 'unsaturated'
+        dB = dLinDn;  // blue is 'on the way down'
+      }
+    }
+
+    iR = clip255((int)floor(256 * dR)); // using 256 rather than 255 gives me some 'rounding up'
+    iG = clip255((int)floor(256 * dG));
+    iB = clip255((int)floor(256 * dB));
+	}
 
   if(piR)
   {
@@ -217,62 +280,173 @@ double dH = iH * _PI_ * 2.0 / 256;
 
 void PXM_RGBToHSV(int iR, int iG, int iB, int *piH, int *piS, int *piV)
 {
-int iC = iR + iG + iB;
-int iH=0, iS=0, iV=0;
+// this algorithm is similar to what Microsoft uses in their MFC classes, and
+// what wxWidgets uses in their classes.  As such, it's an "open" algorithm,
+// as the licensing of these two code bases appears to be otherwise incompatible.
+// The algorithm has been attributed to A. R. Smith .  It appears to be "a standard"
+// (NOTE:  I shall research to make sure it's use here is not stomping on ownership)
 
-  if(iC == 0) // black
-  {
-    iH = 0;
-    iS = 512 / 3; // red?
-    iV = 0;
-  }
-  else
-  {
-    int iP = 2*(iB * iB + iG * iG + iR * iR - iG * iR - iB * iG - iB * iR);
+double dH, dS, dV, dDelta;
+int iMinRGB, iMaxRGB;
 
-    if(iP < 0)
-    {
-      iP = 0; // added by bob, to prevent dividing by zero (evar)
-    }
-    iH = ((int)floor(256 * atan2(iB - iG, sqrt(fabs((2.0 * iR - iB - iG)/3.0))) / (_PI_ * 2.0)))
-          & 255; // this is calculating an angle, 0 to 2PI, which should rotate 0-255
-    iS = clip255(iP / (iC + iP));  // iC is never zero
-    iV = clip255((iC + iP) / 3);
 
-//    function hsv.fromrgb(r,b,g)
-//        local c=r+g+b
-//        if c<1e-4 then
-//            return 0,2/3,0
-//        else
-//            local p=2*(b*b+g*g+r*r-g*r-b*g-b*r)^0.5
-//            local h=atan2(b-g,(2*r-b-g)/3^0.5)
-//            local s=p/(c+p)
-//            local v=(c+p)/3
-//            return h,s,v
-//        end
-//    end
-  }
+  iMinRGB = (iR <= iG)
+          ? (iR <= iB)
+             ? iR : iB
+          : (iG <= iB)
+             ? iG : iB;
 
-  if(piH)
-  {
-    *piH = iH;
-  }
-
-  if(piS)
-  {
-    *piS = iS;
-  }
+  iMaxRGB = (iR >= iG)
+          ? (iR >= iB)
+             ? iR : iB
+          : (iG >= iB)
+             ? iG : iB;
 
   if(piV)
   {
-    *piV = iV;
+    *piV = iMaxRGB; // use the max RGB value as my 'volume' (aka brightness, luminocity)
   }
+
+  dV = iMaxRGB / 255.0; // convert to value between 0 and 1 for rest of algorithm
+
+	if(!iMaxRGB) // black
+	{
+	  if(piH)
+	  {
+	    *piH = 0; // the color red
+	  }
+	  if(piS)
+	  {
+	    *piS = 0; // zero saturation
+	  }
+
+		return; // I am done here.  'V' is already equal to the RGB values (which must be the same if I get here)
+	}
+
+  dS = 1.0 * (iMaxRGB - iMinRGB) // the delta
+	   / (double)iMaxRGB;          // ratio of delta to max = saturation (a value from 0 to 1.0)
+
+  if(piS) // store it
+  {
+    *piS = clip255((int)floor(256.0 * dS));  // using 256 rather than 255 gives me some 'rounding up'
+  }
+
+  // calculating 'H'
+
+  if(!piH) // if not asking for H, bail out now
+  {
+    return;
+  }
+
+	if(iMaxRGB == iMinRGB)
+	{
+		dH = 0.0; // the color 'red'
+	}
+	else
+	{
+	  // NOTE:  this infers the quadrants based on which color is maximum
+
+    dDelta = iMaxRGB - iMinRGB;
+
+    if(iR == iMaxRGB) // maxed out red?
+		{
+		  // quadrants 5 and 0 (note quadrant 5 goes negative)
+      dH = (iG - iB) / dDelta; // calculate diff between yellow and magenta as +/- 1.0
+    }
+    else if(iG == iMaxRGB) // maxed out green?
+    {
+      dH = 2.0 + (iB - iR) / dDelta; // calculate diff between cyan and yellow as +/- 1.0
+    }
+    else // if(iB == iMaxRGB) maxed out blue
+    {
+      dH = 4.0 + (iR - iG) / dDelta; // calculate diff between magenta and cyan as +/- 1.0
+    }
+	}
+
+  // dH is a value from -1 to 5.  If it's less than zero, add 6 to it
+  if(dH < 0.0)
+  {
+    dH += 6.0;
+  }
+
+  // now dH is a value from 0 to 6, corresponding to values of 0-256.
+
+  if(dH >= 6.0)
+  {
+    dH = 0.0;  // so it converts correctly
+  }
+
+  *piH = clip255((int)floor((256.0 / 6.0) * dH));  // using 256 rather than 255 gives me some 'rounding up'
 }
 
 
+static unsigned short internal_get_rgb_from_pixel(long lPixel, int iMult, int iMax)
+{
+unsigned long lVal;
+
+
+  if(WB_LIKELY(iMult == 65536)) // a typical value for 8-bit colors in the pixel
+  {
+    lVal = lPixel / 65536; // this should compile as a fast bit shift
+  }
+  else if(WB_LIKELY(iMult == 256)) // a typical value for 8-bit colors in the pixel
+  {
+    lVal = lPixel / 256; // this should compile as a fast bit shift
+  }
+  else if(WB_LIKELY(iMult == 1)) // a typical value for 8-bit colors in the pixel
+  {
+    lVal = lPixel;
+  }
+  else // other values are possible, deal with them here
+  {
+    lVal = lPixel / iMult; // an arbitrary multiplier - slower, but functional
+  }
+
+  if(WB_LIKELY(iMax == 65535 || iMax == 255))
+  {
+    lVal = lVal & iMax;
+
+    if(WB_LIKELY(iMax == 255))
+    {
+      if(lVal == iMax) // so that white is always ffffH
+      {
+        lVal = 65535;
+      }
+      else
+      {
+        lVal *= 256; // to convert it to 0-65535 value
+      }
+    }
+  }
+  else // unlikely, but possible - slower code but functional
+  {
+    lVal %= (iMax + 1);
+
+    if(lVal == iMax) // so that white is always ffffH
+    {
+      lVal = 65535;
+    }
+    else
+    {
+#ifdef HAS_WB_UINT64_BUILTIN
+      lVal = (unsigned long)((WB_UINT64)65536    // do math as 'long long' to avoid overflows on 32-bit
+                             * (WB_UINT64)lVal
+                             / (WB_UINT64)(iMax + 1));
+#else  // !HAS_WB_UINT64_BUILTIN
+      // NOTE:  some values could cause math overflow (but are not likely)
+
+      lVal = 65536L * lVal
+           / (iMax + 1);
+#endif // HAS_WB_UINT64_BUILTIN
+    }
+  }
+
+  return (unsigned short)lVal;
+}
+
 void PXM_PixelToRGB(XStandardColormap *pMap, XColor *pColor)
 {
-unsigned long long lColor, l2;
+unsigned long lColor;
 XStandardColormap map;
 
 
@@ -300,456 +474,20 @@ XStandardColormap map;
 
   pColor->flags = DoRed | DoGreen | DoBlue; // pre-assign this, re-assign as needed
 
-  if(pMap->red_mult >= pMap->green_mult &&
-     pMap->red_mult >= pMap->blue_mult) // this includes monochrome I think
+  if(!pMap->green_mult && !pMap->blue_mult)
   {
-    if(!pMap->green_mult && !pMap->blue_mult)
-    {
-      // it's monochrome, so I only use red
+    // monochrome
 
-      if(pMap->red_mult == 1)
-      {
-        l2 = ((unsigned long long)65535 * lColor);
-      }
-      else
-      {
-        l2 = ((unsigned long long)65535 * lColor) / pMap->red_mult;
-      }
+    pColor->red = internal_get_rgb_from_pixel(lColor, pMap->red_mult, pMap->red_max);
+    pColor->green = pColor->blue = pColor->red; // make them the same (by convention for now)
 
-      if(l2 >= 65536 * pMap->red_max)
-      {
-        l2 = 65535;
-      }
-//      else if(lColor < 0)
-//      {
-//        l2 = 0;
-//      }
-      else
-      {
-        l2 /= pMap->red_max;
-      }
-
-      pColor->red = l2;
-      pColor->green = l2;
-      pColor->blue = l2; // since it's monochrome, though only 'DoRed' is assigned
-
-      pColor->flags = DoRed; // usually indicates 'monochrome'
-    }
-    else if(pMap->green_mult > pMap->blue_mult)
-    {
-      // red first
-
-      l2 = ((unsigned long long)65535 * lColor) / pMap->red_mult;
-      lColor %= pMap->red_mult;
-
-
-      if(l2 >= 65536 * pMap->red_max)
-      {
-        l2 = 65535 * pMap->red_max;
-      }
-//      else if(lColor < 0) // won't happen
-//      {
-//        l2 = 0;
-//      }
-      else
-      {
-        l2 /= pMap->red_max;
-      }
-
-      pColor->red = l2;
-
-      // then green
-
-      l2 = ((unsigned long long)65535 * lColor) / pMap->green_mult;
-      lColor %= pMap->green_mult;
-
-      if(l2 >= 65536 * pMap->green_max)
-      {
-        l2 = 65535 * pMap->green_max;
-      }
-//      else if(lColor < 0) // won't happen
-//      {
-//        l2 = 0;
-//      }
-      else
-      {
-        l2 /= pMap->green_max;
-      }
-
-      pColor->green = l2;
-
-      // and then, blue
-
-      if(!pMap->blue_mult)
-      {
-        l2 = 0;
-      }
-      else
-      {
-        l2 = ((unsigned long long)65535 * lColor) / pMap->blue_mult;
-
-        if(l2 >= 65536 * pMap->blue_max)
-        {
-          l2 = 65535 * pMap->blue_max;
-        }
-//        else if(lColor < 0)
-//        {
-//          l2 = 0;
-//        }
-        else
-        {
-          l2 /= pMap->blue_max;
-        }
-      }
-      pColor->blue = l2;
-    }
-    else // if(pMap->blue_mult > pMap->green_mult)
-    {
-      // red first
-
-      l2 = ((unsigned long long)65535 * lColor) / pMap->red_mult;
-      lColor %= pMap->red_mult;
-
-      if(l2 >= 65536 * pMap->red_max)
-      {
-        l2 = 65535 * pMap->red_max;
-      }
-//      else if(lColor < 0)
-//      {
-//        l2 = 0;
-//      }
-      else
-      {
-        l2 /= pMap->red_max;
-      }
-
-      pColor->red = l2;
-
-      // then blue
-
-      l2 = ((unsigned long long)65535 * lColor) / pMap->blue_mult;
-      lColor %= pMap->blue_mult;
-
-      if(l2 >= 65536 * pMap->blue_max)
-      {
-        l2 = 65535 * pMap->blue_max;
-      }
-//      else if(lColor < 0)
-//      {
-//        l2 = 0;
-//      }
-      else
-      {
-        l2 /= pMap->blue_max;
-      }
-
-      pColor->blue = l2;
-
-      // and then, green
-
-      if(!pMap->green_mult)
-      {
-        l2 = 0;
-      }
-      else
-      {
-        l2 = ((unsigned long long)65535 * lColor) / pMap->green_mult;
-
-        if(l2 >= 65536 * pMap->green_max)
-        {
-          l2 = 65535 * pMap->green_max;
-        }
-//        else if(lColor < 0)
-//        {
-//          l2 = 0;
-//        }
-        else
-        {
-          l2 /= pMap->green_max;
-        }
-      }
-
-      pColor->green = l2;
-    }
+    pColor->flags = DoRed; // usually indicates 'monochrome' - only use 'red'
   }
-  else if(pMap->green_mult >= pMap->red_mult &&
-          pMap->green_mult >= pMap->blue_mult)
+  else
   {
-    if(pMap->red_mult > pMap->blue_mult)
-    {
-      // green first
-
-      l2 = ((unsigned long long)65535 * lColor) / pMap->green_mult;
-      lColor %= pMap->green_mult;
-
-      if(l2 >= 65536 * pMap->green_max)
-      {
-        l2 = 65535 * pMap->green_max;
-      }
-//      else if(lColor < 0)
-//      {
-//        l2 = 0;
-//      }
-      else
-      {
-        l2 /= pMap->green_max;
-      }
-
-      pColor->green = l2;
-
-      // then red
-
-      l2 = ((unsigned long long)65535 * lColor) / pMap->red_mult;
-      lColor %= pMap->red_mult;
-
-      if(l2 >= 65536 * pMap->red_max)
-      {
-        l2 = 65535 * pMap->red_max;
-      }
-//      else if(lColor < 0)
-//      {
-//        l2 = 0;
-//      }
-      else
-      {
-        l2 /= pMap->red_max;
-      }
-
-      pColor->red = l2;
-
-      // and then, blue
-
-      if(!pMap->blue_mult)
-      {
-        l2 = 0;
-      }
-      else
-      {
-        l2 = ((unsigned long long)65535 * lColor) / pMap->blue_mult;
-
-        if(l2 >= 65536 * pMap->blue_max)
-        {
-          l2 = 65535 * pMap->blue_max;
-        }
-//        else if(lColor < 0)
-//        {
-//          l2 = 0;
-//        }
-        else
-        {
-          l2 /= pMap->blue_max;
-        }
-      }
-      pColor->blue = l2;
-    }
-    else // if(pMap->blue_mult > pMap->green_mult)
-    {
-      // green first
-
-      l2 = ((unsigned long long)65535 * lColor) / pMap->green_mult;
-      lColor %= pMap->green_mult;
-
-      if(l2 >= 65536 * pMap->green_max)
-      {
-        l2 = 65535 * pMap->green_max;
-      }
-//      else if(lColor < 0)
-//      {
-//        l2 = 0;
-//      }
-      else
-      {
-        l2 /= pMap->green_max;
-      }
-
-      pColor->green = l2;
-
-      // then blue
-
-      l2 = ((unsigned long long)65535 * lColor) / pMap->blue_mult;
-      lColor %= pMap->blue_mult;
-
-      if(l2 >= 65536 * pMap->blue_max)
-      {
-        l2 = 65535 * pMap->blue_max;
-      }
-//      else if(lColor < 0)
-//      {
-//        l2 = 0;
-//      }
-      else
-      {
-        l2 /= pMap->blue_max;
-      }
-
-      pColor->blue = l2;
-
-      // and then, red
-
-      if(!pMap->red_mult)
-      {
-        l2 = 0;
-      }
-      else
-      {
-        l2 = ((unsigned long long)65535 * lColor) / pMap->red_mult;
-
-        if(l2 >= 65536 * pMap->red_max)
-        {
-          l2 = 65535 * pMap->red_max;
-        }
-//        else if(lColor < 0)
-//        {
-//          l2 = 0;
-//        }
-        else
-        {
-          l2 /= pMap->red_max;
-        }
-      }
-
-      pColor->red = l2;
-    }
-  }
-  else //if(pMap->blue_mult >= pMap->red_mult &&
-       //   pMap->blue_mult >= pMap->green_mult)
-  {
-    if(pMap->red_mult > pMap->green_mult)
-    {
-      // blue first
-
-      l2 = ((unsigned long long)65535 * lColor) / pMap->blue_mult;
-      lColor %= pMap->blue_mult;
-
-      if(l2 >= 65536 * pMap->blue_max)
-      {
-        l2 = 65535 * pMap->blue_max;
-      }
-//      else if(lColor < 0)
-//      {
-//        l2 = 0;
-//      }
-      else
-      {
-        l2 /= pMap->blue_max;
-      }
-
-      pColor->blue = l2;
-
-      // then red
-
-      l2 = ((unsigned long long)65535 * lColor) / pMap->red_mult;
-      lColor %= pMap->red_mult;
-
-      if(l2 >= 65536 * pMap->red_max)
-      {
-        l2 = 65535 * pMap->red_max;
-      }
-//      else if(lColor < 0)
-//      {
-//        l2 = 0;
-//      }
-      else
-      {
-        l2 /= pMap->red_max;
-      }
-
-      pColor->red = l2;
-
-      // and then, green
-
-      if(!pMap->green_mult)
-      {
-        l2 = 0;
-      }
-      else
-      {
-        l2 = ((unsigned long long)65535 * lColor) / pMap->green_mult;
-
-        if(l2 >= 65536 * pMap->green_max)
-        {
-          l2 = 65535 * pMap->green_max;
-        }
-//        else if(lColor < 0)
-//        {
-//          l2 = 0;
-//        }
-        else
-        {
-          l2 /= pMap->green_max;
-        }
-      }
-      pColor->green = l2;
-    }
-    else // if(pMap->blue_mult > pMap->green_mult)
-    {
-      // blue first
-
-      l2 = ((unsigned long long)65535 * lColor) / pMap->blue_mult;
-      lColor %= pMap->blue_mult;
-
-      if(l2 >= 65536 * pMap->blue_max)
-      {
-        l2 = 65535 * pMap->blue_max;
-      }
-//      else if(lColor < 0)
-//      {
-//        l2 = 0;
-//      }
-      else
-      {
-        l2 /= pMap->blue_max;
-      }
-
-      pColor->blue = l2;
-
-      // then green
-
-      l2 = ((unsigned long long)65535 * lColor) / pMap->green_mult;
-      lColor %= pMap->green_mult;
-
-      if(l2 >= 65536 * pMap->green_max)
-      {
-        l2 = 65535 * pMap->green_max;
-      }
-//      else if(lColor < 0)
-//      {
-//        l2 = 0;
-//      }
-      else
-      {
-        l2 /= pMap->green_max;
-      }
-
-      pColor->green = l2;
-
-
-      // and then, red
-
-      if(!pMap->red_mult)
-      {
-        l2 = 0;
-      }
-      else
-      {
-        l2 = ((unsigned long long)65535 * lColor) / pMap->red_mult;
-
-        if(l2 >= 65536 * pMap->red_max)
-        {
-          l2 = 65535 * pMap->red_max;
-        }
-//        else if(lColor < 0)
-//        {
-//          l2 = 0;
-//        }
-        else
-        {
-          l2 /= pMap->red_max;
-        }
-      }
-
-      pColor->red = l2;
-    }
+    pColor->red = internal_get_rgb_from_pixel(lColor, pMap->red_mult, pMap->red_max);
+    pColor->green = internal_get_rgb_from_pixel(lColor, pMap->green_mult, pMap->green_max);
+    pColor->blue = internal_get_rgb_from_pixel(lColor, pMap->blue_mult, pMap->blue_max);
   }
 }
 
@@ -783,7 +521,8 @@ XStandardColormap map;
 
   if(pColor->flags & DoRed)
   {
-    lR = (unsigned long)(pColor->red * pMap->red_max) / 65535;
+    lR = ((unsigned long)(pColor->red) * (unsigned long)(pMap->red_max + 1))
+       / (unsigned long)65536L;
   }
 
 //  if(lR < 0)
@@ -791,14 +530,15 @@ XStandardColormap map;
 //    lR = 0;
 //  }
 //  else
-   if(lR > pMap->red_max)
+  if(lR > pMap->red_max)
   {
     lR = pMap->red_max;
   }
 
   if(pColor->flags & DoGreen)
   {
-    lG = (unsigned long)(pColor->green * pMap->green_max) / 65535;
+    lG = ((unsigned long)(pColor->green) * (unsigned long)(pMap->green_max + 1))
+       / (unsigned long)65536L;
   }
 
 //  if(lG < 0)
@@ -806,14 +546,15 @@ XStandardColormap map;
 //    lG = 0;
 //  }
 //  else
-   if(lG > pMap->green_max)
+  if(lG > pMap->green_max)
   {
     lG = pMap->green_max;
   }
 
   if(pColor->flags & DoBlue)
   {
-    lB = (unsigned long)(pColor->blue * pMap->blue_max) / 65535;
+    lB = (((unsigned long)pColor->blue) * (unsigned long)(pMap->blue_max + 1))
+       / (unsigned long)65536L;
   }
 
 //  if(lB < 0)
@@ -821,7 +562,7 @@ XStandardColormap map;
 //    lB = 0;
 //  }
 //  else
-   if(lB > pMap->blue_max)
+  if(lB > pMap->blue_max)
   {
     lB = pMap->blue_max;
   }
@@ -831,6 +572,12 @@ XStandardColormap map;
                    + lG * pMap->green_mult
                    + lB * pMap->blue_mult)
                 & 0xffffffffL;
+
+//  WB_ERROR_PRINT("TEMPORARY:  %s - pixel=%lX %d,%d,%d  %ld,%ld,%ld  %ld,%ld,%ld  %ld,%ld,%ld %ld\n",
+//                 __FUNCTION__,
+//                 pColor->pixel, pColor->red, pColor->green, pColor->blue,
+//                 lR, lG, lB, pMap->red_mult, pMap->green_mult, pMap->blue_mult,
+//                 pMap->red_max, pMap->green_max, pMap->blue_max, pMap->base_pixel);
 }
 
 
@@ -1336,20 +1083,83 @@ static void DebugDumpXpmAttributes(const char *szFunction, int nLine, XPM_ATTRIB
   WBDebugPrint("  color_closure:      %p\n", pAttr->color_closure);
 #endif // defined(X11WORKBENCH_TOOLKIT_HAVE_XPM)
 }
+#endif // !NO_DEBUG
 
-static void DebugDumpColormap(const XStandardColormap *pMap)
+
+void WBDebugDumpColormap(const char *szTitle, const XStandardColormap *pMap)
 {
-  WBDebugPrint("XStandardColormap:  %p\n", pMap);
-  WBDebugPrint("  colormap   = %lld\n", (WB_UINT64)pMap->colormap);
-  WBDebugPrint("  red_max    = %ld\n", pMap->red_max);
-  WBDebugPrint("  red_mult   = %ld\n", pMap->red_mult);
-  WBDebugPrint("  green_max  = %ld\n", pMap->green_max);
-  WBDebugPrint("  green_mult = %ld\n", pMap->green_mult);
-  WBDebugPrint("  blue_max   = %ld\n", pMap->blue_max);
-  WBDebugPrint("  blue_mult  = %ld\n", pMap->blue_mult);
-  WBDebugPrint("  base_pixel = %ld (%08lxH)\n", pMap->base_pixel, pMap->base_pixel);
+#ifndef NO_DEBUG
+  WBDebugPrint("WBDebugDumpColormap - %s\n", szTitle);
+  WBDebugPrint("  XStandardColormap:  %p\n", pMap);
+  if(pMap)
+  {
+    WBDebugPrint("    colormap   = %lld\n", (WB_UINT64)pMap->colormap);
+    WBDebugPrint("    red_max    = %ld\n", pMap->red_max);
+    WBDebugPrint("    red_mult   = %ld\n", pMap->red_mult);
+    WBDebugPrint("    green_max  = %ld\n", pMap->green_max);
+    WBDebugPrint("    green_mult = %ld\n", pMap->green_mult);
+    WBDebugPrint("    blue_max   = %ld\n", pMap->blue_max);
+    WBDebugPrint("    blue_mult  = %ld\n", pMap->blue_mult);
+    WBDebugPrint("    base_pixel = %ld (%08lxH)\n", pMap->base_pixel, pMap->base_pixel);
+  }
+#endif // !NO_DEBUG
 }
 
 
+void WBDebugDumpXColor(const char *szTitle, const XColor *pColor)
+{
+#ifndef NO_DEBUG
+char tbuf[32];
+
+  WBDebugPrint("DebugDumpXColor - %s\n", szTitle);
+  WBDebugPrint("  XColor:  %p\n", pColor);
+  if(pColor)
+  {
+    WBDebugPrint("    pixel = %lu \"#%6.6lX\"\n", pColor->pixel, pColor->pixel);
+    WBDebugPrint("    red   = %d\n", pColor->red);
+    WBDebugPrint("    green = %d\n", pColor->green);
+    WBDebugPrint("    blue  = %d\n", pColor->blue);
+
+    tbuf[0] = 0;
+    if(pColor->flags & DoRed)
+    {
+//      if(tbuf[0])
+//      {
+//        strcat(tbuf, " | ");
+//      }
+
+      strcat(tbuf, "DoRed");
+    }
+
+    if(pColor->flags & DoGreen)
+    {
+      if(tbuf[0])
+      {
+        strcat(tbuf, " | ");
+      }
+
+      strcat(tbuf, "DoGreen");
+    }
+
+    if(pColor->flags & DoBlue)
+    {
+      if(tbuf[0])
+      {
+        strcat(tbuf, " | ");
+      }
+
+      strcat(tbuf, "DoBlue");
+    }
+
+    if(tbuf[0])
+    {
+      WBDebugPrint("    flags = %d   %s\n", pColor->flags, tbuf);
+    }
+    else
+    {
+      WBDebugPrint("    flags = %d   (%XH)\n", pColor->flags, pColor->flags);
+    }
+  }
 #endif // !NO_DEBUG
+}
 

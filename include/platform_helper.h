@@ -562,6 +562,21 @@ WB_UINT64 WBGetTimeIndex(void);  // returns current 'time index' (in microsecond
 void WBDelay(uint32_t uiDelay);  // approximate delay for specified period (in microseconds).  may be interruptible
 
 
+/** \ingroup platform
+  * \brief Get the number of available CPU cores
+  *
+  * \return The total number of available CPU cores on the system.  On a VM, only those cores that have been assigned to the VM will be counted.
+  *
+  * A generic delay utility that returns the total number of available cores on the system.  This
+  * may be useful when determining how to divide up a parallel algorithm, for example.
+  *
+  * If the number of available cores is not known or cannot be determined for some reason, this
+  * function returns a value of 0.
+  *
+  * Header File:  platform_helper.h
+**/
+int WBCPUCount(void);
+
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////
