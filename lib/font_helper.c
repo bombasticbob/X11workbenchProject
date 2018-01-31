@@ -2068,8 +2068,9 @@ int WBTextWidth(XFontSet fontSet, const char *szText, int cbText)
 int iLen, iRval;
 
 
-  if(!fontSet || !cbText || !szText || (cbText < 0 && !*szText))
+  if(fontSet == None || !cbText || !szText || (cbText < 0 && !*szText))
   {
+    WB_ERROR_PRINT("TEMPORARY:  %s - returning zero (bad parameter)\n", __FUNCTION__);
     return 0;
   }
   else if(cbText < 0)
@@ -2083,6 +2084,8 @@ int iLen, iRval;
 
   iRval = WB_TEXT_ESCAPEMENT(fontSet, szText, iLen);
 
+//  WB_ERROR_PRINT("TEMPORARY:  %s - escapement for '%.*s' is %d\n", __FUNCTION__, iLen, szText, iRval);
+
 //  if(iRval <= 0)
 //  {
 //    iLen = mblen(szUTF8, nLength); // width estimate
@@ -2093,6 +2096,36 @@ int iLen, iRval;
 //  }
 
   return iRval;
+}
+
+void WBTextExtent(XFontSet fontSet, const char *szText, int cbText, WB_EXTENT *pExtent)
+{
+XRectangle rct, rct2;
+int iLen;
+
+
+  if(fontSet == None || !cbText || !szText || (cbText < 0 && !*szText))
+  {
+    WB_ERROR_PRINT("TEMPORARY:  %s - returning zero (bad parameter)\n", __FUNCTION__);
+    return;
+  }
+  else if(cbText < 0)
+  {
+    iLen = strlen(szText);
+  }
+  else
+  {
+    iLen = cbText;
+  }
+
+  memset(&rct2, 0, sizeof(rct2));
+
+  BEGIN_XCALL_DEBUG_WRAPPER
+  WB_TEXT_EXTENTS(fontSet, szText, iLen, &rct, &rct2);
+  END_XCALL_DEBUG_WRAPPER
+
+  pExtent->width = rct2.width;
+  pExtent->height = rct2.height;
 }
 
 

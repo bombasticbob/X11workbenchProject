@@ -312,7 +312,7 @@ void DLGRegisterControlCallback(WBDialogControl *pDialogControl, const char *szC
   *
   * Header File:  dialog_controls.h
 **/
-static __inline void WBDialogControlInvalidateGeom(WBDialogControl *pDialogControl, const WB_GEOM *pGeom, int bPaintFlag)
+static __inline__ void WBDialogControlInvalidateGeom(WBDialogControl *pDialogControl, const WB_GEOM *pGeom, int bPaintFlag)
 {
   if(pDialogControl) // TODO:  a 'validate' function?
   {
@@ -331,7 +331,7 @@ static __inline void WBDialogControlInvalidateGeom(WBDialogControl *pDialogContr
   *
   * Header File:  dialog_controls.h
 **/
-static __inline void WBDialogControlInvalidateRegion(WBDialogControl *pDialogControl, Region rgn, int bPaintFlag)
+static __inline__ void WBDialogControlInvalidateRegion(WBDialogControl *pDialogControl, Region rgn, int bPaintFlag)
 {
   if(pDialogControl) // TODO:  a 'validate' function?
   {
@@ -485,7 +485,7 @@ static __inline__ WBDialogControl *DLGGetDialogControlStruct(Window wID)  // for
   *
   * Header File:  dialog_controls.h
 **/
-static __inline WBDialogControl * WBGetDialogEntryControlStruct(WBDialogWindow *pDialog, int iControlID)
+static __inline__ WBDialogControl * WBGetDialogEntryControlStruct(WBDialogWindow *pDialog, int iControlID)
 {
   return DLGGetDialogControlStruct(DLGGetDialogControl(pDialog, iControlID));
 }
@@ -540,9 +540,8 @@ void WBDialogControlSetCaption(WBDialogControl *pCtrl, const char *szCaption); /
   *
   * Header File:  dialog_controls.h
 **/
-static __inline int WBDialogControlGetCaptionInt(WBDialogControl *pCtrl)
+static __inline__ int WBDialogControlGetCaptionInt(WBDialogControl *pCtrl)
 {
-char tbuf2[4];
 const char *pCaption;
 
   pCaption = WBDialogControlGetCaption(pCtrl);
@@ -570,7 +569,7 @@ const char *pCaption;
   *
   * Header File:  dialog_controls.h
 **/
-static __inline void WBDialogControlSetCaptionInt(WBDialogControl *pCtrl, int iValue, const char *szFormat)
+static __inline__ void WBDialogControlSetCaptionInt(WBDialogControl *pCtrl, int iValue, const char *szFormat)
 {
 char tbuf[64], tbuf2[4];
 const char *pF = szFormat;
@@ -603,9 +602,8 @@ const char *pF = szFormat;
   *
   * Header File:  dialog_controls.h
 **/
-static __inline long WBDialogControlGetCaptionLong(WBDialogControl *pCtrl)
+static __inline__ long WBDialogControlGetCaptionLong(WBDialogControl *pCtrl)
 {
-char tbuf2[4];
 const char *pCaption;
 
   pCaption = WBDialogControlGetCaption(pCtrl);
@@ -633,7 +631,7 @@ const char *pCaption;
   *
   * Header File:  dialog_controls.h
 **/
-static __inline void WBDialogControlSetCaptionLong(WBDialogControl *pCtrl, long lValue, const char *szFormat)
+static __inline__ void WBDialogControlSetCaptionLong(WBDialogControl *pCtrl, long lValue, const char *szFormat)
 {
 char tbuf[64], tbuf2[4];
 const char *pF = szFormat;
@@ -667,9 +665,8 @@ const char *pF = szFormat;
   *
   * Header File:  dialog_controls.h
 **/
-static __inline WB_INT64 WBDialogControlGetCaptionLong(WBDialogControl *pCtrl)
+static __inline__ WB_INT64 WBDialogControlGetCaptionLong(WBDialogControl *pCtrl)
 {
-char tbuf2[4];
 const char *pCaption;
 
   pCaption = WBDialogControlGetCaption(pCtrl);
@@ -697,7 +694,7 @@ const char *pCaption;
   *
   * Header File:  dialog_controls.h
 **/
-static __inline void WBDialogControlSetCaptionLongLong(WBDialogControl *pCtrl, WB_INT64 llValue, const char *szFormat)
+static __inline__ void WBDialogControlSetCaptionLongLong(WBDialogControl *pCtrl, WB_INT64 llValue, const char *szFormat)
 {
 char tbuf[128], tbuf2[8];
 const char *pF = szFormat;

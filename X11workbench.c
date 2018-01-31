@@ -169,7 +169,7 @@ char **argv = argv0; // re-define as char ** so I can re-allocate it as needed
 char **envp = envp0;
 
 
-  if(!WBParseStandardArguments(&argc, &argv, &envp))
+  if(!(iRval = WBParseStandardArguments(&argc, &argv, &envp)))
   {
     iRval = do_main(argc, argv, envp);
 
@@ -185,7 +185,12 @@ char **envp = envp0;
   }
   else
   {
-    usage();
+    if(iRval < 0)
+    {
+      usage();
+    }
+
+    iRval = 1; // for now;  later, return as-is?
   }
 
   return iRval;

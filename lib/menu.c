@@ -1005,8 +1005,9 @@ WBMenuItem *pRval = NULL;
   }
 
 #ifndef NO_DEBUG
-  if((WBGetDebugLevel() & DebugLevel_MASK) >= DebugLevel_Chatty ||
-     (WBGetDebugLevel() & DebugSubSystem_Menu))
+//  if((WBGetDebugLevel() & DebugLevel_MASK) >= DebugLevel_Chatty ||
+//     (WBGetDebugLevel() & DebugSubSystem_Menu))
+  WB_IF_DEBUG_LEVEL(DebugLevel_Chatty | DebugSubSystem_Menu)
   {
     if(pRval->iAction == WBMENU_SEPARATOR)
     {

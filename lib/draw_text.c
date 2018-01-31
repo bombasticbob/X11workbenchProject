@@ -63,7 +63,7 @@
 #include "window_helper.h"  // this also includes 'font_helper.h'
 
 #include "draw_text.h"
-
+#include "pixmap_helper.h" // for anti-alias functions, etc.
 
 
 // function prototypes
@@ -98,6 +98,7 @@ static int InternalCalcIdealBounds(Display *pDisplay, XFontSet fontSet, DT_WORDS
 static void InternalDebugDumpWords(DT_WORDS *pWords); ///< \brief internal debug function to dump 'DT_WORDS' 'words' object
 
 
+static void __internalDoAntiAlias(Display *pDisplay, Drawable dw, GC gc, int iX, int iY, int iWidth, int iHeight);
 
 
 // *******************
@@ -110,6 +111,7 @@ void DTDrawString(Display *pDisplay, Drawable drawable, XFontSet fontSet,
 {
 char tbuf[1024];
 char *pS;
+WB_EXTENT ext;
 
 #if defined(X_HAVE_UTF8_STRING)
 #define DO_DRAW_STRING Xutf8DrawString
@@ -162,7 +164,21 @@ use_the_stack_buffer:
   //        shrink it down onto the display surface with a raster operation that combines
   //        pixels and (effectively) gives it an anti-aliasing effect.
 
+  BEGIN_XCALL_DEBUG_WRAPPER
   DO_DRAW_STRING(pDisplay, drawable, fontSet, gc, x, y, pS, nLength); // for now, just do this
+  END_XCALL_DEBUG_WRAPPER
+
+  // TODO: an 'if' block for anti-aliasing support?
+  {
+    WBTextExtent(fontSet, pS, nLength, &ext);
+
+//    WB_ERROR_PRINT("TEMPORARY:  %s geom: %d,%d,%d,%d\n",
+//                   __FUNCTION__, x, y, ext.width, ext.height);
+
+    // NOTE:  the x and y are for bottom left with this function, not top left
+    __internalDoAntiAlias(pDisplay, drawable, gc, x, y - ext.height, ext.width, ext.height);
+  }
+
 
   if(pS && pS != &(tbuf[0]) && pS != (char *)pString)
   {
@@ -192,7 +208,9 @@ int iRval;//, iLen;
 
   iRval = DTGetTextWidth(fSet, szUTF8, nLength); // WB_TEXT_ESCAPEMENT(fSet, szUTF8, nLength);
 
+  BEGIN_XCALL_DEBUG_WRAPPER
   XFreeFontSet(WBGetDefaultDisplay(), fSet);
+  END_XCALL_DEBUG_WRAPPER
 
   return iRval;
 }
@@ -223,6 +241,23 @@ int iRval;
   // TODO:  any debug output
 
   return iRval;
+}
+
+void DTGetTextExtent(XFontSet fontSet, const char *szUTF8, int nLength, WB_EXTENT *pExtent)
+{
+  if(fontSet == None)
+  {
+    fontSet = WBGetDefaultFontSet(WBGetDefaultDisplay());
+
+    if(fontSet == None)
+    {
+      WB_ERROR_PRINT("ERROR:  %s - fSet is None\n", __FUNCTION__);
+
+      return;
+    }
+  }
+
+  WBTextExtent(fontSet, szUTF8, nLength, pExtent);
 }
 
 
@@ -1323,6 +1358,153 @@ will_not_fit:
 }
 
 
+static void __internalDoAntiAlias(Display *pDisplay, Drawable dw, GC gc, int iX, int iY, int iWidth, int iHeight)
+{
+XStandardColormap map;
+XImage *pImage;
+unsigned long lPixel;
+WB_GEOM geom;
+Window winRoot; // unused, but I still need it
+int iX0=0, iY0=0;
+unsigned int iWidth0=0, iHeight0=0, iBorder;
+unsigned int uiDepth = 0;
+Pixmap pxTemp;
+GC gc2;
+Region rgnClip;
+
+
+  lPixel = WBGetGCFGColor(pDisplay, gc); // current foreground color
+
+  pxTemp = None;
+  rgnClip = None;
+  gc2 = None;
+
+  WBDefaultStandardColormap(pDisplay, &map);
+
+//  WB_ERROR_PRINT("TEMPORARY:  %s - geom %d,%d,%d,%d\n", __FUNCTION__, iX, iY, iWidth, iHeight);
+
+  // use XGetGeometry to obtain the characteristics of the pixmap or window.  iX and iY SHOULD be zero...
+  BEGIN_XCALL_DEBUG_WRAPPER
+  XGetGeometry(pDisplay, dw, &winRoot, &iX0, &iY0, &iWidth0, &iHeight0, &iBorder, &uiDepth);
+  END_XCALL_DEBUG_WRAPPER
+
+  geom.x = 0;
+  geom.y = 0;
+
+  if(iX >= iWidth0 + iX0 || iY >= iHeight0 + iY0)
+  {
+//    WB_ERROR_PRINT("ERROR: %s - drawable smaller than requested geom:  %d,%d,%d,%d  %d,%d,%d,%d\n",
+//                 __FUNCTION__, iX0, iY0, iWidth0, iHeight0,
+//                 iX, iY, iWidth, iHeight);
+    return;
+  }
+
+  iWidth0 = (iWidth0 + iX0) - iX; // right - 'new left' = 'new width'
+  iHeight0 = (iHeight0 + iY0) - iY; // adjust so that it matches the 'remaining space' from X,Y
+
+  // to avoid errors from XGetImage, if the requested geometry is too big, reduce
+  // the width/height to the actual width/height of the Drawable
+
+  if(iWidth0 < iWidth)
+  {
+    geom.width = iWidth0;
+  }
+  else
+  {
+    geom.width = iWidth;
+  }
+
+  if(iHeight0 < iHeight)
+  {
+    geom.height = iHeight0;
+  }
+  else
+  {
+    geom.height = iHeight;
+  }
+
+  geom.x = 0;
+  geom.y = 0;
+
+  BEGIN_XCALL_DEBUG_WRAPPER
+  pxTemp = XCreatePixmap(pDisplay, dw, geom.width, geom.height,
+                         DefaultDepth(pDisplay, DefaultScreen(pDisplay)));
+  END_XCALL_DEBUG_WRAPPER
+
+  if(pxTemp == None)
+  {
+    WB_ERROR_PRINT("ERROR: %s - unable to create temporary pixmap via XCreatePixmap()\n", __FUNCTION__);
+    goto the_end;
+  }
+
+  rgnClip = WBGeomToRegion(&geom);
+  if(rgnClip == None)
+  {
+    WB_ERROR_PRINT("ERROR: %s - unable to create temporary clipping region\n", __FUNCTION__);
+    goto the_end;
+  }
+
+  gc2 = WBCopyDrawableGC(pDisplay, dw, gc); // everything the same except the clip region
+  if(gc2 == None)
+  {
+    WB_ERROR_PRINT("ERROR: %s - unable to create temporary GC copy\n", __FUNCTION__);
+
+    goto the_end;
+  }
+
+  BEGIN_XCALL_DEBUG_WRAPPER
+  XSetRegion(pDisplay, gc2, rgnClip); // new clipping region
+  XCopyArea(pDisplay, dw, pxTemp, gc2,
+            iX, iY, geom.width, geom.height, 0, 0);
+  END_XCALL_DEBUG_WRAPPER
+
+//  WB_ERROR_PRINT("TEMPORARY: %s - geom %d,%d,%d,%d  (%d,%d)\n",
+//                 __FUNCTION__, geom.x, geom.y, geom.width, geom.height, iWidth0, iHeight0);
+
+
+  // create an XImage, and perform the operation on that
+  BEGIN_XCALL_DEBUG_WRAPPER
+  pImage = XGetImage(pDisplay, pxTemp, 0, 0, geom.width, geom.height, 0xffffffff, ZPixmap);
+  END_XCALL_DEBUG_WRAPPER
+
+  if(!pImage)
+  {
+    WB_ERROR_PRINT("ERROR: %s - unable to create image via XGetImage()\n", __FUNCTION__);
+  }
+  else
+  {
+    WBSimpleAntiAliasImage(&map, pImage, lPixel, &geom);
+
+    BEGIN_XCALL_DEBUG_WRAPPER
+    XPutImage(pDisplay, pxTemp, gc2, pImage, 0, 0, 0, 0, geom.width, geom.height);
+
+    XCopyArea(pDisplay, pxTemp, dw, gc, // this one uses 'gc' when copying BACK to 'dw'
+              0, 0, geom.width, geom.height, iX, iY);
+
+    // I can destroy the image now
+    XDestroyImage(pImage);
+    END_XCALL_DEBUG_WRAPPER
+  }
+
+the_end:
+
+  BEGIN_XCALL_DEBUG_WRAPPER
+  if(gc2 != None)
+  {
+    XFreeGC(pDisplay, gc2);
+  }
+  if(pxTemp != None)
+  {
+    XFreePixmap(pDisplay, pxTemp);
+  }
+  if(rgnClip != None)
+  {
+    XDestroyRegion(rgnClip);
+  }
+  END_XCALL_DEBUG_WRAPPER
+
+}
+
 
 void DTDrawSingleLineText0(XFontStruct *pFont, const char *szText, Display *pDisplay, GC gc, Drawable dw,
                            int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment)
@@ -1536,7 +1718,9 @@ XCharStruct xMaxBounds;
               xpt[1].x=iH + DTGetTextWidth(fSet, (char *)(pW->pText) + i3, 1); // width of character
               xpt[1].y=xpt[0].y;
 
+              BEGIN_XCALL_DEBUG_WRAPPER
               XDrawLines(pDisplay, dw, gc, xpt, 2, CoordModeOrigin);
+              END_XCALL_DEBUG_WRAPPER
             }
 
             // advance the pointer
@@ -1567,11 +1751,28 @@ XCharStruct xMaxBounds;
             xpt[1].x=iH + DTGetTextWidth(fSet, (char *)(pW->pText) + i3, 1); // width of character
             xpt[1].y=xpt[0].y;
 
+            BEGIN_XCALL_DEBUG_WRAPPER
             XDrawLines(pDisplay, dw, gc, xpt, 2, CoordModeOrigin);
+            END_XCALL_DEBUG_WRAPPER
           }
         }
       }
+
     }
+  }
+
+  // now that I have drawn the text, anti-alias it if I set the anti-alias flag
+
+  if(iAlignment & DTAlignment_ANTIALIAS)
+  {
+//    BEGIN_XCALL_DEBUG_WRAPPER
+//    XSync(pDisplay, 0);
+//    END_XCALL_DEBUG_WRAPPER
+
+    __internalDoAntiAlias(pDisplay, dw, gc,
+                          rcDest.left, rcDest.top,
+                          rcDest.right - rcDest.left,
+                          rcDest.bottom - rcDest.top);
   }
 
   WBFree(pWords);

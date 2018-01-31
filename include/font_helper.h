@@ -70,6 +70,10 @@
 extern "C" {
 #endif // __cplusplus
 
+#ifndef _WINDOW_HELPER_H_INCLUDED_
+typedef struct _WBExtent_ WB_EXTENT; // forward reference on WB_EXTENT structure for WBTextExtent()
+#endif // _WINDOW_HELPER_H_INCLUDED_
+
 
 /** \ingroup font
   * @{
@@ -357,6 +361,24 @@ XFontSet WBFontSetFromFontSingle(Display *pDisplay, const XFontStruct *pFont);
   *
 **/
 int WBTextWidth(XFontSet fontSet, const char *szText, int cbText);
+
+
+/** \ingroup font
+  * \brief Obtain the pixel extent of specified text for a specified XFontSet
+  *
+  * \param fontSet An XFontSet, as returned by WBFontSetFromFont (or similar)
+  * \param szText A (const) pointer to a Multi-Byte (or UTF8 string) string
+  * \param cbText The total length of the text pointed to by szText (negative value to use a zero-byte terminator)
+  * \param pExtent A pointer to a WB_EXTENT structure that receives the text extent.  This will be the logical text extent, for spacing purposes
+  *
+  * Use this function to determine the correct 'display' width and height of a UTF8 or Multi-Byte character
+  * string. It calculates the 'logical' extent using either XmbTextExtents() or Xutf8TextExtents()
+  * (as applicable) and returns the width/height of the bounding rectangle for the text.
+  *
+  * Header File:  font_helper.h
+  *
+**/
+void WBTextExtent(XFontSet fontSet, const char *szText, int cbText, WB_EXTENT *pExtent);
 
 
 /** \ingroup debug

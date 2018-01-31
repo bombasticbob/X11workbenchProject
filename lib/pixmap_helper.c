@@ -109,6 +109,231 @@ static char **ppRegAppSmall_Internal = NULL;
 
 XStandardColormap PXM_StandardColormapFromColormap_rval; // storage for static var for PXM_StandardColormapFromColormap()
 
+
+//--------------------
+// STARTUP AND CLEANUP
+//--------------------
+
+void PXM_OnExit(void)
+{
+  if(pAtomResourceList)
+  {
+    WBFree(pAtomResourceList);
+    pAtomResourceList = NULL;
+  }
+
+  nAtomResourceList = 0;
+  nAtomResourceListMax = 0;
+
+  ppRegAppLarge_Internal = NULL;
+  ppRegAppSmall_Internal = NULL;
+}
+
+
+//---------------
+// MATH UTILITIES
+//---------------
+
+unsigned char WB_isqrt(unsigned char iVal)
+{
+static const unsigned char aAnswers[256] =
+{
+  0,1,1,2,2,2,2,3,3,3,3,3,3,4,4,4,
+  4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,6,
+  6,6,6,6,6,6,6,6,6,6,6,7,7,7,7,7,
+  7,7,7,7,7,7,7,7,7,8,8,8,8,8,8,8,
+  8,8,8,8,8,8,8,8,8,9,9,9,9,9,9,9,
+  9,9,9,9,9,9,9,9,9,9,9,10,10,10,10,10,
+  10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11,
+  11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,
+  11,11,11,11,11,12,12,12,12,12,12,12,12,12,12,12,
+  12,12,12,12,12,12,12,12,12,12,12,12,12,13,13,13,
+  13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,
+  13,13,13,13,13,13,13,14,14,14,14,14,14,14,14,14,
+  14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,
+  14,14,14,15,15,15,15,15,15,15,15,15,15,15,15,15,
+  15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
+  15,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16
+};
+
+
+  return aAnswers[iVal & 0xff];
+}
+
+unsigned char WB_icos0(unsigned char iVal)
+{
+static const unsigned char aAnswers[256] =
+{
+255,255,255,255,255,255,255,255,255,255,255,254,254,254,254,254,
+254,254,253,253,253,253,253,252,252,252,252,252,251,251,251,250,
+250,250,249,249,249,248,248,248,247,247,247,246,246,245,245,244,
+244,244,243,243,242,242,241,241,240,240,239,238,238,237,237,236,
+236,235,234,234,233,232,232,231,231,230,229,228,228,227,226,226,
+225,224,223,223,222,221,220,220,219,218,217,216,215,215,214,213,
+212,211,210,209,208,208,207,206,205,204,203,202,201,200,199,198,
+197,196,195,194,193,192,191,190,189,188,187,186,185,184,183,181,
+180,179,178,177,176,175,174,172,171,170,169,168,167,165,164,163,
+162,161,159,158,157,156,154,153,152,151,149,148,147,146,144,143,
+142,140,139,138,136,135,134,132,131,130,128,127,126,124,123,122,
+120,119,117,116,115,113,112,110,109,108,106,105,103,102,100,99,
+98,96,95,93,92,90,89,87,86,84,83,81,80,79,77,76,
+74,73,71,70,68,67,65,63,62,60,59,57,56,54,53,51,
+50,48,47,45,44,42,41,39,37,36,34,33,31,30,28,27,
+25,23,22,20,19,17,16,14,13,11,9,8,6,5,3,2
+};
+
+
+  return aAnswers[iVal & 0xff];
+}
+
+static const char aCosAnswers[0x400] = // 1024 of them
+{
+  127, 127, 127, 127, 127, 127, 127, 127,
+  127, 127, 127, 127, 127, 127, 127, 126,
+  126, 126, 126, 126, 126, 126, 126, 126,
+  126, 126, 125, 125, 125, 125, 125, 125,
+  125, 124, 124, 124, 124, 124, 124, 123,
+  123, 123, 123, 123, 122, 122, 122, 122,
+  122, 121, 121, 121, 121, 120, 120, 120,
+  120, 119, 119, 119, 118, 118, 118, 118,
+  117, 117, 117, 116, 116, 116, 115, 115,
+  115, 114, 114, 114, 113, 113, 113, 112,
+  112, 112, 111, 111, 111, 110, 110, 109,
+  109, 109, 108, 108, 107, 107, 106, 106,
+  106, 105, 105, 104, 104, 103, 103, 102,
+  102, 102, 101, 101, 100, 100, 99, 99,
+  98, 98, 97, 97, 96, 96, 95, 95,
+  94, 94, 93, 93, 92, 91, 91, 90,
+  90, 89, 89, 88, 88, 87, 86, 86,
+  85, 85, 84, 84, 83, 82, 82, 81,
+  81, 80, 79, 79, 78, 78, 77, 76,
+  76, 75, 74, 74, 73, 72, 72, 71,
+  71, 70, 69, 69, 68, 67, 67, 66,
+  65, 65, 64, 63, 63, 62, 61, 61,
+  60, 59, 58, 58, 57, 56, 56, 55,
+  54, 54, 53, 52, 51, 51, 50, 49,
+  49, 48, 47, 46, 46, 45, 44, 44,
+  43, 42, 41, 41, 40, 39, 38, 38,
+  37, 36, 35, 35, 34, 33, 32, 32,
+  31, 30, 29, 29, 28, 27, 26, 26,
+  25, 24, 23, 22, 22, 21, 20, 19,
+  19, 18, 17, 16, 16, 15, 14, 13,
+  12, 12, 11, 10, 9, 9, 8, 7,
+  6, 5, 5, 4, 3, 2, 2, 1,
+  0, -1, -2, -2, -3, -4, -5, -5,
+  -6, -7, -8, -9, -9, -10, -11, -12,
+  -12, -13, -14, -15, -16, -16, -17, -18,
+  -19, -19, -20, -21, -22, -22, -23, -24,
+  -25, -26, -26, -27, -28, -29, -29, -30,
+  -31, -32, -32, -33, -34, -35, -35, -36,
+  -37, -38, -38, -39, -40, -41, -41, -42,
+  -43, -44, -44, -45, -46, -46, -47, -48,
+  -49, -49, -50, -51, -51, -52, -53, -54,
+  -54, -55, -56, -56, -57, -58, -58, -59,
+  -60, -61, -61, -62, -63, -63, -64, -65,
+  -65, -66, -67, -67, -68, -69, -69, -70,
+  -71, -71, -72, -72, -73, -74, -74, -75,
+  -76, -76, -77, -78, -78, -79, -79, -80,
+  -81, -81, -82, -82, -83, -84, -84, -85,
+  -85, -86, -86, -87, -88, -88, -89, -89,
+  -90, -90, -91, -91, -92, -93, -93, -94,
+  -94, -95, -95, -96, -96, -97, -97, -98,
+  -98, -99, -99, -100, -100, -101, -101, -102,
+  -102, -102, -103, -103, -104, -104, -105, -105,
+  -106, -106, -106, -107, -107, -108, -108, -109,
+  -109, -109, -110, -110, -111, -111, -111, -112,
+  -112, -112, -113, -113, -113, -114, -114, -114,
+  -115, -115, -115, -116, -116, -116, -117, -117,
+  -117, -118, -118, -118, -118, -119, -119, -119,
+  -120, -120, -120, -120, -121, -121, -121, -121,
+  -122, -122, -122, -122, -122, -123, -123, -123,
+  -123, -123, -124, -124, -124, -124, -124, -124,
+  -125, -125, -125, -125, -125, -125, -125, -126,
+  -126, -126, -126, -126, -126, -126, -126, -126,
+  -126, -126, -127, -127, -127, -127, -127, -127,
+  -127, -127, -127, -127, -127, -127, -127, -127,
+  -127, -127, -127, -127, -127, -127, -127, -127,
+  -127, -127, -127, -127, -127, -127, -127, -126,
+  -126, -126, -126, -126, -126, -126, -126, -126,
+  -126, -126, -125, -125, -125, -125, -125, -125,
+  -125, -124, -124, -124, -124, -124, -124, -123,
+  -123, -123, -123, -123, -122, -122, -122, -122,
+  -122, -121, -121, -121, -121, -120, -120, -120,
+  -120, -119, -119, -119, -118, -118, -118, -118,
+  -117, -117, -117, -116, -116, -116, -115, -115,
+  -115, -114, -114, -114, -113, -113, -113, -112,
+  -112, -112, -111, -111, -111, -110, -110, -109,
+  -109, -109, -108, -108, -107, -107, -106, -106,
+  -106, -105, -105, -104, -104, -103, -103, -102,
+  -102, -102, -101, -101, -100, -100, -99, -99,
+  -98, -98, -97, -97, -96, -96, -95, -95,
+  -94, -94, -93, -93, -92, -91, -91, -90,
+  -90, -89, -89, -88, -88, -87, -86, -86,
+  -85, -85, -84, -84, -83, -82, -82, -81,
+  -81, -80, -79, -79, -78, -78, -77, -76,
+  -76, -75, -74, -74, -73, -72, -72, -71,
+  -71, -70, -69, -69, -68, -67, -67, -66,
+  -65, -65, -64, -63, -63, -62, -61, -61,
+  -60, -59, -58, -58, -57, -56, -56, -55,
+  -54, -54, -53, -52, -51, -51, -50, -49,
+  -49, -48, -47, -46, -46, -45, -44, -44,
+  -43, -42, -41, -41, -40, -39, -38, -38,
+  -37, -36, -35, -35, -34, -33, -32, -32,
+  -31, -30, -29, -29, -28, -27, -26, -26,
+  -25, -24, -23, -22, -22, -21, -20, -19,
+  -19, -18, -17, -16, -16, -15, -14, -13,
+  -12, -12, -11, -10, -9, -9, -8, -7,
+  -6, -5, -5, -4, -3, -2, -2, -1,
+  0, 1, 2, 2, 3, 4, 5, 5,
+  6, 7, 8, 9, 9, 10, 11, 12,
+  12, 13, 14, 15, 16, 16, 17, 18,
+  19, 19, 20, 21, 22, 22, 23, 24,
+  25, 26, 26, 27, 28, 29, 29, 30,
+  31, 32, 32, 33, 34, 35, 35, 36,
+  37, 38, 38, 39, 40, 41, 41, 42,
+  43, 44, 44, 45, 46, 46, 47, 48,
+  49, 49, 50, 51, 51, 52, 53, 54,
+  54, 55, 56, 56, 57, 58, 58, 59,
+  60, 61, 61, 62, 63, 63, 64, 65,
+  65, 66, 67, 67, 68, 69, 69, 70,
+  71, 71, 72, 72, 73, 74, 74, 75,
+  76, 76, 77, 78, 78, 79, 79, 80,
+  81, 81, 82, 82, 83, 84, 84, 85,
+  85, 86, 86, 87, 88, 88, 89, 89,
+  90, 90, 91, 91, 92, 93, 93, 94,
+  94, 95, 95, 96, 96, 97, 97, 98,
+  98, 99, 99, 100, 100, 101, 101, 102,
+  102, 102, 103, 103, 104, 104, 105, 105,
+  106, 106, 106, 107, 107, 108, 108, 109,
+  109, 109, 110, 110, 111, 111, 111, 112,
+  112, 112, 113, 113, 113, 114, 114, 114,
+  115, 115, 115, 116, 116, 116, 117, 117,
+  117, 118, 118, 118, 118, 119, 119, 119,
+  120, 120, 120, 120, 121, 121, 121, 121,
+  122, 122, 122, 122, 122, 123, 123, 123,
+  123, 123, 124, 124, 124, 124, 124, 124,
+  125, 125, 125, 125, 125, 125, 125, 126,
+  126, 126, 126, 126, 126, 126, 126, 126,
+  126, 126, 127, 127, 127, 127, 127, 127,
+  127, 127, 127, 127, 127, 127, 127, 127 //,
+//  127
+};
+
+char WB_icos(int iVal)
+{
+  return aCosAnswers[iVal & 0x3ff];
+}
+
+unsigned int WB_iatan(int iX, int iY)
+{
+
+  return 0; // for now...
+}
+
+
+
+
+
 //-------------------------
 // RGB and YUV conversions
 //-------------------------
@@ -935,6 +1160,7 @@ int iW, iH;
 
   // I will need to create a GC.  Make it a simple one that only specifies FG and BG
 
+  memset(&gcv, 0, sizeof(gcv));
   gcv.foreground = clrFGPixel;//BlackPixel(pDisplay, DefaultScreen(pDisplay));
   gcv.background = clrBGPixel;//WhitePixel(pDisplay, DefaultScreen(pDisplay));
 
@@ -982,8 +1208,8 @@ Pixmap PXM_ImageToPixmap0(Display *pDisplay, Drawable dw, XImage *pImage)
 XImage *PXM_PixmapToImage(Display *pDisplay, Pixmap pxImage)
 {
 XImage *pRval;
-int iX=0, iY=0;
 Window winRoot; // not used, still needed?
+int iX=0, iY=0;
 unsigned int iWidth=0, iHeight=0, iBorder;
 unsigned int uiDepth = 0;
 
@@ -1020,22 +1246,224 @@ unsigned int uiDepth = 0;
   return pRval;
 }
 
-
-
-
-void PXM_OnExit(void)
+void WBSimpleAntiAliasPixmap(Display *pDisplay, const XStandardColormap *pMap, Pixmap pxImage, unsigned long lPixel, WB_GEOM *pGeom)
 {
-  if(pAtomResourceList)
+WB_GEOM geom;
+XImage *pImage = NULL;
+GC gc;
+XGCValues gcv;
+XStandardColormap map;
+
+
+  if(!pDisplay)
   {
-    WBFree(pAtomResourceList);
-    pAtomResourceList = NULL;
+    pDisplay = WBGetDefaultDisplay();
   }
 
-  nAtomResourceList = 0;
-  nAtomResourceListMax = 0;
+  if(pxImage == None)
+  {
+    return;
+  }
 
-  ppRegAppLarge_Internal = NULL;
-  ppRegAppSmall_Internal = NULL;
+  if(!pMap)
+  {
+    WBDefaultStandardColormap(pDisplay, &map);
+    pMap = &map;
+  }
+
+  if(pGeom)
+  {
+    memcpy(&geom, pGeom, sizeof(geom));
+  }
+  else
+  {
+    Window winRoot; // unused, but I still need it
+
+    int iX=0, iY=0;
+    unsigned int iWidth=0, iHeight=0, iBorder;
+    unsigned int uiDepth = 0;
+
+    // use XGetGeometry to obtain the characteristics of the pixmap.  iX and iY SHOULD be zero...
+    BEGIN_XCALL_DEBUG_WRAPPER
+    XGetGeometry(pDisplay, pxImage, &winRoot, &iX, &iY, &iWidth, &iHeight, &iBorder, &uiDepth);
+    END_XCALL_DEBUG_WRAPPER
+
+    geom.x = 0;
+    geom.y = 0;
+    geom.width = iWidth;
+    geom.height = iHeight;
+  }
+
+  if(!geom.width || !geom.height)
+  {
+    return;
+  }
+
+  // create an XImage, and perform the operation on that
+  BEGIN_XCALL_DEBUG_WRAPPER
+  pImage = XGetImage(pDisplay, pxImage, geom.x, geom.y, geom.width, geom.height, 0xffffffff, ZPixmap);
+  // NOTE:  'ZPixmap' is WAY faster than XYPixmap, but takes up more RAM
+  END_XCALL_DEBUG_WRAPPER
+
+  if(!pImage)
+  {
+    WB_ERROR_PRINT("ERROR: %s - unable to create image via XGetImage()\n", __FUNCTION__);
+    return;
+  }
+
+  WBSimpleAntiAliasImage(pMap, pImage, lPixel, &geom);
+
+  memset(&gcv, 0, sizeof(gcv));
+  gcv.foreground = lPixel;
+  gcv.background = lPixel; // for now just do this
+
+  BEGIN_XCALL_DEBUG_WRAPPER
+  gc = XCreateGC(pDisplay, pxImage, (GCForeground | GCBackground), &gcv);
+  END_XCALL_DEBUG_WRAPPER
+
+  if(gc == None)
+  {
+    WB_ERROR_PRINT("%s - XCreateGC failed\n", __FUNCTION__);
+  }
+  else
+  {
+    BEGIN_XCALL_DEBUG_WRAPPER
+    XPutImage(pDisplay, pxImage, gc, pImage, 0, 0, geom.x, geom.y, geom.width, geom.height);
+
+    XFreeGC(pDisplay, gc);
+    END_XCALL_DEBUG_WRAPPER
+  }
+
+  // I can destroy the image now
+  BEGIN_XCALL_DEBUG_WRAPPER
+  XDestroyImage(pImage);
+  END_XCALL_DEBUG_WRAPPER
+}
+
+static unsigned long __internal_grey_the_pixel(XStandardColormap *pMap, unsigned long lPixel,
+                                               int iR0, int iG0, int iB0) // note 16-bit RGB here
+{
+XColor clr;
+int iR, iG, iB;
+
+  clr.pixel = lPixel;
+  PXM_PixelToRGB(pMap, &clr);
+  RGB_FROM_XCOLOR(clr, iR, iG, iB); // 16-bit RGB values
+
+  iR = (3 * iR + iR0 + 1) / 4; // create 'average' colors (this works the best, 3/4 original, 1/4 background)
+  iG = (3 * iG + iG0 + 1) / 4;
+  iB = (3 * iB + iB0 + 1) / 4;
+
+  RGB_TO_XCOLOR(iR, iG, iB, clr);
+  PXM_RGBToPixel(pMap, &clr);
+
+  return clr.pixel;  // yeah that was a lot of stuff to do
+}
+
+void WBSimpleAntiAliasImage(const XStandardColormap *pMap, XImage *pImage, unsigned long lPixel, WB_GEOM *pGeom)
+{
+WB_GEOM geom;
+XStandardColormap map;
+int nX, nY, iR, iG, iB;
+XColor clr;
+
+
+  // TODO:  do I want to operate directly on the memory?  for now, use the 'XGetPixel' and 'XPutPixel' utilities
+
+  if(!pImage)
+  {
+    return;
+  }
+
+  if(!pMap)
+  {
+    WBDefaultStandardColormap(WBGetDefaultDisplay(), &map);
+  }
+  else
+  {
+    memcpy(&map, pMap, sizeof(map));
+  }
+
+  if(pGeom)
+  {
+    memcpy(&geom, pGeom, sizeof(geom));
+  }
+  else
+  {
+    geom.x = 0;
+    geom.y = 0;
+    geom.width = pImage->width;
+    geom.height = pImage->height;
+  }
+
+  clr.pixel = lPixel;
+  PXM_PixelToRGB(&map, &clr);
+  RGB_FROM_XCOLOR(clr, iR, iG, iB);
+
+  for(nX = geom.x; nX < (geom.x + geom.width - 1); nX++)
+  {
+    for(nY = geom.y; nY < (geom.y + geom.height - 1); nY++)
+    {
+      // detect the 'inside pixel' or 'outside pixel' on a corner
+      // the idea is to look for one of these and put 'greyed'
+      // pixels in between
+      //
+      //  X.           Xo       .X           oX
+      //  .X  becomes  oX  and  X.  becomes  Xo
+      //
+      //  where 'o' represents a color between . and X
+      //
+
+      unsigned long lPixel1 = XGetPixel(pImage, nX, nY);
+      unsigned long lPixel2 = XGetPixel(pImage, nX + 1, nY);
+      unsigned long lPixel3 = XGetPixel(pImage, nX, nY + 1);
+      unsigned long lPixel4 = XGetPixel(pImage, nX + 1, nY + 1);
+
+      if(lPixel1 == lPixel && lPixel4 == lPixel)
+      {
+        if(lPixel2 != lPixel) // grey it
+        {
+          lPixel2 = __internal_grey_the_pixel(&map, lPixel2, iR, iG, iB);
+          if(lPixel2 != lPixel) // make sure it's not because if it is, it's a problem
+          {
+            XPutPixel(pImage, nX + 1, nY, lPixel2);
+          }
+        }
+
+        if(lPixel3 != lPixel) // grey it
+        {
+          lPixel3 = __internal_grey_the_pixel(&map, lPixel3, iR, iG, iB);
+          if(lPixel3 != lPixel) // make sure it's not because if it is, it's a problem
+          {
+            XPutPixel(pImage, nX, nY + 1, lPixel3);
+          }
+        }
+      }
+
+      if(lPixel2 == lPixel && lPixel3 == lPixel)
+      {
+        if(lPixel1 != lPixel) // grey it
+        {
+          lPixel1 = __internal_grey_the_pixel(&map, lPixel1, iR, iG, iB);
+          if(lPixel1 != lPixel) // make sure it's not because if it is, it's a problem
+          {
+            XPutPixel(pImage, nX, nY, lPixel1);
+          }
+        }
+
+        if(lPixel4 != lPixel) // grey it
+        {
+          lPixel4 = __internal_grey_the_pixel(&map, lPixel4, iR, iG, iB);
+          if(lPixel4 != lPixel) // make sure it's not because if it is, it's a problem
+          {
+            XPutPixel(pImage, nX + 1, nY + 1, lPixel4);
+          }
+        }
+      }
+
+    }
+  }
+
 }
 
 
@@ -1054,6 +1482,7 @@ static void DebugDumpXpmAttributes(const char *szFunction, int nLine, XPM_ATTRIB
   WBDebugPrint("  width:              %u\n", pAttr->width);
   WBDebugPrint("  height:             %u\n", pAttr->height);
 
+// if I'm using libXpm then I have some additional data members...
 #if defined(X11WORKBENCH_TOOLKIT_HAVE_XPM)
   WBDebugPrint("  x_hotspot:          %u\n", pAttr->x_hotspot);
   WBDebugPrint("  y_hotspot:          %u\n", pAttr->y_hotspot);
@@ -1162,4 +1591,5 @@ char tbuf[32];
   }
 #endif // !NO_DEBUG
 }
+
 

@@ -483,14 +483,29 @@ void WBPlatformOnExit(void);
 /** \ingroup startup
   * \brief parses standard C arguments as passed to 'main()'
   *
+  * \param pargc A pointer to an integer, containing 'argc'.  On exit, it is updated based on the arguments that were parsed.
+  * \param pargv A pointer to a char **, initially the list of arguments passed as 'argv'.  On exit, the char ** value may change; if it does, it will need to be free'd using WBFree()
+  * \param penvp A pointer to a char **, initially the list of arguments passed as 'envp'.  May be NULL.  On exit, the char ** value may change; if it does, it will need to be free'd using WBFree()
+  * \return A negative value if an error occurred, a positive value if the application should exit, and a zero value if the arguments were parsed correctly.
+  *
   * In order to support a large number of default switches and parameters that are
   * supported by the X11workbench Toolkit API, you should pass pointers to the
-  * parameters that were passed to 'main()' by the C startup code to this function.\n
-  * Returns 0 on success, non-zero (or error code) otherwise.\n
-  * The values for 'argc' (as *pargc) 'argv' (as *pargv) and 'envp' (as *penvp) will
-  * likely be modified from their original values as part of the processing.  If you
-  * want to retain the original values, pass 'copies' to this function and use the
-  * copies for normal argument processing (as with 'getarg').
+  * parameters that were passed to 'main()' by the C startup code to this function, before
+  * processing the arguments and environment strings with your own application.\n
+  * The function will parse the parameters and environment, and then returns 0 on success,
+  * a negative value on error, and a positive value (indicating 'close the application') otherwise.\n
+  * The values for 'argc' (as *pargc) 'argv' (as *pargv) and 'envp' (as *penvp) will likely
+  * be modified from their original values as part of the processing, using pointers that were
+  * allocated via WBAlloc().  If you want to retain the original values, make copies of the 'argc',
+  * 'argv', and 'envp' parameters, and then pass the address of the 'copies' to this function.
+  * Then, use the copies (which may be WBAlloc()'d) for normal argument processing (as with 'getarg').\n
+  *
+  * NOTE:  you can compare the copy to the original pointer values for argv and envp to determine
+  *        whether they were 'WBAlloc()'d in order to free them later.  However, when an application
+  *        exits its memory is typically free'd automatically, so the benefit of doing this is small.
+  *
+  * For consistency, a negative return should display a 'usage()' banner (see WBToolkitUsage(), below).
+  * Any non-zero return value should cause the application to close.
   *
   * Header File:  platform_helper.h
 **/

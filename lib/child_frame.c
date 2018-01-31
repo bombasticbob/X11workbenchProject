@@ -744,6 +744,11 @@ int nL, nL2, nC, nC2;
     {
       WBSetVScrollRange(&(pChildFrame->scroll), 0, 0);
     }
+
+    // set the HPos and VPos based on what's currently visible (upper left corner)
+
+    pChildFrame->scroll.iHPos = pChildFrame->origin.x;
+    pChildFrame->scroll.iVPos = pChildFrame->origin.y;
   }
   else
   {
@@ -788,18 +793,17 @@ void FWSetChildFrameScrollInfo(WBChildFrame *pChildFrame, int iRow, int iMaxRow,
 
   InternalChildFrameRecalcGeom(pChildFrame, 0); // re-calculate geom but do NOT re-size window
 
-  // NEXT: see if I need scroll bars.  if I do, make them visible and shrink the size of the viewport
-  //       according to the scroll bar sizes [this is the same as what the listbox already does]
+  // Need for scroll bars (and window shrinkage) was determined by InternalChildFrameRecalcGeom().
 
+  // at this point the scroll bars will be correctly drawn, and the display area appropriately "shrunk"
+  // when re-painting the client area, using 'pChildFrame->extent' and 'pChildFrame->geom'.
 
 
   // FINALLY, auto-scroll iRow and iCol into view [as needed]
 
-
   WB_ERROR_PRINT("TODO:  %s - implement.  %p %u (%08xH)  %d, %d, %d, %d, %d, %d\n", __FUNCTION__,
                  pChildFrame, (int)pChildFrame->wID, (int)pChildFrame->wID,
                  iRow, iMaxRow, iCol, iMaxCol, iRowHeight, iColWidth);
-
 
 }
 
@@ -1024,7 +1028,15 @@ int nChar = sizeof(tbuf);
       }
     }
   }
+  else if(pEvent->type == ClientMessage)
+  {
+    iRval = WBScrollBarEvent(wID, pEvent, &(pC->scroll));
 
+    if(iRval)
+    {
+      return iRval; // return whatever 'WBScrollBarEvent' says to return
+    }
+  }
 
   // TODO:  messages I handle myself, before any user callbacks
   //        (and perhaps messages that I don't pass to the callback at all)
@@ -1252,10 +1264,10 @@ int iButtonMask;
     return 0; // sanity check (temporary?)
   }
 
-#ifndef NO_DEBUG
-  WB_ERROR_PRINT("TEMPORARY:  %s - WM_POINTER\n", __FUNCTION__);
-  WBDebugDumpEvent((XEvent *)pEvent);
-#endif // NO_DEBUG
+//#ifndef NO_DEBUG
+//  WB_ERROR_PRINT("TEMPORARY:  %s - WM_POINTER\n", __FUNCTION__);
+//  WBDebugDumpEvent((XEvent *)pEvent);
+//#endif // NO_DEBUG
 
 
   // left-click - position cursor, cancel selection

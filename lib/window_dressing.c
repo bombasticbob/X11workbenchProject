@@ -159,63 +159,6 @@ static void CheckInitScrollColors(void)
 }
 
 
-/** \brief integer square root of a value 0-255
-**/
-static unsigned char WB_UNUSED isqrt(unsigned char iVal) // NOTE:  marked 'unused' for now, reserved for later
-{
-unsigned char aAnswers[256] =
-{
-  0,1,1,2,2,2,2,3,3,3,3,3,3,4,4,4,
-  4,4,4,4,4,5,5,5,5,5,5,5,5,5,5,6,
-  6,6,6,6,6,6,6,6,6,6,6,7,7,7,7,7,
-  7,7,7,7,7,7,7,7,7,8,8,8,8,8,8,8,
-  8,8,8,8,8,8,8,8,8,9,9,9,9,9,9,9,
-  9,9,9,9,9,9,9,9,9,9,9,10,10,10,10,10,
-  10,10,10,10,10,10,10,10,10,10,10,10,10,10,10,11,
-  11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,11,
-  11,11,11,11,11,12,12,12,12,12,12,12,12,12,12,12,
-  12,12,12,12,12,12,12,12,12,12,12,12,12,13,13,13,
-  13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,13,
-  13,13,13,13,13,13,13,14,14,14,14,14,14,14,14,14,
-  14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,
-  14,14,14,15,15,15,15,15,15,15,15,15,15,15,15,15,
-  15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,15,
-  15,16,16,16,16,16,16,16,16,16,16,16,16,16,16,16
-};
-
-
-  return aAnswers[iVal & 0xff];
-}
-
-/** \brief integer 255 * cos(iVal * pi / 512) calculation via lookup table
-**/
-static unsigned char icos(unsigned char iVal)
-{
-unsigned char aAnswers[256] =
-{
-255,255,255,255,255,255,255,255,255,255,255,254,254,254,254,254,
-254,254,253,253,253,253,253,252,252,252,252,252,251,251,251,250,
-250,250,249,249,249,248,248,248,247,247,247,246,246,245,245,244,
-244,244,243,243,242,242,241,241,240,240,239,238,238,237,237,236,
-236,235,234,234,233,232,232,231,231,230,229,228,228,227,226,226,
-225,224,223,223,222,221,220,220,219,218,217,216,215,215,214,213,
-212,211,210,209,208,208,207,206,205,204,203,202,201,200,199,198,
-197,196,195,194,193,192,191,190,189,188,187,186,185,184,183,181,
-180,179,178,177,176,175,174,172,171,170,169,168,167,165,164,163,
-162,161,159,158,157,156,154,153,152,151,149,148,147,146,144,143,
-142,140,139,138,136,135,134,132,131,130,128,127,126,124,123,122,
-120,119,117,116,115,113,112,110,109,108,106,105,103,102,100,99,
-98,96,95,93,92,90,89,87,86,84,83,81,80,79,77,76,
-74,73,71,70,68,67,65,63,62,60,59,57,56,54,53,51,
-50,48,47,45,44,42,41,39,37,36,34,33,31,30,28,27,
-25,23,22,20,19,17,16,14,13,11,9,8,6,5,3,2
-};
-
-
-  return aAnswers[iVal & 0xff];
-}
-
-
 #if 0 /* this function not currently used.  consider removeing it in a refactor */
 static char ilog2n(unsigned char y)
 {
@@ -330,17 +273,19 @@ Display *pDisplay = WBGetWindowDisplay(wID);
 
 static void InternalCalcVScrollBar(WB_SCROLLINFO *pScrollInfo, WB_GEOM *pgeomClient, int iVScrollWidth, int iHScrollHeight)
 {
-int iKnobSize, iKnobPos, iBarHeight, iBarWidth;
+int iKnobSize, iKnobPos, iBarHeight;
 int i1, i2;
 int nListItems;
 
 
   iBarHeight = pgeomClient->height;
-  iBarWidth = pgeomClient->width;
 
   pScrollInfo->iVScrollWidth = iVScrollWidth;
   pScrollInfo->iVBarHeight = iBarHeight;
 
+  WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
+                 "%s - iVScrollWidth=%d, iHScrollHeight=%d  iBarHeight=%d\n",
+                 __FUNCTION__, iVScrollWidth, iHScrollHeight, iBarHeight);
 
   if(pScrollInfo->iVPos < pScrollInfo->iVMin || pScrollInfo->iVPos > pScrollInfo->iVMax)
   {
@@ -396,29 +341,42 @@ int nListItems;
 
   // cache these geometries because I need them for mouse handling
 
-  pScrollInfo->geomVBar.y      = pgeomClient->y + 1;
-  pScrollInfo->geomVBar.height = pgeomClient->height - 2;
-  pScrollInfo->geomVBar.width  = pScrollInfo->iVScrollWidth;
-  pScrollInfo->geomVBar.x      = pgeomClient->x + pgeomClient->width
-                               - pScrollInfo->geomVBar.width - 1;
+  pScrollInfo->iVKnobSize       = iKnobSize;
 
-  pScrollInfo->geomVDown.x      = pScrollInfo->geomVUp.x
-                                = pScrollInfo->geomVBar.x + 1;
-  pScrollInfo->geomVDown.width  = pScrollInfo->geomVUp.width
-                                = pScrollInfo->geomVBar.width - 2;
-  pScrollInfo->geomVDown.height = pScrollInfo->geomVUp.height
-                                = iHScrollHeight - 1;
+  pScrollInfo->geomVBar.x       = pgeomClient->x
+                                + pgeomClient->width
+                                - iVScrollWidth
+                                + 2 * pgeomClient->border; // to account for the border size
 
-  pScrollInfo->geomVUp.y   = pScrollInfo->geomVBar.y + 1;
-  pScrollInfo->geomVDown.y = pScrollInfo->geomVBar.y
-                           + pScrollInfo->geomVBar.height
-                           - pScrollInfo->geomVDown.height
-                           - 1;
+  pScrollInfo->geomVBar.y       = pgeomClient->y
+                                - pgeomClient->border; // to account for the border size
+  pScrollInfo->geomVBar.height  = pgeomClient->height
+                                + 2 * pgeomClient->border; // to account for the border size
+  pScrollInfo->geomVBar.width   = iVScrollWidth;
+
+  // is there a vertical scroll bar?  If so, I need to adjust the width
+  if(pScrollInfo->iHMin < pScrollInfo->iHMax) // not '-1'
+  {
+    pScrollInfo->geomVBar.height -= iHScrollHeight; // make it a tad smaller
+  }
+
+
+  pScrollInfo->geomVUp.x        = pScrollInfo->geomVBar.x + 1;
+  pScrollInfo->geomVUp.y        = pScrollInfo->geomVBar.y + 1;
+  pScrollInfo->geomVUp.width    = pScrollInfo->geomVBar.width - 2;
+  pScrollInfo->geomVUp.height   = pScrollInfo->geomVUp.width;
+
+  pScrollInfo->geomVDown.x      = pScrollInfo->geomVUp.x;
+  pScrollInfo->geomVDown.y      = pScrollInfo->geomVBar.y
+                                + pScrollInfo->geomVBar.height
+                                - pScrollInfo->geomVDown.height
+                                - 1;
+  pScrollInfo->geomVDown.width  = pScrollInfo->geomVUp.width;
+  pScrollInfo->geomVDown.height = pScrollInfo->geomVUp.height;
 
   pScrollInfo->geomVKnob.x      = pScrollInfo->geomVDown.x;
   pScrollInfo->geomVKnob.width  = pScrollInfo->geomVDown.width;
-  pScrollInfo->geomVKnob.height = pScrollInfo->iVKnobSize
-                                = iKnobSize;
+  pScrollInfo->geomVKnob.height = iKnobSize;
 
   // now that I have a reasonable estimate of the knob size, calculate
   // the starting vertical position of the knob
@@ -460,17 +418,21 @@ int nListItems;
 
 static void InternalCalcHScrollBar(WB_SCROLLINFO *pScrollInfo, WB_GEOM *pgeomClient, int iVScrollWidth, int iHScrollHeight)
 {
-int iKnobSize, iKnobPos, iBarHeight, iBarWidth;
+int iKnobSize, iKnobPos, iBarWidth;
 int i1, i2;
 int nListItems;
 
 
 
-  iBarHeight = pgeomClient->height;
   iBarWidth = pgeomClient->width;
 
   pScrollInfo->iHScrollHeight = iHScrollHeight;
   pScrollInfo->iHBarWidth = iBarWidth;
+
+
+  WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
+                 "%s - iVScrollWidth=%d, iHScrollHeight=%d  iBarWidth=%d\n",
+                 __FUNCTION__, iVScrollWidth, iHScrollHeight, iBarWidth);
 
 
   if(pScrollInfo->iHPos < pScrollInfo->iHMin || pScrollInfo->iHPos > pScrollInfo->iHMax)
@@ -484,7 +446,7 @@ int nListItems;
   // knob height equals 'nListItems / nListItems!' multiplied by
   // the available knob height, for a minimum value of 'iHScrollHeight'
 
-  iKnobSize = (iBarHeight - 4 * iHScrollHeight - 2);
+  iKnobSize = (iBarWidth - 4 * iHScrollHeight - 2);
 
   if(iKnobSize > iVScrollWidth / 2)
   {
@@ -527,32 +489,43 @@ int nListItems;
 
   // cache these geometries because I need them for mouse handling
 
-  pScrollInfo->geomHBar.x      = pgeomClient->x + 1;
-  pScrollInfo->geomVBar.width  = pgeomClient->width - 2;
-  pScrollInfo->geomVBar.height = pScrollInfo->iHScrollHeight;
-  pScrollInfo->geomVBar.y      = pgeomClient->y + pgeomClient->height
-                               - pScrollInfo->geomVBar.height - 1;
+  pScrollInfo->iHKnobSize      = iKnobSize;
 
-  pScrollInfo->geomHLeft.y      = pScrollInfo->geomHRight.y
-                                = pScrollInfo->geomHBar.y + 1;
-  pScrollInfo->geomHLeft.height = pScrollInfo->geomHRight.height
-                                = pScrollInfo->geomHBar.height - 2;
-  pScrollInfo->geomHLeft.width  = pScrollInfo->geomHRight.width
-                                = iVScrollWidth - 1;
+  pScrollInfo->geomHBar.x      = pgeomClient->x
+                               - pgeomClient->border; // to account for the border size
+  pScrollInfo->geomHBar.y      = pgeomClient->y
+                               + pgeomClient->height
+                               - iHScrollHeight
+                               + 2 * pgeomClient->border; // to account for the border size
+  pScrollInfo->geomHBar.width  = pgeomClient->width
+                               + 2 * pgeomClient->border; // to account for the border size
+  pScrollInfo->geomHBar.height = iHScrollHeight;
 
-  pScrollInfo->geomHLeft.x     = pScrollInfo->geomHBar.x + 1;
-  pScrollInfo->geomHRight.x    = pScrollInfo->geomHBar.x
-                               + pScrollInfo->geomHBar.width
-                               - pScrollInfo->geomHRight.width
-                               - 1;
+  // is there a vertical scroll bar?  If so, I need to adjust the width
+  if(pScrollInfo->iVMin < pScrollInfo->iVMax) // not '-1'
+  {
+    pScrollInfo->geomHBar.width -= iVScrollWidth; // make it a tad smaller
+  }
+
+  pScrollInfo->geomHLeft.x      = pScrollInfo->geomHBar.x;
+  pScrollInfo->geomHLeft.y      = pScrollInfo->geomHBar.y + 1;
+  pScrollInfo->geomHLeft.height = pScrollInfo->geomHBar.height - 2;
+  pScrollInfo->geomHLeft.width  = pScrollInfo->geomHLeft.height;
+
+  pScrollInfo->geomHRight.x     = pScrollInfo->geomHBar.x
+                                + pScrollInfo->geomHBar.width
+                                - pScrollInfo->geomHLeft.width
+                                - 1;
+  pScrollInfo->geomHRight.y      = pScrollInfo->geomHLeft.y;
+  pScrollInfo->geomHRight.height = pScrollInfo->geomHLeft.height;
+  pScrollInfo->geomHRight.width  = pScrollInfo->geomHLeft.width;
 
   pScrollInfo->geomHKnob.y      = pScrollInfo->geomHLeft.y;
   pScrollInfo->geomHKnob.height = pScrollInfo->geomHLeft.height;
-  pScrollInfo->geomHKnob.width  = pScrollInfo->iHKnobSize
-                                = iKnobSize;
+  pScrollInfo->geomHKnob.width  = iKnobSize;
 
   // now that I have a reasonable estimate of the knob size, calculate
-  // the starting vertical position of the knob
+  // the starting horizontal position of the knob
 
   if(pScrollInfo->iHPos <= 0 || nListItems <= 0)
   {
@@ -759,6 +732,11 @@ XCharStruct xBounds;
 
   // TODO:  data validation
 
+  if(fontSetRef == None)
+  {
+    fontSetRef = WBGetDefaultFontSet(WBGetDefaultDisplay());
+  }
+
   geom.x = pgeomClient->x;
   geom.y = pgeomClient->y;
   geom.width = pgeomClient->width;
@@ -769,13 +747,18 @@ XCharStruct xBounds;
   iVScrollWidth = WBTextWidth(fontSetRef, "X", 1) * 2 + 4; // standard width of vertical scrollbar
   iHScrollHeight = xBounds.ascent + xBounds.descent + 4;
 
+  WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_ScrollBar,
+                 "INFO:  %s - iVScrollWidth=%d, iHScrollHeight=%d  geom=%d,%d,%d,%d\n",
+                 __FUNCTION__, iVScrollWidth, iHScrollHeight,
+                 geom.x, geom.y, geom.width, geom.height);
+
   // calculate the rectangles for the scroll bars
 
   if(pSI->iVMin < pSI->iVMax)
   {
 //    InternalCalcVScrollBar(pSI, pgeomClient, iVScrollWidth, pScrollInfo->iVMin,
 //                           pScrollInfo->iVMax, pScrollInfo->iVPos);
-    InternalCalcVScrollBar(pSI, pgeomClient, iVScrollWidth, geom.height - iHScrollHeight);
+    InternalCalcVScrollBar(pSI, pgeomClient, iVScrollWidth, iHScrollHeight);
 
     geom.width -= iVScrollWidth;
   }
@@ -784,7 +767,7 @@ XCharStruct xBounds;
   {
 //    InternalCalcHScrollBar(pSI, pgeomClient, iHScrollHeight, pScrollInfo->iHMin,
 //                           pScrollInfo->iHMax, pScrollInfo->iHPos);
-    InternalCalcHScrollBar(pSI, pgeomClient, iHScrollHeight, geom.width - iVScrollWidth);
+    InternalCalcHScrollBar(pSI, pgeomClient, iVScrollWidth, iHScrollHeight);
 
 
     geom.height -= iHScrollHeight;
@@ -794,6 +777,20 @@ XCharStruct xBounds;
   {
     memcpy(pgeomUsable, &geom, sizeof(*pgeomUsable));
   }
+
+  WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_ScrollBar,
+                 "    SCROLL INFO:  iVBarHeight = %-6d    iHBarWidth  = %d\n"
+                 "                  iVKnob      = %-6d    iHKnob      = %d\n"
+                 "                  iVKnobSize  = %-6d    iHKnobSize  = %d\n"
+                 "                  iVPos       = %-6d    iHPos       = %d\n"
+                 "                  iVMin       = %-6d    iVMin       = %d\n"
+                 "                  iVMax       = %-6d    iVMax       = %d\n\n",
+                 pSI->iVBarHeight, pSI->iHBarWidth,
+                 pSI->iVKnob,      pSI->iHKnob,
+                 pSI->iVKnobSize,  pSI->iHKnobSize,
+                 pSI->iVPos,       pSI->iHPos,
+                 pSI->iVMin,       pSI->iHMin,
+                 pSI->iVMax,       pSI->iHMax);
 }
 
 
@@ -1133,15 +1130,40 @@ void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable w
      pScrollInfo->iHPos > pScrollInfo->iHMax ||
      pScrollInfo->iHMax < pScrollInfo->iHMin)
   {
-//    WB_ERROR_PRINT("TEMPORARY:  grey out %d %d %d\n",
-//                   pScrollInfo->iVPos, pScrollInfo->iVMin, pScrollInfo->iVMax);
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_ScrollBar,
+                   "%s - grey out iHPos=%d  iHMin=%d  iHMax=%d\n", __FUNCTION__,
+                   pScrollInfo->iHPos, pScrollInfo->iHMin, pScrollInfo->iHMax);
+
     return;  // I am done (greyed out bar)
   }
 
+  WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
+                 "%s - paint 'left' button %d %d %d %d\n", __FUNCTION__,
+                 pScrollInfo->geomHLeft.x,
+                 pScrollInfo->geomHLeft.y,
+                 pScrollInfo->geomHLeft.width,
+                 pScrollInfo->geomHLeft.height);
+
   WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomHLeft),
                      clrScrollBD2.pixel, clrScrollBD3.pixel);
+
+  WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
+                 "%s - paint 'right' button %d %d %d %d\n", __FUNCTION__,
+                 pScrollInfo->geomHRight.x,
+                 pScrollInfo->geomHRight.y,
+                 pScrollInfo->geomHRight.width,
+                 pScrollInfo->geomHRight.height);
+
   WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomHRight),
                      clrScrollBD2.pixel, clrScrollBD3.pixel);
+
+  WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
+                 "%s - paint horizontal 'knob' %d %d %d %d\n", __FUNCTION__,
+                 pScrollInfo->geomHKnob.x,
+                 pScrollInfo->geomHKnob.y,
+                 pScrollInfo->geomHKnob.width,
+                 pScrollInfo->geomHKnob.height);
+
   WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomHKnob),
                      clrScrollBD2.pixel, clrScrollBD3.pixel);
 
@@ -1173,15 +1195,40 @@ void WBPaintVScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable w
      pScrollInfo->iVPos > pScrollInfo->iVMax ||
      pScrollInfo->iVMax < pScrollInfo->iVMin)
   {
-//    WB_ERROR_PRINT("TEMPORARY:  grey out %d %d %d\n",
-//                   pScrollInfo->iVPos, pScrollInfo->iVMin, pScrollInfo->iVMax);
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_ScrollBar,
+                   "%s - grey out iVPos=%d  iVMin=%d  iVMax=%d\n", __FUNCTION__,
+                   pScrollInfo->iVPos, pScrollInfo->iVMin, pScrollInfo->iVMax);
+
     return;  // I am done (greyed out bar)
   }
 
+  WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
+                 "%s - paint 'up' button %d %d %d %d\n", __FUNCTION__,
+                 pScrollInfo->geomVUp.x,
+                 pScrollInfo->geomVUp.y,
+                 pScrollInfo->geomVUp.width,
+                 pScrollInfo->geomVUp.height);
+
   WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomVUp),
                      clrScrollBD2.pixel, clrScrollBD3.pixel);
+
+  WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
+                 "%s - paint 'down' button %d %d %d %d\n", __FUNCTION__,
+                 pScrollInfo->geomVDown.x,
+                 pScrollInfo->geomVDown.y,
+                 pScrollInfo->geomVDown.width,
+                 pScrollInfo->geomVDown.height);
+
   WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomVDown),
                      clrScrollBD2.pixel, clrScrollBD3.pixel);
+
+  WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
+                 "%s - paint vertical 'knob' %d %d %d %d\n", __FUNCTION__,
+                 pScrollInfo->geomVKnob.x,
+                 pScrollInfo->geomVKnob.y,
+                 pScrollInfo->geomVKnob.width,
+                 pScrollInfo->geomVKnob.height);
+
   WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomVKnob),
                      clrScrollBD2.pixel, clrScrollBD3.pixel);
 
@@ -1682,8 +1729,8 @@ WB_RECT rctTemp;
       XPoint xpt2[2];
       int iR2 = abs(i1 - (xpt[5].y + i2 / 2)); // 'i2 / 2' is 3/7 of the height...
 
-      iR2 = icos(iR2 * 240 / i2); // 255 would be pi/2, so go slightly less than that for 'full range' on the cosine
-                                  // NOTE:  a value closer to '255' will darken the darkest part of the shadow
+      iR2 = 128 + WB_icos(iR2 * 240 / i2); // 255 would be pi/2, so go slightly less than that for 'full range' on the cosine
+                                           // NOTE:  a value closer to '255' will darken the darkest part of the shadow
       iR2 = ((int)iR2 * (int)iR2) / 256; // use cos^2 - 'icos' returns a value between 0 and 255
 //      iR2 *= iR2;  old way, squared it
 //      iR2 = isqrt(iR2); old way, square root
@@ -1852,22 +1899,24 @@ WB_RECT rctTemp;
     rctTemp.right--;
     rctTemp.bottom--;
 
-    XSetBackground(pDisplay, gc2, lFGColor);
-    XSetForeground(pDisplay, gc2, lHighlightColor2);
+    XSetBackground(pDisplay, gc2, lBGColor);
+//    XSetForeground(pDisplay, gc2, lHighlightColor2);
+    XSetForeground(pDisplay, gc2, lBGColor);
 
     DTDrawSingleLineText(fontSet, szText, pDisplay, gc2, dw, 0, 0, &rctTemp,
-                         DTAlignment_HCENTER | DTAlignment_VCENTER);
+                         DTAlignment_HCENTER | DTAlignment_VCENTER | DTAlignment_ANTIALIAS);
 
     rctTemp.left += 2;
     rctTemp.top += 2;
     rctTemp.right += 2;
     rctTemp.bottom += 2;
 
-    XSetForeground(pDisplay, gc2, lBGColor);
+//    XSetForeground(pDisplay, gc2, lBGColor);
+    XSetForeground(pDisplay, gc2, lHighlightColor2);
 
     // for now just do centered text
     DTDrawSingleLineText(fontSet, szText, pDisplay, gc2, dw, 0, 0, &rctTemp,
-                         DTAlignment_HCENTER | DTAlignment_VCENTER);
+                         DTAlignment_HCENTER | DTAlignment_VCENTER | DTAlignment_ANTIALIAS);
 
 
     rctTemp.left--;
@@ -1875,7 +1924,7 @@ WB_RECT rctTemp;
     rctTemp.right--;
     rctTemp.bottom--;
 
-    XSetBackground(pDisplay, gc2, lHighlightColor2);
+//    XSetBackground(pDisplay, gc2, lHighlightColor2);
   }
   else
   {
@@ -1886,7 +1935,7 @@ WB_RECT rctTemp;
 
   // for now just do centered text
   DTDrawSingleLineText(fontSet, szText, pDisplay, gc2, dw, 0, 0, &rctTemp,
-                       DTAlignment_HCENTER | DTAlignment_VCENTER);
+                       DTAlignment_HCENTER | DTAlignment_VCENTER | DTAlignment_ANTIALIAS);
 
 
   // NOW, I need to draw the 'x' for the close button.  Fist, I calculate its rect

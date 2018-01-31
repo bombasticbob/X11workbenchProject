@@ -278,7 +278,7 @@ void WBEditWindowClear(WBEditWindow *pEditWindow);
   *
   * Header File:  edit_window.h
 **/
-static __inline int WBIsValidEditWindow(WBEditWindow *pEditWindow)
+static __inline__ int WBIsValidEditWindow(WBEditWindow *pEditWindow)
 {
   if(!pEditWindow ||                                     // invalid pointer (TODO:  check range?)
      pEditWindow->childframe.ulTag != CHILD_FRAME_TAG || // child frame tag not valid

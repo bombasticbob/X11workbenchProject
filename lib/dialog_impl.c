@@ -1074,6 +1074,11 @@ struct _COLOR_DIALOG_
 #define COLORBOX_PIXMAP_WIDTH  96 /* width of 'colorbox' pixmap */
 #define COLORBOX_PIXMAP_HEIGHT 24 /* height of 'colorbox' pixmap */
 
+#ifdef COMPILER_SUPPORTS_UNUSED_ATTRIBUTE
+// prototype needed so I can declare it 'WB_UNUSED'
+static void ColorDialogDumpData(const char *szCaption, struct _COLOR_DIALOG_ *pData) WB_UNUSED;
+#endif // COMPILER_SUPPORTS_UNUSED_ATTRIBUTE
+
 static void ColorDialogDumpData(const char *szCaption, struct _COLOR_DIALOG_ *pData)
 {
   WBDebugPrint("ColorDialogDumpData - %s\n", szCaption);
@@ -1416,7 +1421,6 @@ Display *pDisplay = WBGetWindowDisplay(wID);
 WBDialogWindow *pDlg = DLGGetDialogWindowStruct(wID);
 struct _COLOR_DIALOG_ *pUserData = (struct _COLOR_DIALOG_ *)(pDlg ? pDlg->pUserData : NULL);
 //Display *pDisplay = WBGetWindowDisplay(wID);
-char *p1, *p2;
 
 
   if(!pDlg || !pUserData)

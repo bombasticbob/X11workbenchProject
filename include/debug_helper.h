@@ -37,6 +37,62 @@ extern "C" {
 
 
 /** \ingroup debug
+  * \enum DebugLevel
+  * \brief Debug level enumeration
+  *
+  * Debug Level enumeration and subsystem idetification enumeration
+  *
+  * Bits 0 to 3 identify the level (0 = none, 7 = excessive)\n
+  * The remaining bits identify the subsystem filters (no bits set for ALL)
+  *
+  * \sa WBParseStandardArguments() in platform_helper.c, 'aszDebugSubSys[]' array
+  *
+**/
+enum DebugLevel
+{
+  DebugLevel_None = 0,      //!< none (no debug output)
+  DebugLevel_ERROR = 0,     //!< errors (output whenever debug cmopiled in)
+  DebugLevel_WARN = 1,      //!< warnings (all debug levels)
+
+                            // criteria for selecting debug output
+  DebugLevel_Minimal = 1,   //!< minimal, implies warnings and important information
+  DebugLevel_Light = 2,     //!< light, implies basic/summary process/flow information
+  DebugLevel_Medium = 3,    //!< medium, implies process/flow tracing
+  DebugLevel_Heavy = 4,     //!< heavy, implies detailed process/flow tracing
+  DebugLevel_Chatty = 5,    //!< chatty, implies details about flow decisions
+  DebugLevel_Verbose = 6,   //!< verbose, implies details regarding information used for decision making
+  DebugLevel_Excessive = 7, //!< excessive, implies more information that you probably want
+  DebugLevel_MASK = 7,      //!< mask for allowed 'level' values (none through Excessive)
+
+  // next are subsystem masks for additional debugging.
+  // Also, see 'aszDebugSubSys' in WBParseStandardArguments(), platform_helper.c
+  DebugSubSystem_ALL         = 0,           //!< 'ALL' is the default unless masked bits are non-zero
+  DebugSubSystem_RESTRICT    = 0x80000000,  //!< only show specific subsystems (prevents zero masked value)
+  DebugSubSystem_BITSHIFT    = 3,           //!< bit # for 'lowest' subsystem bit
+  DebugSubSystem_Init        = 0x00000008,  //!< initialization/termination          "init"
+  DebugSubSystem_Application = 0x00000010,  //!< application-level                   "application"
+  DebugSubSystem_Window      = 0x00000020,  //!< generic window processing           "window"
+  DebugSubSystem_Menu        = 0x00000040,  //!< generic menu processing             "menu"
+  DebugSubSystem_Event       = 0x00000080,  //!< generic event processing            "event"
+  DebugSubSystem_Dialog      = 0x00000100,  //!< dialog box (container window)       "dialog"
+  DebugSubSystem_DialogCtrl  = 0x00000200,  //!< dialog controls                     "dialogctrl"
+  DebugSubSystem_Frame       = 0x00000400,  //!< Frame windows                       "frame"
+  DebugSubSystem_Keyboard    = 0x00000800,  //!< generic keyboard processing         "keyboard"
+  DebugSubSystem_Mouse       = 0x00001000,  //!< generic mouse event processing      "mouse"
+  DebugSubSystem_Font        = 0x00002000,  //!< font manager                        "font"
+  DebugSubSystem_Settings    = 0x00004000,  //!< settings manager                    "settings"
+  DebugSubSystem_Selection   = 0x00008000,  //!< selection processing (clipboard)    "selection"
+  DebugSubSystem_Pixmap      = 0x00010000,  //!< pixmap handling                     "pixmap"
+  DebugSubSystem_Expose      = 0x00020000,  //!< expose/paint handling               "expose"
+  DebugSubSystem_EditWindow  = 0x00040000,  //!< edit window callbacks               "editwindow"
+  DebugSubSystem_ScrollBar   = 0x00080000,  //!< edit window callbacks               "scrollbar"
+
+  DebugSubSystem_MASK = ~7L  //!< mask for allowed 'subsystem' bits
+};
+
+
+
+/** \ingroup debug
   * \brief set debug level
   *
   * This function should typically be called once, at the beginning of the program.
@@ -64,16 +120,16 @@ void WBSetDebugLevel(unsigned int iLevel);
   * Header File:  debug_helper.h
 **/
 
-#ifdef __GNUC__
+#if defined(__GNUC__) || defined(_MSVC_VER)
 static __inline__ unsigned int WBGetDebugLevel(void)
 {
 extern unsigned int iWBDebugLevel;
 
   return iWBDebugLevel;
 }
-#else // __GNUC__
+#else // !defined(__GNUC__) && !defined(_MSVC_VER)
 unsigned int WBGetDebugLevel(void);
-#endif // __GNUC__
+#endif // defined(__GNUC__) || defined(_MSVC_VER)
 
 /** \ingroup debug
   * \brief conditional debug message output
@@ -166,6 +222,53 @@ void WBDebugDumpRegion(Region hRgn, int bRotate);
 void WBDebugDumpEvent(XEvent *pEvent);
 
 
+/** \ingroup debug
+  * \brief Check specified debug level against the value returned by WBGetDebugLevel() and return non-zero for a match
+  *
+  * \param dwLevel A combination of one or more 'DebugLevel_' and 'DebugSubSystem_' flags to check
+  * \return A non-zero value if the specified debug level matches that returned by WBGetDebugLevel(), zero otherwise.
+  *
+  * Various 'debug print' macros need to know what the current debug level
+  * is in order to filter their output.  This function provides a standard
+  * way in which to obtain the debug level.  It is defined 'inline' to
+  * minimize any performance impact and to allow optimization.
+  *
+  * Header File:  debug_helper.h
+**/
+#if defined(__GNUC__) || defined(_MSVC_VER)
+static __inline__ int WBCheckDebugLevel(unsigned int dwLevel)
+{
+extern unsigned int iWBDebugLevel;
+
+  if(WB_LIKELY((iWBDebugLevel & DebugLevel_MASK) < (dwLevel & DebugLevel_MASK)))
+  {
+    return 0;
+  }
+
+  if(!WB_UNLIKELY( WBGetDebugLevel() & DebugSubSystem_RESTRICT )) // RESTRICT not specified
+  {
+    if(!(dwLevel & DebugSubSystem_MASK) ) // no subsystem specified in debug output
+    {
+      return 1; // this is acceptable - since no subsystem specified, allow debug output if not 'RESTRICT'
+    }
+  }
+
+  // at this point I have a debug subsystem 'RESTRICT' specified
+
+  if(((dwLevel & DebugSubSystem_MASK) & (iWBDebugLevel & DebugSubSystem_MASK))
+     != 0) // check to see that subsystem bits in 'dwLevel' match bits in 'iWBDebugLevel'
+  {
+    // at least one subsystem bit matches from 'dwLevel' and iWBDebugLevel
+    return 1;
+  }
+
+  return 0;
+}
+#else // !defined(__GNUC__) && !defined(_MSVC_VER)
+int WBGetDebugLevel(void);
+#endif // defined(__GNUC__) || defined(_MSVC_VER)
+
+
 
 // NOTE:  The debug code will be included when NO_DEBUG is *NOT* defined
 
@@ -194,14 +297,17 @@ void WBDebugDumpEvent(XEvent *pEvent);
   * \sa \ref DebugLevel
 **/
 #define WB_DEBUG_PRINT(L, ...) \
-  if(WB_UNLIKELY((WBGetDebugLevel() & DebugLevel_MASK) >= ((L) & DebugLevel_MASK))) \
-  { \
-    if(!((L) & DebugSubSystem_MASK) || !(WBGetDebugLevel() & DebugSubSystem_MASK) \
-       || (((L) & WBGetDebugLevel()) & DebugSubSystem_MASK) != 0) \
-    { \
-      WBDebugPrint(__VA_ARGS__); \
-    } \
-  }
+    WB_IF_DEBUG_LEVEL(L) { WBDebugPrint(__VA_ARGS__); }
+
+//  if(WB_UNLIKELY((WBGetDebugLevel() & DebugLevel_MASK) >= ((L) & DebugLevel_MASK))) \
+//  { \
+//    if((!(WBGetDebugLevel() & DebugSubSystem_RESTRICT) && \
+//        (!((L) & DebugSubSystem_MASK) || !(WBGetDebugLevel() & DebugSubSystem_MASK))) \
+//       || (((L) & WBGetDebugLevel()) & DebugSubSystem_MASK) != 0) \
+//    { \
+//      WBDebugPrint(__VA_ARGS__); \
+//    } \
+//  }
 /** \ingroup debug
   * \brief Preferred method of implementing conditional debug 'dump' output
   *
@@ -221,14 +327,17 @@ void WBDebugDumpEvent(XEvent *pEvent);
   * \sa \ref DebugLevel
 **/
 #define WB_DEBUG_DUMP(L,X,Y,Z) \
-  if(WB_UNLIKELY((WBGetDebugLevel() & DebugLevel_MASK) >= ((L) & DebugLevel_MASK))) \
-  { \
-    if(!((L) & DebugSubSystem_MASK) || !(WBGetDebugLevel() & DebugSubSystem_MASK) \
-       || (((L) & WBGetDebugLevel()) & DebugSubSystem_MASK) != 0) \
-    { \
-      WBDebugDump(X,Y,Z); \
-    } \
-  }
+    WB_IF_DEBUG_LEVEL(L) { WBDebugDump(X,Y,Z); }
+
+//  if(WB_UNLIKELY((WBGetDebugLevel() & DebugLevel_MASK) >= ((L) & DebugLevel_MASK))) \
+//  { \
+//    if((!(WBGetDebugLevel() & DebugSubSystem_RESTRICT) && \
+//        (!((L) & DebugSubSystem_MASK) || !(WBGetDebugLevel() & DebugSubSystem_MASK))) \
+//       || (((L) & WBGetDebugLevel()) & DebugSubSystem_MASK) != 0) \
+//    { \
+//      WBDebugDump(X,Y,Z); \
+//    } \
+//  }
 
 /** \ingroup debug
   * \brief Preferred method of implementing conditional debug 'if block' code
@@ -246,10 +355,27 @@ void WBDebugDumpEvent(XEvent *pEvent);
   * \endcode
   * \sa \ref DebugLevel
 **/
-#define WB_IF_DEBUG_LEVEL(L) if(WB_UNLIKELY((WBGetDebugLevel() & DebugLevel_MASK) >= ((L) & DebugLevel_MASK)) && \
-                                (!((L) & DebugSubSystem_MASK) || !(WBGetDebugLevel() & DebugSubSystem_MASK) \
-                                   || (((L) & WBGetDebugLevel()) & DebugSubSystem_MASK) != 0))
 
+#define WB_IF_DEBUG_LEVEL(L) if(WBCheckDebugLevel((L)))
+
+//#define WB_IF_DEBUG_LEVEL(L) if(WB_UNLIKELY( (WBGetDebugLevel() & DebugLevel_MASK) >= ( (L) & DebugLevel_MASK ) \
+//                                             && \
+//                                             ( ( !( WBGetDebugLevel() & DebugSubSystem_RESTRICT ) \
+//                                                 && \
+//                                                 ( !( (L) & DebugSubSystem_MASK ) \
+//                                                   || \
+//                                                   !( WBGetDebugLevel() & DebugSubSystem_MASK ) \
+//                                                 ) \
+//                                               ) \
+//                                               || \
+//                                               ( ( (L) & WBGetDebugLevel() ) & DebugSubSystem_MASK ) \
+//                                               != 0 \
+//                                             ) \
+//                                           ) )
+//
+
+//                                (!((L) & DebugSubSystem_MASK) || !(WBGetDebugLevel() & DebugSubSystem_MASK)
+//                                   || (((L) & WBGetDebugLevel()) & DebugSubSystem_MASK) != 0))
 #endif // NO_DEBUG
 
 
@@ -288,59 +414,6 @@ void WBDebugDumpEvent(XEvent *pEvent);
   * Preferred method of implementing an 'error level' binary dump for all subsystems
 **/
 #define WB_ERROR_DUMP(X,Y,Z) WB_DEBUG_DUMP(DebugLevel_ERROR, X,Y,Z)
-
-/** \ingroup debug
-  * \enum DebugLevel
-  * \brief Debug level enumeration
-  *
-  * Debug Level enumeration and subsystem idetification enumeration
-  *
-  * Bits 0 to 3 identify the level (0 = none, 7 = excessive)\n
-  * The remaining bits identify the subsystem filters (no bits set for ALL)
-  *
-  * \sa WBParseStandardArguments() in platform_helper.c, 'aszDebugSubSys[]' array
-  *
-**/
-enum DebugLevel
-{
-  DebugLevel_None = 0,      //!< none (no debug output)
-  DebugLevel_ERROR = 0,     //!< errors (output whenever debug cmopiled in)
-  DebugLevel_WARN = 1,      //!< warnings (all debug levels)
-
-                            // criteria for selecting debug output
-  DebugLevel_Minimal = 1,   //!< minimal, implies warnings and important information
-  DebugLevel_Light = 2,     //!< light, implies basic/summary process/flow information
-  DebugLevel_Medium = 3,    //!< medium, implies process/flow tracing
-  DebugLevel_Heavy = 4,     //!< heavy, implies detailed process/flow tracing
-  DebugLevel_Chatty = 5,    //!< chatty, implies details about flow decisions
-  DebugLevel_Verbose = 6,   //!< verbose, implies details regarding information used for decision making
-  DebugLevel_Excessive = 7, //!< excessive, implies more information that you probably want
-  DebugLevel_MASK = 7,      //!< mask for allowed 'level' values (none through Excessive)
-
-  // next are subsystem masks for additional debugging.
-  // Also, see 'aszDebugSubSys' in WBParseStandardArguments(), platform_helper.c
-  DebugSubSystem_ALL         = 0,           //!< 'ALL' is the default unless masked bits are non-zero
-  DebugSubSystem_RESTRICT    = 0x80000000,  //!< only show specific subsystems (prevents zero masked value)
-  DebugSubSystem_BITSHIFT    = 3,           //!< bit # for 'lowest' subsystem bit
-  DebugSubSystem_Init        = 0x00000008,  //!< initialization/termination          "init"
-  DebugSubSystem_Application = 0x00000010,  //!< application-level                   "application"
-  DebugSubSystem_Window      = 0x00000020,  //!< generic window processing           "window"
-  DebugSubSystem_Menu        = 0x00000040,  //!< generic menu processing             "menu"
-  DebugSubSystem_Event       = 0x00000080,  //!< generic event processing            "event"
-  DebugSubSystem_Dialog      = 0x00000100,  //!< dialog box (container window)       "dialog"
-  DebugSubSystem_DialogCtrl  = 0x00000200,  //!< dialog controls                     "dialogctrl"
-  DebugSubSystem_Frame       = 0x00000400,  //!< Frame windows                       "frame"
-  DebugSubSystem_Keyboard    = 0x00000800,  //!< generic keyboard processing         "keyboard"
-  DebugSubSystem_Mouse       = 0x00001000,  //!< generic mouse event processing      "mouse"
-  DebugSubSystem_Font        = 0x00002000,  //!< font manager                        "font"
-  DebugSubSystem_Settings    = 0x00004000,  //!< settings manager                    "settings"
-  DebugSubSystem_Selection   = 0x00008000,  //!< selection processing (clipboard)    "selection"
-  DebugSubSystem_Pixmap      = 0x00010000,  //!< pixmap handling                     "pixmap"
-  DebugSubSystem_Expose      = 0x00020000,  //!< expose/paint handling               "expose"
-  DebugSubSystem_EditWindow  = 0x00040000,  //!< edit window callbacks               "editwindow"
-
-  DebugSubSystem_MASK = ~7L  //!< mask for allowed 'subsystem' bits
-};
 
 
 #ifdef __cplusplus

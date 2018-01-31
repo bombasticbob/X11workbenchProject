@@ -116,6 +116,7 @@ enum DTAlignment
                                          /// DTCalcIdealBounds and DTCalcIdealFont functions will attempt to restructure
                                          /// the text with word-wrapping to fit within horizontal bounds.
 
+    DTAlignment_ANTIALIAS = 0x10000000,  ///< internal flag, applies simple anti-aliasing.  See WBSimpleAntiAliasImage() and WBSimpleAntiAliasPixmap() for more information.
     DTAlignment_SINGLELINE = 0x20000000, ///< internal flag, 'single line only' (no line breaks).  Implies DTAlignment_NO_WORD_WRAP
     DTAlignment_UNDERSCORE = 0x40000000, ///< internal flag, indicates that an underscore underlines the next character
     DTAlignment_PRINTING = 0x80000000    ///< internal flag, indicates that I'm printing, so don't go beyond word wrap
@@ -223,8 +224,8 @@ typedef struct __DT_WORDS__
   * \param drawable The 'Drawable' object upon which to render the text
   * \param fontSet The Font Set for which to query metrics
   * \param gc The graphics context 'GC' for rendering the text
-  * \param x The 'x' coordinate for the text alignment
-  * \param y The 'y' coordinate for the text alignment
+  * \param x The 'x' coordinate for the text alignment (left)
+  * \param y The 'y' coordinate for the text alignment (bottom)
   * \param pString A const pointer to a UTF-8 or multi-byte string
   * \param nLength The BYTE LENGTH of the UTF-8 or mult-byte string (not character length)
   *
@@ -248,11 +249,29 @@ void DTDrawString(Display *pDisplay, Drawable drawable, XFontSet fontSet,
   * \param nLength The BYTE LENGTH of the UTF-8 string (not character length)
   * \returns the text width, in pixels
   *
-  * Use this function in lieu of XTextWidth for MBCS and UTF-8 strings.
+  * This function is similar to WBTextWidth() except that it allows you to pass
+  * a font set of 'None', which will then use the default font set.  It calls
+  * the WBTextWidth() function internally.
   *
   * Header File:  draw_text.h
 **/
 int DTGetTextWidth(XFontSet fontSet, const char *szUTF8, int nLength);
+
+/** \ingroup draw_text
+  * \brief XTextExtent equivalent for MBCS and UTF-8 strings
+  *
+  * \param fontSet The Font Set for which to query metrics
+  * \param szUTF8 A const pointer to a UTF-8 string
+  * \param nLength The BYTE LENGTH of the UTF-8 string (not character length)
+  * \param pExtent A pointer to a WB_EXTENT structure that receives the text extent
+  *
+  * This function is similar to WBTextExtent() except that it allows you to pass
+  * a font set of 'None', which will then use the default font set.  It calls
+  * the WBTextExtent() function internally.
+  *
+  * Header File:  draw_text.h
+**/
+void DTGetTextExtent(XFontSet fontSet, const char *szUTF8, int nLength, WB_EXTENT *pExtent);
 
 
 /** \ingroup draw_text

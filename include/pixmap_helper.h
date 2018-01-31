@@ -167,7 +167,7 @@ extern "C" {
   * This is a convenience function for things like PXM_PixelToRGB() and PXM_RGBToPixel(), where you may
   * have a Colormap but you need an XStandardColormap.
 **/
-static __inline XStandardColormap *PXM_StandardColormapFromColormap(Display *pDisplay, Colormap colormap)
+static __inline__ XStandardColormap *PXM_StandardColormapFromColormap(Display *pDisplay, Colormap colormap)
 {
 extern XStandardColormap PXM_StandardColormapFromColormap_rval; // declare extern rather than static, for single mem spot
 
@@ -519,7 +519,7 @@ void WBDebugDumpColormap(const char *szTitle, const XStandardColormap *pMap);
   *
   * Header File:  pixmap_helper.h
 **/
-static __inline void *PXM_GetImageDataPtr(XImage *pImage)
+static __inline__ void *PXM_GetImageDataPtr(XImage *pImage)
 {
   return pImage->data;
 }
@@ -535,7 +535,7 @@ static __inline void *PXM_GetImageDataPtr(XImage *pImage)
   *
   * Header File:  pixmap_helper.h
 **/
-static __inline unsigned long PXM_GetImageDataLength(XImage *pImage)
+static __inline__ unsigned long PXM_GetImageDataLength(XImage *pImage)
 {
   if(pImage->depth <= 1)
   {
@@ -545,6 +545,92 @@ static __inline unsigned long PXM_GetImageDataLength(XImage *pImage)
   return (unsigned long)pImage->bytes_per_line * (unsigned long)pImage->height
          * (unsigned long)pImage->depth;
 }
+
+/** \ingroup pixmap
+  * \brief Simple anti-alias of a Pixmap using foreground pixel color
+  *
+  * \param pDisplay A pointer to a Display (NULL implies the default display)
+  * \param pMap A const pointer to an XStandardColormap.  May be NULL to use the system default colormap
+  * \param pixmap A pixmap containing the image data (must not be None)
+  * \param lPixel A pixel value equal to the foreground color for anti-aliasing
+  * \param pGeom A pointer to a WB_GEOM structure (may be NULL, implying the entire pixmap)
+  *
+  * Call this to do a 'simple anti-alias' on the data stored in an XImage.  The algorithm
+  * will look for corners that use the foreground color, and fill them in with an appropriate
+  * calculated color value based on the current pixel in that spot.
+  *
+  * This function is expected to be used with lines and text, following a drawing operation.
+  *
+  * Header File:  pixmap_helper.h
+**/
+void WBSimpleAntiAliasPixmap(Display *pDisplay, const XStandardColormap *pMap, Pixmap pxImage,
+                             unsigned long lPixel, WB_GEOM *pGeom);
+
+/** \ingroup pixmap
+  * \brief Simple anti-alias of an XImage using foreground pixel color
+  *
+  * \param pMap A const pointer to an XStandardColormap.  May be NULL to use the system default colormap
+  * \param pImage A pointer to an XImage (must not be NULL)
+  * \param lPixel A pixel value equal to the foreground color for anti-aliasing
+  * \param pGeom A pointer to a WB_GEOM structure (may be NULL, implying the entire image)
+  *
+  * Call this to do a 'simple anti-alias' on the data stored in an XImage.  The algorithm
+  * will look for corners that use the foreground color, and fill them in with an appropriate
+  * calculated color value based on the current pixel in that spot.
+  *
+  * This function is expected to be used with lines and text, following a drawing operation.
+  *
+  * Header File:  pixmap_helper.h
+**/
+void WBSimpleAntiAliasImage(const XStandardColormap *pMap, XImage *pImage, unsigned long lPixel, WB_GEOM *pGeom);
+
+
+
+/** \ingroup pixmap
+  * \brief integer square root of a value 0-255
+  *
+  * \param iVal An integer between 0 and 255, for which a square root will be returned
+  * \return The integer square root of 'iVal'.
+  *
+  * Use this function when an approximate square root of an integer between 0 and 255 is needed,
+  * and you don't want to waste CPU cycles calculating it with floating point numbers.
+**/
+unsigned char WB_isqrt(unsigned char iVal);
+
+/** \ingroup pixmap
+  * \brief integer 255 * cos(iVal * pi / 512) calculation via lookup table (legacy, to be removed?)
+  *
+  * \param iVal An unsigned integer between 0 and 255 that corresponds to an angle, where 0-256 would be 0-pi/2 radians.  (a value of 256 would always be 0)
+  * \return An integer cosine value between 0 and 255, where WB_icos(0) would return 255, WB_icos(64) would return zero
+  *
+  * Use this function when an approximate cosine is needed within Quadrant I
+  *
+**/
+unsigned char WB_icos0(unsigned char iVal);
+
+/** \ingroup pixmap
+  * \brief integer 127 * cos(iVal * pi / 512) calculation via lookup table
+  *
+  * \param iVal An integer between 0 and 1024 that corresponds to an angle, where 0-1024 would be 0-2pi radians
+  * \return An signed char cosine value between -127 and 127
+  *
+  * Use this function when an approximate cosine is needed within Quadrant I
+  *
+**/
+char WB_icos(int iVal);
+
+/** \ingroup pixmap
+  * \brief integer 127 * sin(iVal * pi / 512) calculation via lookup table
+  *
+  * \param iVal An integer between 0 and 1024 that corresponds to an angle, where 0-1024 would be 0-2pi radians
+  * \return An signed char sine value between -127 and 127
+  *
+  * Use this function when an approximate cosine is needed within Quadrant I
+  *
+**/
+#define WB_isin(X) WB_icos((X) - 256) /* subtract 256, i.e. pi/2 radians, to convert a cos to a sin */
+
+
 
 
 #ifdef __cplusplus

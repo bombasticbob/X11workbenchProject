@@ -223,7 +223,7 @@ static const char * const aszDebugSubSys[]=
   "init","application","window","menu","event",
   "dialog","dialogctrl","frame","keyboard",
   "mouse","font","settings","selection",
-  "pixmap","expose","editwindow",
+  "pixmap","expose","editwindow","scrollbar",
   NULL
 };
 
@@ -343,31 +343,65 @@ enum
               break;
 
             case option_subsys:
-              for(i2=0; aszDebugSubSys[i2]; i2++)
+              if(!strcmp("help", szVal))
               {
-                if(!strcasecmp(aszDebugSubSys[i2], szVal))
+                // --subsys=help   lists all of them on stderr
+
+                WBDebugPrint("List of '--subsys' options:\n"
+                             "    Subsystem Name           Bit Value  (hexadecimal)\n"
+                             "    ----------------------- ----------- -------------\n");
+
+                for(i2=0; aszDebugSubSys[i2]; i2++)
                 {
-                  iWBDebugLevel |= 1L << (i2 + DebugSubSystem_BITSHIFT);
-                  break;
+                  WBDebugPrint("    %-24s%10ld    %08lxH\n", aszDebugSubSys[i2],
+                               1L << (i2 + DebugSubSystem_BITSHIFT),
+                               1L << (i2 + DebugSubSystem_BITSHIFT));
                 }
+
+                WBDebugPrint("  (special '--subsys' options)\n"
+                             "    all                              0    00000000H\n"
+                             "    restrict                2147483648    80000000H\n\n"
+                             "Specify 'restrict' in addition to one or more subsystems in order\n"
+                             "to ONLY display debug output for the specified subsystem(s)\n\n");
+
+                return 1; // advise NOT to display 'usage()' but to definitely exit the application
               }
-              if(!aszDebugSubSys[i2])
+              else if(!strcmp("restrict", szVal))
               {
-                i2 = atoi(szVal);
-                if(i2 > 0 && (i2 + DebugSubSystem_BITSHIFT) <= 32)
+                iWBDebugLevel |= DebugSubSystem_RESTRICT; // means ONLY the subsys that I specify
+              }
+              else if(!strcmp("all", szVal))
+              {
+                iWBDebugLevel &= ~(DebugSubSystem_MASK | DebugSubSystem_RESTRICT); // "all"
+              }
+              else
+              {
+                for(i2=0; aszDebugSubSys[i2]; i2++)
                 {
-                  iWBDebugLevel |= 1L << (i2 + DebugSubSystem_BITSHIFT - 1);
-                }
-                else
-                {
-                  WBDebugPrint("unrecognized subsystem %s\n", szVal);
-
-                  if(argvNew)
+                  if(!strcasecmp(aszDebugSubSys[i2], szVal))
                   {
-                    WBFree(argvNew);
+                    iWBDebugLevel |= 1L << (i2 + DebugSubSystem_BITSHIFT);
+                    break;
                   }
+                }
+                if(!aszDebugSubSys[i2])
+                {
+                  i2 = atoi(szVal);
+                  if(i2 > 0 && (i2 + DebugSubSystem_BITSHIFT) <= 32)
+                  {
+                    iWBDebugLevel |= 1L << (i2 + DebugSubSystem_BITSHIFT - 1);
+                  }
+                  else
+                  {
+                    WBDebugPrint("unrecognized subsystem %s\n", szVal);
 
-                  return -1;
+                    if(argvNew)
+                    {
+                      WBFree(argvNew);
+                    }
+
+                    return -1;
+                  }
                 }
               }
 
@@ -491,7 +525,19 @@ enum
 
     for(; (i1 + DebugSubSystem_BITSHIFT) < 32; i1++)
     {
-      if(iWBDebugLevel & (1L << (i1 + DebugSubSystem_BITSHIFT)))
+      if((1L << (i1 + DebugSubSystem_BITSHIFT)) == DebugSubSystem_RESTRICT)
+      {
+        if(!i2)
+        {
+          WBDebugPrint("Debug SubSystem: RESTRICT");
+          i2 = 1;
+        }
+        else
+        {
+          WBDebugPrint(", RESTRICT");
+        }
+      }
+      else if(iWBDebugLevel & (1L << (i1 + DebugSubSystem_BITSHIFT)))
       {
         if(!i2)
         {
@@ -505,7 +551,10 @@ enum
       }
     }
 
-    WBDebugPrint("\n");
+    if(i2) // must print an additional LF
+    {
+      WBDebugPrint("\n");
+    }
   }
 
   return 0;
@@ -520,6 +569,7 @@ void WBToolkitUsage(void)
         "                'xx' is a subsystem name or bit value (see window_helper.h)\n"
         "                A bit value of 1 is equivalent to the lowest subsystem bit\n"
         "                NOTE:  this option can be specified multiple times\n"
+        "                (You can specify '--subsys help' to get a list of subsystems)\n"
         "--display xx    X11 display to use (default is DISPLAY env variable)\n"
         "--minimize      show minimized window on startup\n"
         "--maximize      show maximized window on startup\n"
@@ -555,13 +605,41 @@ void WBSetDebugLevel(unsigned int iNew)  // pass level as argument, 0 for none, 
   iWBDebugLevel = iNew;
 }
 
-#ifndef __GNUC__
-// querying debug level.  Useful in WB_DEBUG_PRINT macro
-unsigned int WBGetDebugLevel(void) // window_helper.h makes this inline when __GNUC__ defined
+#if !defined(__GNUC__) && !defined(_MSVC_VER)
+// querying debug level.  non-inline version
+unsigned int WBGetDebugLevel(void) // debug_helper.h makes this inline when __GNUC__ or _MSVC_VER defined
 {
   return iWBDebugLevel;
 }
-#endif // __GNUC__
+
+// checking debug level - non-inline version
+int WBCheckDebugLevel(unsigned int dwLevel) // debug_helper.h makes this inline when __GNUC__ or _MSVC_VER defined
+{
+  if(WB_LIKELY((iWBDebugLevel & DebugLevel_MASK) < (dwLevel & DebugLevel_MASK)))
+  {
+    return 0;
+  }
+
+  if(!WB_UNLIKELY( WBGetDebugLevel() & DebugSubSystem_RESTRICT )) // RESTRICT not specified
+  {
+    if(!(dwLevel & DebugSubSystem_MASK) ) // no subsystem specified in debug output
+    {
+      return 1; // this is acceptable - since no subsystem specified, allow debug output if not 'RESTRICT'
+    }
+  }
+
+  // at this point I have a debug subsystem 'RESTRICT' specified
+
+  if(((dwLevel & DebugSubSystem_MASK) & (iWBDebugLevel & DebugSubSystem_MASK))
+     != 0) // check to see that subsystem bits in 'dwLevel' match bits in 'iWBDebugLevel'
+  {
+    // at least one subsystem bit matches from 'dwLevel' and iWBDebugLevel
+    return 1;
+  }
+
+  return 0;
+}
+#endif // !defined(__GNUC__) && !defined(_MSVC_VER)
 
 void WBDebugPrint(const char *fmt, ...)
 {
@@ -1901,6 +1979,13 @@ int iLen;
   if(!pDisplay)
   {
     pDisplay = WBGetDefaultDisplay();
+
+    if(!pDisplay)
+    {
+      WB_ERROR_PRINT("ERROR - %s - no display!\n", __FUNCTION__);
+
+      return None;
+    }
   }
 
   aRval = WBLookupAtom(pDisplay, szAtomName);
@@ -2070,16 +2155,31 @@ char *pRval, *pTemp;
 unsigned int nAtom;
 
 
-  if(aAtom == None || (unsigned int)aAtom >= (unsigned int)(WB_INTERNAL_ATOM_MIN_VAL + nInternalAtoms))
+  if(aAtom == None)
   {
-    WB_ERROR_PRINT("ERROR:  %s - bad Atom:  %u (%08xH)\n", __FUNCTION__, (unsigned int)aAtom, (unsigned int)aAtom);
+    // NOTE:  this can happen under normal circumstances, so don't make it an error
+    //        (especially true for dialog controls without IDs assigned, like static text)
 
-    return None;  // bad parameter
+    WB_WARN_PRINT("ERROR:  %s - passed 'None' for aAtom\n", __FUNCTION__);
+
+    return NULL;
+  }
+  else if((unsigned int)aAtom >= (unsigned int)(WB_INTERNAL_ATOM_MIN_VAL + nInternalAtoms))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - bad (internal) Atom:  %u (%08xH)\n", __FUNCTION__, (unsigned int)aAtom, (unsigned int)aAtom);
+
+    return NULL;  // bad parameter
   }
 
   if(!pDisplay)
   {
     pDisplay = WBGetDefaultDisplay();
+
+    if(!pDisplay)
+    {
+      WB_ERROR_PRINT("ERROR - %s - no display!\n", __FUNCTION__);
+      return NULL;
+    }
   }
 
   if((unsigned int)aAtom < WB_INTERNAL_ATOM_MIN_VAL)
@@ -2097,6 +2197,10 @@ unsigned int nAtom;
 
       return pRval;
     }
+
+    WB_DEBUG_PRINT(DebugLevel_Light,
+                   "INFO:  %s - unknown Atom:  %u (%08xH)\n",
+                   __FUNCTION__, (unsigned int)aAtom, (unsigned int)aAtom);
 
     return NULL;
   }
@@ -2122,7 +2226,8 @@ unsigned int nAtom;
 
   if(!pRval)
   {
-    WB_ERROR_PRINT("ERROR:  %s - atom index %u (%u) not found, %u atoms stored\n", __FUNCTION__,
+    WB_DEBUG_PRINT(DebugLevel_Light,
+                   "INFO:  %s - atom index %u (%u) not found, %u atoms stored\n", __FUNCTION__,
                    (unsigned int)aAtom, (unsigned int)(aAtom - WB_INTERNAL_ATOM_MIN_VAL),
                    nInternalAtoms);
   }
