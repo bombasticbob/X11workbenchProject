@@ -172,10 +172,7 @@ use_the_stack_buffer:
   {
     WBTextExtent(fontSet, pS, nLength, &ext);
 
-//    WB_ERROR_PRINT("TEMPORARY:  %s geom: %d,%d,%d,%d\n",
-//                   __FUNCTION__, x, y, ext.width, ext.height);
-
-    // NOTE:  the x and y are for bottom left with this function, not top left
+    // NOTE:  the x and y are for bottom left when the function was called, not top left (as with specifying a rect or geom)
     __internalDoAntiAlias(pDisplay, drawable, gc, x, y - ext.height, ext.width, ext.height);
   }
 
@@ -1393,9 +1390,9 @@ Region rgnClip;
 
   if(iX >= iWidth0 + iX0 || iY >= iHeight0 + iY0)
   {
-//    WB_ERROR_PRINT("ERROR: %s - drawable smaller than requested geom:  %d,%d,%d,%d  %d,%d,%d,%d\n",
-//                 __FUNCTION__, iX0, iY0, iWidth0, iHeight0,
-//                 iX, iY, iWidth, iHeight);
+    WB_ERROR_PRINT("ERROR: %s - drawable smaller than requested geom:  %d,%d,%d,%d  %d,%d,%d,%d\n",
+                 __FUNCTION__, iX0, iY0, iWidth0, iHeight0,
+                 iX, iY, iWidth, iHeight);
     return;
   }
 

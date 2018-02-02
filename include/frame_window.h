@@ -51,6 +51,8 @@
 #ifndef FRAME_WINDOW_H_INCLUDED
 #define FRAME_WINDOW_H_INCLUDED
 
+#include <inttypes.h> // needed for intptr_t, uintptr_t among other things
+
 //#include "window_helper.h"
 #include "window_dressing.h"
 #include "menu_bar.h"
@@ -200,7 +202,7 @@ extern "C" {
 
   typedef struct __WB_FW_MENU_HANDLER__
   {
-    unsigned long lMenuID;                       // menu ID (< 0x10000L) or const pointer to string
+    uintptr_t lMenuID;                           // menu ID (< 0x10000L) or const pointer to string
 
     int (* callback)(XClientMessageEvent *);     // menu callback (gets pointer to the 'XClientMessageEvent')
     int (* UIcallback)(WBMenu *, WBMenuItem *);  // menu 'UI' callback to handle displaying menu states
@@ -214,7 +216,7 @@ extern "C" {
 **/
 typedef struct __WB_FW_MENU_HANDLER__
 {
-  unsigned long lMenuID;                       ///< menu ID (< 0x10000L) or const pointer to string
+  uintptr_t lMenuID;                       ///< menu ID (< 0x10000L) or const pointer to string
 
   int (* callback)(XClientMessageEvent *);     ///< menu callback (gets pointer to the 'XClientMessageEvent').
 

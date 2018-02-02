@@ -4107,7 +4107,6 @@ TEXT_BUFFER *pBuf;
 
         while(pThis->rctView.left > pThis->iCol)
         {
-
           pThis->rctView.left -= iAutoScrollWidth;
           pThis->rctView.right -= iAutoScrollWidth;
         }
@@ -4537,22 +4536,102 @@ TEXT_BUFFER *pBuf;
   }
 }
 
+
+static XFontSet __attribute__((noinline)) __internal_verify_get_fontset(Display *pDisplay, XFontSet rFontSet, GC gc)
+{
+XFontSet fSet;
+
+  if(rFontSet == None) /* NULL? */
+  {
+    XFontStruct *pFont = WBGetGCFont(pDisplay, gc);
+
+    if(!pFont)
+    {
+      WB_ERROR_PRINT("%s - ERROR:  WBGetGCFont returns NULL\n", __FUNCTION__);
+
+      return None; // bad
+    }
+
+    fSet = WBFontSetFromFont(pDisplay, pFont); // convert font to font set
+
+    XFreeFont(pDisplay, pFont); // free it now (important to do so)
+    pFont = NULL;
+
+    if(fSet == None)
+    {
+      WB_ERROR_PRINT("%s - ERROR:  WBFontSetFromFont returns None\n", __FUNCTION__);
+    }
+  }
+  else
+  {
+    fSet = rFontSet;
+  }
+
+  return fSet;
+}
+
+int __attribute__((noinline)) __internal_get_fontset_count_and_max_asc_desc(XFontSet fSet, int *pAsc, int *pDesc)
+{
+int nFonts, i1, iAsc, iDesc;
+XFontStruct **ppFonts = NULL;
+char **ppNames = NULL;
+
+  nFonts = XFontsOfFontSet(fSet, &ppFonts, &ppNames); // returns # of items (do NOT free resources!  They are owned by the font set)
+
+  if(nFonts <= 0 || !ppFonts)
+  {
+    return -1;
+  }
+
+  for(i1=0, iAsc=0, iDesc=0; i1 < nFonts; i1++)
+  {
+    if(iAsc < ppFonts[i1]->ascent)
+    {
+      iAsc = ppFonts[i1]->ascent;
+    }
+    if(iDesc < ppFonts[i1]->descent)
+    {
+      iDesc = ppFonts[i1]->descent;
+    }
+  }
+
+  if(pAsc)
+  {
+    *pAsc = iAsc;
+  }
+
+  if(pDesc)
+  {
+    *pDesc = iDesc;
+  }
+
+  return nFonts;
+}
+
 static void __internal_do_expose(struct _text_object_ *pThis, Display *pDisplay, Window wID,
                                  GC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
                                  XFontSet rFontSet)
 {
-TEXT_BUFFER *pBuf;
+TEXT_BUFFER *pBuf = NULL;
 WB_GEOM geomV, geomP, geomC;
-XFontStruct *pFont = NULL, **ppFonts = NULL;
-char **ppNames, *pL;
+char *pL = NULL;
+int iXDelta, iYDelta;
 int i1, iLen, iFontHeight, iFontWidth, nFonts, iAsc, iDesc, iX, iY, iPX, iPY;
-int iXDelta = 0, iYDelta = 0;
 XFontSet fSet;
 Pixmap pxTemp;
 unsigned long clrFG, clrBG, clrHFG, clrHBG;
 GC gc2 = None;
 WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
+int iAutoScrollWidth, iWindowHeightInLines;
 
+
+  if(!WBIsValidTextObject(pThis))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - text object %p not valid\n", __FUNCTION__, pThis);
+    return;
+  }
+
+  iXDelta = iYDelta = 0; // make sure, as they're used in a few places
 
   if(pViewGeom)
   {
@@ -4587,77 +4666,38 @@ WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
   }
   else
   {
-    memcpy(&geomP, &geomV, sizeof(geomV));
+    memcpy(&geomP, &geomV, sizeof(geomP));
   }
 
-  if(rFontSet == None) /* NULL? */
-  {
-    pFont = WBGetGCFont(pDisplay, gc);
+  fSet = __internal_verify_get_fontset(pDisplay, rFontSet, gc);
+  // NOTE:  at this point I must use 'fSet' to do all of the font metrics + drawing
 
-    if(!pFont)
-    {
-      WB_ERROR_PRINT("%s - ERROR:  WBGetGCFont returns NULL\n", __FUNCTION__);
 
-      return; // bad
-    }
+  // NOTE:  to find the floor of the font, I'll need to determine max iAsc and iDesc
+  //        this next function call tells me how many fonts I have, and determines the
+  //        max ascent and descent and stores that in iAsc and iDesc
+  nFonts = __internal_get_fontset_count_and_max_asc_desc(fSet, &iAsc, &iDesc);
 
-    fSet = WBFontSetFromFont(pDisplay, pFont); // convert font to font set
-
-    XFreeFont(pDisplay, pFont); // free it now (important to do so)
-    pFont = NULL;
-
-    if(fSet == None)
-    {
-      WB_ERROR_PRINT("%s - ERROR:  WBFontSetFromFont returns None\n", __FUNCTION__);
-
-      return; // bad
-    }
-  }
-  else
-  {
-    fSet = rFontSet; // I must check for this before I free fSet later
-  }
-
-  // at this point I must use 'fSet' to do all of the font metrics + drawing
-
-  // NOTE:  doing the call directly instead of calling WBFontSetAscent() etc. so only loop once
-
-  nFonts = XFontsOfFontSet(fSet, &ppFonts, &ppNames); // returns # of items (do NOT free resources!  They are owned by the font set)
 
   // TODO:  XFontStruct::direction indicates LTR RTL TTB or BTT for painting - for now _ONLY_ LTR_TTB will apply
 
-  if(nFonts <= 0 || !ppFonts) // no fonts?
+  if(nFonts <= 0) // no fonts?
   {
     WB_ERROR_PRINT("%s - ERROR:  XFontsOfFontSet returns %d\n", __FUNCTION__, nFonts);
 
     goto the_end;
   }
 
-  // to find the floor of the font, I'll need to determine max iAsc and iDesc
-
-  for(i1=0, iAsc=0, iDesc=0; i1 < nFonts; i1++)
-  {
-    if(iAsc < ppFonts[i1]->ascent)
-    {
-      iAsc = ppFonts[i1]->ascent;
-    }
-    if(iDesc < ppFonts[i1]->descent)
-    {
-      iDesc = ppFonts[i1]->descent;
-    }
-  }
-
   // NOW get the font width for a space (TODO:  average char width instead?)
-
-  iFontWidth = WB_TEXT_ESCAPEMENT(fSet, " ", 1);
+  iFontWidth = WBTextWidth(fSet, " ", 1); // WB_TEXT_ESCAPEMENT(fSet, " ", 1);
 
   // get FG/BG color information
-
   clrFG = WBGetGCFGColor(pDisplay, gc);
   clrBG = WBGetGCBGColor(pDisplay, gc);
 
   // TODO:  compare clrHFG and clrHBG to a "NULL" XColor?
-  if(!memcmp(&pThis->clrHFG, &pThis->clrHBG, sizeof(XColor))) // not assigned (they should never match)
+  if(!(pThis->clrHFG.flags & (DoRed | DoGreen | DoBlue)) && //!memcmp(&pThis->clrHFG, &pThis->clrHBG, sizeof(XColor)))
+     !(pThis->clrHFG.flags & (DoRed | DoGreen | DoBlue)))   // the colors have not been assigned
   {
     clrHBG = clrFG;
     clrHFG = clrBG;
@@ -4674,7 +4714,7 @@ WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
 
   if(gc2 != None)
   {
-    // NOTE:  docs wrong for XCopyGC, header correct - see WBBeginPaint()
+    // NOTE:  old docs were wrong for XCopyGC, new docs and header correct - see WBBeginPaint()
     if(!XCopyGC(pDisplay, gc, GCAll, gc2))
     {
       XFreeGC(pDisplay, gc2);
@@ -4684,59 +4724,136 @@ WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
 
   // font metrics complete. Now THAT wasn't so bad, was it?  OK it was but only need to do it here
 
-  if(WBIsValidTextObject(pThis))
-  {
-    // cache the window ID
-    pThis->wIDOwner = wID;
+  // cache the owner window ID
+  pThis->wIDOwner = wID;
 
-    // cache the font metrics
-    pThis->iAsc = iAsc;
-    pThis->iDesc = iDesc;
-    pThis->iFontWidth = iFontWidth;
+  // cache the font metrics
+  pThis->iAsc = iAsc;
+  pThis->iDesc = iDesc;
+  pThis->iFontWidth = iFontWidth;
+
+  // keep track of the total viewport in window coordinates.
+  // this will be used later for mouse translation
+
+  pThis->rctWinView.left = geomV.x;
+  pThis->rctWinView.top  = geomV.y;
+  pThis->rctWinView.right = pThis->rctWinView.left + geomV.width;
+  pThis->rctWinView.bottom = pThis->rctWinView.top + geomV.height;
+
+  // cache the pointer to the TEXT BUFFER
+  pBuf = (TEXT_BUFFER *)(pThis->pText);
+
+
+  // ------------------------------------------
+  // CALCULATING THE CORRECT VIEWPORT (rctView)
+  // ------------------------------------------
+  //
+  // NOTE:  if the owning window has reset the viewport, the entire window SHOULD
+  //        be invalid.  If not, it won't paint properly.
+
+  if(pThis->iLineFeed == LineFeed_NONE || // SINGLE LINE
+     !pBuf || pBuf->nEntries <= 0)        // also test for this condition and treat it as single-line also (temporary)
+  {
+    // AUTO-ASSIGN the viewport whenever right <= left (i.e. viewport is 'NULL' or 'empty')
+    // or whenever the viewport is not properly assigned (window re-size re-paint)
 
     iFontHeight = iAsc + iDesc; // does not include interline spacing (that comes later for multi-line only)
 
-
-    // keep track of the total viewport in window coordinates.
-    // this will be used later for mouse translation
-
-    pThis->rctWinView.left = geomV.x;
-    pThis->rctWinView.top  = geomV.y;
-    pThis->rctWinView.right = pThis->rctWinView.left + geomV.width;
-    pThis->rctWinView.bottom = pThis->rctWinView.top + geomV.height;
-
-    // cache the pointer to the TEXT BUFFER
-    pBuf = (TEXT_BUFFER *)(pThis->pText);
-
-
-    // ------------------------------------------
-    // CALCULATING THE CORRECT VIEWPORT (rctView)
-    // ------------------------------------------
-    //
-    // NOTE:  if the owning window has reset the viewport, the entire window SHOULD
-    //        be invalid.  If not, it won't paint properly.
-
-    if(pThis->iLineFeed == LineFeed_NONE || // SINGLE LINE
-       !pBuf || pBuf->nEntries <= 0)        // also test for this condition and treat it as single-line also (temporary)
+    if(pThis->rctView.top || pThis->rctView.bottom ||
+       pThis->rctView.right != pThis->rctView.left + geomV.width / iFontWidth) // not PROPERLY assigned
     {
-      // AUTO-ASSIGN the viewport whenever right <= left (i.e. viewport is 'NULL' or 'empty')
-      // or whenever the viewport is not properly assigned (window re-size re-paint)
+      iAutoScrollWidth = AUTO_HSCROLL_SIZE;
 
-      if(pThis->rctView.top || pThis->rctView.bottom ||
-         pThis->rctView.right != pThis->rctView.left + geomV.width / iFontWidth) // not PROPERLY assigned
+      if(pThis->rctView.left < 0) // not already assigned
       {
-        int iAutoScrollWidth = AUTO_HSCROLL_SIZE;
+        pThis->rctView.left = 0;
+      }
 
-        if(pThis->rctView.left < 0) // not already assigned
+      pThis->rctView.top = pThis->rctView.bottom = 0; // single line forces this (always)
+
+      pThis->rctView.right = pThis->rctView.left + geomV.width / iFontWidth;
+
+      if(pThis->rctView.right > pThis->rctView.left)
+      {
+        while(iAutoScrollWidth > 1 && iAutoScrollWidth >= pThis->rctView.right - pThis->rctView.left)
         {
-          pThis->rctView.left = 0;
+          iAutoScrollWidth >>= 1;
         }
 
-        pThis->rctView.top = pThis->rctView.bottom = 0; // single line forces this (always)
+        // scroll right to expose the cursor
 
+        while(pThis->rctView.right <= pThis->iCol)
+        {
+          pThis->rctView.left += iAutoScrollWidth;
+          pThis->rctView.right += iAutoScrollWidth;
+        }
+      }
+      else
+      {
+        pThis->rctView.right = pThis->rctView.left = pThis->iCol; // desperate to have something there
+      }
+    }
+  }
+  else                                  // MULTI-LINE
+  {
+    // adjust font height to include line spacing (I'll use this to position the lines)
+
+    iFontHeight = WBTextObjectCalculateLineHeight(pThis->iAsc, pThis->iDesc);
+
+    iWindowHeightInLines = geomV.height / iFontHeight; // window height (in lines)
+    if(!iWindowHeightInLines)
+    {
+      iWindowHeightInLines = 1; // just in case so I don't divide by zero
+    }
+
+    // AUTO-ASSIGN the viewport whenever right <= left (i.e. viewport is 'NULL' or 'empty')
+    // or whenever the viewport is not properly assigned (window re-size re-paint)
+
+    // NOTE:  in this section, pBuf cannot be NULL
+
+    if(pThis->rctView.right - pThis->rctView.left
+          != geomV.width / iFontWidth                   // viewport needs re-calculation
+       || pThis->rctView.bottom - pThis->rctView.top
+          != iWindowHeightInLines                       // viewport needs re-calculation
+       || pThis->rctView.top > pBuf->nEntries)          // top exceeds total # of lines
+    {
+      iAutoScrollWidth = AUTO_HSCROLL_SIZE;
+
+      if(pThis->rctView.left < 0) // not already assigned
+      {
+        pThis->rctView.left = 0;
+      }
+
+      if(pThis->rctView.top < 0 || pThis->rctView.top > pBuf->nEntries
+         || (pThis->rctView.top && pBuf->nEntries < iWindowHeightInLines))
+      {
+        pThis->rctView.top = 0; // set viewport to top
+      }
+
+      if(pThis->rctView.bottom - pThis->rctView.top
+          != iWindowHeightInLines)
+      {
+        pThis->rctView.bottom = pThis->rctView.top + iWindowHeightInLines;
+
+        // always scroll row into view
+
+        while(pThis->rctView.top > pThis->iRow)
+        {
+          pThis->rctView.top -= iWindowHeightInLines - 1;
+          pThis->rctView.bottom -= iWindowHeightInLines - 1;
+        }
+        while(pThis->rctView.bottom <= pThis->iRow)
+        {
+          pThis->rctView.top += iWindowHeightInLines - 1;
+          pThis->rctView.bottom += iWindowHeightInLines - 1;
+        }
+      }
+
+      if(pThis->rctView.right - pThis->rctView.left != geomV.width / iFontWidth)
+      {
         pThis->rctView.right = pThis->rctView.left + geomV.width / iFontWidth;
 
-        if(pThis->rctView.right > pThis->rctView.left)
+        if(pThis->rctView.right > pThis->rctView.left) // just in case, test it
         {
           while(iAutoScrollWidth > 1 && iAutoScrollWidth >= pThis->rctView.right - pThis->rctView.left)
           {
@@ -4757,562 +4874,375 @@ WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
         }
       }
     }
-    else                                  // MULTI-LINE
+  }
+
+
+  //--------------------------------------------------------------------------
+  // convert the highlight rectangle into screen coordinates (fills in rctSel)
+  //--------------------------------------------------------------------------
+
+  if(!SEL_RECT_EMPTY(pThis))
+  {
+    if(SEL_RECT_ALL(pThis))
     {
-      int iWindowHeightInLines;
-
-      // adjust font height to include line spacing (I'll use this to position the lines)
-
-      iFontHeight = WBTextObjectCalculateLineHeight(pThis->iAsc, pThis->iDesc);
-
-      iWindowHeightInLines = geomV.height / iFontHeight; // window height (in lines)
-      if(!iWindowHeightInLines)
-      {
-        iWindowHeightInLines = 1; // just in case so I don't divide by zero
-      }
-
-      // AUTO-ASSIGN the viewport whenever right <= left (i.e. viewport is 'NULL' or 'empty')
-      // or whenever the viewport is not properly assigned (window re-size re-paint)
-
-      // NOTE:  in this section, pBuf cannot be NULL
-
-      if(pThis->rctView.right - pThis->rctView.left
-            != geomV.width / iFontWidth                   // viewport needs re-calculation
-         || pThis->rctView.bottom - pThis->rctView.top
-            != iWindowHeightInLines                       // viewport needs re-calculation
-         || pThis->rctView.top > pBuf->nEntries)          // top exceeds total # of lines
-      {
-        int iAutoScrollWidth = AUTO_HSCROLL_SIZE;
-
-        if(pThis->rctView.left < 0) // not already assigned
-        {
-          pThis->rctView.left = 0;
-        }
-
-        if(pThis->rctView.top < 0 || pThis->rctView.top > pBuf->nEntries
-           || (pThis->rctView.top && pBuf->nEntries < iWindowHeightInLines))
-        {
-          pThis->rctView.top = 0; // set viewport to top
-        }
-
-        if(pThis->rctView.bottom - pThis->rctView.top
-            != iWindowHeightInLines)
-        {
-          pThis->rctView.bottom = pThis->rctView.top + iWindowHeightInLines;
-
-          // always scroll row into view
-
-          while(pThis->rctView.top > pThis->iRow)
-          {
-            pThis->rctView.top -= iWindowHeightInLines - 1;
-            pThis->rctView.bottom -= iWindowHeightInLines - 1;
-          }
-          while(pThis->rctView.bottom <= pThis->iRow)
-          {
-            pThis->rctView.top += iWindowHeightInLines - 1;
-            pThis->rctView.bottom += iWindowHeightInLines - 1;
-          }
-        }
-
-        if(pThis->rctView.right - pThis->rctView.left != geomV.width / iFontWidth)
-        {
-          pThis->rctView.right = pThis->rctView.left + geomV.width / iFontWidth;
-
-          if(pThis->rctView.right > pThis->rctView.left) // just in case, test it
-          {
-            while(iAutoScrollWidth > 1 && iAutoScrollWidth >= pThis->rctView.right - pThis->rctView.left)
-            {
-              iAutoScrollWidth >>= 1;
-            }
-
-            // scroll right to expose the cursor
-
-            while(pThis->rctView.right <= pThis->iCol)
-            {
-              pThis->rctView.left += iAutoScrollWidth;
-              pThis->rctView.right += iAutoScrollWidth;
-            }
-          }
-          else
-          {
-            pThis->rctView.right = pThis->rctView.left = pThis->iCol; // desperate to have something there
-          }
-        }
-      }
-    }
-
-
-    //--------------------------------------------------------------------------
-    // convert the highlight rectangle into screen coordinates (fills in rctSel)
-    //--------------------------------------------------------------------------
-
-    if(!SEL_RECT_EMPTY(pThis))
-    {
-      if(SEL_RECT_ALL(pThis))
-      {
-        memcpy(&rctSel, &(pThis->rctView), sizeof(rctSel)); // use entire viewport for hightlight rect
-        // TODO:  single-line, only select to end of string?
-      }
-      else
-      {
-        memcpy(&rctSel, &(pThis->rctSel), sizeof(rctSel));
-        NORMALIZE_SEL_RECT(rctSel);
-      }
-
-      pThis->rctHighLight.left = pThis->rctWinView.left
-                               + (rctSel.left - pThis->rctView.left) * iFontWidth;
-
-      pThis->rctHighLight.top  = pThis->rctWinView.top
-                               + (rctSel.top - pThis->rctView.top) * iFontHeight;
-
-      if(pThis->iLineFeed == LineFeed_NONE)
-      {
-        pThis->rctHighLight.top += (geomV.height - iAsc - iDesc) / 2; // since single-line text is centered
-      }
-
-      pThis->rctHighLight.right = pThis->rctHighLight.left
-                                + (rctSel.right - rctSel.left) * iFontWidth;
-
-      pThis->rctHighLight.bottom = pThis->rctHighLight.top // NOTE add 1 to # of lines, always
-                                + (rctSel.bottom - rctSel.top + 1) * iFontHeight;
-
-      // NOTE:  this is independent of the selection method.  In the special case
-      //        that a single line or an entire line is selected, I may have
-      //        to handle this differently
+      memcpy(&rctSel, &(pThis->rctView), sizeof(rctSel)); // use entire viewport for hightlight rect
+      // TODO:  single-line, only select to end of string?
     }
     else
     {
-      bzero(&rctSel, sizeof(rctSel)); // zero out selection rectangle
-      bzero(&(pThis->rctHighLight), sizeof(pThis->rctHighLight));
+      memcpy(&rctSel, &(pThis->rctSel), sizeof(rctSel));
+      NORMALIZE_SEL_RECT(rctSel);
     }
 
+    pThis->rctHighLight.left = pThis->rctWinView.left
+                             + (rctSel.left - pThis->rctView.left) * iFontWidth;
 
-    //--------------------------------------------
-    // CREATE PIXMAP (for speeding up the process)
-    //--------------------------------------------
+    pThis->rctHighLight.top  = pThis->rctWinView.top
+                             + (rctSel.top - pThis->rctView.top) * iFontHeight;
 
-    iPX = pThis->rctWinView.right - pThis->rctWinView.left + 2 * MIN_BORDER_SPACING;
-    iPY = pThis->rctWinView.bottom - pThis->rctWinView.top + 2 * MIN_BORDER_SPACING;
+    if(pThis->iLineFeed == LineFeed_NONE)
+    {
+      pThis->rctHighLight.top += (geomV.height - iAsc - iDesc) / 2; // since single-line text is centered
+    }
+
+    pThis->rctHighLight.right = pThis->rctHighLight.left
+                              + (rctSel.right - rctSel.left) * iFontWidth;
+
+    pThis->rctHighLight.bottom = pThis->rctHighLight.top // NOTE add 1 to # of lines, always
+                              + (rctSel.bottom - rctSel.top + 1) * iFontHeight;
+
+    // NOTE:  this is independent of the selection method.  In the special case
+    //        that a single line or an entire line is selected, I may have
+    //        to handle this differently
+  }
+  else
+  {
+    bzero(&rctSel, sizeof(rctSel)); // zero out selection rectangle
+    bzero(&(pThis->rctHighLight), sizeof(pThis->rctHighLight));
+  }
+
+
+  //--------------------------------------------
+  // CREATE PIXMAP (for speeding up the process)
+  //--------------------------------------------
+
+  iPX = pThis->rctWinView.right - pThis->rctWinView.left + 2 * MIN_BORDER_SPACING;
+  iPY = pThis->rctWinView.bottom - pThis->rctWinView.top + 2 * MIN_BORDER_SPACING;
 
 //    WB_ERROR_PRINT("TEMPORARY:  %s window %u (%08xH) pixmap dimensions %d,%d\n"
 //                   "            row/col %d,%d\n",
 //                   __FUNCTION__, (int)wID, (int)wID, iPX, iPY,
 //                   pThis->iRow, pThis->iCol);
 
-    if(gc2 != None && iPX > 0 && iPY > 0)
-    {
-      pxTemp = XCreatePixmap(pDisplay, wID, iPX, iPY,
-                             DefaultDepth(pDisplay, DefaultScreen(pDisplay)));
-    }
-    else
-    {
-      pxTemp = None;
-    }
+  if(gc2 != None && iPX > 0 && iPY > 0)
+  {
+    pxTemp = XCreatePixmap(pDisplay, wID, iPX, iPY,
+                           DefaultDepth(pDisplay, DefaultScreen(pDisplay)));
+  }
+  else
+  {
+    pxTemp = None;
+  }
 
-    //-----------------------
-    // FILL/ERASE BACKGROUND
-    //-----------------------
+  //-----------------------
+  // FILL/ERASE BACKGROUND
+  //-----------------------
 
-    if(pxTemp != None)
-    {
-      iXDelta = geomV.x - MIN_BORDER_SPACING;
-      iYDelta = geomV.y - MIN_BORDER_SPACING;
+  if(pxTemp != None)
+  {
+    iXDelta = geomV.x - MIN_BORDER_SPACING;
+    iYDelta = geomV.y - MIN_BORDER_SPACING;
 
-      // sometimes the clipping origin, when filling the background, might matter, especially if patterns are involved
-      XSetClipOrigin(pDisplay, gc2, -iXDelta, -iYDelta);  // so that it matches the display's clipping in gc
+    // sometimes the clipping origin, when filling the background, might matter, especially if patterns are involved
+    XSetClipOrigin(pDisplay, gc2, -iXDelta, -iYDelta);  // so that it matches the display's clipping in gc
 
-      XSetForeground(pDisplay, gc2, clrBG);
-      XFillRectangle(pDisplay, pxTemp, gc2, 0, 0, iPX, iPY);
+    XSetForeground(pDisplay, gc2, clrBG);
+    XFillRectangle(pDisplay, pxTemp, gc2, 0, 0, iPX, iPY);
 
-      XSetForeground(pDisplay, gc2, clrFG);
-    }
-    else // FALLBACK, if no pixmap, go to window directly
-    {
-      iXDelta = iYDelta = 0; // make sure, as they're used in a few places
+    XSetForeground(pDisplay, gc2, clrFG);
+  }
+  else // FALLBACK, if no pixmap, go to window directly
+  {
+    iXDelta = 0;
+    iYDelta = 0; // make sure, as they're used in a few places
 
-      XSetForeground(pDisplay, gc, clrBG);
-      XFillRectangle(pDisplay, wID, gc,
-                     pThis->rctWinView.left,
-                     pThis->rctWinView.top,
-                     pThis->rctWinView.right - pThis->rctWinView.left,
-                     pThis->rctWinView.bottom - pThis->rctWinView.top);
+    XSetForeground(pDisplay, gc, clrBG);
+    XFillRectangle(pDisplay, wID, gc,
+                   pThis->rctWinView.left,
+                   pThis->rctWinView.top,
+                   pThis->rctWinView.right - pThis->rctWinView.left,
+                   pThis->rctWinView.bottom - pThis->rctWinView.top);
 
-      XSetForeground(pDisplay, gc, clrFG);
-    }
+    XSetForeground(pDisplay, gc, clrFG);
+  }
 
-    // At this point, if pBuf is NULL or the # of entries zero, the background is *STILL* erased
+//  WB_ERROR_PRINT("TEMPORARY:  %s line %d - iXDelta is %d, iYDelta is %d\n", __FUNCTION__, __LINE__, iXDelta, iYDelta);
 
-    if(!pBuf || pBuf->nEntries <= 0)
-    {
+  // At this point, if pBuf is NULL or the # of entries zero, the background is *STILL* erased
+
+  if(!pBuf || pBuf->nEntries <= 0)
+  {
 //      WB_ERROR_PRINT("TEMPORARY:  %s - no text\n", __FUNCTION__);
-      goto almost_the_end; // I use the goto so I can put cleanup code there - it's safer
+    goto almost_the_end; // I use the goto so I can put cleanup code there - it's safer
+  }
+
+
+  // if it's a single-line object, center it within the window and display only ONE line
+
+  if(pThis->iLineFeed == LineFeed_NONE) // i.e. SINGLE LINE
+  {
+    ///////////////////////
+    // SINGLE LINE PAINTING
+    ///////////////////////
+
+    iY = geomV.height - iFontHeight;
+    if(iY < 0) // when this happens it screws the calculation up
+    {
+      iY = 0;
+    }
+
+    // calculate a Y position that's essentially centered within the single-line display area
+
+    iY = geomV.y + iY / 2 + iAsc; // iY is now "the baseline" for the font, where it needs to be drawn
+    iX = geomV.x;
+
+    pL = pBuf->aLines[0];
+    if(!pL)
+    {
+      goto the_end;
     }
 
 
-    // if it's a single-line object, center it within the window and display only ONE line
+    //-----------------------------
+    // DRAWING HIGHLIGHT RECTANGLE
+    //-----------------------------
 
-    if(pThis->iLineFeed == LineFeed_NONE) // i.e. SINGLE LINE
+    if(pThis->rctHighLight.right > pThis->rctHighLight.left &&
+       WBRectOverlapped(pThis->rctHighLight, pThis->rctWinView))
     {
-      ///////////////////////
-      // SINGLE LINE PAINTING
-      ///////////////////////
-
-      iY = geomV.y + (geomV.height - iAsc - iDesc) / 2 + iAsc; // iY is now "the baseline" for the font
-      iX = geomV.x;
-
-      pL = pBuf->aLines[0];
-      if(!pL)
+      if(pxTemp != None)
       {
-        goto the_end;
-      }
-
-
-      //-----------------------------
-      // DRAWING HIGHLIGHT RECTANGLE
-      //-----------------------------
-
-      if(pThis->rctHighLight.right > pThis->rctHighLight.left &&
-         WBRectOverlapped(pThis->rctHighLight, pThis->rctWinView))
-      {
-        if(pxTemp != None)
-        {
-          // NOTE:  iXDelta and iYDelta were calculated before, when background was erased
-          //        and the clip origin was also assigned for gc2
+        // NOTE:  iXDelta and iYDelta were calculated before, when background was erased
+        //        and the clip origin was also assigned for gc2
 //          XSetClipOrigin(pDisplay, gc2, -iXDelta, -iYDelta);  // so that it matches the display's clipping in gc
 
-          XSetForeground(pDisplay, gc2, clrHBG); // highlight background color
+        XSetForeground(pDisplay, gc2, clrHBG); // highlight background color
 
-          XFillRectangle(pDisplay, pxTemp, gc2,
-                         pThis->rctHighLight.left - iXDelta,
-                         pThis->rctHighLight.top - iYDelta,
-                         pThis->rctHighLight.right - pThis->rctHighLight.left,
-                         pThis->rctHighLight.bottom - pThis->rctHighLight.top);
+        XFillRectangle(pDisplay, pxTemp, gc2,
+                       pThis->rctHighLight.left - iXDelta,
+                       pThis->rctHighLight.top - iYDelta,
+                       pThis->rctHighLight.right - pThis->rctHighLight.left,
+                       pThis->rctHighLight.bottom - pThis->rctHighLight.top);
 
-          XSetForeground(pDisplay, gc2, clrFG);
-        }
-        else // FALLBACK, if no pixmap, go to window directly
-        {
-          XSetForeground(pDisplay, gc, clrHBG); // highlight background color
-
-          XFillRectangle(pDisplay, wID, gc,
-                         pThis->rctHighLight.left,
-                         pThis->rctHighLight.top,
-                         pThis->rctHighLight.right - pThis->rctHighLight.left,
-                         pThis->rctHighLight.bottom - pThis->rctHighLight.top);
-
-          XSetForeground(pDisplay, gc, clrFG);
-        }
+        XSetForeground(pDisplay, gc2, clrFG);
       }
-
-      //---------------------------------------
-      // DRAW the text and the vertical cursor
-      //---------------------------------------
-
-      iLen = WBGetMBLength(pL);
-
-      pThis->iCursorX = pThis->iCursorY = pThis->iCursorHeight = 0; // to indicate "not drawn"
-
-      for(i1=pThis->rctView.left; i1 < pThis->rctView.right; i1++, iX += iFontWidth)
+      else // FALLBACK, if no pixmap, go to window directly
       {
-        WB_RECT rctChar, rctCursor;
+        XSetForeground(pDisplay, gc, clrHBG); // highlight background color
 
-        if(i1 == pThis->iCol) // display the cursor (NOTE:  row ALWAYS matches)
-        {
-          pThis->iCursorX = iX - 1;
+        XFillRectangle(pDisplay, wID, gc,
+                       pThis->rctHighLight.left,
+                       pThis->rctHighLight.top,
+                       pThis->rctHighLight.right - pThis->rctHighLight.left,
+                       pThis->rctHighLight.bottom - pThis->rctHighLight.top);
 
-          if(pThis->iInsMode == InsertMode_OVERWRITE)
-          {
-            pThis->iCursorY = iY + iDesc + 1;
-            pThis->iCursorHeight = 1;
-
-            rctCursor.left = pThis->iCursorX - iXDelta;
-            rctCursor.top = pThis->iCursorY - iYDelta;
-            rctCursor.right = pThis->iCursorX + iFontWidth - iXDelta;
-            rctCursor.bottom = pThis->iCursorY - iYDelta;
-          }
-          else // INSERT mode cursor
-          {
-            pThis->iCursorY = iY - iAsc - 1;
-            pThis->iCursorHeight = iY + iDesc + 1 - pThis->iCursorY;
-
-            rctCursor.left = pThis->iCursorX - iXDelta;
-            rctCursor.top = pThis->iCursorY - iYDelta;
-            rctCursor.right = pThis->iCursorX - iXDelta;
-            rctCursor.bottom = pThis->iCursorY + pThis->iCursorHeight - iYDelta;
-          }
-
-
-          if(pThis->iBlinkState != 0) // horizontal cursor for overwrite
-          {
-            if(WBRectOverlapped(rctCursor, pThis->rctHighLight))
-            {
-              XSetForeground(pDisplay, gc2 != None ? gc2 : gc, clrHFG);
-              XSetBackground(pDisplay, gc2 != None ? gc2 : gc, clrHBG);
-            }
-            else
-            {
-              XSetForeground(pDisplay, gc2 != None ? gc2 : gc, clrFG);
-              XSetBackground(pDisplay, gc2 != None ? gc2 : gc, clrBG);
-            }
-
-            XDrawLine(pDisplay, pxTemp != None ? pxTemp : wID,
-                      gc2 != None ? gc2 : gc,
-                      rctCursor.left, rctCursor.top, rctCursor.right, rctCursor.bottom);
-          }
-        }
-
-        rctChar.top = iY - iAsc;
-        rctChar.bottom = iY + iDesc;
-        rctChar.left = iX + 1;
-        rctChar.right = iX + iFontWidth - 1; // since I'm checking overlap, make it a bit 'skinnier'
-
-        if(WBRectOverlapped(rctChar, pThis->rctHighLight))
-        {
-          XSetForeground(pDisplay, gc2 != None ? gc2 : gc, clrHFG);
-          XSetBackground(pDisplay, gc2 != None ? gc2 : gc, clrHBG);
-        }
-        else
-        {
-          XSetForeground(pDisplay, gc2 != None ? gc2 : gc, clrFG);
-          XSetBackground(pDisplay, gc2 != None ? gc2 : gc, clrBG);
-        }
-
-        // for NOW, draw one character at a time. But make sure it's within
-        // the invalid region first...
-
-        geomC.x = iX;
-        geomC.y = iY; // TODO:  for single line, move this and the next 2 outside the loop?
-        geomC.width = iFontWidth;
-        geomC.height = iFontHeight;
-
-        if(i1 < iLen)
-        {
-          if(WBGeomOverlapped(geomC, geomP)) // only if the character's geometry overlaps the paint geometry
-          {
-            int iLen2;
-            const char *p1 = WBGetMBCharPtr(pL, i1, &iLen2);
-
-            if(p1 && iLen2 > 0)
-            {
-//              if(iLen2 > 1)
-//              {
-//                WB_ERROR_PRINT("TEMPORARY:  %s - iLen2=%d, %d, %d, p1 = %02xH,%02xH\n", __FUNCTION__,
-//                               iLen2, iX - iXDelta, iY - iYDelta, (unsigned char)p1[0], (unsigned char)p1[1]);
-//              }
-
-              DTDrawString(pDisplay, pxTemp ? pxTemp : wID, fSet,
-                           gc2 != None ? gc2 : gc,
-                           iX - iXDelta, iY - iYDelta, p1, iLen2);
-            }
-          }
-        }
-        else if(i1 > pThis->iCol)
-        {
-          break; // slight optimization
-        }
+        XSetForeground(pDisplay, gc, clrFG);
       }
     }
-    else // MULTI-LINE
+
+    //---------------------------------------
+    // DRAW the text and the vertical cursor
+    //---------------------------------------
+
+    iLen = WBGetMBLength(pL);
+
+    pThis->iCursorX = pThis->iCursorY = pThis->iCursorHeight = 0; // to indicate "not drawn"
+
+    for(i1=pThis->rctView.left; i1 < pThis->rctView.right; i1++, iX += iFontWidth)
     {
-      int iCurRow; // my counter
+      WB_RECT rctChar, rctCursor;
 
-      //////////////////////
-      // MULTI LINE PAINTING
-      //////////////////////
-
-      // 3 different important conditions that affect painting:
-      // 1.  the cursor is (or is not) on this row
-      // 2.  the row has highlighting in it
-      // 3.  if 2, the row is either fully or partially highlighted
-
-      // if 1 and 2 are FALSE, paint the string 'as-is' with DTDrawString
-      // if 2 is TRUE, but 3 is false, paint the entire line "highlighted".
-      // otherwise, duplicate (for this row) what single-line painting does,
-      // dealing with cursor and highlight rectangles as needed, 1 char at a time
-
-      pThis->iCursorX = pThis->iCursorY = pThis->iCursorHeight = 0; // to indicate "not drawn"
-
-      for(iCurRow=pThis->rctView.top; iCurRow <= pBuf->nEntries && iCurRow <= pThis->rctView.bottom; iCurRow++)
+      if(i1 == pThis->iCol) // display the cursor (NOTE:  row ALWAYS matches)
       {
-        int bHighlight = 0;
+        pThis->iCursorX = iX - 1;
 
-        // NOTE:  geomV already has 'border spacing' taken into account
-
-        iY = geomV.y + iFontHeight * (iCurRow - pThis->rctView.top)
-           + iAsc; // add the ascent to the top of the text to get "the baseline" for the font
-
-        iX = geomV.x;
-
-        if(iCurRow < pBuf->nEntries)
+        if(pThis->iInsMode == InsertMode_OVERWRITE)
         {
-          pL = pBuf->aLines[iCurRow];
+          pThis->iCursorY = iY + iDesc + 1;
+          pThis->iCursorHeight = 1;
+
+          rctCursor.left = pThis->iCursorX - iXDelta;
+          rctCursor.top = pThis->iCursorY - iYDelta;
+          rctCursor.right = pThis->iCursorX + iFontWidth - iXDelta;
+          rctCursor.bottom = pThis->iCursorY - iYDelta;
         }
-        else
+        else // INSERT mode cursor
         {
-          pL = NULL;
-        }
+          pThis->iCursorY = iY - iAsc - 1;
+          pThis->iCursorHeight = iY + iDesc + 1 - pThis->iCursorY;
 
-        if(pL)
-        {
-          iLen = WBGetMBLength(pL); // length in "characters"
-        }
-        else
-        {
-          iLen = 0;
+          rctCursor.left = pThis->iCursorX - iXDelta;
+          rctCursor.top = pThis->iCursorY - iYDelta;
+          rctCursor.right = pThis->iCursorX - iXDelta;
+          rctCursor.bottom = pThis->iCursorY + pThis->iCursorHeight - iYDelta;
         }
 
-        // if the row might be highlighted, it will be within 'rctSel', which can
-        // span multiple lines.  It identifies the starting and ending row/col combo, but in pixels.
 
-        if((rctSel.left != rctSel.right || rctSel.top != rctSel.bottom) && // has a selection
-           iCurRow >= pThis->rctSel.top &&         // row is in range below or equal to 'top'
-           (iCurRow < pThis->rctSel.bottom ||      // above 'last' row
-            (iCurRow == pThis->rctSel.bottom && pThis->rctSel.right > 0))) // last row but has column > 0
+        if(pThis->iBlinkState != 0) // horizontal cursor for overwrite
         {
-          bHighlight = 1; // flag for later
-        }
-
-        if(iCurRow == pThis->iRow ||            // current row is cursor row
-           (bHighlight &&                       // I am highlighting this row AND
-            (iCurRow == pThis->rctSel.top ||    // it's the starting row for highlight
-             iCurRow == pThis->rctSel.bottom))) // it's the ending row for highlight
-        {
-          for(i1=pThis->rctView.left; i1 <= pThis->rctView.right; i1++, iX += iFontWidth)
+          if(WBRectOverlapped(rctCursor, pThis->rctHighLight))
           {
-            WB_RECT rctCursor;
-            int iLen2;
-            const char *p1;
+            XSetForeground(pDisplay, gc2 != None ? gc2 : gc, clrHFG);
+            XSetBackground(pDisplay, gc2 != None ? gc2 : gc, clrHBG);
+          }
+          else
+          {
+            XSetForeground(pDisplay, gc2 != None ? gc2 : gc, clrFG);
+            XSetBackground(pDisplay, gc2 != None ? gc2 : gc, clrBG);
+          }
 
-            if(pL && i1 < iLen)
-            {
-              p1 = WBGetMBCharPtr(pL, i1, &iLen2);
-            }
-            else
-            {
-              p1 = NULL; // past end of string
-            }
+          XDrawLine(pDisplay, pxTemp != None ? pxTemp : wID,
+                    gc2 != None ? gc2 : gc,
+                    rctCursor.left, rctCursor.top, rctCursor.right, rctCursor.bottom);
+        }
+      }
 
-            if(bHighlight &&
-               ((iCurRow > pThis->rctSel.top &&
-                 iCurRow < pThis->rctSel.bottom) ||
-                (iCurRow == pThis->rctSel.top &&
-                 i1 >= pThis->rctSel.left &&
-                 (i1 < pThis->rctSel.right || iCurRow != pThis->rctSel.bottom)) ||
-                (iCurRow == pThis->rctSel.bottom && i1 < pThis->rctSel.right)))
-            {
-              int iY0 = iY - iAsc; // NOTE:  iY is the BASE of the font, so I need to font ascent to get top of rect
+      rctChar.top = iY - iAsc;
+      rctChar.bottom = iY + iDesc;
+      rctChar.left = iX + 1;
+      rctChar.right = iX + iFontWidth - 1; // since I'm checking overlap, make it a bit 'skinnier'
 
-              // fill the rectangle for this character with the correct background color.
+      if(WBRectOverlapped(rctChar, pThis->rctHighLight))
+      {
+        XSetForeground(pDisplay, gc2 != None ? gc2 : gc, clrHFG);
+        XSetBackground(pDisplay, gc2 != None ? gc2 : gc, clrHBG);
+      }
+      else
+      {
+        XSetForeground(pDisplay, gc2 != None ? gc2 : gc, clrFG);
+        XSetBackground(pDisplay, gc2 != None ? gc2 : gc, clrBG);
+      }
 
-              if(pxTemp != None)
-              {
-                XSetForeground(pDisplay, gc2, clrHBG); // highlight background color
-                XSetBackground(pDisplay, gc2, clrHBG);
+      // for NOW, draw one character at a time. But make sure it's within
+      // the invalid region first...
 
-                XFillRectangle(pDisplay, pxTemp, gc2,
-                               iX - iXDelta, iY0 - iYDelta,
-                               iFontWidth, iFontHeight);
+      geomC.x = iX;
+      geomC.y = iY; // TODO:  for single line, move this and the next 2 outside the loop?
+      geomC.width = iFontWidth;
+      geomC.height = iFontHeight;
 
-                XSetForeground(pDisplay, gc2, clrHFG);
-              }
-              else // FALLBACK, if no pixmap, go to window directly
-              {
-                XSetForeground(pDisplay, gc, clrHBG); // highlight background color
-                XSetBackground(pDisplay, gc, clrHBG);
+      if(i1 < iLen)
+      {
+        if(WBGeomOverlapped(geomC, geomP)) // only if the character's geometry overlaps the paint geometry
+        {
+          int iLen2;
+          const char *p1 = WBGetMBCharPtr(pL, i1, &iLen2);
 
-                XFillRectangle(pDisplay, wID, gc,
-                               iX, iY0,
-                               iFontWidth, iFontHeight);
-
-                XSetForeground(pDisplay, gc, clrHFG);
-              }
-            }
-            else // non-highlighted character
-            {
-              XSetForeground(pDisplay, gc2 != None ? gc2 : gc, clrFG);
-              XSetBackground(pDisplay, gc2 != None ? gc2 : gc, clrBG);
-            }
-
-
-            //------------
-            // draw cursor
-            //------------
-
-            if(iCurRow == pThis->iRow && i1 == pThis->iCol) // display the cursor (matching row/col)
-            {
-              pThis->iCursorX = iX - 1;
-
-              if(pThis->iInsMode == InsertMode_OVERWRITE)  // NOTE:  horizontal cursor for overwrite
-              {
-                int iY0 = iY + iDesc + 1;
-
-                // there WAS a bizarre compile error here, optimizing sub-expressions incorrectly, maybe
-
-                pThis->iCursorY = iY0;
-                pThis->iCursorHeight = 1;
-
-                rctCursor.left = pThis->iCursorX - iXDelta;
-                rctCursor.top = iY0 - iYDelta;
-                rctCursor.right = pThis->iCursorX + iFontWidth - iXDelta;
-                rctCursor.bottom = rctCursor.top;
-
-//                WB_ERROR_PRINT("TEMPORARY:  %s - iX=%d, iY=%d A=%d,D=%d dX=%d, dY=%d  cursor %d,%d  %d,%d,%d,%d\n", __FUNCTION__,
-//                               iX, iY, iAsc, iDesc, iXDelta, iYDelta,
-//                               pThis->iCursorX, pThis->iCursorY,
-//                               rctCursor.left, rctCursor.top, rctCursor.right, rctCursor.bottom);
-              }
-              else // INSERT mode cursor (normally will be this)
-              {
-                int iY0 = iY - iAsc - 1;
-                int iY1 = iY + iDesc + 1;
-
-                pThis->iCursorY = iY0;
-                pThis->iCursorHeight = iY1 - iY0;
-
-                rctCursor.left = pThis->iCursorX - iXDelta;
-                rctCursor.top = iY0 - iYDelta;
-                rctCursor.right = rctCursor.left;
-                rctCursor.bottom = iY1 - iYDelta;
-              }
-
-              if(pThis->iBlinkState != 0)
-              {
-                XDrawLine(pDisplay, pxTemp != None ? pxTemp : wID,
-                          gc2 != None ? gc2 : gc,
-                          rctCursor.left, rctCursor.top, rctCursor.right, rctCursor.bottom);
-              }
-
-//              WB_ERROR_PRINT("TEMPORARY:  %s - cursor x,y = %d,%d\n", __FUNCTION__, pThis->iCursorX, pThis->iCursorY);
-            }
-//            else
-//            {
-//              WB_ERROR_PRINT("TEMPORARY:  %s - pThis->iRow=%d,iCol=%d,iCurRow=%d,i1=%d\n",
-//                             __FUNCTION__, pThis->iRow, pThis->iCol, iCurRow, i1);
-//            }
-
-
-            if(p1 && iLen2 > 0)
-            {
-//              if(iLen2 > 1)
-//              {
-//                WB_ERROR_PRINT("TEMPORARY:  %s - iLen2=%d, %d, %d, p1 = %02xH,%02xH\n", __FUNCTION__,
-//                               iLen2, iX - iXDelta, iY - iYDelta, (unsigned char)p1[0], (unsigned char)p1[1]);
-//              }
-
-              DTDrawString(pDisplay, pxTemp ? pxTemp : wID, fSet,
-                           gc2 != None ? gc2 : gc,
-                           iX - iXDelta, iY - iYDelta, p1, iLen2);
-            }
+          if(p1 && iLen2 > 0)
+          {
+            DTDrawString(pDisplay, pxTemp ? pxTemp : wID, fSet,
+                         gc2 != None ? gc2 : gc,
+                         iX - iXDelta, iY - iYDelta, p1, iLen2);
           }
         }
-        else if(pL) // current row is NOT cursor row (and line is not blank)
-        {
-          const char *p1 = WBGetMBCharPtr(pL, pThis->rctView.left, NULL);
-          const char *p2 = WBGetMBCharPtr(pL, pThis->rctView.right, NULL);
+      }
+      else if(i1 > pThis->iCol)
+      {
+        break; // slight optimization
+      }
+    }
+  }
+  else // MULTI-LINE
+  {
+    int iCurRow; // my counter
 
-          if(bHighlight)
+    //////////////////////
+    // MULTI LINE PAINTING
+    //////////////////////
+
+    // 3 different important conditions that affect painting:
+    // 1.  the cursor is (or is not) on this row
+    // 2.  the row has highlighting in it
+    // 3.  if 2, the row is either fully or partially highlighted
+
+    // if 1 and 2 are FALSE, paint the string 'as-is' with DTDrawString
+    // if 2 is TRUE, but 3 is false, paint the entire line "highlighted".
+    // otherwise, duplicate (for this row) what single-line painting does,
+    // dealing with cursor and highlight rectangles as needed, 1 char at a time
+
+    pThis->iCursorX = pThis->iCursorY = pThis->iCursorHeight = 0; // to indicate "not drawn"
+
+    for(iCurRow=pThis->rctView.top; iCurRow <= pBuf->nEntries && iCurRow <= pThis->rctView.bottom; iCurRow++)
+    {
+      int bHighlight = 0;
+
+      // NOTE:  geomV already has 'border spacing' taken into account
+
+      iY = geomV.y + iFontHeight * (iCurRow - pThis->rctView.top)
+         + iAsc; // add the ascent to the top of the text to get "the baseline" for the font
+
+      iX = geomV.x;
+
+      if(iCurRow < pBuf->nEntries)
+      {
+        pL = pBuf->aLines[iCurRow];
+      }
+      else
+      {
+        pL = NULL;
+      }
+
+      if(pL)
+      {
+        iLen = WBGetMBLength(pL); // length in "characters"
+      }
+      else
+      {
+        iLen = 0;
+      }
+
+      // if the row might be highlighted, it will be within 'rctSel', which can
+      // span multiple lines.  It identifies the starting and ending row/col combo, but in pixels.
+
+      if((rctSel.left != rctSel.right || rctSel.top != rctSel.bottom) && // has a selection
+         iCurRow >= pThis->rctSel.top &&         // row is in range below or equal to 'top'
+         (iCurRow < pThis->rctSel.bottom ||      // above 'last' row
+          (iCurRow == pThis->rctSel.bottom && pThis->rctSel.right > 0))) // last row but has column > 0
+      {
+        bHighlight = 1; // flag for later
+      }
+
+      if(iCurRow == pThis->iRow ||            // current row is cursor row
+         (bHighlight &&                       // I am highlighting this row AND
+          (iCurRow == pThis->rctSel.top ||    // it's the starting row for highlight
+           iCurRow == pThis->rctSel.bottom))) // it's the ending row for highlight
+      {
+        for(i1=pThis->rctView.left; i1 <= pThis->rctView.right; i1++, iX += iFontWidth)
+        {
+          WB_RECT rctCursor;
+          int iLen2;
+          const char *p1;
+
+          if(pL && i1 < iLen)
+          {
+            p1 = WBGetMBCharPtr(pL, i1, &iLen2);
+          }
+          else
+          {
+            p1 = NULL; // past end of string
+          }
+
+          if(bHighlight &&
+             ((iCurRow > pThis->rctSel.top &&
+               iCurRow < pThis->rctSel.bottom) ||
+              (iCurRow == pThis->rctSel.top &&
+               i1 >= pThis->rctSel.left &&
+               (i1 < pThis->rctSel.right || iCurRow != pThis->rctSel.bottom)) ||
+              (iCurRow == pThis->rctSel.bottom && i1 < pThis->rctSel.right)))
           {
             int iY0 = iY - iAsc; // NOTE:  iY is the BASE of the font, so I need to font ascent to get top of rect
+
+            // fill the rectangle for this character with the correct background color.
 
             if(pxTemp != None)
             {
@@ -5321,7 +5251,7 @@ WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
 
               XFillRectangle(pDisplay, pxTemp, gc2,
                              iX - iXDelta, iY0 - iYDelta,
-                             geomV.width, iFontHeight);  // entire line
+                             iFontWidth, iFontHeight);
 
               XSetForeground(pDisplay, gc2, clrHFG);
             }
@@ -5332,81 +5262,185 @@ WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
 
               XFillRectangle(pDisplay, wID, gc,
                              iX, iY0,
-                             geomV.width, iFontHeight);  // entire line
+                             iFontWidth, iFontHeight);
 
               XSetForeground(pDisplay, gc, clrHFG);
             }
           }
-          else
+          else // non-highlighted character
           {
             XSetForeground(pDisplay, gc2 != None ? gc2 : gc, clrFG);
             XSetBackground(pDisplay, gc2 != None ? gc2 : gc, clrBG);
           }
 
-          if(p1 && p1 && p2 > p1)
+
+          //------------
+          // draw cursor
+          //------------
+
+          if(iCurRow == pThis->iRow && i1 == pThis->iCol) // display the cursor (matching row/col)
+          {
+            pThis->iCursorX = iX - 1;
+
+            if(pThis->iInsMode == InsertMode_OVERWRITE)  // NOTE:  horizontal cursor for overwrite
+            {
+              int iY0 = iY + iDesc + 1;
+
+              // there WAS a bizarre compile error here, optimizing sub-expressions incorrectly, maybe
+
+              pThis->iCursorY = iY0;
+              pThis->iCursorHeight = 1;
+
+              rctCursor.left = pThis->iCursorX - iXDelta;
+              rctCursor.top = iY0 - iYDelta;
+              rctCursor.right = pThis->iCursorX + iFontWidth - iXDelta;
+              rctCursor.bottom = rctCursor.top;
+
+//                WB_ERROR_PRINT("TEMPORARY:  %s - iX=%d, iY=%d A=%d,D=%d dX=%d, dY=%d  cursor %d,%d  %d,%d,%d,%d\n", __FUNCTION__,
+//                               iX, iY, iAsc, iDesc, iXDelta, iYDelta,
+//                               pThis->iCursorX, pThis->iCursorY,
+//                               rctCursor.left, rctCursor.top, rctCursor.right, rctCursor.bottom);
+            }
+            else // INSERT mode cursor (normally will be this)
+            {
+              int iY0 = iY - iAsc - 1;
+              int iY1 = iY + iDesc + 1;
+
+              pThis->iCursorY = iY0;
+              pThis->iCursorHeight = iY1 - iY0;
+
+              rctCursor.left = pThis->iCursorX - iXDelta;
+              rctCursor.top = iY0 - iYDelta;
+              rctCursor.right = rctCursor.left;
+              rctCursor.bottom = iY1 - iYDelta;
+            }
+
+            if(pThis->iBlinkState != 0)
+            {
+              XDrawLine(pDisplay, pxTemp != None ? pxTemp : wID,
+                        gc2 != None ? gc2 : gc,
+                        rctCursor.left, rctCursor.top, rctCursor.right, rctCursor.bottom);
+            }
+
+//              WB_ERROR_PRINT("TEMPORARY:  %s - cursor x,y = %d,%d\n", __FUNCTION__, pThis->iCursorX, pThis->iCursorY);
+          }
+//            else
+//            {
+//              WB_ERROR_PRINT("TEMPORARY:  %s - pThis->iRow=%d,iCol=%d,iCurRow=%d,i1=%d\n",
+//                             __FUNCTION__, pThis->iRow, pThis->iCol, iCurRow, i1);
+//            }
+
+
+          if(p1 && iLen2 > 0)
           {
             DTDrawString(pDisplay, pxTemp ? pxTemp : wID, fSet,
                          gc2 != None ? gc2 : gc,
-                         iX - iXDelta, iY - iYDelta,
-                         p1, p2 - p1);
+                         iX - iXDelta, iY - iYDelta, p1, iLen2);
           }
+        }
+      }
+      else if(pL) // current row is NOT cursor row (and line is not blank)
+      {
+        const char *p1 = WBGetMBCharPtr(pL, pThis->rctView.left, NULL);
+        const char *p2 = WBGetMBCharPtr(pL, pThis->rctView.right, NULL);
+
+        if(bHighlight)
+        {
+          int iY0 = iY - iAsc; // NOTE:  iY is the BASE of the font, so I need to font ascent to get top of rect
+
+          if(pxTemp != None)
+          {
+            XSetForeground(pDisplay, gc2, clrHBG); // highlight background color
+            XSetBackground(pDisplay, gc2, clrHBG);
+
+            XFillRectangle(pDisplay, pxTemp, gc2,
+                           iX - iXDelta, iY0 - iYDelta,
+                           geomV.width, iFontHeight);  // entire line
+
+            XSetForeground(pDisplay, gc2, clrHFG);
+          }
+          else // FALLBACK, if no pixmap, go to window directly
+          {
+            XSetForeground(pDisplay, gc, clrHBG); // highlight background color
+            XSetBackground(pDisplay, gc, clrHBG);
+
+            XFillRectangle(pDisplay, wID, gc,
+                           iX, iY0,
+                           geomV.width, iFontHeight);  // entire line
+
+            XSetForeground(pDisplay, gc, clrHFG);
+          }
+        }
+        else
+        {
+          XSetForeground(pDisplay, gc2 != None ? gc2 : gc, clrFG);
+          XSetBackground(pDisplay, gc2 != None ? gc2 : gc, clrBG);
+        }
+
+        if(p1 && p1 && p2 > p1)
+        {
+          DTDrawString(pDisplay, pxTemp ? pxTemp : wID, fSet,
+                       gc2 != None ? gc2 : gc,
+                       iX - iXDelta, iY - iYDelta,
+                       p1, p2 - p1);
+        }
 //          else  (this happens when lines are blank)
 //          {
 //            WB_ERROR_PRINT("TEMPORARY:  %s - NOT drawing \"%s\"\n          p1=%p  p2=%p  delta=%d\n",
 //                           __FUNCTION__, pL, p1, p2, (int)(p2 - p1));
 //          }
-        }
       }
     }
+  }
 
-    //------------------------------------------
-    // PIXMAP OPTIMIZATION - TRANSFER TO WINDOW
-    //------------------------------------------
+  //------------------------------------------
+  // PIXMAP OPTIMIZATION - TRANSFER TO WINDOW
+  //------------------------------------------
 
 almost_the_end:
 
-    if(pxTemp != None) // OPTIMIZATION (using pixmap)
+  if(pxTemp != None) // OPTIMIZATION (using pixmap)
+  {
+    int iX0=0, iY0=0, iW0=iPX, iH0=iPY;
+
+    iX = pThis->rctWinView.left - MIN_BORDER_SPACING;
+    iY = pThis->rctWinView.top - MIN_BORDER_SPACING;
+
+    // only copy the invalid area (this should save some time)
+
+    if(geomP.x > iX)
     {
-      int iX0=0, iY0=0, iW0=iPX, iH0=iPY;
-
-      iX = pThis->rctWinView.left - MIN_BORDER_SPACING;
-      iY = pThis->rctWinView.top - MIN_BORDER_SPACING;
-
-      // only copy the invalid area (this should save some time)
-
-      if(geomP.x > iX)
-      {
-        iX0 = geomP.x - iX;
-        iW0 -= iX0;
-        iX = geomP.x;
-      }
-
-      if(geomP.x + geomP.width < iX + iW0)
-      {
-        iW0 = geomP.x + geomP.width - iX;
-      }
-
-      if(geomP.y > iY)
-      {
-        iY0 = geomP.y - iY;
-        iH0 -= iY0;
-        iY = geomP.y;
-      }
-
-      if(geomP.y + geomP.height < iY + iH0)
-      {
-        iH0 = geomP.y + geomP.height - iY;
-      }
-
-      if(iH0 > 0 && iW0 > 0)
-      {
-        XCopyArea(pDisplay, pxTemp, wID, gc, // this time use GC to do the copy
-                  iX0, iY0, iW0, iH0, iX, iY);
-      }
-
-      XFreePixmap(pDisplay, pxTemp);
+      iX0 = geomP.x - iX;
+      iW0 -= iX0;
+      iX = geomP.x;
     }
+
+    if(geomP.x + geomP.width < iX + iW0)
+    {
+      iW0 = geomP.x + geomP.width - iX;
+    }
+
+    if(geomP.y > iY)
+    {
+      iY0 = geomP.y - iY;
+      iH0 -= iY0;
+      iY = geomP.y;
+    }
+
+    if(geomP.y + geomP.height < iY + iH0)
+    {
+      iH0 = geomP.y + geomP.height - iY;
+    }
+
+    if(iH0 > 0 && iW0 > 0)
+    {
+      XCopyArea(pDisplay, pxTemp, wID, gc, // this time use GC to do the copy
+                iX0, iY0, iW0, iH0, iX, iY);
+    }
+
+    XFreePixmap(pDisplay, pxTemp);
   }
+
 
 the_end:
 

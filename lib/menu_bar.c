@@ -139,7 +139,7 @@ Atom aMENU_RESIZE = 0;
   *   format = 32
   *
   * To activate a specific menu item:
-  *   data.l[0] = (long) pointer to WBMenuItem (advisory only; 32-bit truncation)
+  *   data.l[0] = Hashed pointer to WBMenuItem - see WBGetPointerFromHash()
   *   data.l[1] = the index for menu item
   *
   * To move to the previous or next menu item in the list:
@@ -909,9 +909,8 @@ let_parent_process_it:
         pItem = pMenu->ppItems[pSelf->iSelected];
 
         // this next part is a 'self-check' which helps to validate the menu item pointer
-        // it does not actually USE the menu item pointer passed in the event (it's likely to get truncated)
-#warning potentially dangerous code - this should be reviewed an re-written
-        if((unsigned long)pItem == (unsigned long)(((XClientMessageEvent *)pEvent)->data.l[0]))
+
+        if(pItem == WBGetPointerFromHash((((XClientMessageEvent *)pEvent)->data.l[0])))
         {
           geom.x = pItem->iPosition;
           geom.y = pSelf->iY;
@@ -936,6 +935,8 @@ let_parent_process_it:
           pSelf->iSelected = -1;
           WBInvalidateGeom(wID, NULL, TRUE);
         }
+
+        WBDestroyPointerHash(((XClientMessageEvent *)pEvent)->data.l[0]);
       }
       else if(/*iMenuItemIndex &&*/ !((XClientMessageEvent *)pEvent)->data.l[0])
       {

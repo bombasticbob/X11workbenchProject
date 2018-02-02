@@ -1121,8 +1121,7 @@ XClientMessageEvent evt;
       evt.window = pMB->wSelf;
       evt.message_type = aMENU_ACTIVATE;
       evt.format = 32;
-#warning this is potentially dangerous code.  find another way to pass a pointer, if I even need it
-      evt.data.l[0] = (long)pItem;
+      evt.data.l[0] = WBCreatePointerHash(pItem);
       evt.data.l[1] = iIndex; // index for menu item
 
       WBPostPriorityEvent(pMB->wSelf, (XEvent *)&evt);
@@ -1153,8 +1152,7 @@ XClientMessageEvent evt;
       evt.window = pMP->wSelf;
       evt.message_type = aMENU_ACTIVATE;
       evt.format = 32;
-#warning this is potentially dangerous code.  find another way to pass a pointer, if I even need it
-      evt.data.l[0] = (long)pItem;
+      evt.data.l[0] = WBCreatePointerHash(pItem);
       evt.data.l[1] = iIndex; // index for menu item
 
       WBPostPriorityEvent(pMP->wSelf, (XEvent *)&evt);

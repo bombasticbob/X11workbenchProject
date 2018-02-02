@@ -3185,11 +3185,11 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 
             while(pHandler->lMenuID) // zero marks the end
             {
-              long lID = pHandler->lMenuID;
+              uintptr_t lID = pHandler->lMenuID;
 
               if(pHandler->lMenuID >= 0x10000L) // TODO:  this isn't compatible with the WBGetAtom paradigm...
               {
-#warning this is potentially dangerous code.  find a better way of managing this (lMenuID as const char *)
+#warning is this still potentially dangerous code?
                 lID = WBGetAtom(WBGetDefaultDisplay(), (const char *)lID);
 
                 if(!lID)
@@ -3253,11 +3253,11 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 
             while(pHandler->lMenuID) // zero marks the end
             {
-              long lID = pHandler->lMenuID;
+              uintptr_t lID = pHandler->lMenuID;
 
               if(pHandler->lMenuID >= 0x10000L)
               {
-#warning this is potentially dangerous code - find a better way of managing this (lMenuID as const char *)
+#warning is this still potentially dangerous code?
                 lID = WBGetAtom(WBGetDefaultDisplay(), (const char *)lID);
 
                 if(!lID)
