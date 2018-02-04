@@ -299,15 +299,6 @@ int WBGetDebugLevel(void);
 #define WB_DEBUG_PRINT(L, ...) \
     WB_IF_DEBUG_LEVEL(L) { WBDebugPrint(__VA_ARGS__); }
 
-//  if(WB_UNLIKELY((WBGetDebugLevel() & DebugLevel_MASK) >= ((L) & DebugLevel_MASK))) \
-//  { \
-//    if((!(WBGetDebugLevel() & DebugSubSystem_RESTRICT) && \
-//        (!((L) & DebugSubSystem_MASK) || !(WBGetDebugLevel() & DebugSubSystem_MASK))) \
-//       || (((L) & WBGetDebugLevel()) & DebugSubSystem_MASK) != 0) \
-//    { \
-//      WBDebugPrint(__VA_ARGS__); \
-//    } \
-//  }
 /** \ingroup debug
   * \brief Preferred method of implementing conditional debug 'dump' output
   *
@@ -329,16 +320,6 @@ int WBGetDebugLevel(void);
 #define WB_DEBUG_DUMP(L,X,Y,Z) \
     WB_IF_DEBUG_LEVEL(L) { WBDebugDump(X,Y,Z); }
 
-//  if(WB_UNLIKELY((WBGetDebugLevel() & DebugLevel_MASK) >= ((L) & DebugLevel_MASK))) \
-//  { \
-//    if((!(WBGetDebugLevel() & DebugSubSystem_RESTRICT) && \
-//        (!((L) & DebugSubSystem_MASK) || !(WBGetDebugLevel() & DebugSubSystem_MASK))) \
-//       || (((L) & WBGetDebugLevel()) & DebugSubSystem_MASK) != 0) \
-//    { \
-//      WBDebugDump(X,Y,Z); \
-//    } \
-//  }
-
 /** \ingroup debug
   * \brief Preferred method of implementing conditional debug 'if block' code
   *
@@ -355,27 +336,8 @@ int WBGetDebugLevel(void);
   * \endcode
   * \sa \ref DebugLevel
 **/
-
 #define WB_IF_DEBUG_LEVEL(L) if(WBCheckDebugLevel((L)))
 
-//#define WB_IF_DEBUG_LEVEL(L) if(WB_UNLIKELY( (WBGetDebugLevel() & DebugLevel_MASK) >= ( (L) & DebugLevel_MASK ) \
-//                                             && \
-//                                             ( ( !( WBGetDebugLevel() & DebugSubSystem_RESTRICT ) \
-//                                                 && \
-//                                                 ( !( (L) & DebugSubSystem_MASK ) \
-//                                                   || \
-//                                                   !( WBGetDebugLevel() & DebugSubSystem_MASK ) \
-//                                                 ) \
-//                                               ) \
-//                                               || \
-//                                               ( ( (L) & WBGetDebugLevel() ) & DebugSubSystem_MASK ) \
-//                                               != 0 \
-//                                             ) \
-//                                           ) )
-//
-
-//                                (!((L) & DebugSubSystem_MASK) || !(WBGetDebugLevel() & DebugSubSystem_MASK)
-//                                   || (((L) & WBGetDebugLevel()) & DebugSubSystem_MASK) != 0))
 #endif // NO_DEBUG
 
 

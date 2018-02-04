@@ -209,13 +209,33 @@ AC_CHECK_FUNCS([printf])
 AC_CHECK_FUNCS([alarm])
 AC_CHECK_FUNCS([memset])
 AC_CHECK_FUNCS([nanosleep])
-# the 'clock_gettime' function might require '-lrt' - see next section
-AC_CHECK_FUNCS([clock_gettime])
 
+# the 'clock_gettime' function might require '-lrt'
+AC_CHECK_LIB(rt, clock_gettime,
+[
+  test_need_lrt=true
+  my_save_LDLAGS="$LDFLAGS"
+  LDFLAGS="$LDLAGS -lrt"
+  AC_CHECK_FUNCS([clock_gettime])
+  LDFLAGS="$my_save_LDLAGS"
+],
+[
+  AC_CHECK_FUNCS([clock_gettime])
+])
 
-# check for a couple of things that might need external libraries
-AC_CHECK_LIB(rt, clock_gettime, test_need_lrt=true)
-AC_CHECK_LIB(dl, dlopen, test_need_ldl=true)
+# the 'dlopen' function might require '-ldl'
+AC_CHECK_LIB(dl, dlopen,
+[
+  test_need_ldl=true
+  my_save_LDLAGS="$LDFLAGS"
+  LDFLAGS="$LDLAGS -ldl"
+  AC_CHECK_FUNCS([dlopen])
+  LDFLAGS="$my_save_LDLAGS"
+],
+[
+  AC_CHECK_FUNCS([dlopen])
+])
+
 
 # custom function checks go here
 

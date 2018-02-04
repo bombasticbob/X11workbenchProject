@@ -1596,8 +1596,9 @@ char tbuf[512];
 
 
 #ifndef NO_DEBUG /* assign this to disable debugging - most likely a -D in Makefile */
-  if((WBGetDebugLevel() & DebugLevel_MASK) >= FONT_DUMP_DEBUG_LEVEL ||
-     (WBGetDebugLevel() & DebugSubSystem_Font))
+//  if((WBGetDebugLevel() & DebugLevel_MASK) >= FONT_DUMP_DEBUG_LEVEL ||
+//     (WBGetDebugLevel() & DebugSubSystem_Font))
+  WB_IF_DEBUG_LEVEL(FONT_DUMP_DEBUG_LEVEL | DebugSubSystem_Font)
   {
     WBDumpFontSet(pDisplay, fsRval);
   }

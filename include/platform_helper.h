@@ -112,6 +112,91 @@
 #error configure script feature check 1 fail
 #error critical features missing
 #error
+#ifndef HAVE_ALARM
+#error  HAVE_ALARM is not defined
+#endif //  HAVE_ALARM
+#ifndef HAVE_CHOWN
+#error  HAVE_CHOWN is not defined
+#endif //  HAVE_CHOWN
+#ifndef HAVE_CLOCK_GETTIME
+#error  HAVE_CLOCK_GETTIME is not defined
+#endif //  HAVE_CLOCK_GETTIME
+#ifndef HAVE_DUP2
+#error  HAVE_DUP2 is not defined
+#endif //  HAVE_DUP2
+#ifndef HAVE_FORK
+#error  HAVE_FORK is not defined
+#endif //  HAVE_FORK
+#ifndef HAVE_FTRUNCATE
+#error  HAVE_FTRUNCATE is not defined
+#endif //  HAVE_FTRUNCATE
+#ifndef HAVE_GETCWD
+#error  HAVE_GETCWD is not defined
+#endif //  HAVE_GETCWD
+#ifndef HAVE_GETTIMEOFDAY
+#error  HAVE_GETTIMEOFDAY is not defined
+#endif //  HAVE_GETTIMEOFDAY
+#ifndef HAVE_MALLOC
+#error  HAVE_MALLOC is not defined
+#endif //  HAVE_MALLOC
+#ifndef HAVE_MBLEN
+#error  HAVE_MBLEN is not defined
+#endif //  HAVE_MBLEN
+#ifndef HAVE_MEMCHR
+#error  HAVE_MEMCHR is not defined
+#endif //  HAVE_MEMCHR
+#ifndef HAVE_MEMMOVE
+#error  HAVE_MEMMOVE is not defined
+#endif //  HAVE_MEMMOVE
+#ifndef HAVE_MEMSET
+#error  HAVE_MEMSET is not defined
+#endif //  HAVE_MEMSET
+#ifndef HAVE_MKDIR
+#error  HAVE_MKDIR is not defined
+#endif //  HAVE_MKDIR
+#ifndef HAVE_PRINTF
+#error  HAVE_PRINTF is not defined
+#endif //  HAVE_PRINTF
+#ifndef HAVE_REALLOC
+#error  HAVE_REALLOC is not defined
+#endif //  HAVE_REALLOC
+#ifndef HAVE_SELECT
+#error  HAVE_SELECT is not defined
+#endif //  HAVE_SELECT
+#ifndef HAVE_SETLOCALE
+#error  HAVE_SETLOCALE is not defined
+#endif //  HAVE_SETLOCALE
+#ifndef HAVE_STRCASECMP
+#error  HAVE_STRCASECMP is not defined
+#endif //  HAVE_STRCASECMP
+#ifndef HAVE_STRCHR
+#error  HAVE_STRCHR is not defined
+#endif //  HAVE_STRCHR
+#ifndef HAVE_STRNCASECMP
+#error  HAVE_STRNCASECMP is not defined
+#endif //  HAVE_STRNCASECMP
+#ifndef HAVE_STRRCHR
+#error  HAVE_STRRCHR is not defined
+#endif //  HAVE_STRRCHR
+#ifndef HAVE_STRSTR
+#error  HAVE_STRSTR is not defined
+#endif //  HAVE_STRSTR
+#ifndef HAVE__BOOL
+#error  HAVE__BOOL is not defined
+#endif //  HAVE__BOOL
+#ifndef LSTAT_FOLLOWS_SLASHED_SYMLINK
+#error  LSTAT_FOLLOWS_SLASHED_SYMLINK is not defined
+#endif //  LSTAT_FOLLOWS_SLASHED_SYMLINK
+#ifndef HAVE_VFORK
+#error  HAVE_VFORK is not defined
+#endif //  HAVE_VFORK
+#ifndef HAVE_WORKING_FORK
+#error  HAVE_WORKING_FORK is not defined
+#endif //  HAVE_WORKING_FORK
+#ifndef HAVE_WORKING_VFORK
+#error  HAVE_WORKING_VFORK is not defined
+#endif //  HAVE_WORKING_VFORK
+#error
 #else
 #if !( HAVE_ALARM ) || !( HAVE_CHOWN ) || \
     !( HAVE_CLOCK_GETTIME ) || !( HAVE_DUP2 ) || !( HAVE_FORK ) || \

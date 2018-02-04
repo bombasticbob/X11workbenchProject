@@ -5252,6 +5252,7 @@ WB_DIALOG_PROP *pProp;
   geomBorder.y = 0;
   geomBorder.width = xwa.width - geomBorder.x;
   geomBorder.height = xwa.height - geomBorder.y;
+  geomBorder.border = 0; // no additional window border [this MUST be assigned]
 
   if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_HAS_FOCUS)
   {
@@ -5339,6 +5340,9 @@ WB_DIALOG_PROP *pProp;
       pListInfo->nPos = pListInfo->nTop;
     }
   }
+
+//  WB_ERROR_PRINT("TEMPORARY:  %s - V scroll bar geomBorder %d,%d,%d,%d\n", __FUNCTION__,
+//                 geomBorder.x, geomBorder.y, geomBorder.width, geomBorder.height);
 
   if(pListInfo)
   {

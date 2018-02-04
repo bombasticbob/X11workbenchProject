@@ -159,6 +159,38 @@ static void CheckInitScrollColors(void)
 }
 
 
+static void DebugDumpScrollInfo(WB_SCROLLINFO *pSI)
+{
+
+  WBDebugPrint("%s - Debug Dump of Scroll Info\n"
+               "  iScrollState = %d,\n"
+               "  iVScrollWidth = %d, iHScrollHeight = %d, iVBarHeight = %d, iHBarWidth = %d,\n"
+               "  iHKnob = %d, iVKnob = %d, iHKnobSize = %d, iVKnobSize = %d,\n"
+               "  iHMin = %d, iHMax = %d    iVMin = %d, iVMax = %d, iHPos = %d, iVPos = %d\n"
+               "  geomHBar:    %d,%d,%d,%d\n"
+               "  geomHLeft:   %d,%d,%d,%d\n"
+               "  geomHRight:  %d,%d,%d,%d\n"
+               "  geomHKnob:   %d,%d,%d,%d\n"
+               "  geomVBar:    %d,%d,%d,%d\n"
+               "  geomVUp:     %d,%d,%d,%d\n"
+               "  geomVDown:   %d,%d,%d,%d\n"
+               "  geomVKnob:   %d,%d,%d,%d\n",
+               __FUNCTION__,
+               pSI->iScrollState, pSI->iVScrollWidth, pSI->iHScrollHeight,
+               pSI->iVBarHeight, pSI->iHBarWidth,
+               pSI->iHKnob, pSI->iVKnob, pSI->iHKnobSize, pSI->iVKnobSize,
+               pSI->iHMin, pSI->iHMax, pSI->iVMin, pSI->iVMax, pSI->iHPos, pSI->iVPos,
+               pSI->geomHBar.x, pSI->geomHBar.y, pSI->geomHBar.width, pSI->geomHBar.height,
+               pSI->geomHLeft.x, pSI->geomHLeft.y, pSI->geomHLeft.width, pSI->geomHLeft.height,
+               pSI->geomHRight.x, pSI->geomHRight.y, pSI->geomHRight.width, pSI->geomHRight.height,
+               pSI->geomHKnob.x, pSI->geomHKnob.y, pSI->geomHKnob.width, pSI->geomHKnob.height,
+               pSI->geomVBar.x, pSI->geomVBar.y, pSI->geomVBar.width, pSI->geomVBar.height,
+               pSI->geomVUp.x, pSI->geomVUp.y, pSI->geomVUp.width, pSI->geomVUp.height,
+               pSI->geomVDown.x, pSI->geomVDown.y, pSI->geomVDown.width, pSI->geomVDown.height,
+               pSI->geomVKnob.x, pSI->geomVKnob.y, pSI->geomVKnob.width, pSI->geomVKnob.height);
+}
+
+
 #if 0 /* this function not currently used.  consider removeing it in a refactor */
 static char ilog2n(unsigned char y)
 {
@@ -284,8 +316,9 @@ int nListItems;
   pScrollInfo->iVBarHeight = iBarHeight;
 
   WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
-                 "%s - iVScrollWidth=%d, iHScrollHeight=%d  iBarHeight=%d\n",
-                 __FUNCTION__, iVScrollWidth, iHScrollHeight, iBarHeight);
+                 "%s - iVScrollWidth=%d, iHScrollHeight=%d  iBarHeight=%d  geomClient=%d,%d,%d,%d border=%d\n",
+                 __FUNCTION__, iVScrollWidth, iHScrollHeight, iBarHeight,
+                 pgeomClient->x, pgeomClient->y, pgeomClient->width, pgeomClient->height, pgeomClient->border);
 
   if(pScrollInfo->iVPos < pScrollInfo->iVMin || pScrollInfo->iVPos > pScrollInfo->iVMax)
   {
@@ -413,6 +446,10 @@ int nListItems;
   pScrollInfo->geomVDown.border = 0;
   pScrollInfo->geomVKnob.border = 0;
 
+  WB_IF_DEBUG_LEVEL(DebugLevel_Heavy | DebugSubSystem_ScrollBar)
+  {
+    DebugDumpScrollInfo(pScrollInfo);
+  }
 }
 
 
@@ -431,8 +468,9 @@ int nListItems;
 
 
   WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
-                 "%s - iVScrollWidth=%d, iHScrollHeight=%d  iBarWidth=%d\n",
-                 __FUNCTION__, iVScrollWidth, iHScrollHeight, iBarWidth);
+                 "%s - iVScrollWidth=%d, iHScrollHeight=%d  iBarWidth=%d  geomClient=%d,%d,%d,%d border=%d\n",
+                 __FUNCTION__, iVScrollWidth, iHScrollHeight, iBarWidth,
+                 pgeomClient->x, pgeomClient->y, pgeomClient->width, pgeomClient->height, pgeomClient->border);
 
 
   if(pScrollInfo->iHPos < pScrollInfo->iHMin || pScrollInfo->iHPos > pScrollInfo->iHMax)
@@ -559,6 +597,10 @@ int nListItems;
   pScrollInfo->geomVDown.border = 0;
   pScrollInfo->geomVKnob.border = 0;
 
+  WB_IF_DEBUG_LEVEL(DebugLevel_Heavy | DebugSubSystem_ScrollBar)
+  {
+    DebugDumpScrollInfo(pScrollInfo);
+  }
 }
 
 
@@ -595,8 +637,9 @@ int iBarHeight, iBarWidth;
     pScrollInfo->iHKnob = pScrollInfo->iHKnobSize = pScrollInfo->iHPos = pScrollInfo->iHMin = pScrollInfo->iHMax = 0;
   }
 
-//  WB_ERROR_PRINT("TEMPORARY:  %d %d %d %d %d\n",
-//                 iBarHeight, iVScrollWidth, iHScrollHeight, nListItems, nPos);
+  WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
+                 "%s line %d -  %d %d %d %d %d\n", __FUNCTION__, __LINE__,
+                 iBarHeight, iVScrollWidth, iHScrollHeight, nListItems, nPos);
 
   pScrollInfo->iVMin = 0;
   pScrollInfo->iVMax = nListItems - 1;
@@ -615,6 +658,10 @@ int iBarHeight, iBarWidth;
 
   pScrollInfo->iHScrollHeight = iHScrollHeight;
   pScrollInfo->iHBarWidth = iBarWidth;
+
+  WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
+                 "%s line %d -  iHScrollHeight=%d, iBarWidth=%d\n", __FUNCTION__, __LINE__,
+                 iHScrollHeight, iBarWidth);
 
 }
 
@@ -649,6 +696,10 @@ int /*iKnobSize, iKnobPos,*/ iBarHeight, iBarWidth;
     pScrollInfo->iVKnob = pScrollInfo->iVKnobSize = pScrollInfo->iVPos = pScrollInfo->iVMin = pScrollInfo->iVMax = 0;
   }
 
+  WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
+                 "%s line %d -  %d %d %d %d %d\n", __FUNCTION__, __LINE__,
+                 iBarWidth, iVScrollWidth, iHScrollHeight, nListItems, nPos);
+
   pScrollInfo->iHMin = 0;
   pScrollInfo->iHMax = nListItems - 1;
 
@@ -668,6 +719,9 @@ int /*iKnobSize, iKnobPos,*/ iBarHeight, iBarWidth;
   pScrollInfo->iVScrollWidth = iVScrollWidth;
   pScrollInfo->iVBarHeight = iBarHeight;
 
+  WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
+                 "%s line %d -  iHScrollHeight=%d, iBarWidth=%d\n", __FUNCTION__, __LINE__,
+                 iVScrollWidth, iBarHeight);
 }
 
 
