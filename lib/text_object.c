@@ -1409,7 +1409,8 @@ WB_RECT rctInvalid;
 
     if(!pRect)
     {
-      WB_ERROR_PRINT("TEMPORARY:  %s - invalidate entire window %u (%08xH)\n",
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_EditWindow | DebugSubSystem_Expose,
+                     "%s - invalidate entire window %u (%08xH)\n",
                      __FUNCTION__, (int)pThis->wIDOwner, (int)pThis->wIDOwner);
 
       WBInvalidateRect(pThis->wIDOwner, NULL, bPaintFlag);
@@ -2316,6 +2317,7 @@ WB_RECT rctSel;
       pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
     }
 
+   WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
     __internal_invalidate_rect(pThis, NULL, 1); // TODO:  optimize this
   }
 }
@@ -2398,6 +2400,7 @@ int iSelAll;
       pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
     }
 
+     WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
     __internal_invalidate_rect(pThis, NULL, 1); // TODO:  optimize this
   }
 }
@@ -2727,6 +2730,7 @@ WB_RECT rctInvalid;
           pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
         }
 
+        WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
         __internal_invalidate_rect(pThis, NULL, 1); // scrolling, so invalidate everything
       }
       else
@@ -2736,6 +2740,7 @@ WB_RECT rctInvalid;
           pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
         }
 
+        WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
         // for now, always do this
         __internal_invalidate_rect(pThis, NULL, 1); // scrolling, so invalidate everything
 //        __internal_invalidate_rect(pThis, &rctInvalid, 1); // invalidate bounding rectangle
@@ -2749,6 +2754,8 @@ WB_RECT rctInvalid;
       }
 
       // for now, always do this
+        WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+
         __internal_invalidate_rect(pThis, NULL, 1); // scrolling, so invalidate everything
 
 //      __internal_invalidate_rect(pThis, &rctInvalid, 1); // invalidate bounding rectangle
@@ -3229,6 +3236,8 @@ WB_RECT rctInvalid;
         pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
       }
 
+      WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+
       __internal_invalidate_rect(pThis, NULL, 1); // so invalidate everything (for NOW)
     }
 
@@ -3260,6 +3269,7 @@ WB_RECT rctInvalid;
           pThis->rctView.right += iAutoScrollWidth;
         }
 
+        WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
         __internal_invalidate_rect(pThis, NULL, 1); // scrolling, so invalidate everything
       }
       else
@@ -3269,6 +3279,8 @@ WB_RECT rctInvalid;
     }
     else
     {
+      WB_WARN_PRINT("WARNING:  %s line %d - invalidate entire window rect\n", __FUNCTION__, __LINE__);
+
       __internal_invalidate_rect(pThis, NULL, 1); // invalidate everything (confusion handler)
     }
   }
@@ -3357,6 +3369,8 @@ WB_RECT rctSel;
       if(!SEL_RECT_EMPTY(pThis))
       {
         __internal_invalidate_rect(pThis, &(pThis->rctHighLight), 0); // invalidate the highlight rectangle
+
+        // clearing the selection (TODO:  do this with a utility function?)
         memset(&(pThis->rctSel), 0, sizeof(pThis->rctSel));
         memset(&(pThis->rctHighLight), 0, sizeof(pThis->rctHighLight));
       }
@@ -3463,7 +3477,9 @@ WB_RECT rctSel;
 
     // for now mouse-click invalidates the entire rectangle.  Later I fix this.
 
-    __internal_invalidate_rect(pThis, NULL, 1); // POOBAH
+    WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+
+    __internal_invalidate_rect(pThis, NULL, 1);
   }
 }
 static void __internal_begin_mouse_drag(struct _text_object_ *pThis)
@@ -3485,7 +3501,6 @@ static void __internal_end_mouse_drag(struct _text_object_ *pThis)
 static void __internal_cursor_up(struct _text_object_ *pThis)
 {
 TEXT_BUFFER *pBuf;
-//int iPageHeight;
 
 
   if(!WBIsValidTextObject(pThis))
@@ -3502,8 +3517,6 @@ TEXT_BUFFER *pBuf;
     {
       return; // do nothing
     }
-
-    WB_ERROR_PRINT("TEMPORARY:  %s - here I am at line %d\n", __FUNCTION__, __LINE__);
 
     __internal_invalidate_cursor(pThis, 0); // invalidate current cursor rectangle
 
@@ -3553,28 +3566,9 @@ TEXT_BUFFER *pBuf;
     if(pThis->rctView.top > pThis->iRow ||
        pThis->rctView.bottom <= pThis->iRow)
     {
+      WB_WARN_PRINT("WARNING:  %s line %d - invalidate entire window rect\n", __FUNCTION__, __LINE__);
+
       __internal_invalidate_rect(pThis, NULL, 1); // scrolling invalidates all
-
-#if 0 /* it was the way I did it, but no longer */
-      iPageHeight = pThis->rctView.bottom - pThis->rctView.top - 1;
-
-      // scroll up/down to expose the cursor
-
-      if(iPageHeight > 0)
-      {
-        while(pThis->rctView.top > pThis->iRow)
-        {
-          pThis->rctView.top -= iPageHeight;
-          pThis->rctView.bottom -= iPageHeight;
-        }
-
-        while(pThis->rctView.bottom <= pThis->iRow)
-        {
-          pThis->rctView.top += iPageHeight;
-          pThis->rctView.bottom += iPageHeight;
-        }
-      }
-#endif // 0
 
       // scroll right/left so that I have one additional white space visible
       if(pThis->rctView.top > pThis->iRow)
@@ -3593,11 +3587,6 @@ TEXT_BUFFER *pBuf;
       pThis->iCursorY += WBTextObjectCalculateLineHeight(pThis->iAsc, pThis->iDesc)
                        * (pThis->iRow - iOldRow); // will effectively subtract
 
-//                        (pThis->iAsc + pThis->iDesc
-//                         + pThis->iDesc > MIN_LINE_SPACING * 2 ?
-//                           pThis->iDesc / 2 : MIN_LINE_SPACING)
-//                       * (pThis->iRow - iOldRow);
-
       __internal_invalidate_cursor(pThis, 1); // invalidate the NEW cursor rectangle
     }
   }
@@ -3605,7 +3594,6 @@ TEXT_BUFFER *pBuf;
 static void __internal_cursor_down(struct _text_object_ *pThis)
 {
 TEXT_BUFFER *pBuf;
-//int iPageHeight;
 
 
   if(!WBIsValidTextObject(pThis))
@@ -3622,8 +3610,6 @@ TEXT_BUFFER *pBuf;
     {
       return; // do nothing
     }
-
-    WB_ERROR_PRINT("TEMPORARY:  %s - here I am at line %d\n", __FUNCTION__, __LINE__);
 
     __internal_invalidate_cursor(pThis, 0); // invalidate current cursor rectangle
 
@@ -3669,30 +3655,11 @@ TEXT_BUFFER *pBuf;
     if(pThis->rctView.top > pThis->iRow ||
        pThis->rctView.bottom <= pThis->iRow)
     {
+      WB_WARN_PRINT("WARNING:  %s line %d - invalidate entire window rect\n", __FUNCTION__, __LINE__);
+
       __internal_invalidate_rect(pThis, NULL, 1); // scrolling invalidates all
 
-#if 0 /* it was the way I did it, but no longer */
-      iPageHeight = pThis->rctView.bottom - pThis->rctView.top - 1;
-
-      // scroll up/down to expose the cursor
-
-      if(iPageHeight > 0)
-      {
-        while(pThis->rctView.top > pThis->iRow)
-        {
-          pThis->rctView.top -= iPageHeight;
-          pThis->rctView.bottom -= iPageHeight;
-        }
-
-        while(pThis->rctView.bottom <= pThis->iRow)
-        {
-          pThis->rctView.top += iPageHeight;
-          pThis->rctView.bottom += iPageHeight;
-        }
-      }
-#endif // 0
-
-      // scroll right/left so that I have one additional white space visible
+      // scroll down so that I have one additional white space visible
       if(pThis->rctView.top > pThis->iRow)
       {
         pThis->rctView.bottom -= (pThis->rctView.top - pThis->iRow);
@@ -3708,11 +3675,6 @@ TEXT_BUFFER *pBuf;
     {
       pThis->iCursorY += WBTextObjectCalculateLineHeight(pThis->iAsc, pThis->iDesc)
                        * (pThis->iRow - iOldRow);
-
-//                        (pThis->iAsc + pThis->iDesc
-//                         + pThis->iDesc > MIN_LINE_SPACING * 2 ?
-//                           pThis->iDesc / 2 : MIN_LINE_SPACING)
-//                       * (pThis->iRow - iOldRow);
 
       __internal_invalidate_cursor(pThis, 1); // invalidate the NEW cursor rectangle
     }
@@ -3778,28 +3740,6 @@ TEXT_BUFFER *pBuf;
       if(pThis->rctView.right <= pThis->iCol ||
          pThis->rctView.left > pThis->iCol)
       {
-#if 0 /* this method works better with page right/left and not arrow */
-        int iAutoScrollWidth = AUTO_HSCROLL_SIZE;
-
-        while(iAutoScrollWidth > 1 && iAutoScrollWidth >= pThis->rctView.right - pThis->rctView.left)
-        {
-          iAutoScrollWidth >>= 1;
-        }
-
-        // scroll left/right to expose the cursor
-
-        while(pThis->rctView.left > pThis->iCol)
-        {
-          pThis->rctView.left -= iAutoScrollWidth;
-          pThis->rctView.right -= iAutoScrollWidth;
-        }
-        while(pThis->rctView.right <= pThis->iCol)
-        {
-          pThis->rctView.left += iAutoScrollWidth;
-          pThis->rctView.right += iAutoScrollWidth;
-        }
-#endif // 0
-
         // scroll right/left so that I have one additional white space visible
         if(pThis->rctView.left > pThis->iCol)
         {
@@ -3812,6 +3752,8 @@ TEXT_BUFFER *pBuf;
           pThis->rctView.right = pThis->iCol + 1;
         }
 
+        WB_WARN_PRINT("WARNING:  %s line %d - invalidate entire window rect\n", __FUNCTION__, __LINE__);
+
         __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
       }
       else // re-calculate cursor metrics
@@ -3823,6 +3765,8 @@ TEXT_BUFFER *pBuf;
     }
     else
     {
+      WB_WARN_PRINT("WARNING:  %s line %d - invalidate entire window rect\n", __FUNCTION__, __LINE__);
+
       __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here (confusion point)
     }
   }
@@ -3917,28 +3861,6 @@ TEXT_BUFFER *pBuf;
       if(pThis->rctView.right <= pThis->iCol ||
          pThis->rctView.left > pThis->iCol)
       {
-#if 0 /* this method works better with page right/left and not arrow */
-        int iAutoScrollWidth = AUTO_HSCROLL_SIZE;
-
-        while(iAutoScrollWidth > 1 && iAutoScrollWidth >= pThis->rctView.right - pThis->rctView.left)
-        {
-          iAutoScrollWidth >>= 1;
-        }
-
-        // scroll left/right to expose the cursor
-
-        while(pThis->rctView.left > pThis->iCol)
-        {
-          pThis->rctView.left -= iAutoScrollWidth;
-          pThis->rctView.right -= iAutoScrollWidth;
-        }
-        while(pThis->rctView.right <= pThis->iCol)
-        {
-          pThis->rctView.left += iAutoScrollWidth;
-          pThis->rctView.right += iAutoScrollWidth;
-        }
-#endif // 0
-
         // scroll right/left so that I have one additional white space visible
         if(pThis->rctView.left > pThis->iCol)
         {
@@ -3951,6 +3873,8 @@ TEXT_BUFFER *pBuf;
           pThis->rctView.right = pThis->iCol + 1;
         }
 
+        WB_WARN_PRINT("WARNING:  %s line %d - invalidate entire window rect\n", __FUNCTION__, __LINE__);
+
         __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
       }
       else // re-calculate cursor metrics
@@ -3962,34 +3886,214 @@ TEXT_BUFFER *pBuf;
     }
     else
     {
+      WB_WARN_PRINT("WARNING:  %s line %d - invalidate entire window rect\n", __FUNCTION__, __LINE__);
+
       __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here (confusion point)
     }
   }
 }
 static void __internal_page_up(struct _text_object_ *pThis)
 {
+TEXT_BUFFER *pBuf;
+
   if(!WBIsValidTextObject(pThis))
   {
     WB_ERROR_PRINT("ERROR:  %p - invalid text object %p\n", __FUNCTION__, pThis);
   }
   else
   {
+    int iOldRow = pThis->iRow;
+    int iPageHeight = pThis->rctView.bottom - pThis->rctView.top;
+
     pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
 
+    if(pThis->iLineFeed == LineFeed_NONE) // single line
+    {
+      return; // do nothing
+    }
+
+    __internal_invalidate_cursor(pThis, 0); // invalidate current cursor rectangle
+
+    pBuf = (TEXT_BUFFER *)(pThis->pText);
+
+    if(!pBuf)
+    {
+      pThis->iRow = 0;
+      pThis->iCol = 0;
+    }
+    else if(pThis->iRow <= iPageHeight)
+    {
+      if(pThis->iRow <= 0) // check for negatives anyway
+      {
+        pThis->iCol = 0; // page-up on top line homes the cursor
+      }
+
+      pThis->iRow = 0;
+    }
+    else
+    {
+      pThis->iRow -= iPageHeight;
+    }
+
+    if(pThis->iDragState & DragState_CURSOR)
+    {
+      if(SEL_RECT_EMPTY(pThis))
+      {
+        pThis->rctSel.left = pThis->iCol;
+        pThis->rctSel.top = iOldRow;
+      }
+
+      pThis->rctSel.right = pThis->iCol;
+      pThis->rctSel.bottom = pThis->iRow;
+    }
+    else
+    {
+      // clear the selection if there is one
+      if(!SEL_RECT_EMPTY(pThis))
+      {
+        __internal_invalidate_rect(pThis, &(pThis->rctHighLight), 0); // invalidate the highlight rectangle
+        memset(&(pThis->rctSel), 0, sizeof(pThis->rctSel));
+        memset(&(pThis->rctHighLight), 0, sizeof(pThis->rctHighLight));
+      }
+    }
+
+    if(WB_LIKELY(pThis->rctView.top > pThis->iRow ||
+                 pThis->rctView.bottom <= pThis->iRow))
+    {
+      int iDelta = iOldRow - pThis->iRow;
+
+      if((pThis->rctView.top - iDelta) > 0)
+      {
+        pThis->rctView.top -= iDelta;
+        pThis->rctView.bottom -= iDelta;
+      }
+      else
+      {
+        pThis->rctView.bottom -= pThis->rctView.top;
+        pThis->rctView.top = 0;
+      }
+
+      if(pThis->rctView.top > pThis->iRow) // still?
+      {
+        iDelta = pThis->rctView.top - pThis->iRow;
+
+        pThis->rctView.bottom -= iDelta;
+        pThis->rctView.top = pThis->iRow;
+      }
+      else if(pThis->rctView.bottom <= pThis->iRow) // still?
+      {
+        iDelta = (pThis->iRow + 1) - pThis->rctView.bottom;
+
+        pThis->rctView.top += iDelta;
+        pThis->rctView.bottom = pThis->iRow + 1;
+      }
+    }
+
+    // in this case, since I updated the position by an entire page, the entire window is probably invalid
 
     __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
   }
+
 }
 static void __internal_page_down(struct _text_object_ *pThis)
 {
+TEXT_BUFFER *pBuf;
+
   if(!WBIsValidTextObject(pThis))
   {
     WB_ERROR_PRINT("ERROR:  %p - invalid text object %p\n", __FUNCTION__, pThis);
   }
   else
   {
+    int iOldRow = pThis->iRow;
+    int iPageHeight = pThis->rctView.bottom - pThis->rctView.top;
+
     pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
 
+    if(pThis->iLineFeed == LineFeed_NONE) // single line
+    {
+      return; // do nothing
+    }
+
+    __internal_invalidate_cursor(pThis, 0); // invalidate current cursor rectangle
+
+    pBuf = (TEXT_BUFFER *)(pThis->pText);
+
+    if(!pBuf)
+    {
+      pThis->iRow = 0;
+      pThis->iCol = 0;
+    }
+    else if((int)pThis->iRow >= ((int)pBuf->nEntries - iPageHeight))
+    {
+      if(pThis->iRow >= 0) // check for negatives anyway
+      {
+        pThis->iCol = 0; // page-up on top line homes the cursor
+      }
+
+      pThis->iRow = pBuf->nEntries;
+    }
+    else
+    {
+      pThis->iRow += iPageHeight;
+    }
+
+    if(pThis->iDragState & DragState_CURSOR)
+    {
+      if(SEL_RECT_EMPTY(pThis))
+      {
+        pThis->rctSel.left = pThis->iCol;
+        pThis->rctSel.top = iOldRow;
+      }
+
+      pThis->rctSel.right = pThis->iCol;
+      pThis->rctSel.bottom = pThis->iRow;
+    }
+    else
+    {
+      // clear the selection if there is one
+      if(!SEL_RECT_EMPTY(pThis))
+      {
+        __internal_invalidate_rect(pThis, &(pThis->rctHighLight), 0); // invalidate the highlight rectangle
+        memset(&(pThis->rctSel), 0, sizeof(pThis->rctSel));
+        memset(&(pThis->rctHighLight), 0, sizeof(pThis->rctHighLight));
+      }
+    }
+
+    if(WB_LIKELY(pThis->rctView.top > pThis->iRow ||
+                 pThis->rctView.bottom <= pThis->iRow))
+    {
+      int iDelta = pThis->iRow - iOldRow;
+
+      if(!pBuf || (pThis->rctView.bottom + iDelta) <= pBuf->nEntries)
+      {
+        pThis->rctView.top += iDelta;
+        pThis->rctView.bottom += iDelta;
+      }
+      else
+      {
+        pThis->rctView.top = pBuf->nEntries + 1
+                           - (pThis->rctView.bottom - pThis->rctView.top);
+        pThis->rctView.bottom = pBuf->nEntries + 1;
+      }
+
+      if(pThis->rctView.top > pThis->iRow) // still?
+      {
+        iDelta = pThis->rctView.top - pThis->iRow;
+
+        pThis->rctView.bottom -= iDelta;
+        pThis->rctView.top = pThis->iRow;
+      }
+      else if(pThis->rctView.bottom <= pThis->iRow) // still?
+      {
+        iDelta = (pThis->iRow + 1) - pThis->rctView.bottom;
+
+        pThis->rctView.top += iDelta;
+        pThis->rctView.bottom = pThis->iRow + 1;
+      }
+    }
+
+    // in this case, since I updated the position by an entire page, the entire window is probably invalid
 
     __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
   }
@@ -4004,6 +4108,7 @@ static void __internal_page_left(struct _text_object_ *pThis)
   {
     pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
 
+    // in this case, since I updated the position by an entire page, the entire window is probably invalid
 
     __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
   }
@@ -4018,6 +4123,7 @@ static void __internal_page_right(struct _text_object_ *pThis)
   {
     pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
 
+    // in this case, since I updated the position by an entire page, the entire window is probably invalid
 
     __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
   }
@@ -4096,25 +4202,18 @@ TEXT_BUFFER *pBuf;
       if(pThis->rctView.right <= pThis->iCol ||
          pThis->rctView.left > pThis->iCol)
       {
-        int iAutoScrollWidth = AUTO_HSCROLL_SIZE;
-
-        while(iAutoScrollWidth > 1 && iAutoScrollWidth >= pThis->rctView.right - pThis->rctView.left)
+        if(pThis->rctView.left > pThis->iCol)
         {
-          iAutoScrollWidth >>= 1;
+          pThis->rctView.right -= (pThis->rctView.left - pThis->iCol);
+          pThis->rctView.left = pThis->iCol;
+        }
+        else if(pThis->rctView.right <= pThis->iCol)
+        {
+          pThis->rctView.left += pThis->iCol + 1 - pThis->rctView.right;
+          pThis->rctView.right = pThis->iCol + 1;
         }
 
-        // scroll left/right to expose the cursor
-
-        while(pThis->rctView.left > pThis->iCol)
-        {
-          pThis->rctView.left -= iAutoScrollWidth;
-          pThis->rctView.right -= iAutoScrollWidth;
-        }
-        while(pThis->rctView.right <= pThis->iCol)
-        {
-          pThis->rctView.left += iAutoScrollWidth;
-          pThis->rctView.right += iAutoScrollWidth;
-        }
+        WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
 
         __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
       }
@@ -4127,6 +4226,8 @@ TEXT_BUFFER *pBuf;
     }
     else
     {
+      WB_WARN_PRINT("WARNING:  %s line %d - invalidate entire window rect\n", __FUNCTION__, __LINE__);
+
       __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here (confusion point)
     }
   }
@@ -4197,25 +4298,18 @@ TEXT_BUFFER *pBuf;
       if(pThis->rctView.right <= pThis->iCol ||
          pThis->rctView.left > pThis->iCol)
       {
-        int iAutoScrollWidth = AUTO_HSCROLL_SIZE;
-
-        while(iAutoScrollWidth > 1 && iAutoScrollWidth >= pThis->rctView.right - pThis->rctView.left)
+        if(pThis->rctView.left > pThis->iCol)
         {
-          iAutoScrollWidth >>= 1;
+          pThis->rctView.right -= (pThis->rctView.left - pThis->iCol);
+          pThis->rctView.left = pThis->iCol;
+        }
+        else if(pThis->rctView.right <= pThis->iCol)
+        {
+          pThis->rctView.left += pThis->iCol + 1 - pThis->rctView.right;
+          pThis->rctView.right = pThis->iCol + 1;
         }
 
-        // scroll left/right to expose the cursor
-
-        while(pThis->rctView.left > pThis->iCol)
-        {
-          pThis->rctView.left -= iAutoScrollWidth;
-          pThis->rctView.right -= iAutoScrollWidth;
-        }
-        while(pThis->rctView.right <= pThis->iCol)
-        {
-          pThis->rctView.left += iAutoScrollWidth;
-          pThis->rctView.right += iAutoScrollWidth;
-        }
+        WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
 
         __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
       }
@@ -4228,6 +4322,8 @@ TEXT_BUFFER *pBuf;
     }
     else
     {
+      WB_WARN_PRINT("WARNING:  %s line %d - invalidate entire window rect\n", __FUNCTION__, __LINE__);
+
       __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here (confusion point)
     }
   }
@@ -4235,7 +4331,8 @@ TEXT_BUFFER *pBuf;
 
 static void __internal_cursor_top(struct _text_object_ *pThis)
 {
-int iPageHeight;
+TEXT_BUFFER *pBuf;
+
 
   if(!WBIsValidTextObject(pThis))
   {
@@ -4244,13 +4341,14 @@ int iPageHeight;
   else
   {
     int iOldRow = pThis->iRow;
+    int iPageHeight = pThis->rctView.bottom - pThis->rctView.top;
 
     pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
 
     pThis->iRow = 0;
     pThis->iCol = 0;
 
-    iPageHeight = pThis->rctView.bottom - pThis->rctView.top - 1;
+    pBuf = (TEXT_BUFFER *)(pThis->pText);
 
     if(pThis->iDragState & DragState_CURSOR)
     {
@@ -4274,29 +4372,20 @@ int iPageHeight;
       }
     }
 
-    // scroll up/down to expose the cursor
+    // force scroll to top
+    pThis->rctView.top = 0;
+    pThis->rctView.bottom = iPageHeight;
 
-    if(iPageHeight > 0)
-    {
-      while(pThis->rctView.top > pThis->iRow)
-      {
-        pThis->rctView.top -= iPageHeight;
-        pThis->rctView.bottom -= iPageHeight;
-      }
+    WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
 
-      while(pThis->rctView.bottom <= pThis->iRow)
-      {
-        pThis->rctView.top += iPageHeight;
-        pThis->rctView.bottom += iPageHeight;
-      }
-    }
+    __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
   }
 }
 
 static void __internal_cursor_bottom(struct _text_object_ *pThis)
 {
 TEXT_BUFFER *pBuf;
-int iPageHeight;
+
 
   if(!WBIsValidTextObject(pThis))
   {
@@ -4305,6 +4394,7 @@ int iPageHeight;
   else
   {
     int iOldRow = pThis->iRow;
+    int iPageHeight = pThis->rctView.bottom - pThis->rctView.top;
 
     pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
 
@@ -4343,24 +4433,21 @@ int iPageHeight;
       }
     }
 
-    iPageHeight = pThis->rctView.bottom - pThis->rctView.top - 1;
-
-    // scroll up/down to expose the cursor
-
-    if(iPageHeight > 0)
+    // force scroll to bottom (with an extra line)
+    if(!pBuf || iPageHeight > pBuf->nEntries)
     {
-      while(pThis->rctView.top > pThis->iRow)
-      {
-        pThis->rctView.top -= iPageHeight;
-        pThis->rctView.bottom -= iPageHeight;
-      }
-
-      while(pThis->rctView.bottom <= pThis->iRow)
-      {
-        pThis->rctView.top += iPageHeight;
-        pThis->rctView.bottom += iPageHeight;
-      }
+      pThis->rctView.top = 0;
+      pThis->rctView.bottom = iPageHeight;
     }
+    else
+    {
+      pThis->rctView.top = pBuf->nEntries + 1 - iPageHeight;
+      pThis->rctView.bottom = pBuf->nEntries + 1;
+    }
+
+    WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+
+    __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
   }
 }
 
@@ -4421,6 +4508,10 @@ TEXT_BUFFER *pBuf;
         pThis->rctView.top += nRows;
       }
     }
+
+    WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+
+    __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
   }
 }
 
@@ -4533,6 +4624,10 @@ TEXT_BUFFER *pBuf;
         }
       }
     }
+
+    WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+
+    __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
   }
 }
 

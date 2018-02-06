@@ -1386,7 +1386,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-end
   {
     pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->cursor_home(&(pE->xTextObject));
+    pE->xTextObject.vtable->cursor_end(&(pE->xTextObject));
   }
   else if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_SHIFT | WB_KEYEVENT_CTRL)) // ctrl-shift-end
   {
@@ -1428,12 +1428,19 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-  if(iACS) // not handling ctrl, shift, or alt with 'enter'.  yet.
+  if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-end
+  {
+    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
+    pE->xTextObject.vtable->page_up(&(pE->xTextObject));
+  }
+  else if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl or alt.  yet.
   {
     XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
   }
   else
   {
+//    WB_ERROR_PRINT("TEMPORARY:  %s - WBChildFrame calling 'page_up'\n", __FUNCTION__);
+
     pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
     pE->xTextObject.vtable->page_up(&(pE->xTextObject));
   }
@@ -1455,12 +1462,19 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-  if(iACS) // not handling ctrl, shift, or alt with 'enter'.  yet.
+  if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-end
+  {
+    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
+    pE->xTextObject.vtable->page_down(&(pE->xTextObject));
+  }
+  else if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl or alt.  yet.
   {
     XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
   }
   else
   {
+//    WB_ERROR_PRINT("TEMPORARY:  %s - WBChildFrame calling 'page_down'\n", __FUNCTION__);
+
     pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
     pE->xTextObject.vtable->page_down(&(pE->xTextObject));
   }
