@@ -1428,7 +1428,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-  if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-end
+  if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-pgup
   {
     pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
     pE->xTextObject.vtable->page_up(&(pE->xTextObject));
@@ -1462,7 +1462,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-  if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-end
+  if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-pgdown
   {
     pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
     pE->xTextObject.vtable->page_down(&(pE->xTextObject));
@@ -1496,11 +1496,16 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-//  if(iACS) // not handling ctrl, shift, or alt with 'enter'.  yet.
-//  {
-//    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
-//  }
-//  else
+  if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_SHIFT | WB_KEYEVENT_CTRL)) // ctrl-shift-pgup
+  {
+    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
+    pE->xTextObject.vtable->page_left(&(pE->xTextObject));
+  }
+  else if((iACS & WB_KEYEVENT_ACSMASK) != WB_KEYEVENT_CTRL) // not handling alt with 'pgup'.  yet.
+  {
+    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+  }
+  else // CTRL-pgup
   {
     pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
     pE->xTextObject.vtable->page_left(&(pE->xTextObject));
@@ -1523,11 +1528,16 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-//  if(iACS) // not handling ctrl, shift, or alt with 'enter'.  yet.
-//  {
-//    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
-//  }
-//  else
+  if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_SHIFT | WB_KEYEVENT_CTRL)) // ctrl-shift-pgdn
+  {
+    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
+    pE->xTextObject.vtable->page_right(&(pE->xTextObject));
+  }
+  else if((iACS & WB_KEYEVENT_ACSMASK) != WB_KEYEVENT_CTRL) // not handling alt with 'pgup'.  yet.
+  {
+    XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
+  }
+  else
   {
     pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
     pE->xTextObject.vtable->page_right(&(pE->xTextObject));

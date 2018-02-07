@@ -102,6 +102,11 @@ struct __internal_undo_redo_buffer
                                { int i1 = (X).left; (X).left = (X).right; (X).right = i1; i1 = (X).top; (X).top = (X).bottom; (X).bottom = i1; }}
 
 
+#define CURSOR_BLINK_RESET 0 /* shows blinking cursor for max time */
+#define CURSOR_BLINK_PERIOD 3
+#define CURSOR_BLINK_OFF (CURSOR_BLINK_PERIOD - 1)
+
+
 // *************************
 // LOCAL FUNCTION PROTOTYPES
 // *************************
@@ -171,6 +176,9 @@ static void __internal_do_expose(struct _text_object_ *pThis, Display *pDisplay,
                                  GC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
                                  XFontSet rFontSet);
 static void __internal_cursor_blink(struct _text_object_ *pThis, int bHasFocus);
+static int __internal_cursor_show(int iBlinkState);
+
+
 
 // *********************************
 // LOCALLY DEFINED GLOBAL STRUCTURES
@@ -839,7 +847,7 @@ struct __internal_undo_redo_buffer *pUndo, *pTU, *pTU2;
     return;
   }
 
-  pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+  pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
   cbLen = cbLen2 = 0;
 
@@ -1837,7 +1845,7 @@ static void __internal_set_insmode(struct _text_object_ *pThis, int iInsMode)
   {
     pThis->iInsMode = iInsMode;
 
-    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+    pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     __internal_invalidate_cursor(pThis, 1);  // invalidate the cursor immediately
   }
@@ -2014,9 +2022,12 @@ static void __internal_set_col(struct _text_object_ *pThis, int iCol)
 {
 int iAutoScrollWidth = AUTO_HSCROLL_SIZE;
 
+
   if(WBIsValidTextObject(pThis))
   {
     pThis->iCol = iCol; // for now, assign "as-is"
+
+    // auto-scroll viewport for single-line only
 
     if(pThis->iLineFeed == LineFeed_NONE && // single-line, do auto-scrolling
        pThis->rctView.right > pThis->rctView.left) // in case the view area is empty
@@ -2052,7 +2063,7 @@ WB_RECT rctSel;
   if(WBIsValidTextObject(pThis))
   {
     __internal_invalidate_cursor(pThis, 0);
-    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+    pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     iSelAll = SEL_RECT_ALL(pThis); // identifies "select all"
 
@@ -2429,7 +2440,7 @@ WB_RECT rctInvalid;
   }
 
   __internal_invalidate_cursor(pThis, 0);
-  pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+  pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
   if(nChar > 0 || (pThis->iCol == 0 && pThis->iLineFeed == LineFeed_NONE))
   {
@@ -2809,7 +2820,7 @@ WB_RECT rctInvalid;
     }
 
     __internal_invalidate_cursor(pThis, 0);
-    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+    pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     __internal_calc_rect(pThis, &rctInvalid, pThis->iRow, pThis->iCol, pThis->iRow, -1); // always refresh entire line from 'iCol' forward
 
@@ -3511,7 +3522,7 @@ TEXT_BUFFER *pBuf;
   {
     int iOldRow = pThis->iRow;
 
-    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+    pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     if(pThis->iLineFeed == LineFeed_NONE) // single line
     {
@@ -3604,7 +3615,7 @@ TEXT_BUFFER *pBuf;
   {
     int iOldRow = pThis->iRow;
 
-    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+    pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     if(pThis->iLineFeed == LineFeed_NONE) // single line
     {
@@ -3693,7 +3704,7 @@ TEXT_BUFFER *pBuf;
   {
     int iOldCol = pThis->iCol;
 
-    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+    pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     __internal_invalidate_cursor(pThis, 0); // invalidate current cursor rectangle
 
@@ -3784,7 +3795,7 @@ TEXT_BUFFER *pBuf;
   {
     int iOldCol = pThis->iCol;
 
-    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+    pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     __internal_invalidate_cursor(pThis, 0); // invalidate current cursor rectangle
 
@@ -3905,7 +3916,7 @@ TEXT_BUFFER *pBuf;
     int iOldRow = pThis->iRow;
     int iPageHeight = pThis->rctView.bottom - pThis->rctView.top;
 
-    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+    pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     if(pThis->iLineFeed == LineFeed_NONE) // single line
     {
@@ -4008,7 +4019,7 @@ TEXT_BUFFER *pBuf;
     int iOldRow = pThis->iRow;
     int iPageHeight = pThis->rctView.bottom - pThis->rctView.top;
 
-    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+    pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     if(pThis->iLineFeed == LineFeed_NONE) // single line
     {
@@ -4100,13 +4111,98 @@ TEXT_BUFFER *pBuf;
 }
 static void __internal_page_left(struct _text_object_ *pThis)
 {
+int iAutoScrollWidth = AUTO_HSCROLL_SIZE;
+TEXT_BUFFER *pBuf;
+
+
   if(!WBIsValidTextObject(pThis))
   {
     WB_ERROR_PRINT("ERROR:  %p - invalid text object %p\n", __FUNCTION__, pThis);
   }
+//  else if(pThis->iLineFeed == LineFeed_NONE) // single line
+//  {
+//    __internal_cursor_left(pThis); // for now, just do this
+//
+//    return;
+//  }
   else
   {
-    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+    int iOldCol = pThis->iCol;
+    int iPageWidth = pThis->rctView.right - pThis->rctView.left;
+
+    pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
+
+    __internal_invalidate_cursor(pThis, 0); // invalidate current cursor rectangle
+
+    pBuf = (TEXT_BUFFER *)(pThis->pText);
+
+    if(!pBuf)
+    {
+      pThis->iRow = 0;
+      pThis->iCol = 0;
+    }
+    else if(pThis->iCol > iPageWidth)
+    {
+      pThis->iCol -= iPageWidth;
+    }
+    else
+    {
+      pThis->iCol = 0;
+    }
+
+    if(pThis->iDragState & DragState_CURSOR)
+    {
+      if(SEL_RECT_EMPTY(pThis))
+      {
+        pThis->rctSel.left = iOldCol;
+        pThis->rctSel.top = pThis->iRow;
+      }
+
+      pThis->rctSel.right = pThis->iCol;
+      pThis->rctSel.bottom = pThis->iRow;
+    }
+    else
+    {
+      // clear the selection if there is one
+      if(!SEL_RECT_EMPTY(pThis))
+      {
+        __internal_invalidate_rect(pThis, &(pThis->rctHighLight), 0); // invalidate the highlight rectangle
+        memset(&(pThis->rctSel), 0, sizeof(pThis->rctSel));
+        memset(&(pThis->rctHighLight), 0, sizeof(pThis->rctHighLight));
+      }
+    }
+
+    if(WB_LIKELY(pThis->rctView.left > pThis->iCol ||
+                 pThis->rctView.right <= pThis->iCol))
+    {
+      int iDelta = pThis->iCol - iOldCol;
+
+      if(pThis->rctView.left > iDelta)
+      {
+        pThis->rctView.left -= iDelta;
+        pThis->rctView.right -= iDelta;
+      }
+      else
+      {
+        pThis->rctView.right = iPageWidth;
+        pThis->rctView.left = 0;
+      }
+
+      if(pThis->rctView.left > pThis->iCol) // still?
+      {
+        iDelta = pThis->rctView.left - pThis->iCol;
+
+        pThis->rctView.right -= iDelta;
+        pThis->rctView.left = pThis->iCol;
+      }
+      else if(pThis->rctView.right <= pThis->iCol) // still?
+      {
+        iDelta = (pThis->iCol + 1) - pThis->rctView.right;
+
+        pThis->rctView.left += iDelta;
+        pThis->rctView.right = pThis->iCol + 1;
+      }
+    }
 
     // in this case, since I updated the position by an entire page, the entire window is probably invalid
 
@@ -4115,13 +4211,88 @@ static void __internal_page_left(struct _text_object_ *pThis)
 }
 static void __internal_page_right(struct _text_object_ *pThis)
 {
+TEXT_BUFFER *pBuf;
+
+
   if(!WBIsValidTextObject(pThis))
   {
     WB_ERROR_PRINT("ERROR:  %p - invalid text object %p\n", __FUNCTION__, pThis);
   }
   else
   {
-    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+    int iOldCol = pThis->iCol;
+    int iPageWidth = pThis->rctView.right - pThis->rctView.left;
+
+    pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
+
+    __internal_invalidate_cursor(pThis, 0); // invalidate current cursor rectangle
+
+    pBuf = (TEXT_BUFFER *)(pThis->pText);
+
+    if(!pBuf)
+    {
+      pThis->iRow = 0;
+      pThis->iCol = 0;
+    }
+    else if(pThis->iCol < (INT_MAX - iPageWidth))
+    {
+      pThis->iCol += iPageWidth;
+
+      if(pThis->iCol < 0) // in case of wrap/overflow?
+      {
+        pThis->iCol = 0;
+      }
+    }
+    else
+    {
+      pThis->iCol = INT_MAX; // can't scroll any more
+    }
+
+    if(pThis->iDragState & DragState_CURSOR)
+    {
+      if(SEL_RECT_EMPTY(pThis))
+      {
+        pThis->rctSel.left = iOldCol;
+        pThis->rctSel.top = pThis->iRow;
+      }
+
+      pThis->rctSel.right = pThis->iCol;
+      pThis->rctSel.bottom = pThis->iRow;
+    }
+    else
+    {
+      // clear the selection if there is one
+      if(!SEL_RECT_EMPTY(pThis))
+      {
+        __internal_invalidate_rect(pThis, &(pThis->rctHighLight), 0); // invalidate the highlight rectangle
+        memset(&(pThis->rctSel), 0, sizeof(pThis->rctSel));
+        memset(&(pThis->rctHighLight), 0, sizeof(pThis->rctHighLight));
+      }
+    }
+
+    if(WB_LIKELY(pThis->rctView.left > pThis->iCol ||
+                 pThis->rctView.right <= pThis->iCol))
+    {
+      int iDelta = pThis->iCol - iOldCol;
+
+      pThis->rctView.left += iDelta; // TODO:  scroll forever? (maybe MAX_INT as a limit)
+      pThis->rctView.right += iDelta;
+
+      if(pThis->rctView.left > pThis->iCol) // still?
+      {
+        iDelta = pThis->rctView.left - pThis->iCol;
+
+        pThis->rctView.right -= iDelta;
+        pThis->rctView.left = pThis->iCol;
+      }
+      else if(pThis->rctView.right <= pThis->iCol) // still?
+      {
+        iDelta = (pThis->iCol + 1) - pThis->rctView.right;
+
+        pThis->rctView.left += iDelta;
+        pThis->rctView.right = pThis->iCol + 1;
+      }
+    }
 
     // in this case, since I updated the position by an entire page, the entire window is probably invalid
 
@@ -4143,7 +4314,7 @@ TEXT_BUFFER *pBuf;
   {
     int iOldCol = pThis->iCol;
 
-    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+    pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     __internal_invalidate_cursor(pThis, 0); // invalidate current cursor rectangle
 
@@ -4247,7 +4418,7 @@ TEXT_BUFFER *pBuf;
   {
     int iOldCol = pThis->iCol;
 
-    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+    pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     __internal_invalidate_cursor(pThis, 0); // invalidate current cursor rectangle
 
@@ -4343,7 +4514,7 @@ TEXT_BUFFER *pBuf;
     int iOldRow = pThis->iRow;
     int iPageHeight = pThis->rctView.bottom - pThis->rctView.top;
 
-    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+    pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     pThis->iRow = 0;
     pThis->iCol = 0;
@@ -4396,7 +4567,7 @@ TEXT_BUFFER *pBuf;
     int iOldRow = pThis->iRow;
     int iPageHeight = pThis->rctView.bottom - pThis->rctView.top;
 
-    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+    pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     pBuf = (TEXT_BUFFER *)(pThis->pText);
 
@@ -4463,7 +4634,7 @@ TEXT_BUFFER *pBuf;
   {
     int iOldRow WB_UNUSED = pThis->iRow; // TODO:  do I still need this assignment?  For now, mark 'unused' and leave for reference
 
-    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+    pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     if(!nRows)
     {
@@ -4527,7 +4698,7 @@ TEXT_BUFFER *pBuf;
   {
     int iOldRow WB_UNUSED = pThis->iRow; // TODO:  do I still need this assignment?  For now, mark 'unused' and leave for reference
 
-    pThis->iBlinkState = 0; // this affects the cursor blink, basically resetting it whenever I edit something
+    pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     if(!nCols)
     {
@@ -5183,7 +5354,7 @@ int iAutoScrollWidth, iWindowHeightInLines;
         }
 
 
-        if(pThis->iBlinkState != 0) // horizontal cursor for overwrite
+        if(__internal_cursor_show(pThis->iBlinkState)) // do I draw the horizontal cursor for overwrite?
         {
           if(WBRectOverlapped(rctCursor, pThis->rctHighLight))
           {
@@ -5410,7 +5581,7 @@ int iAutoScrollWidth, iWindowHeightInLines;
               rctCursor.bottom = iY1 - iYDelta;
             }
 
-            if(pThis->iBlinkState != 0)
+            if(__internal_cursor_show(pThis->iBlinkState)) // do I draw the cursor?
             {
               XDrawLine(pDisplay, pxTemp != None ? pxTemp : wID,
                         gc2 != None ? gc2 : gc,
@@ -5552,26 +5723,32 @@ the_end:
   }
 }
 
+static int __internal_cursor_show(int iBlinkState) // determines if blink state shows the cursor
+{
+  return iBlinkState != CURSOR_BLINK_OFF ? 1 : 0;
+}
+
 static void __internal_cursor_blink(struct _text_object_ *pThis, int bHasFocus)
 {
   if(WBIsValidTextObject(pThis))
   {
-//    WB_RECT rctCursor;
+    int bShow = __internal_cursor_show(pThis->iBlinkState);
 
     if(!bHasFocus)
     {
-      if(pThis->iBlinkState)
+      if(pThis->iBlinkState != CURSOR_BLINK_OFF)
       {
-        pThis->iBlinkState = 0; // no cursor
+        pThis->iBlinkState = CURSOR_BLINK_OFF; // no cursor
 
         __internal_invalidate_cursor(pThis, 1);
       }
     }
     else
     {
-      pThis->iBlinkState = (pThis->iBlinkState + 1) % 3;
+      pThis->iBlinkState = (pThis->iBlinkState + 1) % CURSOR_BLINK_PERIOD;
 
-      __internal_invalidate_cursor(pThis, pThis->iBlinkState == 0 || pThis->iBlinkState == 1);
+      __internal_invalidate_cursor(pThis, bShow != __internal_cursor_show(pThis->iBlinkState));
+        //pThis->iBlinkState == 0 || pThis->iBlinkState == 1);
     }
   }
 }
