@@ -99,7 +99,8 @@ struct __internal_undo_redo_buffer
 #define SEL_RECT_ALL(X) ((X)->rctSel.left < 0)
 #define SEL_RECT_EMPTY(X) (!SEL_RECT_ALL(X) && ((X)->rctSel.left == (X)->rctSel.right && (X)->rctSel.bottom == (X)->rctSel.top))
 #define NORMALIZE_SEL_RECT(X) {if((X).top > (X).bottom || ((X).top == (X).bottom && (X).left > (X).right)) \
-                               { int i1 = (X).left; (X).left = (X).right; (X).right = i1; i1 = (X).top; (X).top = (X).bottom; (X).bottom = i1; }}
+                               { int i1 = (X).left; (X).left = (X).right; (X).right = i1; \
+                                 i1 = (X).top; (X).top = (X).bottom; (X).bottom = i1; }}
 
 
 #define CURSOR_BLINK_RESET 0 /* shows blinking cursor for max time */
@@ -148,7 +149,7 @@ static void __internal_undo(struct _text_object_ *pThis);
 static int __internal_can_redo(struct _text_object_ *pThis);
 static void __internal_redo(struct _text_object_ *pThis);
 static void __internal_get_view(const struct _text_object_ *pThis, WB_RECT *pRct);
-static void __internal_set_view(struct _text_object_ *pThis, const WB_RECT *pRct);
+static void __internal_set_view_origin(struct _text_object_ *pThis, const WB_POINT *pOrig);
 static void __internal_begin_highlight(struct _text_object_ *pThis);
 static void __internal_end_highlight(struct _text_object_ *pThis);
 
@@ -178,6 +179,8 @@ static void __internal_do_expose(struct _text_object_ *pThis, Display *pDisplay,
 static void __internal_cursor_blink(struct _text_object_ *pThis, int bHasFocus);
 static int __internal_cursor_show(int iBlinkState);
 
+static void __internal_set_save_point(struct _text_object_ *pThis);
+static int __internal_get_modified(struct _text_object_ *pThis);
 
 
 // *********************************
@@ -223,7 +226,7 @@ const TEXT_OBJECT_VTABLE WBDefaultTextObjectVTable =
   __internal_can_redo,
   __internal_redo,
   __internal_get_view,
-  __internal_set_view,
+  __internal_set_view_origin,
   __internal_begin_highlight,
   __internal_end_highlight,
   __internal_mouse_click,
@@ -247,7 +250,11 @@ const TEXT_OBJECT_VTABLE WBDefaultTextObjectVTable =
   __internal_scroll_horizontal,
 
   __internal_do_expose,
-  __internal_cursor_blink
+  __internal_cursor_blink,
+
+  __internal_set_save_point,
+  __internal_get_modified
+
 };
 
 
@@ -362,7 +369,8 @@ int cbLen;
       p3 = p2 + cbLen; // the end of the string
       *p3 = 0; // always zero-byte terminate it first
 
-      while(p3 > p2 && (*(p3 - 1) <= ' ' || *(p3 - 1) == HARD_TAB_CHAR)) // trim ALL trailing white space including CR, LF, tab, space, FF, etc.
+      while(p3 > p2 && (*(p3 - 1) <= ' ' ||
+            *(p3 - 1) == HARD_TAB_CHAR)) // trim ALL trailing white space including CR, LF, tab, space, FF, etc.
       {
         // TODO:  handle <FF> or <VT> differently?
         // TODO:  leave white space to mark 'extent' of line?  naaw, probably not
@@ -462,6 +470,28 @@ int i1;
   WBFree(pBuf);
 }
 
+int WBTextBufferLineLength(TEXT_BUFFER *pBuf, unsigned long nLine)
+{
+int i1;
+
+  if(!pBuf || pBuf->nEntries <= nLine) // not enough lines in buffer?
+  {
+    return 0;
+  }
+
+  // TODO:  hashing, sorted, ?
+
+  for(i1=0; i1 < TEXT_BUFFER_LINE_CACHE_SIZE && pBuf->aLineCacheLen[i1]; i1++)
+  {
+    if(pBuf->aLineCache[i1] == nLine)
+    {
+      return pBuf->aLineCacheLen[i1];
+    }
+  }
+
+  return 0;
+}
+
 void WBTextBufferLineChange(TEXT_BUFFER *pBuf, unsigned long nLine, int nNewLen)
 {
 int i1, i2;
@@ -470,7 +500,11 @@ unsigned int nNewMax = 0, nNewMinMax = UINT_MAX;
 
   if(pBuf->nEntries <= 1) // zero or one lines?
   {
+//    WB_ERROR_PRINT("TEMPORARY:  %s %d - (single line) nLine=%ld, nNewLen = %d\n",
+//                   __FUNCTION__, __LINE__, nLine, nNewLen);
+
     WBTextBufferRefreshCache(pBuf); // always do it THIS way
+
     return;
   }
 
@@ -479,27 +513,34 @@ unsigned int nNewMax = 0, nNewMinMax = UINT_MAX;
     return; // sanity check failed (do nothing)
   }
 
+//  WB_ERROR_PRINT("TEMPORARY:  %s %d - nLine=%ld, nNewLen = %d\n",
+//                 __FUNCTION__, __LINE__, nLine, nNewLen);
+
   // update the line info in my cache.  If this line appears, remove it (always).
   // If I'm deleting the line, subtract one from every line higher than this one.
 
-  for(i1=0; i1 < TEXT_BUFFER_LINE_CACHE_SIZE && pBuf->aLineCacheLen[i1]; i1++)
+  i1 = 0;
+
+  while(i1 < TEXT_BUFFER_LINE_CACHE_SIZE && pBuf->aLineCacheLen[i1])
   {
     if(pBuf->aLineCache[i1] == nLine)
     {
-      // move everything up, remove the last entry, decrement i1
+      // move everything up, remove the last entry
       for(i2=i1 + 1; i2 < TEXT_BUFFER_LINE_CACHE_SIZE && pBuf->aLineCacheLen[i2]; i2++)
       {
-        pBuf->aLineCache[i2] = pBuf->aLineCache[i2 + 1];
-        pBuf->aLineCacheLen[i2] = pBuf->aLineCacheLen[i2 + 1];
-
-        // now by convention mark that last entry as if it's unused
-        pBuf->aLineCache[i2 + 1] = 0;
-        pBuf->aLineCacheLen[i2 + 1] = 0; // an 'end' marker (if the loop exits, it becomes the new 'end')
+        pBuf->aLineCache[i2 - 1] = pBuf->aLineCache[i2];
+        pBuf->aLineCacheLen[i2 - 1] = pBuf->aLineCacheLen[i2];
       }
 
-      i1--; // so I do the 'next' one as I should
+      // at this point 'i2 - 1' _was_ the last entry.  make sure it has zeros in it.
+      i2--;
+      if(i2 < TEXT_BUFFER_LINE_CACHE_SIZE)
+      {
+        pBuf->aLineCache[i2] = 0;
+        pBuf->aLineCacheLen[i2] = 0;
+      }
     }
-    else
+    else // if it's a line that follows this one, make sure I decrement the line number if I deleted it
     {
       if(pBuf->aLineCache[i1] > nLine)
       {
@@ -518,12 +559,15 @@ unsigned int nNewMax = 0, nNewMinMax = UINT_MAX;
       {
         nNewMinMax = pBuf->aLineCacheLen[i1]; // done this way as sanity check
       }
+
+      i1++;
     }
   }
 
   // if the cache is NOW empty, re-evaluate it.
   if(!pBuf->aLineCacheLen[0]) // empty
   {
+//    WB_ERROR_PRINT("TEMPORARY:  %s exit (d) after WBTextBufferRefreshCache()\n", __FUNCTION__);
     WBTextBufferRefreshCache(pBuf);
     return;
   }
@@ -546,14 +590,26 @@ unsigned int nNewMax = 0, nNewMinMax = UINT_MAX;
   {
     if(!nNewMax) // in case my cache has dwindled to nothing
     {
+//      WB_ERROR_PRINT("TEMPORARY:  %s exit (c) after WBTextBufferRefreshCache()\n", __FUNCTION__);
       WBTextBufferRefreshCache(pBuf); // time to re-evaluate
     }
+//    else
+//    {
+//      WB_ERROR_PRINT("TEMPORARY:  %s exit (c)\n", __FUNCTION__);
+//    }
 
     return; // I'm done for delete.  The rest is for updates
   }
 
   // see if the length exceeds any of the maximums, and do an 'insertion sort'
   // into my cache array if it does.  Otherwise I can just leave.
+
+  if(!nNewLen) // don't bother, it has a zero length
+  {
+//    WB_ERROR_PRINT("TEMPORARY:  %s exit (f)\n", __FUNCTION__);
+
+    return;  // I'm done - no need to re-insert this line into the cache (yet)
+  }
 
   if(nNewLen >= pBuf->nMaxCol) // bigger than maximum (or equal to it)
   {
@@ -581,11 +637,15 @@ unsigned int nNewMax = 0, nNewMinMax = UINT_MAX;
   }
   else
   {
+//    WB_ERROR_PRINT("TEMPORARY:  %s exit (a)\n", __FUNCTION__);
+
     return;  // I'm done - no need to re-insert this line into the cache (yet)
     // NOTE:  re-inserting the line into the cache would require re-doing the
     //        cache information from scratch.  this is an optimization, so I'll
     //        avoid THAT operation until it's truly necessary.
   }
+
+  // at this point, 'i2' is the insertion point for the line length info
 
   if(i2 < TEXT_BUFFER_LINE_CACHE_SIZE) // sanity check, might happen
   {
@@ -601,6 +661,8 @@ unsigned int nNewMax = 0, nNewMinMax = UINT_MAX;
   }
 
   // everything should be ok now, unless I b0rked something
+
+//  WB_ERROR_PRINT("TEMPORARY:  %s exit (b)\n", __FUNCTION__);
 }
 
 void WBTextBufferRefreshCache(TEXT_BUFFER *pBuf)
@@ -612,6 +674,8 @@ char *p1;
   {
     return;
   }
+
+//  WB_ERROR_PRINT("TEMPORARY:  %s\n", __FUNCTION__);
 
   // zero out the cache arrays
   memset(pBuf->aLineCache, 0, sizeof(pBuf->aLineCache));
@@ -716,7 +780,9 @@ char *p1;
         while(i3 < TEXT_BUFFER_LINE_CACHE_SIZE)
         {
           pBuf->aLineCache[i3] = 0; // do this to, just because
-          pBuf->aLineCacheLen[i3++] = 0;
+          pBuf->aLineCacheLen[i3] = 0;
+
+          i3++;
         }
 
         // and finally, insert this line's info at position 'i2'
@@ -726,6 +792,8 @@ char *p1;
       }
     }
   }
+
+//  WB_ERROR_PRINT("TEMPORARY:  %s exit point\n", __FUNCTION__);
 }
 
 // *********************************
@@ -1139,7 +1207,8 @@ int iOldSel, cbLen;
 // iCol is the starting column position
 // iEndRow is the ending row position.  In modes OTHER than 'box mode', this may equal 'iCol'
 // iEndCol is the ending column position.  In modes OTHER than 'box mode' this may be LESS than 'iCol'
-static char * __internal_get_selected_text(const struct _text_object_ *pThis, int iRow, int iCol, int iEndRow, int iEndCol)
+static char * __internal_get_selected_text(const struct _text_object_ *pThis,
+                                           int iRow, int iCol, int iEndRow, int iEndCol)
 {
 int i1, i2, i3, cb1, cbLF=0;
 char *p1, *pRval = NULL;
@@ -1467,7 +1536,8 @@ WB_RECT rctInvalid;
 
 // NOTE:  iStartRow and iStartCol may be 0 but not negative
 //        iEndRow and iEndCol can be negative to indicate "all"
-static void __internal_calc_rect(const struct _text_object_ *pThis, WB_RECT *pRect, int iStartRow, int iStartCol, int iEndRow, int iEndCol)
+static void __internal_calc_rect(const struct _text_object_ *pThis, WB_RECT *pRect,
+                                 int iStartRow, int iStartCol, int iEndRow, int iEndCol)
 {
 int iFontHeight;
 TEXT_BUFFER *pBuf;
@@ -1572,7 +1642,8 @@ TEXT_BUFFER *pBuf;
   }
 }
 
-static void __internal_merge_rect(const struct _text_object_ *pThis, WB_RECT *pRect, int iStartRow, int iStartCol, int iEndRow, int iEndCol)
+static void __internal_merge_rect(const struct _text_object_ *pThis, WB_RECT *pRect,
+                                  int iStartRow, int iStartCol, int iEndRow, int iEndCol)
 {
 WB_RECT rctMerge;
 
@@ -1660,7 +1731,10 @@ static void __internal_init(struct _text_object_ *pThis)
     char szHFG[16], szHBG[16];
     Colormap colormap = DefaultColormap(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
 
-#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
+#define LOAD_COLOR(X,Y,Z) \
+    if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0) \
+    { WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", \
+                    __FUNCTION__, X, Z); strcpy(Y,Z); }
 
     LOAD_COLOR("selected_bg_color", szHBG, "#0040FF"); // a slightly greenish blue for the 'selected' BG color
     LOAD_COLOR("selected_fg_color", szHFG, "white");   // white FG when selected
@@ -1727,6 +1801,11 @@ TEXT_BUFFER *pTemp;
   else
   {
     WB_ERROR_PRINT("ERROR - %s - NOT a valid TEXT_OBJECT - %p\n", __FUNCTION__, pThis);
+  }
+
+  if(pThis->pText)
+  {
+    WBTextBufferRefreshCache(pThis->pText);
   }
 }
 
@@ -2050,6 +2129,13 @@ int iAutoScrollWidth = AUTO_HSCROLL_SIZE;
         pThis->rctView.right += iAutoScrollWidth;
       }
     }
+
+    if(pThis->pText &&
+       WBTextBufferLineLength(pThis->pText, pThis->iRow) < iCol)
+    {
+      WBTextBufferLineChange(pThis->pText, pThis->iRow, iCol);
+//      WBTextBufferRefreshCache(pThis->pText);
+    }
   }
 }
 static void __internal_del_select(struct _text_object_ *pThis)
@@ -2177,6 +2263,8 @@ WB_RECT rctSel;
           pThis->rctView.right += iAutoScrollWidth;
         }
       }
+
+      WBTextBufferRefreshCache(pThis->pText);
     }
     else if(pThis->iSelMode == SelectMode_BOX) // multiline delete BOX mode
     {
@@ -2292,6 +2380,28 @@ WB_RECT rctSel;
         }
       }
 
+      // update cached line length info
+
+      if(rctSel.bottom == rctSel.top) // same line delete
+      {
+        int iNewLen = 0;
+
+        if(pBuf->aLines[rctSel.top])
+        {
+          iNewLen = WBGetMBLength(pBuf->aLines[rctSel.top]);
+        }
+
+        WBTextBufferLineChange(pThis->pText, rctSel.top, iNewLen);
+      }
+      else if((rctSel.bottom - rctSel.top) == 1) // single-line delete
+      {
+        WBTextBufferLineChange(pThis->pText, rctSel.top, -1); // deleted line
+      }
+      else // multi-line
+      {
+        WBTextBufferRefreshCache(pThis->pText);
+      }
+
       if(pTemp)
       {
         __internal_add_undo(pThis, UNDO_DELETE, pThis->iSelMode,
@@ -2328,7 +2438,8 @@ WB_RECT rctSel;
       pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
     }
 
-   WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+    WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+
     __internal_invalidate_rect(pThis, NULL, 1); // TODO:  optimize this
   }
 }
@@ -2413,6 +2524,9 @@ int iSelAll;
 
      WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
     __internal_invalidate_rect(pThis, NULL, 1); // TODO:  optimize this
+
+    // NOTE:  no need to call WBTextBufferRefreshCache(), the 'del_select' and 'ins_chars' would've done it
+
   }
 }
 static void __internal_del_chars(struct _text_object_ *pThis, int nChar)
@@ -2495,8 +2609,11 @@ WB_RECT rctInvalid;
 
     // if it's at an edge, merge lines
 
-    if(pThis->iRow > 0 && nChar < 0 && pThis->iCol == 0) // backspace while at the start of a line
+    if(nChar < 0 &&                         // backspacing
+       pThis->iRow > 0 && pThis->iCol == 0) // backspace while at the start of a line NOT the first line
     {
+      // this backspace will merge the previous line with this one
+
       pL2 = pBuf->aLines[pThis->iRow - 1];
       if(!pL2)
       {
@@ -2539,13 +2656,15 @@ WB_RECT rctInvalid;
 
       // if I hit backspace while on row==nEntries, just move the cursor to the end
       // of the previous line.  I'm not really deleting anything.
-      if(pThis->iRow >= pBuf->nEntries)
+      if(pThis->iRow >= pBuf->nEntries) // beyond the last line?
       {
         pThis->iRow--;
         if(pBuf->aLines[pThis->iRow])
         {
           pThis->iCol = WBGetMBLength(pBuf->aLines[pThis->iRow]);
         }
+
+        // NOTE:  no need to update the line's length in the buffer cache, I didn't change anything
       }
       else
       {
@@ -2559,7 +2678,12 @@ WB_RECT rctInvalid;
         pBuf->nEntries--;
         pBuf->aLines[pBuf->nEntries] = NULL; // so that pointers aren't accidentally re-used
 
+        WBTextBufferLineChange(pThis->pText, pThis->iRow, -1); // deleted line (current 'iRow')
+
         pThis->iRow--; // since I moved up
+
+        WBTextBufferLineChange(pThis->pText, pThis->iRow,
+                               WBGetMBLength(pBuf->aLines[pThis->iRow])); // 'replaced' line (new length)
       }
 
       nChar++; // backspacing, so increment
@@ -2571,8 +2695,11 @@ WB_RECT rctInvalid;
 
       __internal_merge_rect(pThis, &rctInvalid, pThis->iRow, 0, -1, -1);
     }
-    else if(pThis->iCol >= iLen && nChar > 0 && pThis->iRow < (pBuf->nEntries - 1))
+    else if(nChar > 0 && // deleting
+            pThis->iCol >= iLen && pThis->iRow < (pBuf->nEntries - 1)) // not at end of 'last row'
     {
+      // delete at end of line which merges with the next line
+
       pL2 = pBuf->aLines[pThis->iRow + 1];
 
       if(pL2)
@@ -2607,6 +2734,11 @@ WB_RECT rctInvalid;
 
       pBuf->aLines[pBuf->nEntries] = NULL; // so that pointers aren't accidentally re-used
 
+      WBTextBufferLineChange(pThis->pText, pThis->iRow + 1, -1); // deleted line (the one that follows 'iRow')
+
+      WBTextBufferLineChange(pThis->pText, pThis->iRow,
+                             WBGetMBLength(pBuf->aLines[pThis->iRow])); // 'replaced' line (new length)
+
       nChar--; // deleting, so decrement
 
       __internal_add_undo(pThis, UNDO_DELETE, pThis->iSelMode,
@@ -2614,6 +2746,8 @@ WB_RECT rctInvalid;
                           "\n", 1,
                           pThis->iRow + 1, 0, NULL, NULL, 0);
 
+
+      WB_ERROR_PRINT("TEMPORARY:  %s %d - fix the optimization for __internal_merge_rect\n", __FUNCTION__, __LINE__);
 //      __internal_merge_rect(pThis, &rctInvalid, pThis->iRow, 0, -1, -1); // invalidate entire row and those that follow
 
       // bug workaround, mark everything 'invalid'
@@ -2637,6 +2771,8 @@ WB_RECT rctInvalid;
 
       if(nChar < 0 && pThis->iCol > 0)
       {
+        // backspacing
+
         // TODO:  handle hard tab translation?  For now "leave it"
 
         i2 = -nChar;
@@ -2651,6 +2787,27 @@ WB_RECT rctInvalid;
           pL2 = WBGetMBCharPtr(pL, pThis->iCol - i2, NULL);  // column to which I delete (backspace)
           pL3 = WBGetMBCharPtr(pL, pThis->iCol, NULL);  // position FROM where I delete/backspace
 
+// TEMPORARY DEBUG CODE - remove when I fix this, it's here to remind me
+          {
+            const char *pL2a;
+            const char *pL3a;
+            int i2a;
+
+            for(i2a=0; i2a < i2; i2a++)
+            {
+              pL2a = WBGetMBCharPtr(pL, pThis->iCol - i2 + i2a, NULL);
+              pL3a = WBGetMBCharPtr(pL, pThis->iCol - i2 + i2a + 1, NULL);
+
+              if(pL2a && (pL3a - pL2a) == 1 &&
+                 ((unsigned char)*pL2a == (unsigned char)HARD_TAB_CHAR || *pL2a == '\t'))
+              {
+                WB_ERROR_PRINT("TEMPORARY:  %s %d - hard tab (%02xH) at row %d column %d\n",
+                               __FUNCTION__, __LINE__, (unsigned char)*pL2a,
+                               pThis->iRow, pThis->iCol - i2 + i2a);
+              }
+            }
+          }
+
 
           // create undo record first, before I actually delete things
           __internal_add_undo(pThis, UNDO_DELETE, pThis->iSelMode,
@@ -2663,6 +2820,9 @@ WB_RECT rctInvalid;
 
         pThis->iCol -= i2;
         nChar += i2; // # of characters actually deleted (added 'cause nChar is negative)
+
+        WBTextBufferLineChange(pThis->pText, pThis->iRow,
+                               WBGetMBLength(pBuf->aLines[pThis->iRow])); // new length
 
         __internal_merge_rect(pThis, &rctInvalid, pThis->iRow, pThis->iCol, pThis->iRow, -1); // invalidate remainder of row
       }
@@ -2683,6 +2843,27 @@ WB_RECT rctInvalid;
           pL2 = WBGetMBCharPtr(pL, pThis->iCol + i2, NULL);  // column to which I delete
           pL3 = WBGetMBCharPtr(pL, pThis->iCol, NULL);  // position FROM where I delete/backspace
 
+// TEMPORARY DEBUG CODE - remove when I fix this, it's here to remind me
+          {
+            const char *pL2a;
+            const char *pL3a;
+            int i2a;
+
+            for(i2a=0; i2a < i2; i2a++)
+            {
+              pL2a = WBGetMBCharPtr(pL, pThis->iCol + i2a, NULL);
+              pL3a = WBGetMBCharPtr(pL, pThis->iCol + i2a + 1, NULL);
+
+              if(pL3a && (pL2a - pL3a) == 1 &&
+                 ((unsigned char)*pL3a == (unsigned char)HARD_TAB_CHAR || *pL3a == '\t'))
+              {
+                WB_ERROR_PRINT("TEMPORARY:  %s %d - hard tab (%02xH) at row %d column %d\n",
+                               __FUNCTION__, __LINE__, (unsigned char)*pL3a,
+                               pThis->iRow, pThis->iCol - i2 + i2a);
+              }
+            }
+          }
+
           // create undo record first, before I actually delete things
           __internal_add_undo(pThis, UNDO_DELETE, pThis->iSelMode,
                               pThis->iRow, pThis->iCol, &(pThis->rctSel),
@@ -2694,13 +2875,16 @@ WB_RECT rctInvalid;
 
         nChar -= i2;
 
+        WBTextBufferLineChange(pThis->pText, pThis->iRow,
+                               WBGetMBLength(pBuf->aLines[pThis->iRow])); // new length
+
         // NOTE:  column does not change
         __internal_merge_rect(pThis, &rctInvalid, pThis->iRow, pThis->iCol, pThis->iRow, -1); // invalidate remainder of row
       }
       else
       {
         // this is a condition that might infinite loop since it doesn't inc/dec nChar
-        // it was SUPPOSED to be tested for, but wasn't.
+        // so it's a condition that was SUPPOSED to be tested for, but wasn't.
 
         WB_ERROR_PRINT("UNEXPECTED:  %s - nChar=%d, iCol=%d, iRow=%d   nEntries=%d\n",
                        __FUNCTION__, nChar, pThis->iCol, pThis->iRow, (int)pBuf->nEntries);
@@ -2765,9 +2949,9 @@ WB_RECT rctInvalid;
       }
 
       // for now, always do this
-        WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+      WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
 
-        __internal_invalidate_rect(pThis, NULL, 1); // scrolling, so invalidate everything
+      __internal_invalidate_rect(pThis, NULL, 1); // scrolling, so invalidate everything
 
 //      __internal_invalidate_rect(pThis, &rctInvalid, 1); // invalidate bounding rectangle
     }
@@ -2820,9 +3004,11 @@ WB_RECT rctInvalid;
     }
 
     __internal_invalidate_cursor(pThis, 0);
-    pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
+    pThis->iBlinkState = CURSOR_BLINK_RESET;
+      // this affects the cursor blink, basically resetting it whenever I edit something
 
-    __internal_calc_rect(pThis, &rctInvalid, pThis->iRow, pThis->iCol, pThis->iRow, -1); // always refresh entire line from 'iCol' forward
+    __internal_calc_rect(pThis, &rctInvalid, pThis->iRow, pThis->iCol, pThis->iRow, -1);
+      // always refresh entire line from 'iCol' forward
 
     pBuf = (TEXT_BUFFER *)(pThis->pText);
 
@@ -3294,7 +3480,19 @@ WB_RECT rctInvalid;
 
       __internal_invalidate_rect(pThis, NULL, 1); // invalidate everything (confusion handler)
     }
+
+    if(iMultiLine || !pBuf)
+    {
+      WBTextBufferRefreshCache(pThis->pText);
+    }
+    else if(pThis->iRow < pBuf->nEntries)
+    {
+      WBTextBufferLineChange(pThis->pText, pThis->iRow,
+                             WBGetMBLength(pBuf->aLines[pThis->iRow])); // new length
+    }
   }
+
+  // TODO:  anything else??
 }
 static void __internal_indent(struct _text_object_ *pThis, int nCol)
 {
@@ -3335,14 +3533,70 @@ static void __internal_redo(struct _text_object_ *pThis)
 }
 static void __internal_get_view(const struct _text_object_ *pThis, WB_RECT *pRct)
 {
+  if(!pRct)
+  {
+    return;
+  }
+
   if(WBIsValidTextObject(pThis))
   {
+    memcpy(pRct, &(pThis->rctView), sizeof(*pRct));
   }
 }
-static void __internal_set_view(struct _text_object_ *pThis, const WB_RECT *pRct)
+static void __internal_set_view_origin(struct _text_object_ *pThis, const WB_POINT *pOrig)
 {
+  if(!pOrig)
+  {
+    return;
+  }
+
   if(WBIsValidTextObject(pThis))
   {
+    int nRows = __internal_get_rows(pThis);
+    int nCols = __internal_get_cols(pThis);
+
+    nRows -= (pThis->rctView.bottom - pThis->rctView.top); // note that 'nRows' includes the blank line at the end
+    if(nRows < 0)
+    {
+      nRows = 0;
+    }
+
+    nCols -= (pThis->rctView.right - pThis->rctView.left - 4); // TODO:  what constant do I subtract?
+    if(nCols < 0)
+    {
+      nCols = 0;
+    }
+
+    if(pOrig->x < 0)
+    {
+      nCols = 0;
+    }
+    else if(pOrig->x < nCols)
+    {
+      nCols = pOrig->x;
+    }
+
+    if(pOrig->y < 0)
+    {
+      nRows = 0;
+    }
+    else if(pOrig->y < nRows)
+    {
+      nRows = pOrig->y;
+    }
+
+    if(nRows != pThis->rctView.top || nCols != pThis->rctView.left)
+    {
+      pThis->rctView.bottom = (pThis->rctView.bottom - pThis->rctView.top)
+                            + nRows;
+      pThis->rctView.top = nRows;
+
+      pThis->rctView.right = (pThis->rctView.right - pThis->rctView.left)
+                           + nCols;
+      pThis->rctView.left = nCols;
+
+      __internal_invalidate_rect(pThis, NULL, 1); // invalidate the display and re-draw
+    }
   }
 }
 static void __internal_begin_highlight(struct _text_object_ *pThis)
@@ -4111,7 +4365,7 @@ TEXT_BUFFER *pBuf;
 }
 static void __internal_page_left(struct _text_object_ *pThis)
 {
-int iAutoScrollWidth = AUTO_HSCROLL_SIZE;
+//int iAutoScrollWidth = AUTO_HSCROLL_SIZE;
 TEXT_BUFFER *pBuf;
 
 
@@ -4119,12 +4373,6 @@ TEXT_BUFFER *pBuf;
   {
     WB_ERROR_PRINT("ERROR:  %p - invalid text object %p\n", __FUNCTION__, pThis);
   }
-//  else if(pThis->iLineFeed == LineFeed_NONE) // single line
-//  {
-//    __internal_cursor_left(pThis); // for now, just do this
-//
-//    return;
-//  }
   else
   {
     int iOldCol = pThis->iCol;
@@ -4888,7 +5136,7 @@ Pixmap pxTemp;
 unsigned long clrFG, clrBG, clrHFG, clrHBG;
 GC gc2 = None;
 WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
-int iAutoScrollWidth, iWindowHeightInLines;
+int nEntries, iAutoScrollWidth, iWindowHeightInLines;
 
 
   if(!WBIsValidTextObject(pThis))
@@ -5009,6 +5257,18 @@ int iAutoScrollWidth, iWindowHeightInLines;
   // cache the pointer to the TEXT BUFFER
   pBuf = (TEXT_BUFFER *)(pThis->pText);
 
+  // NOTE:  in the next sections, deal with NULL pBuf by cacheing 'nEntries'
+
+  if(!pBuf || pBuf->nEntries <= 0)   // also test for this condition and treat it as single-line also (temporary)
+  {
+    nEntries = 0;
+  }
+  else
+  {
+    nEntries = pBuf->nEntries;
+  }
+
+
 
   // ------------------------------------------
   // CALCULATING THE CORRECT VIEWPORT (rctView)
@@ -5017,8 +5277,7 @@ int iAutoScrollWidth, iWindowHeightInLines;
   // NOTE:  if the owning window has reset the viewport, the entire window SHOULD
   //        be invalid.  If not, it won't paint properly.
 
-  if(pThis->iLineFeed == LineFeed_NONE || // SINGLE LINE
-     !pBuf || pBuf->nEntries <= 0)        // also test for this condition and treat it as single-line also (temporary)
+  if(pThis->iLineFeed == LineFeed_NONE) // SINGLE LINE
   {
     // AUTO-ASSIGN the viewport whenever right <= left (i.e. viewport is 'NULL' or 'empty')
     // or whenever the viewport is not properly assigned (window re-size re-paint)
@@ -5075,13 +5334,11 @@ int iAutoScrollWidth, iWindowHeightInLines;
     // AUTO-ASSIGN the viewport whenever right <= left (i.e. viewport is 'NULL' or 'empty')
     // or whenever the viewport is not properly assigned (window re-size re-paint)
 
-    // NOTE:  in this section, pBuf cannot be NULL
-
     if(pThis->rctView.right - pThis->rctView.left
           != geomV.width / iFontWidth                   // viewport needs re-calculation
        || pThis->rctView.bottom - pThis->rctView.top
           != iWindowHeightInLines                       // viewport needs re-calculation
-       || pThis->rctView.top > pBuf->nEntries)          // top exceeds total # of lines
+       || pThis->rctView.top > nEntries)          // top exceeds total # of lines
     {
       iAutoScrollWidth = AUTO_HSCROLL_SIZE;
 
@@ -5090,8 +5347,8 @@ int iAutoScrollWidth, iWindowHeightInLines;
         pThis->rctView.left = 0;
       }
 
-      if(pThis->rctView.top < 0 || pThis->rctView.top > pBuf->nEntries
-         || (pThis->rctView.top && pBuf->nEntries < iWindowHeightInLines))
+      if(pThis->rctView.top < 0 || pThis->rctView.top > nEntries
+         || (pThis->rctView.top && nEntries < iWindowHeightInLines))
       {
         pThis->rctView.top = 0; // set viewport to top
       }
@@ -5245,12 +5502,13 @@ int iAutoScrollWidth, iWindowHeightInLines;
 //  WB_ERROR_PRINT("TEMPORARY:  %s line %d - iXDelta is %d, iYDelta is %d\n", __FUNCTION__, __LINE__, iXDelta, iYDelta);
 
   // At this point, if pBuf is NULL or the # of entries zero, the background is *STILL* erased
+  // and the cursor has to be drawn.
 
-  if(!pBuf || pBuf->nEntries <= 0)
-  {
-//      WB_ERROR_PRINT("TEMPORARY:  %s - no text\n", __FUNCTION__);
-    goto almost_the_end; // I use the goto so I can put cleanup code there - it's safer
-  }
+//  if(!pBuf || pBuf->nEntries <= 0)
+//  {
+////      WB_ERROR_PRINT("TEMPORARY:  %s - no text\n", __FUNCTION__);
+//    goto almost_the_end; // I use the goto so I can put cleanup code there - it's safer
+//  }
 
 
   // if it's a single-line object, center it within the window and display only ONE line
@@ -5272,11 +5530,19 @@ int iAutoScrollWidth, iWindowHeightInLines;
     iY = geomV.y + iY / 2 + iAsc; // iY is now "the baseline" for the font, where it needs to be drawn
     iX = geomV.x;
 
-    pL = pBuf->aLines[0];
-    if(!pL)
+    if(pBuf)
     {
-      goto the_end;
+      pL = pBuf->aLines[0];
     }
+    else
+    {
+      pL= NULL;
+    }
+
+//    if(!pL)
+//    {
+//      goto the_end;
+//    }
 
 
     //-----------------------------
@@ -5320,7 +5586,14 @@ int iAutoScrollWidth, iWindowHeightInLines;
     // DRAW the text and the vertical cursor
     //---------------------------------------
 
-    iLen = WBGetMBLength(pL);
+    if(pL)
+    {
+      iLen = WBGetMBLength(pL);
+    }
+    else
+    {
+      iLen = 0;
+    }
 
     pThis->iCursorX = pThis->iCursorY = pThis->iCursorHeight = 0; // to indicate "not drawn"
 
@@ -5397,7 +5670,7 @@ int iAutoScrollWidth, iWindowHeightInLines;
       geomC.width = iFontWidth;
       geomC.height = iFontHeight;
 
-      if(i1 < iLen)
+      if(pL && i1 < iLen) // NOTE:  pL can be NULL, but iLen should be zero - test anyway
       {
         if(WBGeomOverlapped(geomC, geomP)) // only if the character's geometry overlaps the paint geometry
         {
@@ -5438,7 +5711,7 @@ int iAutoScrollWidth, iWindowHeightInLines;
 
     pThis->iCursorX = pThis->iCursorY = pThis->iCursorHeight = 0; // to indicate "not drawn"
 
-    for(iCurRow=pThis->rctView.top; iCurRow <= pBuf->nEntries && iCurRow <= pThis->rctView.bottom; iCurRow++)
+    for(iCurRow=pThis->rctView.top; iCurRow <= nEntries && iCurRow <= pThis->rctView.bottom; iCurRow++)
     {
       int bHighlight = 0;
 
@@ -5449,7 +5722,7 @@ int iAutoScrollWidth, iWindowHeightInLines;
 
       iX = geomV.x;
 
-      if(iCurRow < pBuf->nEntries)
+      if(pBuf && iCurRow < nEntries) // 'nEntries' was cached from before
       {
         pL = pBuf->aLines[iCurRow];
       }
@@ -5663,7 +5936,7 @@ int iAutoScrollWidth, iWindowHeightInLines;
   // PIXMAP OPTIMIZATION - TRANSFER TO WINDOW
   //------------------------------------------
 
-almost_the_end:
+//almost_the_end:
 
   if(pxTemp != None) // OPTIMIZATION (using pixmap)
   {
@@ -5752,6 +6025,22 @@ static void __internal_cursor_blink(struct _text_object_ *pThis, int bHasFocus)
     }
   }
 }
+
+static void __internal_set_save_point(struct _text_object_ *pThis)
+{
+  // TODO:  implement
+
+  WB_ERROR_PRINT("TEMPORARY:  %s - not yet implemented\n", __FUNCTION__);
+}
+
+static int __internal_get_modified(struct _text_object_ *pThis)
+{
+  WB_ERROR_PRINT("TEMPORARY:  %s - not yet implemented - returning 'modified'\n", __FUNCTION__);
+
+  return 1; // for now, ALWAYS modified
+}
+
+
 
 
 // ----------------------------

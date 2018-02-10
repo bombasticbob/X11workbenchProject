@@ -485,74 +485,74 @@ typedef struct __WBChildFrame__
       // tag indicating I'm a 'Child Frame UI' structure
 
     void (*do_char)(WBChildFrame *, XClientMessageEvent *);
-      // handler for regular WM_CHAR Client Messages (typed-in characters).
+      // handler for regular WB_CHAR Client Messages (typed-in characters).
       // NOT called for 'special' characters.
 
     void (*scancode)(WBChildFrame *, XClientMessageEvent *);
-      // handler for 'other scan code' WM_CHAR Client Messages (typed-in characters)
+      // handler for 'other scan code' WB_CHAR Client Messages (typed-in characters)
 
     void (*bkspace)(WBChildFrame *, int iACS);
       // 'backspace' delete character (backspace equivalent).
-      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWB_CHAR
 
     void (*del)(WBChildFrame *, int iACS);
       // 'delete' char under cursor (delete equivalent).
-      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWB_CHAR
 
     void (*tab)(WBChildFrame *, int iACS);
       // 'tab' char, or tab navigation.
-      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWB_CHAR
 
     void (*enter)(WBChildFrame *, int iACS);
       // 'enter' char, or 'enter' for navigation.
-      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWB_CHAR
 
     void (*properties)(WBChildFrame *);
       // display the property sheet for the displayed document
 
     void (*uparrow)(WBChildFrame *, int iACS);
       // 'up' arrow navigation.
-      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWB_CHAR
 
     void (*downarrow)(WBChildFrame *, int iACS);
       // 'down' arrow navigation.
-      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWB_CHAR
 
     void (*leftarrow)(WBChildFrame *, int iACS);
       // 'left' arrow navigation.
-      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWB_CHAR
 
     void (*rightarrow)(WBChildFrame *, int iACS);
       // 'right' arrow navigation.
-      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWB_CHAR
 
     void (*home)(WBChildFrame *, int iACS);
       // 'home' arrow navigation.
-      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWB_CHAR
 
     void (*end)(WBChildFrame *, int iACS);
       // 'end' arrow navigation.
-      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWB_CHAR
 
     void (*pgup)(WBChildFrame *, int iACS);
       // 'page up' navigation.
-      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWB_CHAR
 
     void (*pgdown)(WBChildFrame *, int iACS);
       // 'page down' navigation.
-      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWB_CHAR
 
     void (*pgleft)(WBChildFrame *, int iACS);
       // 'page left' navigation.
-      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWB_CHAR
 
     void (*pgright)(WBChildFrame *, int iACS);
       // 'page right' navigation.
-      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWB_CHAR
 
     void (*help)(WBChildFrame *, int iACS);
       // 'help' context (F1).
-      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWM_CHAR
+      // 'iACS' is the Alt/Ctrl/Shift flags. See Also:  aWB_CHAR
 
     void (*hover_notify)(WBChildFrame *, int x, int y);
       // 'mouse hover' notification (x and y are pixel coords with respect to upper left corner)
@@ -592,34 +592,32 @@ typedef struct __WBChildFrame__
 
     void (*mouse_click)(WBChildFrame *, int iX, int iY,
                         int iButtonMask, int iACS);
-      // 'mouse click' notification.  See Also: aWM_POINTER
+      // 'mouse click' notification.  See Also: aWB_POINTER
 
     void (*mouse_dblclick)(WBChildFrame *, int iX, int iY,
                            int iButtonMask, int iACS);
-      // 'mouse double click' notification.  See Also: aWM_POINTER
+      // 'mouse double click' notification.  See Also: aWB_POINTER
 
     void (*mouse_drag)(WBChildFrame *, int iX, int iY,
                        int iButtonMask, int iACS);
-      // 'mouse drag' (begin) notification.  See Also: aWM_POINTER
+      // 'mouse drag' (begin) notification.  See Also: aWB_POINTER
 
     void (*mouse_drop)(WBChildFrame *, int iX, int iY,
                        int iButtonMask, int iACS);
-      // 'mouse drop' (drag end) notification.  See Also: aWM_POINTER
+      // 'mouse drop' (drag end) notification.  See Also: aWB_POINTER
 
     void (*mouse_move)(WBChildFrame *, int iX, int iY);
-      // 'mouse motion' notification.  See Also: aWM_POINTER
+      // 'mouse motion' notification.  See Also: aWB_POINTER
 
-    void (*mouse_scrollup)(WBChildFrame *, int iX, int iY,
-                           int iButtonMask, int iACS);
-      // 'mouse scroll up' notification.  See Also: aWM_POINTER
+    void (*scroll_vert)(WBChildFrame *, int iMode, int iValue);
+      // 'scroll vertical' notification.  See Also: aSCROLL_NOTIFY
 
-    void (*mouse_scrolldown)(WBChildFrame *, int iX, int iY,
-                             int iButtonMask, int iACS);
-      // 'mouse scroll down' notification.  See Also: aWM_POINTER
+    void (*scroll_horiz)(WBChildFrame *, int iMode, int iValue);
+      // 'scroll horizontal' notification.  See Also: aSCROLL_NOTIFY
 
     void (*mouse_cancel)(WBChildFrame *);
       // 'mouse cancel' notification (cancel 'drag', etc.).
-      // See Also:  aWM_POINTER , WBMouseCancel()
+      // See Also:  aWB_POINTER , WBMouseCancel()
 
     void (*get_row_col)(WBChildFrame *, int *piR, int *piC);
       // Obtain the current row/column cursor location for UI notification.
@@ -657,9 +655,9 @@ typedef struct __WBChildFrame__
   * the derived window interface does not need 'hover' support, you can leave the 'hover_notify' and
   * 'hover_cancel' function pointers as NULL, but populate everything else.
   *
-  * For the 'iACS' parameters, use the 'iACS' information from the aWM_CHAR.  This is the 'Alt/Ctrl/Shift'
+  * For the 'iACS' parameters, use the 'iACS' information from the aWB_CHAR.  This is the 'Alt/Ctrl/Shift'
   * flag that indicates which of those buttons were being held down at the time of the character translation.
-  * For more information on THAT, see \ref aWM_CHAR "WM_CHAR".
+  * For more information on THAT, see \ref aWB_CHAR "WB_CHAR".
   *
   * The basic difference between 'do_char' and 'scancode' is that the 'character' events will be passed along
   * to the 'do_char' callback, but 'scan code' events (NOT processed by one of the other callbacks) will be
@@ -667,7 +665,7 @@ typedef struct __WBChildFrame__
   * 'special' keys as needed.  The ones normally processed are:  insert, delete, home, end, pgup, pgdown, and
   * the 'F1' key.
   *
-  * NOTE:  if a menu defines hotkey combinations, no 'WM_CHAR' event will be generated for any of those.  Instead,
+  * NOTE:  if a menu defines hotkey combinations, no 'WB_CHAR' event will be generated for any of those.  Instead,
   * the menu handler needs to interpret them correctly if the UI callback will need to be invoked.  One example
   * in the X11workbench.c handler (for the main edit window UI) is the handling of the 'Edit' sub-menu, which
   * includes hotkey combinations such as 'CTRL+V' for 'paste'.  When the 'paste' menu is invoked, the handler will
@@ -679,24 +677,24 @@ typedef struct __WBChildFrame__
 typedef struct __WBChildFrameUI__
 {
   unsigned int ulTag;                                       ///< tag indicating I'm a 'Child Frame UI' structure
-  void (*do_char)(WBChildFrame *, XClientMessageEvent *);   ///< handler for regular WM_CHAR Client Messages (typed-in characters). \details The XClientMessageEvent will be interpreted and characters added to the associated document or object.  This function should NOT be called for 'special' characters, like cursors, backspace, and so on.
-  void (*scancode)(WBChildFrame *, XClientMessageEvent *);  ///< handler for 'other scan code' WM_CHAR Client Messages.  \details For those characters NOT already processed as actual characters or 'special' characters, call this function.  The XClientMessageEvent will be interpreted, and characters may be added to the associated document or object.  In some cases, there may be additional actions performed.  This function should rarely be needed.
-  void (*bkspace)(WBChildFrame *, int iACS);                ///< 'backspace' delete character (backspace equivalent), or perform related 'backspace' operation via ctrl/alt/shift.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-  void (*del)(WBChildFrame *, int iACS);                    ///< 'delete' char under cursor (delete equivalent), or perform related 'delete' operation via ctrl/alt/shift.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-  void (*tab)(WBChildFrame *, int iACS);                    ///< 'tab' char, or tab navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-  void (*enter)(WBChildFrame *, int iACS);                  ///< 'enter' char, or 'enter' for navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+  void (*do_char)(WBChildFrame *, XClientMessageEvent *);   ///< handler for regular WB_CHAR Client Messages (typed-in characters). \details The XClientMessageEvent will be interpreted and characters added to the associated document or object.  This function should NOT be called for 'special' characters, like cursors, backspace, and so on.
+  void (*scancode)(WBChildFrame *, XClientMessageEvent *);  ///< handler for 'other scan code' WB_CHAR Client Messages.  \details For those characters NOT already processed as actual characters or 'special' characters, call this function.  The XClientMessageEvent will be interpreted, and characters may be added to the associated document or object.  In some cases, there may be additional actions performed.  This function should rarely be needed.
+  void (*bkspace)(WBChildFrame *, int iACS);                ///< 'backspace' delete character (backspace equivalent), or perform related 'backspace' operation via ctrl/alt/shift.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+  void (*del)(WBChildFrame *, int iACS);                    ///< 'delete' char under cursor (delete equivalent), or perform related 'delete' operation via ctrl/alt/shift.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+  void (*tab)(WBChildFrame *, int iACS);                    ///< 'tab' char, or tab navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+  void (*enter)(WBChildFrame *, int iACS);                  ///< 'enter' char, or 'enter' for navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
   void (*properties)(WBChildFrame *);                       ///< display the property sheet for the displayed document (optional)
-  void (*uparrow)(WBChildFrame *, int iACS);                ///< 'up' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-  void (*downarrow)(WBChildFrame *, int iACS);              ///< 'down' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-  void (*leftarrow)(WBChildFrame *, int iACS);              ///< 'left' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-  void (*rightarrow)(WBChildFrame *, int iACS);             ///< 'right' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-  void (*home)(WBChildFrame *, int iACS);                   ///< 'home' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-  void (*end)(WBChildFrame *, int iACS);                    ///< 'end' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-  void (*pgup)(WBChildFrame *, int iACS);                   ///< 'page up' navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-  void (*pgdown)(WBChildFrame *, int iACS);                 ///< 'page down' navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-  void (*pgleft)(WBChildFrame *, int iACS);                 ///< 'page left' navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-  void (*pgright)(WBChildFrame *, int iACS);                ///< 'page right' navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-  void (*help)(WBChildFrame *, int iACS);                   ///< 'help' context (F1).  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+  void (*uparrow)(WBChildFrame *, int iACS);                ///< 'up' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+  void (*downarrow)(WBChildFrame *, int iACS);              ///< 'down' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+  void (*leftarrow)(WBChildFrame *, int iACS);              ///< 'left' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+  void (*rightarrow)(WBChildFrame *, int iACS);             ///< 'right' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+  void (*home)(WBChildFrame *, int iACS);                   ///< 'home' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+  void (*end)(WBChildFrame *, int iACS);                    ///< 'end' arrow navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+  void (*pgup)(WBChildFrame *, int iACS);                   ///< 'page up' navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+  void (*pgdown)(WBChildFrame *, int iACS);                 ///< 'page down' navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+  void (*pgleft)(WBChildFrame *, int iACS);                 ///< 'page left' navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+  void (*pgright)(WBChildFrame *, int iACS);                ///< 'page right' navigation.  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+  void (*help)(WBChildFrame *, int iACS);                   ///< 'help' context (F1).  \details 'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
   void (*hover_notify)(WBChildFrame *, int x, int y);       ///< 'mouse hover' notification \details x and y are pixel coords with respect to upper left corner
   void (*hover_cancel)(WBChildFrame *);                     ///< 'mouse hover' cancel notification \details This will cancel any 'hover' action
   int (*is_ins_mode)(WBChildFrame *);                       ///< Use this to determine whether you are in 'insert' or 'overwrite' mode. \details returns non-zero if in 'insert' mode, 0 for 'overwrite'
@@ -712,19 +710,19 @@ typedef struct __WBChildFrameUI__
   WB_PCSTR (* get_file_name)(WBChildFrame *);               ///< get a (const) pointer to the file name string \details Use this function to find out what the currently assigned file name is.  The returned pointer is NOT persistent across function calls.  If you need a copy, use SBCopyString() or similar
 
   void (*mouse_click)(WBChildFrame *, int iX, int iY,
-                      int iButtonMask, int iACS);           ///< 'mouse click' notification.  \details part of the mouse UI handling.  'iX', 'iY', 'iButtonMask', and 'iACS'  are copied from the aWM_POINTER Client Message event.
+                      int iButtonMask, int iACS);           ///< 'mouse click' notification.  \details part of the mouse UI handling.  'iX', 'iY', 'iButtonMask', and 'iACS'  are copied from the aWB_POINTER Client Message event.
   void (*mouse_dblclick)(WBChildFrame *, int iX, int iY,
-                         int iButtonMask, int iACS);        ///< 'mouse double click' notification.  \details part of the mouse UI handling.  'iX', 'iY', 'iButtonMask', and 'iACS'  are copied from the aWM_POINTER Client Message event.
+                         int iButtonMask, int iACS);        ///< 'mouse double click' notification.  \details part of the mouse UI handling.  'iX', 'iY', 'iButtonMask', and 'iACS'  are copied from the aWB_POINTER Client Message event.
   void (*mouse_drag)(WBChildFrame *, int iX, int iY,
-                     int iButtonMask, int iACS);            ///< 'mouse drag' (begin) notification.  \details part of the mouse UI handling.  'iX', 'iY', 'iButtonMask', and 'iACS'  are copied from the aWM_POINTER Client Message event.
+                     int iButtonMask, int iACS);            ///< 'mouse drag' (begin) notification.  \details part of the mouse UI handling.  'iX', 'iY', 'iButtonMask', and 'iACS'  are copied from the aWB_POINTER Client Message event.
   void (*mouse_drop)(WBChildFrame *, int iX, int iY,
-                     int iButtonMask, int iACS);            ///< 'mouse drop' (drag end) notification.  \details part of the mouse UI handling.  'iX', 'iY', 'iButtonMask', and 'iACS'  are copied from the aWM_POINTER Client Message event.
-  void (*mouse_move)(WBChildFrame *, int iX, int iY);       ///< 'mouse motion' notification.  \details part of the mouse UI handling.  'iX' and 'iY' are copied from the aWM_POINTER Client Message event.
-  void (*mouse_scrollup)(WBChildFrame *, int iX, int iY,
-                         int iButtonMask, int iACS);        ///< 'mouse scroll up' notification.  \details part of the mouse UI handling.  'iX', 'iY', 'iButtonMask', and 'iACS'  are copied from the aWM_POINTER Client Message event.
-  void (*mouse_scrolldown)(WBChildFrame *, int iX, int iY,
-                           int iButtonMask, int iACS);      ///< 'mouse scroll down' notification.  \details part of the mouse UI handling.  'iX', 'iY', 'iButtonMask', and 'iACS'  are copied from the aWM_POINTER Client Message event.
-  void (*mouse_cancel)(WBChildFrame *);                     ///< 'mouse cancel' notification (cancel 'drag', etc.).  \details This is a notification only (any mouse capture must already have been handled).  \sa aWM_POINTER , WBMouseCancel()
+                     int iButtonMask, int iACS);            ///< 'mouse drop' (drag end) notification.  \details part of the mouse UI handling.  'iX', 'iY', 'iButtonMask', and 'iACS'  are copied from the aWB_POINTER Client Message event.
+  void (*mouse_move)(WBChildFrame *, int iX, int iY);       ///< 'mouse motion' notification.  \details part of the mouse UI handling.  'iX' and 'iY' are copied from the aWB_POINTER Client Message event.
+
+  void (*scroll_vert)(WBChildFrame *, int iMode, int iValue); ///< 'scroll vertical' notification.  \details A higher-level scrolling notification.  'iMode' is 0 for absolute, 1 for relative.  'iValue' is the absolute (or relative) new vertical scroll position to assign  \sa aSCROLL_NOTIFY
+  void (*scroll_horiz)(WBChildFrame *, int iMode, int iValue);///< 'scroll vertical' notification.  \details A higher-level scrolling notification.  'iMode' is 0 for absolute, 1 for relative.  'iValue' is the absolute (or relative) new horizontal scroll position to assign  \sa aSCROLL_NOTIFY
+
+  void (*mouse_cancel)(WBChildFrame *);                     ///< 'mouse cancel' notification (cancel 'drag', etc.).  \details This is a notification only (any mouse capture must already have been handled).  \sa aWB_POINTER , WBMouseCancel()
   void (*get_row_col)(WBChildFrame *, int *piR, int *piC);  ///< Obtain the current row/column cursor locationfor UI notification. \details 'piR' points to an integer to get the row, and 'piC' points to an integer to get the column.  Both are 1-based values, so a value \<\= 0 is considered 'error' or 'NA'
   int (*has_selection)(WBChildFrame *);                     ///< returns non-zero value if there is a selection \details Since this affects specific UI behavior, you should use this to control enabling of the 'copy' and 'cut' menus, as an example
   void (*undo)(WBChildFrame *);                             ///< perform an undo operation \details Use 'can_undo()' to determine whether an undo is possible

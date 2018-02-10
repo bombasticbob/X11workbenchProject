@@ -145,13 +145,14 @@ int iStartupMinMax = 0; // main window open min/max/normal flag
   * \brief commands sent by menus via ClientMessage
   *
   * MENU_COMMAND message format (relative to XEvent.xclient)\n
+  * \n
   * type == ClientMessage\n
   * message_type == aMENU_COMMAND\n
   * format == 32 (always)\n
   * data.l[0] Menu command message ID (aka 'action')\n
   * data.l[1] secure hash for WBMenu object pointer - see  WBCreatePointerHash()\n
   * data.l[2] Window ID of the menu bar\n
-  *
+  * \n
   * Whenever this message is received, you should NOT call WBDestroyPointerHash() for the WBMenu object
   * pointer.  This will be done automatically by the message framework.
   *
@@ -163,6 +164,7 @@ Atom aMENU_COMMAND=None;
   * \brief UI notifications sent by menus to owning Frame windows via ClientMessage using 'WBWindowDispatch'
   *
   * MENU_COMMAND message format (relative to XEvent.xclient)\n
+  * \n
   * type == ClientMessage\n
   * message_type == aMENU_UI_COMMAND\n
   * format == 32 (always)\n
@@ -171,7 +173,7 @@ Atom aMENU_COMMAND=None;
   * data.l[2] secure hash for WBMenuItem object pointer - see  WBCreatePointerHash()\n
   * data.l[3] the value '0' (reserved)\n
   * data.l[4] the value '0' (reserved)\n
-  *
+  * \n
   * A Frame Window returns '0' to indicate that the menu should be displayed normally (same as 'not handled')\n
   * Other return values alter the display of the menu.
   *
@@ -200,6 +202,7 @@ Atom aMENU_UI_COMMAND=None;
   * \brief notification of window re-size via ClientMessage
   *
   * RESIZE_NOTIFY message format (relative to XEvent.xclient)\n
+  * \n
   * type == ClientMessage\n
   * message_type == aRESIZE_NOTIFY\n
   * format == 32 (always)\n
@@ -207,29 +210,12 @@ Atom aMENU_UI_COMMAND=None;
   * data.l[1] new 'top' client rectangle coordinate\n
   * data.l[2] new 'right' client rectangle coordinate\n
   * data.l[3] new 'bottom' client rectangle coordinate\n
-  *
+  * \n
   * The return value is ignored.  It is typically sent via a direct call to the message callback function.
   * Since it is merely a notification message, it does not need to be handled.  The specified coordinates
   * are in 'client' coordinates relative to the upper left corner of the client area, which is always (0,0).\n
 **/
 Atom aRESIZE_NOTIFY=None;
-
-/** \ingroup xatoms
-  * \hideinitializer
-  * \brief notification of window scrollbar position/range changes via ClientMessage
-  *
-  * SCROLLBAR_NOTIFY message format (relative to XEvent.xclient)\n
-  * type == ClientMessage\n
-  * message_type == aSCROLLBAR_NOTIFY\n
-  * format == 32 (always)\n
-  * (data is reserved)
-  *
-  * The return value is ignored.  It is typically sent via a direct call to the message callback function.
-  * Since it is merely a notification message, it does not need to be handled.  The message callback
-  * should check its own cached scroll information against the sender's (typically a child frame) and
-  * make any necessary changes for consistency, then (as needed) invalidate and asynchronously re-paint itself
-**/
-Atom aSCROLLBAR_NOTIFY=None;
 
 /** \ingroup xatoms
   * \hideinitializer
@@ -244,13 +230,22 @@ Atom aDESTROY_NOTIFY=None;
   * \hideinitializer
   * \brief dialog control and child window notification messages
   *
+  * These events are posted to the owning window (or dialog box frame) for controls
+  * that are members of the dialog box or window.  These provide a powerful asynchronous
+  * method by which you can handle user input and other information directly from the
+  * control windows.
+  *
   * CONTROL_NOTIFY message format (relative to XEvent.xclient)\n
+  * \n
   * type == ClientMessage\n
   * message_type == aCONTROL_NOTIFY\n
   * format == 32 (always)\n
   * data.l[0] contains the dialog control ID (or -1 if N/A)\n
   * data.l[1] is the notify code\n
   * data.l[2] is window ID\n
+  * \n
+  * Other data elements are specific to the type notify code being used.\n
+  * For more information, see:  \ref dlgctrl_notify
 **/
 Atom aCONTROL_NOTIFY=None;
 
@@ -259,10 +254,11 @@ Atom aCONTROL_NOTIFY=None;
  Scroll notifications via ClientMessage
   *
   * MENU_COMMAND message format (relative to XEvent.xclient)\n
+  * \n
   * type == ClientMessage\n
   * message_type == aSCROLL_NOTIFY\n
   * format == 32 (always)\n
-  * data.l[0] Identifies the bar (SCROLL_VERTICAL, SCROLL_HORIZONTAL, or SCROLL_DEFAULT)\n
+  * data.l[0] Identifies the bar (WB_SCROLL_VERTICAL, WB_SCROLL_HORIZONTAL, or WB_SCROLL_DEFAULT)\n
   * data.l[1] Indicates the notification type, one of the following:\n
   * \li WB_SCROLL_KNOB    'knob track' - knob position will be in data.l[2]
   * \li WB_SCROLL_FORWARD  move down, or move right
@@ -277,6 +273,7 @@ Atom aCONTROL_NOTIFY=None;
   * \li WB_SCROLL_NA       generic 'NA' or 'UNDEFINED' value
   *
   * data.l[2] Optional parameter, typically the absolute or relative scroll position
+  * \n
 */
 Atom aSCROLL_NOTIFY = None; // specific notification for scrollbars
 
@@ -285,11 +282,12 @@ Atom aSCROLL_NOTIFY = None; // specific notification for scrollbars
   * \brief query if it's ok to close (and optionally destroy yourself if ok) a window
   *
   * QUERY_CLOSE message format (relative to XEvent.xclient)\n
+  * \n
   * type == ClientMessage\n
   * message_type == aQUERY_CLOSE\n
   * format == 32 (always)\n
   * data.l[0] contains a non-zero value if the window should destroy its private data NOW; 0 otherwise\n
-  *
+  * \n
   * Window callbacks should check for this and return '0' when it's ok to destroy the window, a positive
   * value if it's NOT ok, or a negative value on error.
   *
@@ -311,21 +309,22 @@ Atom aQUERY_CLOSE=None;
   * \brief notify window that it should re-calculate things like scrollbars and viewports
   *
   * RECALC_LAYOUT message format (relative to XEvent.xclient)\n
+  * \n
   * type == ClientMessage\n
   * message_type == aRECALC_LAYOUT\n
   * format == 32 (always)\n
-  *
+  * \n
   * A window that has a viewport and scrollbars, using a text object or other construct that
   * supports this ClientMessage atom, should check for this message and recalculate viewports and
   * scrollbar positions whenever it is received.  If scroll positions have changed, you should invalidate
   * the entire window rectangle so that it can be re-painted.  However, you should not paint the window
   * synchronously.  You should rely on asynchronous processing of Expose events.
   *
-  * In some cases, default handling of 'recalc layout' functionality may cause aSCROLLBAR_NOTIFY and/or
-  * aRESIZE_NOTIFY client message events to be dispatched.  Care should be taken to NOT cause an infinite
-  * loop or infinite recursion due to the handling of these events.
+  * In some cases, default handling of 'recalc layout' functionality may cause aRESIZE_NOTIFY client
+  * message events to be dispatched.  Care should be taken to NOT cause an infinite loop or
+  * infinite recursion due to the handling of these events.
   *
-  * \sa aSCROLLBAR_NOTIFY, aRESIZE_NOTIFY
+  * \sa aRESIZE_NOTIFY
 **/
 Atom aRECALC_LAYOUT=None;
 
@@ -335,6 +334,7 @@ Atom aRECALC_LAYOUT=None;
   * \brief dialog focus messages
   *
   * DLG_FOCUS message format (relative to XEvent.xclient)\n
+  * \n
   * type == ClientMessage\n
   * message_type == aDLG_FOCUS\n
   * format == 32 (always)\n
@@ -343,11 +343,12 @@ Atom aRECALC_LAYOUT=None;
   * \li greater than zero for 'next window'
   * \li equal to zero for 'set to this window'
   *
-  * \b for \b data.l[0] \b== \b0
-  * data.l[1] is the control id to set focus to
-  * data.l[2] is non-zero if the control focus was assigned via a hot-key
+  * \b for \b data.l[0] \b == \b 0
+  * \li data.l[1] is the control id to set focus to
+  * \li data.l[2] is non-zero if the control focus was assigned via a hot-key, else zero.
   *
-  * (otherwise, all remaining entries in 'data.l' should be zero)
+  *
+  * by convention, all remaining entries in 'data.l' should be zero
 **/
 Atom aDLG_FOCUS=None;
 
@@ -356,11 +357,12 @@ Atom aDLG_FOCUS=None;
   * \brief dialog focus messages
   *
   * SET_FOCUS message format (relative to XEvent.xclient)\n
+  * \n
   * type == ClientMessage\n
   * message_type == aSET_FOCUS\n
   * format == 32 (always)\n
   * data.l[0] is the window ID to set focus to (None for default)
-  *
+  * \n
   * This message is typically sent to the application (.window = None)
   *
   * By posting a SET_FOCUS message to the application, you can ASYNCHRONOUSLY
@@ -377,51 +379,54 @@ Atom aSET_FOCUS=None;
   * \hideinitializer
   * \brief keystroke/character notifications generated by API
   *
-  * Mid-level keystroke handling generates WM_CHAR notifications via ClientMessage
+  * Mid-level keystroke handling generates WB_CHAR notifications via ClientMessage
   * passed to the appropriate window in addition to normal key up/down events.
   *
-  * WM_CHAR notification message format (relative to XEvent.xclient)\n
+  * WB_CHAR notification message format (relative to XEvent.xclient)\n
+  * \n
   * type == ClientMessage\n
-  * message_type == aWM_CHAR\n
+  * message_type == aWB_CHAR\n
   * format == 32 (always)\n
   * data.l[0] is return from WBKeyEventProcessKey\n
   * data.l[1] is *piAltCtrlShift from WBKeyEventProcessKey\n
   * data.l[2] is # of characters decoded into data.l[3..4]\n
   * data.l[3..4] (as char[]) is decode buffer (at least 8 chars long, possibly 16 for 64-bit)\n
-  *
+  * \n
   * see also:   WBKeyEventProcessKey()
 **/
-Atom aWM_CHAR=None;          ///< character notifications (generated by API; avoids key up/down handling)
+Atom aWB_CHAR=None;          ///< character notifications (generated by API; avoids key up/down handling)
 
 /** \ingroup xatoms
   * \hideinitializer
   * \brief timer notifications generated by API
   *
-  * Mid-level timer handling generates WM_TIMER notifications via ClientMessage
+  * Mid-level timer handling generates WB_TIMER notifications via ClientMessage
   * passed to the appropriate window, either periodic or 'one-shot'\n
   * See \ref CreateTimer() for more information.
   *
-  * WM_TIMER message format (relative to XEvent.xclient)\n
+  * WB_TIMER message format (relative to XEvent.xclient)\n
+  * \n
   * type == ClientMessage\n
-  * message_type == aWM_TIMER\n
+  * message_type == aWB_TIMER\n
   * format == 32 (always)\n
   * data.l[0] is the unique identifier associated with the timer
-  *
+  * \n
   * see also:  CreateTimer(), DeleteTimer()
 **/
-Atom aWM_TIMER=None;         ///< timer notifications (generated by API)
+Atom aWB_TIMER=None;         ///< timer notifications (generated by API)
 
 /** \ingroup xatoms
   * \hideinitializer
   * \brief pointer click/double-click/drag notifications generated by API
   *
-  * Mid-level pointer click/double-click/drag handling generates WM_POINTER notifications
+  * Mid-level pointer click/double-click/drag handling generates WB_POINTER notifications
   * (i.e. mouse motion) via ClientMessage passed to the appropriate window in addition to
   * the normal pointer notification events via the normal event system.
   *
-  * WM_POINTER notification message format (relative to XEvent.xclient)\n
+  * WB_POINTER notification message format (relative to XEvent.xclient)\n
+  * \n
   * type == ClientMessage\n
-  * message_type == aWM_POINTER\n
+  * message_type == aWB_POINTER\n
   * format == 32 (always)\n
   * data.l[0] is one of the notification codes\n
   * \li \ref WB_POINTER_UNSPECIFIED
@@ -448,8 +453,9 @@ Atom aWM_TIMER=None;         ///< timer notifications (generated by API)
   *
   * data.l[3] is translated X coordinate\n
   * data.l[4] is translated Y coordinate\n
+  * \n
 **/
-Atom aWM_POINTER=None;       ///< 'pointer' notifications (generated by API)
+Atom aWB_POINTER=None;       ///< 'pointer' notifications (generated by API)
 
 // things used by window managers
 /** \ingroup wmatom
@@ -494,128 +500,170 @@ Atom aAVERAGE_WIDTH=None;
 
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief CLIPBOARD Atom for the clipboard
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aCLIPBOARD=None;        // Atom for 'CLIPBOARD'
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief PRIMARY Atom for the clipboard - uses XA_PRIMARY
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aPRIMARY=XA_PRIMARY;    // Atom for 'PRIMARY' XA_PRIMARY
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief SECONDARY Atom for the clipboard - uses XA_SECONDARY
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aSECONDARY=XA_SECONDARY;// Atom for 'SECONDARY' XA_SECONDARY
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief MANAGER Atom for the clipboard
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aMANAGER=None;          // Atom for 'MANAGER'
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief TARGET Atom for the clipboard
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aTARGET=None;           // Atom for 'TARGET'
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief INCR Atom for the clipboard
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aINCR=None;             // Atom for 'INCR' (incremental transfers)
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief WINDOW Atom for the clipboard - uses XA_WINDOW
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aWINDOW=XA_WINDOW;      // Atom for 'WINDOW'
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief BITMAP Atom for the clipboard - uses XA_BITMAP
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aBITMAP=XA_BITMAP;      // Atom for 'BITMAP'
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief DRAWABLE Atom for the clipboard - uses XA_DRAWABLE
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aDRAWABLE=XA_DRAWABLE;  // Atom for 'DRAWABLE'
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief COLORMAP Atom for the clipboard - uses XA_COLORMAP
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aCOLORMAP=XA_COLORMAP;  // Atom for 'COLORMAP'
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief PIXEL Atom for the clipboard
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aPIXEL=None;            // Atom for 'PIXEL'
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief PIXMAP Atom for the clipboard - uses XA_PIXMAP
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aPIXMAP=XA_PIXMAP;      // Atom for 'PIXMAP'
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief TEXT Atom for the clipboard
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aTEXT=None;             // Atom for 'TEXT'
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief STRING Atom for the clipboard - uses XA_STRING
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aSTRING=XA_STRING;      // Atom for 'STRING'
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief UTF8_STRING Atom for the clipboard
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aUTF8_STRING=None;      // Atom for 'UTF8_STRING'
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief C_STRING Atom for the clipboard
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aC_STRING=None;         // Atom for 'C_STRING'
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief COMPOUND_TEXT Atom for the clipboard
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aCOMPOUND_TEXT=None;    // Atom for 'COMPOUND_TEXT'
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief TARGETS Atom for the clipboard
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aTARGETS=None;          // Atom for 'TARGETS'
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief MULTIPLE Atom for the clipboard
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aMULTIPLE=None;         // Atom for 'MULTIPLE'
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief TIMESTAMP Atom for the clipboard
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aTIMESTAMP=None;        // Atom for 'TIMESTAMP'
 /** \ingroup wmatom
   * \hideinitializer
-  * \brief Atoms for the clipboard
+  * \brief NULL Atom for the clipboard
   *
+  * Used by Clipboard owners and clients to communicate.\n
+  * More information at freedesktop.org WM documentation\n
 **/
 Atom aNULL=None;             // Atom for 'NULL'
 
@@ -641,6 +689,12 @@ Atom aNULL=None;             // Atom for 'NULL'
 
 /** \ingroup wcore
   * \internal
+  * \struct __internal_window_entry__
+  * \copydoc _WINDOW_ENTRY_
+**/
+/** \ingroup wcore
+  * \internal
+  * \typedef _WINDOW_ENTRY_
   * \brief Core (internal) structure for window management, one per window
   *
   * Each '_WINDOW_ENTRY_' structure is mapped 1:1 to a window ID, and is allocated
@@ -653,9 +707,51 @@ Atom aNULL=None;             // Atom for 'NULL'
   *
   * Management of this structure's members is handled by the API, and as such
   * their values should neither be directly modified nor relied upon outside
-  * of the API's implementation files.
+  * of the API's implementation files.  However, it's being documented here so
+  * that you can understand the code if you need to debug or troubleshoot something.
+  *
+  * \code
+
+  typedef struct __internal_window_entry__     // the structure that identifies the window and what to do with it
+  {
+    Window wID;                                // window to which the structure is mapped
+    const char *szClassName;                   // window 'class name', mostly for debug and tracing, points to NULL or persistent name string
+    Display *pDisplay;                         // display associated with this window
+    Window wParent;                            // cached window parent ID
+    GC hGC;                                    // default graphics context
+    unsigned long clrFG;                       // default foreground color (also assigned to GC)
+    unsigned long clrBG;                       // default background color (also assigned to GC)
+    XFontStruct *pFontStruct;                  // Assigned font structure.  NULL implies global 'pDefaultFont'
+    XFontSet fontSet;                          // Assigned font set structure.  None implies global 'fontsetDefault'
+    XWMHints *pWMHints;                        // XWMHints structure (cached)
+    Pixmap pxIcon;                             // icon pixmap (may be None)
+    Pixmap pxMask;                             // icon mask pixmap (may be None)
+    int (* pCallback)(Window wIDEvent, XEvent *pEvent); // Pointer to the window's event callback function
+    WB_GEOM geomAbsolute;                      // absolute window geometry (from notification)
+    Region rgnClip;                            // complex clip (aka 'invalid') region (0 implies 'none')
+    Region rgnPaint;                           // rectangular paint region (0 implies 'none')
+    Window wIDMenu;                            // window ID for attached menu window
+    int (* pMenuCallback)(Window wIDEvent, XEvent *pEvent); // Pointer to the window's MENU callback function - may be NULL, valid only for windows with menus
+    Cursor curRecent;                          // most recent cursor resource (must be freed via XFreeCursor)
+    int idCursor;                              // last cursor ID used by 'WBSetCursor()'
+    int idDefaultCursor;                       // default cursor
+    int iWaitCursorCount;                      // current 'count' for wait cursor
+    int width;                                 // cached width value from latest 'Expose' event
+    int height;                                // cached height value from latest 'Expose' event (TODO:  ConfigureNotify?)
+    int border;                                // cached border value from latest 'Expose' event (TODO:  ConfigureNotify?)
+    int iModalFlag;                            // current modal state (0 for modeless)  (see WBShowModal)
+    int iModalReturn;                          // return value for a modal window (see WBShowModal)
+    int iWindowState;                          // indicates if window mapped
+    enum WMPropertiesWindowType eWindowType;   // a combination of WMPropertiesWindowType values (default None)
+    enum WMPropertiesWMProtocols eWMProtocols; // a combination of WMPropertiesWMProtocols values, indicating supported protocols (default None)
+    struct timeval tvLastActivity;             // time of last activity (TODO:  find a better way than 'gettimeofday')
+    void *aWindowData[WINDOW_DATA_SIZE];       // 4 void pointers, to be uased as needed for 'window data'
+  } _WINDOW_ENTRY_;
+
+  * \endcode
+  *
 **/
-typedef struct  // the structure that identifies the window and what to do with it
+typedef struct __internal_window_entry__     // the structure that identifies the window and what to do with it
 {
   Window wID;                                ///< window to which the structure is mapped
   const char *szClassName;                   ///< window 'class name', mostly for debug and tracing, points to NULL or persistent name string
@@ -669,7 +765,6 @@ typedef struct  // the structure that identifies the window and what to do with 
   XWMHints *pWMHints;                        ///< XWMHints structure (cached)
   Pixmap pxIcon;                             ///< icon pixmap (may be None)
   Pixmap pxMask;                             ///< icon mask pixmap (may be None)
-//  WBWinEvent pCallback;
   /** \brief Pointer to the window's event callback function
     *
     * The callback function defines the behavior of the window.  Each event that is dispatched
@@ -683,8 +778,7 @@ typedef struct  // the structure that identifies the window and what to do with 
   Region rgnClip;                            ///< complex clip (aka 'invalid') region (0 implies 'none')
   Region rgnPaint;                           ///< rectangular paint region (0 implies 'none')
   Window wIDMenu;                            ///< window ID for attached menu window
-//  WBWinEvent pMenuCallback;   // valid only for menu windows
-  /** \brief Pointer to the window's MENU callback function - may be NULL, valid for windows with menus */
+  /** \brief Pointer to the window's MENU callback function - may be NULL, valid only for windows with menus */
   int (* pMenuCallback)(Window wIDEvent, XEvent *pEvent);
   Cursor curRecent;                          ///< most recent cursor resource (must be freed via XFreeCursor)
   int idCursor;                              ///< last cursor ID used by 'WBSetCursor()'
@@ -1078,7 +1172,6 @@ int WBInitDisplay(Display *pDisplay)
   aMENU_COMMAND     = WBGetAtom(pDisplay, "MENU_COMMAND");    //XInternAtom(pDisplay, "MENU_COMMAND", False);
   aMENU_UI_COMMAND  = WBGetAtom(pDisplay, "MENU_UI_COMMAND"); //XInternAtom(pDisplay, "MENU_UI_COMMAND", False);
   aRESIZE_NOTIFY    = WBGetAtom(pDisplay, "RESIZE_NOTIFY");   //XInternAtom(pDisplay, "RESIZE_NOTIFY", False);
-  aSCROLLBAR_NOTIFY = WBGetAtom(pDisplay, "SCROLLBAR_NOTIFY");//XInternAtom(pDisplay, "SCROLLBAR_NOTIFY", False);
   aCONTROL_NOTIFY   = WBGetAtom(pDisplay, "CONTROL_NOTIFY");  //XInternAtom(pDisplay, "CONTROL_NOTIFY", False);
   aSCROLL_NOTIFY    = WBGetAtom(pDisplay, "SCROLL_NOTIFY");   //XInternAtom(pDisplay, "SCROLL_NOTIFY", False);
   aQUERY_CLOSE      = WBGetAtom(pDisplay, "QUERY_CLOSE");     //XInternAtom(pDisplay, "QUERY_CLOSE", False);
@@ -1090,12 +1183,12 @@ int WBInitDisplay(Display *pDisplay)
   // no doubt the above list will grow as new types of ClientMessage events are added
 
   // internally-generated 'TIMER' event notification
-  aWM_TIMER         = WBGetAtom(pDisplay, "WM_TIMER");        //XInternAtom(pDisplay, "WM_TIMER", False);
+  aWB_TIMER         = WBGetAtom(pDisplay, "WB_TIMER");        //XInternAtom(pDisplay, "WB_TIMER", False);
 
   // additional 'window manager' ClientMessage events that are generated internally by the toolkit
   // as a result of 'message translation' (basically user input 'RAW' to something more usable)
-  aWM_CHAR          = WBGetAtom(pDisplay, "WM_CHAR");         //XInternAtom(pDisplay, "WM_CHAR", False);
-  aWM_POINTER       = WBGetAtom(pDisplay, "WM_POINTER");      //XInternAtom(pDisplay, "WM_POINTER", False);
+  aWB_CHAR          = WBGetAtom(pDisplay, "WB_CHAR");         //XInternAtom(pDisplay, "WB_CHAR", False);
+  aWB_POINTER       = WBGetAtom(pDisplay, "WB_POINTER");      //XInternAtom(pDisplay, "WB_POINTER", False);
 
 
   // these next atoms REQUIRE the use of 'XInternAtom' since they have 'global' scope for the entire X11 system
@@ -1145,7 +1238,6 @@ int WBInitDisplay(Display *pDisplay)
   if(aMENU_COMMAND     == None ||
      aMENU_UI_COMMAND  == None ||
      aRESIZE_NOTIFY    == None ||
-     aSCROLLBAR_NOTIFY == None ||
      aCONTROL_NOTIFY   == None ||
      aSCROLL_NOTIFY    == None ||
      aQUERY_CLOSE      == None ||
@@ -1156,9 +1248,9 @@ int WBInitDisplay(Display *pDisplay)
      aWM_DELETE_WINDOW == None ||
      aWM_TAKE_FOCUS    == None ||
      aAVERAGE_WIDTH    == None ||
-     aWM_CHAR          == None ||
-     aWM_TIMER         == None ||
-     aWM_POINTER       == None ||
+     aWB_CHAR          == None ||
+     aWB_TIMER         == None ||
+     aWB_POINTER       == None ||
      aCLIPBOARD        == None ||
      aMANAGER          == None ||
      aTARGET           == None ||
@@ -1845,7 +1937,7 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
        (bMenuSplashFlag >= 0 && WBIsChildWindow(wID, event.xany.window)) || // check for 'is a child of modal' when NOT a splash window
        WB_UNLIKELY(event.type == ClientMessage &&
                    (event.xclient.message_type == aWM_PROTOCOLS || // all of these get through
-                    event.xclient.message_type == aWM_TIMER)))     // all timers get through
+                    event.xclient.message_type == aWB_TIMER)))     // all timers get through
     {
       if(event.xany.window != wID && bMenuSplashFlag > 0 && // menu only because I'm capturing keyboard and mouse
          (event.type == KeyPress || event.type == KeyRelease || event.type == MotionNotify))
@@ -1874,7 +1966,7 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 #ifndef NO_DEBUG
       if(event.xany.window != wID &&
          WB_LIKELY(event.type != ClientMessage ||
-                   (event.xclient.message_type != aWM_TIMER && event.xclient.message_type != aWM_PROTOCOLS)))
+                   (event.xclient.message_type != aWB_TIMER && event.xclient.message_type != aWM_PROTOCOLS)))
 
       {
         WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_Event | DebugSubSystem_Window,
@@ -3275,7 +3367,7 @@ WB_UINT64 lTime = WBGetTimeIndex();
       pEvent->xclient.send_event = 0;
       pEvent->xclient.display = pDisplay;
       pEvent->xclient.window = pCur->wID;
-      pEvent->xclient.message_type = aWM_TIMER;
+      pEvent->xclient.message_type = aWB_TIMER;
       pEvent->xclient.format=32;  // 32-bit integers
       pEvent->xclient.data.l[0] = pCur->lID;
 
@@ -3899,7 +3991,7 @@ static unsigned long long ullLastTime = 0;
                                           .send_event=0,
                                           .display=pDisplay,
                                           .window=((XButtonEvent *)pEvent)->window,
-                                          .message_type=aWM_POINTER,
+                                          .message_type=aWB_POINTER,
                                           .format=32
                                         };
 
@@ -3946,7 +4038,7 @@ static unsigned long long ullLastTime = 0;
                                         .send_event=0,
                                         .display=pDisplay,
                                         .window=((XButtonEvent *)pEvent)->window,
-                                        .message_type=aWM_POINTER,
+                                        .message_type=aWB_POINTER,
                                         .format=32
                                       };
 
@@ -3991,7 +4083,7 @@ static unsigned long long ullLastTime = 0;
                                           .send_event=0,
                                           .display=pDisplay,
                                           .window=pEvent->xany.window,
-                                          .message_type=aWM_POINTER,
+                                          .message_type=aWB_POINTER,
                                           .format=32
                                         };
 
@@ -4078,7 +4170,7 @@ static unsigned long long ullLastTime = 0;
                                           .send_event=0,
                                           .display=pDisplay,
                                           .window=pEvent->xany.window,
-                                          .message_type=aWM_POINTER,
+                                          .message_type=aWB_POINTER,
                                           .format=32
                                         };
 
@@ -4177,7 +4269,7 @@ static unsigned long long ullLastTime = 0;
                                           .send_event=0,
                                           .display=pDisplay,
                                           .window=((XButtonEvent *)pEvent)->window,
-                                          .message_type=aWM_POINTER,
+                                          .message_type=aWB_POINTER,
                                           .format=32
                                         };
 
@@ -4219,7 +4311,7 @@ static unsigned long long ullLastTime = 0;
                                         .send_event=0,
                                         .display=pDisplay,
                                         .window=((XButtonEvent *)pEvent)->window,
-                                        .message_type=aWM_POINTER,
+                                        .message_type=aWB_POINTER,
                                         .format=32
                                       };
 
@@ -4814,10 +4906,10 @@ int WBDefault(Window wID, XEvent *pEvent)
         return 1;  // "handled"
       }
     }
-    else if(pEvent->xclient.message_type == aWM_TIMER && pEvent->xclient.window == wID)
+    else if(pEvent->xclient.message_type == aWB_TIMER && pEvent->xclient.window == wID)
     {
       WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Window | DebugSubSystem_Event,
-                      "%s - un-handled WM_TIMER for %d (%08xH)\n",
+                      "%s - un-handled WB_TIMER for %d (%08xH)\n",
                       __FUNCTION__, (int)wID, (int)wID);
     }
 #ifndef NO_DEBUG    // uncomment this block to dump every event NOT handled
@@ -4843,9 +4935,9 @@ int WBDefault(Window wID, XEvent *pEvent)
 
     if(pEvent->type == KeyPress /* || pEvent->type == KeyRelease */)
     {
-      // generate a WM_CHAR event for unhandled 'keypress' events
+      // generate a WB_CHAR event for unhandled 'keypress' events
       // this lets all windows have a chance at intercepting the
-      // keypress event before a WM_CHAR is generated
+      // keypress event before a WB_CHAR is generated
 
       XClientMessageEvent evt;
       int cbData, iACS = 0;
@@ -4856,7 +4948,7 @@ int WBDefault(Window wID, XEvent *pEvent)
       evt.type = ClientMessage;
       evt.display = pDisplay;
       evt.window = pEvent->xany.window;
-      evt.message_type = aWM_CHAR; // WM_CHAR notification
+      evt.message_type = aWB_CHAR; // WB_CHAR notification
       evt.format = 32;
 
       cbData = sizeof(evt.data) - 3 * sizeof(evt.data.l[0]);
@@ -4881,7 +4973,7 @@ int WBDefault(Window wID, XEvent *pEvent)
         {
           // temporary debug
           WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Keyboard,
-                         "%s - generating WM_CHAR for KEYSYM %ld (%lxH) iACS=%xH window %d (%08xH)\n",
+                         "%s - generating WB_CHAR for KEYSYM %ld (%lxH) iACS=%xH window %d (%08xH)\n",
                          __FUNCTION__, evt.data.l[0], evt.data.l[0], iACS,
                          (int)pEvent->xany.window, (int)pEvent->xany.window);
         }
@@ -4889,7 +4981,7 @@ int WBDefault(Window wID, XEvent *pEvent)
         {
           // temporary debug
           WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_Keyboard,
-                         "%s - generating WM_CHAR \"%.*s\" iACS=%xH window %d (%08xH)\n",
+                         "%s - generating WB_CHAR \"%.*s\" iACS=%xH window %d (%08xH)\n",
                          __FUNCTION__, cbData, (char *)&(evt.data.l[3]), iACS,
                          (int)pEvent->xany.window, (int)pEvent->xany.window);
         }
@@ -5122,7 +5214,7 @@ int iX, iY;
   evt.type=ClientMessage;
   evt.display=pDisplay;
   evt.window=wID;
-  evt.message_type=aWM_POINTER;
+  evt.message_type=aWB_POINTER;
   evt.format=32;
   evt.data.l[0] = WB_POINTER_CANCEL;
 
@@ -5136,7 +5228,7 @@ int iX, iY;
   evt.data.l[3] = iX;
   evt.data.l[4] = iY;
 
-  WBPostPriorityEvent(wID, (XEvent *)&evt); // post the WM_POINTER 'WB_POINTER_CANCEL' event
+  WBPostPriorityEvent(wID, (XEvent *)&evt); // post the WB_POINTER 'WB_POINTER_CANCEL' event
 
   iMouseState = MouseState_NONE; // canceled
 

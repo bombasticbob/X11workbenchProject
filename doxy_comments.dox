@@ -259,7 +259,7 @@
   * If 'proof of concept' or 'under development' code temporarily uses 'the wrong method', mark
   * the code with a 'TODO' comment to indicate that it needs to be re-factored for reliability.
   *
-  * Avoid excessive use of malloc.  If you need a lot of small memory blocks, create a structure
+  * Avoid excessive use of allocated memory.  If you need a lot of small memory blocks, create a structure
   * instead, and allocate THAT way.  If the structure has an array in it, the array should be the final
   * member of the structure, declared with a single element, and the actual size of the structure
   * should be large enough to accomodate the entire array.  There are already a lot of examples of
@@ -268,10 +268,17 @@
   * In cases where an object may be accessed by a worker thread after the main thread has
   * destroyed it, you should use reference counting to prevent accessing 'free'd memory blocks.
   *
-  * There is a set of high speed sub-allocation utilities, WBAlloc(), WBReAlloc() and WBFree().  In
-  * those cases where you really DO need to allocate a lot of dynamic memory blocks, use these
+  * There is a set of generic platform-independent sub-allocation utilities, WBAlloc(), WBReAlloc() and WBFree().
+  * In those cases where you really DO need to allocate a lot of dynamic memory blocks, use these functions
   * in lieu of 'malloc()' 'realloc()' or 'free()'.  Contributed code should not abuse these functions,
-  * but INSTEAD make use of them ONLY when actually needed.
+  * but INSTEAD make use of them ONLY when actually needed, and get cleaned up properly.  There should NEVER
+  * be any 'use after free' or 'memory leak' problems in the toolkit or in the X11 Workbench.
+
+  * Preventing 'use after free' can be a simple discipline of assigning any pointer to NULL right after
+  * calling WBFree(), even if there is no code that might use the pointer (for now, at least).  Code
+  * that might be added later by others may attempt to use this pointer, assuming it is valid.  Assigning
+  * it to NULL is therefore pre-emptive in this case, forcing a crash to occur instead of pointer re-use,
+  * which is FAR more preferable, as it would likely be caught early on.
   *
   * All functions must be declared in the form of 'a prototype', as per ANSI standards.  Functions
   * without any arguments must have '(void)' rather than '()'.  All function return types are to be
@@ -882,12 +889,12 @@
   *
 **/
 
-/** \defgroup platform Platform-Helper Functions and Definitions
+/** \defgroup platform Platform Independence
   *
   * Some functions either need special help on certain platforms, or are missing entirely.  In
   * other cases, the manner in which a function is implemented is very specific for a particular
-  * platform.  Additionally, common definitions change from one platform to another.  The functions
-  * and definitions in this group deal with these specific problems.\n
+  * platform.  Additionally, common definitions change from one platform to another.  The functions,
+  * data types, and definitions in this group deal with these specific problems.\n
 **/
 
 /** \defgroup conf_help Configuration 'helper' functions
@@ -900,7 +907,15 @@
   * \brief Generic Utility functions for copying and manipulating text
   *
   * Utility functions for copying and manipulating text, such as string copying and concatenation.
-  * These function standardize common string operations and allocate buffers with 'malloc()' as needed.
+  * These function standardize common string operations and allocate new buffers with 'WBAlloc()'
+  * as needed.  This can greatly simplify working with string-based data.
+  *
+  * These generic string functions are compatible with Multi-Byte character sets, with the assumption
+  * that a standard UTF-8 or multi-byte character consists of 1 or more non-zero bytes, and that the
+  * end of a multi-byte or UTF-8 string is marked with a zero byte.
+  *
+  * For working specifically with Multi-Byte Character Sets (MBCS), see \ref text_object_multibyte.
+  *
 **/
 
 /** \defgroup sub_alloc Memory sub-allocator for high performance dynamic memory management
@@ -1106,7 +1121,7 @@
   * the various events can be dispatched to window callback functions, or to the
   * application's event handler. The X11workbench Toolkit API has provisinos for
   * event prioritization, asynchronous processing, and the generation of 'internal
-  * events' (see \ref aWM_CHAR, \ref aWM_POINTER, \ref aWM_TIMER).
+  * events' (see \ref aWB_CHAR, \ref aWB_POINTER, \ref aWB_TIMER).
 **/
 
 /** \ingroup core
@@ -1155,7 +1170,7 @@
   * \defgroup timer Timer Functions
   *
   * The X11workbench Toolkit API has support for one-shot and periodic timer
-  * events that are generated via XClientEvent using \ref aWM_TIMER.\n
+  * events that are generated via XClientEvent using \ref aWB_TIMER.\n
   * These timer events are NOT hyper-accurate, although the timer event time
   * is expressed in microseconds (for math efficiency and convenience).  The
   * message loop will check for 'crossing an event time' and generate events
@@ -1207,16 +1222,16 @@
   * \defgroup keyboard Keyboard Event Handling
   *
   * The X11workbench Toolkit API provides for mid-level keyboard event handling via
-  * WM_CHAR ClientMessage notification events.\n
-  * See \ref aWM_CHAR for more info.
+  * WB_CHAR ClientMessage notification events.\n
+  * See \ref aWB_CHAR for more info.
 **/
 
 /** \ingroup events
   * \defgroup pointer Mouse Pointer Event Handling
   *
   * The X11workbench Toolkit API provides for mid-level pointer event handling via
-  * WM_POINTER ClientMessage notification events.\n
-  * See \ref aWM_POINTER for more info.
+  * WB_POINTER ClientMessage notification events.\n
+  * See \ref aWB_POINTER for more info.
 **/
 
 

@@ -53,6 +53,36 @@
   * X11 Work Bench Toolkit Toolkit API
 */
 
+/** \defgroup text_object_definitions Definitions associated with Text Objects
+  * \ingroup text_object
+  * \brief Definitions associated with Text Objects
+  *
+  * The definitions associated with Text Objects, including various 'enum' types
+**/
+/** \defgroup text_object_structures Structures associated with Text Objects
+  * \ingroup text_object
+  * \brief Structures associated with Text Objects
+  *
+  * The structures associated with Text Objects, including the 'VTABLE' structure
+  * and associated Text Object 'member' functions
+**/
+/** \defgroup text_object_utils Text Object utility functions
+  * \ingroup text_object
+  * \brief Utility functions for managing Text Objects
+  *
+  * Utility functions for managing Text Objects.
+**/
+/** \defgroup text_object_multibyte Multi-Byte Character Set utility functions
+  * \ingroup text_object
+  * \brief 'Multi-Byte' Character Set utility functions
+  *
+  * Utility functions for working with Multi-Byte character sets (MBCS).  These are
+  * primarily intended for use with 'Text Objects'.
+  *
+**/
+
+
+
 #ifndef _TEXT_OBJECT_H_INCLUDED_
 #define _TEXT_OBJECT_H_INCLUDED_
 
@@ -65,32 +95,37 @@ extern "C" {
 
 // FILE TYPE CONSTANTS
 
-/** \ingroup text_object
+/** \ingroup text_object_definitions
   * \brief file types for TEXT_OBJECT
+  *
+  * A list of supported 'file types' for a Text Object.  See also get_filetype(), set_filetype()
+  *
 **/
 enum _FileType_
 {
-  FileType_PLAIN_TEXT    = 0,  // no special handling, no source decorations
-  FileType_PROGRAM       = 1,  // program source
-  FileType_RESOURCE      = 2,  // 'resource' file, text-based format
-  FileType_XML           = 3,  // XML data (includes HTML)
-  FileType_MAKEFILE      = 4,  // Make Files with special handling (implies 'hard tab', always)
+  FileType_PLAIN_TEXT    = 0,       ///< no special handling, no source decorations
+  FileType_PROGRAM       = 1,       ///< program source
+  FileType_RESOURCE      = 2,       ///< 'resource' file, text-based format
+  FileType_XML           = 3,       ///< XML data (includes HTML)
+  FileType_MAKEFILE      = 4,       ///< Make Files with special handling (implies 'hard tab', always)
 
-  FileType_CUSTOM_FLAG   = 0x80, // 'custom' file types - 'or' with custom definition (0-0x7f)
+  FileType_CUSTOM_FLAG   = 0x80,    ///< 'custom' file types - 'or' with custom definition (0-0x7f)
 
-  FileType_MASK          = 0xff,
+  FileType_MASK          = 0xff,    ///< a bitmask for the various file types.  Perform a logical 'and' of the file type value with this, and then you can compare it as being equal to one of the other 'FileType_' constants
 
   // additional bits are reserved (for now)
 
   // and now the bit flags
-  FileType_HARDTAB       = 0x10000, // hard tabs - implied by 'FileType_MAKEFILE', otherwise explicit
-  FileType_RESERVED2     = 0x20000,
-  FileType_RESERVED3     = 0x40000,
-  FileType_RESERVED4     = 0x80000
+  FileType_HARDTAB       = 0x10000, ///< hard tabs - implied by 'FileType_MAKEFILE', otherwise explicit
+  FileType_RESERVED2     = 0x20000, ///< reserved 2
+  FileType_RESERVED3     = 0x40000, ///< reserved 3
+  FileType_RESERVED4     = 0x80000  ///< reserved 4
 };
 
-/** \ingroup text_object
+/** \ingroup text_object_definitions
   * \brief line feed (line ending) types for TEXT_OBJECT
+  *
+  * This is a list of acceptable line ending types.  See also get_linefeed(), set_linefeed()
 **/
 enum _LineFeed_
 {
@@ -103,8 +138,10 @@ enum _LineFeed_
   LineFeed_ENTRYCOUNT    = 5    ///< reserved - specifies custom array, indicating the size of the array containing the character values, excluding negative indices
 };
 
-/** \ingroup text_object
+/** \ingroup text_object_definitions
   * \brief select mode types for TEXT_OBJECT
+  *
+  * This is a list of acceptable 'select modes', that determine how multi-line text is selected.  See also get_selmode(), set_selmode()
 **/
 enum _SelectMode_
 {
@@ -114,8 +151,10 @@ enum _SelectMode_
   SelectMode_BOX        = 3     ///< BOX (selects a 'box' using virtual spacing)
 };
 
-/** \ingroup text_object
+/** \ingroup text_object_definitions
   * \brief Insert/Overwrite mode for TEXT_OBJECT
+  *
+  * This is a list of acceptable 'insert/overwrite' modes.  See also get_insmode(), set_insmode()
 **/
 enum _InsertMode_
 {
@@ -124,8 +163,11 @@ enum _InsertMode_
   InsertMode_OVERWRITE   = 2    ///< OVERWRITE mode, character inserted on top of character to the right of the cursor (if any), else inserted
 };
 
-/** \ingroup text_object
+/** \ingroup text_object_definitions
   * \brief State flags for mouse/cursor 'drag' (i.e. selection)
+  *
+  * This is a list of acceptable "drag states", maintained internally.  See also begin_mouse_drag(), end_mouse_drag()
+  * and the use of the 'shift' modifier with cursor keys via begin_highlight() and end_highlight()
 **/
 enum _DragState_
 {
@@ -134,23 +176,23 @@ enum _DragState_
   DragState_MOUSE        = 2    ///< mouse 'drag' (select mode)
 };
 
-/** \ingroup text_object
+/** \ingroup text_object_definitions
 **/
 #define HARD_TAB_CHAR '\xa0' /**< A 'hard tab' is represented internally by this character */
 
-/** \ingroup text_object
+/** \ingroup text_object_definitions
 **/
 #define DEFAULT_TAB_WIDTH 8 /**< the default width for a hard tab in a TEXT_OBJECT */
 
-/** \ingroup text_object
+/** \ingroup text_object_definitions
 **/
 #define AUTO_HSCROLL_SIZE 8 /**< the number of characters to auto-hscroll by to get the cursor inside the viewport */
 
-/** \ingroup text_object
+/** \ingroup text_object_definitions
 **/
 #define MIN_LINE_SPACING 2 /**< the minimum number of pixels by which lines are separated (normally will be 'descent / 2') */
 
-/** \ingroup text_object
+/** \ingroup text_object_definitions
 **/
 #define MIN_BORDER_SPACING 2 /**< the minimum number of pixels separating the text from the window border (when unspecified) */
 
@@ -160,10 +202,10 @@ enum _DragState_
 struct _text_object_; // forward declaration
 
 /** \struct _text_object_vtable_
-  * \ingroup text_object
+  * \ingroup text_object_structures
   * \copydoc TEXT_OBJECT_VTABLE
 **/
-/** \ingroup text_object
+/** \ingroup text_object_structures
   * \typedef TEXT_OBJECT_VTABLE
   * \brief 'vtable' structure for TEXT_OBJECT
   *
@@ -226,7 +268,7 @@ struct _text_object_; // forward declaration
     void (* redo)(struct _text_object_ *pThis);
 
     void (* get_view)(const struct _text_object_ *pThis, WB_RECT *pRct);
-    void (* set_view)(struct _text_object_ *pThis, const WB_RECT *pRct);
+    void (* set_view_orig)(struct _text_object_ *pThis, const WB_POINT *pOrig);
 
     void (* begin_highlight)(struct _text_object_ *pThis);
     void (* end_highlight)(struct _text_object_ *pThis);
@@ -264,6 +306,9 @@ struct _text_object_; // forward declaration
                        XFontSet rFontSet);
 
     void (* cursor_blink)(struct _text_object_ *pThis, int bHasFocus);
+
+    void (* set_save_point)(struct _text_object_ *pThis);
+    int (* get_modified)(struct _text_object_ *pThis);
 
   } TEXT_OBJECT_VTABLE;
 
@@ -586,12 +631,15 @@ typedef struct _text_object_vtable_
   /** \brief Set the current viewport (in characters)\. Only 'left' and 'top' are relevant if the expose method has not (yet) been called.
     *
     * \param pThis A pointer to the TEXT_OBJECT structure
-    * \param pRct A const pointer to a WB_RECT structure that contains the new viewport (in characters)
+    * \param pOrig A const pointer to a WB_POINT structure that contains the new viewport origin (in characters)
     * \return void
     *
     * The 'viewport' is the currently visible area (in characters).  It is independent of the cursor's row and column.
+    * You cannot assign the viewport size directly using this function.  It is derived from things like the font size
+    * and the size of the display window.  You can assign the origin this way, to force the display window to display
+    * an area of the text data beginning with the origin point.  This is useful for scrollbar handling.
   **/
-  void (* set_view)(struct _text_object_ *pThis, const WB_RECT *pRct);
+  void (* set_view_orig)(struct _text_object_ *pThis, const WB_POINT *pOrig);
 
   /** \brief Begin a highlight block
     * \param pThis A pointer to the TEXT_OBJECT structure
@@ -776,12 +824,45 @@ typedef struct _text_object_vtable_
   **/
   void (* cursor_blink)(struct _text_object_ *pThis, int bHasFocus);
 
+  /** \brief Set the 'save point' with respect to the undo/redo buffer
+    *
+    * \param pThis A pointer to the TEXT_OBJECT structure
+    *
+    * Use this function to inform the text object when you have saved the file, and it
+    * is no longer 'modified'.  In conjuction with undo/redo, this helps to maintain
+    * the 'modified' state for the text object.
+    *
+    * use get_modified() to determine whether or not a file has been modified since the last
+    * call to set_save_point().
+    *
+  **/
+  void (* set_save_point)(struct _text_object_ *pThis);
+
+  /** \brief Set the 'save point' with respect to the undo/redo buffer
+    *
+    * \param pThis A pointer to the TEXT_OBJECT structure
+    * \return A non-zero value if the text object has been 'modified' since the last 'save' operation
+    *
+    * Use this function to obtain the 'changed' status of the text object.  A text object
+    * that has been saved (or was just created) is considered to be 'unmodified'.  Otherwise,
+    * anything that writes to the undo buffer/redo buffer that has not directly reverted back
+    * to the 'as saved' content is considered "modified".
+    *
+    * use set_save_point() to mark a file as 'saved' and set it to 'unmodified'
+    *
+  **/
+  int (* get_modified)(struct _text_object_ *pThis);
+
+
 } TEXT_OBJECT_VTABLE;
 
 
 
-/** \ingroup text_object
+/** \ingroup text_object_utils
   * \brief returns the default vtable for a TEXT_OBJECT structure
+  *
+  * Use this function to get a copy of the pointer to the default 'TEXT_OBJECT' vtable.
+  *
 **/
 static __inline__ const TEXT_OBJECT_VTABLE *WBGetDefaultTextObjectVTable(void)
 {
@@ -791,17 +872,17 @@ extern const TEXT_OBJECT_VTABLE WBDefaultTextObjectVTable;
 }
 
 
-/** \ingroup text_object
+/** \ingroup text_object_definitions
   * \brief The 'tag' for a TEXT_OBJECT structure
 **/
 #define TEXT_OBJECT_TAG (*((const unsigned int *)"WBTX"))
 
 
 /** \struct _text_object_
-  * \ingroup text_object
+  * \ingroup text_object_structures
   * \copydoc TEXT_OBJECT
 **/
-/** \ingroup text_object
+/** \ingroup text_object_structures
   * \typedef TEXT_OBJECT
   * \brief 'base class' structure for TEXT_OBJECT
   *
@@ -920,7 +1001,7 @@ typedef struct _text_object_
 
 } TEXT_OBJECT;
 
-/** \ingroup text_object
+/** \ingroup text_object_utils
   * \brief 'TEXT_OBJECT' validator
   * \param pObj A const pointer to a (possible) TEXT_OBJECT structure
   * \return non-zero if the object is a valid TEXT_OBJECT, zero otherwise
@@ -932,7 +1013,7 @@ static __inline__ int WBIsValidTextObject(const TEXT_OBJECT *pObj)
   return pObj && pObj->ulTag == TEXT_OBJECT_TAG;
 }
 
-/** \ingroup text_object
+/** \ingroup text_object_utils
   * \brief initialize an 'in-place' TEXT_OBJECT structure
   *
   * \param pTextObject A pointer to the TEXT_OBJECT structure to be initialized
@@ -957,7 +1038,7 @@ static __inline__ void WBInitializeInPlaceTextObject(TEXT_OBJECT *pTextObject, W
   }
 }
 
-/** \ingroup text_object
+/** \ingroup text_object_utils
   * \brief Destroy a previously initialized 'in-place' TEXT_OBJECT structure
   *
   * \param pTextObject A pointer to the TEXT_OBJECT structure to be initialized
@@ -982,7 +1063,7 @@ static __inline__ void WBDestroyInPlaceTextObject(TEXT_OBJECT *pTextObject)
 
 #define TEXT_BUFFER_LINE_CACHE_SIZE 32
 
-/** \ingroup text_object
+/** \ingroup text_object_structures
   * \brief 'base class' structure for TEXT_OBJECT
   *
   * \code
@@ -1032,7 +1113,7 @@ typedef struct _text_buffer_
 } TEXT_BUFFER;
 
 
-/** \ingroup text_object
+/** \ingroup text_object_utils
   * \brief Generic constructor for a TEXT_BUFFER using defaults
   *
   * \param pBuf Optional initializer text.  Can be NULL or 'blank', which will pre-allocate space for a default number of lines
@@ -1043,7 +1124,7 @@ typedef struct _text_buffer_
 **/
 TEXT_BUFFER * WBAllocTextBuffer(const char *pBuf, unsigned int cbBufSize);
 
-/** \ingroup text_object
+/** \ingroup text_object_utils
   * \brief Re-allocator for TEXT_BUFFER object
   *
   * \param ppBuf A pointer to a TEXT_BUFFER pointer that may be re-assigned (as needed).
@@ -1054,7 +1135,7 @@ TEXT_BUFFER * WBAllocTextBuffer(const char *pBuf, unsigned int cbBufSize);
 **/
 int WBCheckReAllocTextBuffer(TEXT_BUFFER **ppBuf, int nLinesToAdd);
 
-/** \ingroup text_object
+/** \ingroup text_object_utils
   * \brief Re-allocator for TEXT_BUFFER object, returns ZERO on success.  Pointer may be modified (or not).
   *
   * \param pBuf A pointer to a TEXT_BUFFER that has been previously allocated.  It assumes that valid 'aLines' entries contain pointers allocated via 'WBAlloc'
@@ -1064,13 +1145,27 @@ int WBCheckReAllocTextBuffer(TEXT_BUFFER **ppBuf, int nLinesToAdd);
 **/
 void WBFreeTextBuffer(TEXT_BUFFER *pBuf);
 
-/** \ingroup text_object
+/** \ingroup text_object_utils
+  * \brief Text buffer 'cached information' query function indicating a line's cached length
+  *
+  * \param pBuf A pointer to a TEXT_BUFFER object
+  * \param nLine The 0-based line (row) number within the 'aLines' array
+  * \return The current cached length of the line.
+  *
+  * This function returns the cached line length for the specified line.  If you do something that
+  * might change this value, you can check first by calling this function to obtain the cached
+  * value, and then use WBTextBufferRefreshCache() to update it (as needed).
+  *
+  * Header File:  text_object.h
+**/
+int WBTextBufferLineLength(TEXT_BUFFER *pBuf, unsigned long nLine);
+
+/** \ingroup text_object_utils
   * \brief Text buffer 'cached information' update function indicating a change to a line's length
   *
   * \param pBuf A pointer to a TEXT_BUFFER object
   * \param nLine The 0-based line (row) number within the 'aLines' array
   * \param nNewLen The new line length, or -1 if the line is being deleted.
-  * \return void
   *
   * Whenever you modify the length of a line, or delete a line, you should call this function to
   * automatically update the internally cached information specifying the maximum column number.\n
@@ -1082,7 +1177,7 @@ void WBFreeTextBuffer(TEXT_BUFFER *pBuf);
 **/
 void WBTextBufferLineChange(TEXT_BUFFER *pBuf, unsigned long nLine, int nNewLen);
 
-/** \ingroup text_object
+/** \ingroup text_object_utils
   * \brief Text buffer 'cached information' refresh function
   *
   * \param pBuf A pointer to a TEXT_BUFFER object
@@ -1099,7 +1194,7 @@ void WBTextBufferLineChange(TEXT_BUFFER *pBuf, unsigned long nLine, int nNewLen)
 **/
 void WBTextBufferRefreshCache(TEXT_BUFFER *pBuf);
 
-/** \ingroup text_object
+/** \ingroup text_object_utils
   * \brief assign callback function for 'color context' for a given character
   * \param pThis A pointer to the TEXT_OBJECT structure
   * \param callback A function pointer to a 'color context' callback function (see below).  This value may be NULL.
@@ -1139,7 +1234,7 @@ void WBTextObjectSetColorContextCallback(TEXT_OBJECT *pThis,
                                          void *pColorContextPointer);
 
 
-/** \ingroup text_object
+/** \ingroup text_object_utils
   * \brief Generic constructor for a TEXT_OBJECT using defaults
   *
   * \param cbStructSize The size of the 'TEXT_OBJECT' structure itself
@@ -1156,7 +1251,7 @@ void WBTextObjectSetColorContextCallback(TEXT_OBJECT *pThis,
 TEXT_OBJECT *WBTextObjectConstructor(unsigned long cbStructSize, const char *szText, unsigned long cbLen, Window wIDOwner);
 
 
-/** \ingroup text_object
+/** \ingroup text_object_utils
   * \brief Generic detructor for a TEXT_OBJECT
   *
   * \param pObj A pointer to the TEXT_OBJECT structure
@@ -1169,7 +1264,7 @@ TEXT_OBJECT *WBTextObjectConstructor(unsigned long cbStructSize, const char *szT
 void WBTextObjectDestructor(TEXT_OBJECT *pObj);
 
 
-/** \ingroup text_object
+/** \ingroup text_object_utils
   * \brief Calculate the correct per-line height (in pixels) for a specified font ascent and descent
   *
   * \param iAscent The 'ascent' for the display font
@@ -1189,7 +1284,7 @@ int WBTextObjectCalculateLineHeight(int iAscent, int iDescent);
 
 // MBCS-related utilities
 
-/** \ingroup text_object
+/** \ingroup text_object_multibyte
   * \brief Insert multi-byte characters into a WBAlloc'd string, at a specified column
   *
   * \param pString A pointer to a WBAlloc'd buffer containing a multi-byte character string.  The string must terminate with a zero byte.
@@ -1222,7 +1317,7 @@ char * WBInsertMBChars(char *pString, int iCol, const char *pszMBString, int cbS
                        int fTab, int fOverwrite, int *piNewCol, char **ppInserted);
 
 
-/** \ingroup text_object
+/** \ingroup text_object_multibyte
   * \brief Split a multi-byte characters into a WBAlloc'd string, at a specified column, terminating the original string at that column with a zero byte
   *
   * \param pString A pointer to a WBAlloc'd buffer containing a multi-byte character string.  The string must terminate with a zero byte.
@@ -1239,7 +1334,7 @@ char * WBInsertMBChars(char *pString, int iCol, const char *pszMBString, int cbS
 char * WBSplitMBLine(char *pString, int iCol);
 
 
-/** \ingroup text_object
+/** \ingroup text_object_multibyte
   * \brief Split a multi-byte characters into a WBAlloc'd string, at a specified column, terminating the original string at that column with a zero byte
   *
   * \param pString A pointer to a WBAlloc'd buffer containing a multi-byte character string.  The string must terminate with a zero byte.
@@ -1257,7 +1352,7 @@ char * WBSplitMBLine(char *pString, int iCol);
 char * WBJoinMBLine(char *pString, int iCol, const char *pJoin);
 
 
-/** \ingroup text_object
+/** \ingroup text_object_multibyte
   * \brief Delete a specified number of multi-byte characters from a string 'in place', starting at a specified column
   *
   * \param pString A pointer to a buffer containing a multi-byte character string.  The string must terminate with a zero byte.
@@ -1284,7 +1379,7 @@ char * WBJoinMBLine(char *pString, int iCol, const char *pJoin);
 int WBDelMBChars(char *pString, int iCol, int nDel, int *piNewCol, char **ppDeleted);
 
 
-/** \ingroup text_object
+/** \ingroup text_object_multibyte
   * \brief Obtain the length of a multi-byte character string in 'characters' (not bytes)
   *
   * \param pString A pointer to a buffer containing a multi-byte character string.  The string must terminate with a zero byte.
@@ -1295,7 +1390,7 @@ int WBDelMBChars(char *pString, int iCol, int nDel, int *piNewCol, char **ppDele
 int WBGetMBLength(const char *pString);
 
 
-/** \ingroup text_object
+/** \ingroup text_object_multibyte
   * \brief Obtain the pointer to a specific multi-byte character within a multi-byte character string, by specifying it's column
   *
   * \param pString A pointer to a buffer containing a multi-byte character string.  The string must terminate with a zero byte.
@@ -1307,7 +1402,7 @@ int WBGetMBLength(const char *pString);
 **/
 char * WBGetMBCharPtr(char *pString, int iCol, int *pcbLen);
 
-/** \ingroup text_object
+/** \ingroup text_object_multibyte
   * \brief Obtain the column index from a pointer within a multi-byte character string
   *
   * \param pString A pointer to a buffer containing a multi-byte character string.  The string must terminate with a zero byte.

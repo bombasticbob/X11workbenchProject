@@ -184,13 +184,14 @@ static __inline__ void WBInitScrollInfo(WB_SCROLLINFO *pSI) { bzero(pSI, sizeof(
   * \param pSI A pointer to the WB_SCROLLINFO structure
   * \param iMin The minimum scroll value
   * \param iMax The maximum scroll value
+  * \returns A non-zero value if the 'visibility' of the scrollbar has changed
   *
   * Use this function to assign the correct 'scroll range' for a vertical scroll bar that
   * is managed by a WB_SCROLLINFO structure
   *
   * Header File:  window_dressing.h
 **/
-void WBSetVScrollRange(WB_SCROLLINFO *pSI, int iMin, int iMax);
+int WBSetVScrollRange(WB_SCROLLINFO *pSI, int iMin, int iMax);
 
 /** \ingroup window_dressing
   * \brief Set the scroll range for a horizontal scrollbar in the WB_SCROLLINFO structure
@@ -198,13 +199,14 @@ void WBSetVScrollRange(WB_SCROLLINFO *pSI, int iMin, int iMax);
   * \param pSI A pointer to the WB_SCROLLINFO structure
   * \param iMin The minimum scroll value
   * \param iMax The maximum scroll value
+  * \returns A non-zero value if the 'visibility' of the scrollbar has changed
   *
   * Use this function to assign the correct 'scroll range' for a horizontal scroll bar that
   * is managed by a WB_SCROLLINFO structure.
   *
   * Header File:  window_dressing.h
 **/
-void WBSetHScrollRange(WB_SCROLLINFO *pSI, int iMin, int iMax);
+int WBSetHScrollRange(WB_SCROLLINFO *pSI, int iMin, int iMax);
 
 /** \ingroup window_dressing
   * \brief Set the scroll range for a vertical scrollbar in the WB_SCROLLINFO structure

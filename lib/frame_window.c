@@ -3323,7 +3323,7 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 
           return 0; // if there's no handler and no UI handler, always return 0 (not handled)
         }
-        else if(pEvent->xclient.message_type == aWM_CHAR) // hotkeys for menu-related things
+        else if(pEvent->xclient.message_type == aWB_CHAR) // hotkeys for menu-related things
         {
           ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
           //                                                                                                                       //
@@ -3399,7 +3399,7 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
   }
   else // no main menu, like for a dialog-based or form-based application
   {
-    if(pEvent->xclient.message_type == aWM_CHAR) // hotkeys for menu-related things
+    if(pEvent->xclient.message_type == aWB_CHAR) // hotkeys for menu-related things
     {
       ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
       //                                                                                                                       //

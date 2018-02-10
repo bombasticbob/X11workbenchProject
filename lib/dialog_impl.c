@@ -2142,7 +2142,7 @@ struct _SPLASH_ *pData = (struct _SPLASH_ *)WBGetWindowData(wID, 0);
   }
 
   if(pEvent->type == ClientMessage &&
-     pEvent->xclient.message_type == aWM_TIMER)
+     pEvent->xclient.message_type == aWB_TIMER)
   {
     if(!pData)
     {

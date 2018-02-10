@@ -77,7 +77,9 @@
 
 #if defined(__GNUC__) || defined(__DOXYGEN__)
 
-// this section included for doxygen documentation using the X11 definitions
+// ======================================================================================
+// this section is used for doxygen documentation using the X11 definitions
+// Additionally, 'clang' compilers also define '__GNUC__' and will use this section
 
 #include <pthread.h> /* make sure this is included for POSIX */
 
@@ -97,6 +99,8 @@
 // TESTING THE CONFIGURATION - TODO:  for some, provide alternates?
 // NOTE that for 'WIN32' defined, certain features won't be checked
 
+// basic checks - test them all up front, then individual errors if any of these
+//                are not defined in the appropriate header files
 #if !defined( HAVE_ALARM ) || !defined( HAVE_CHOWN ) || \
     !defined( HAVE_CLOCK_GETTIME ) || !defined( HAVE_DUP2 ) || !defined( HAVE_FORK ) || \
     !defined( HAVE_FTRUNCATE ) || !defined( HAVE_GETCWD ) || !defined( HAVE_GETTIMEOFDAY ) || \
@@ -108,10 +112,12 @@
     !defined( HAVE_STRSTR ) || !defined( HAVE__BOOL ) || \
     ( !defined(WIN32) && ( !defined( LSTAT_FOLLOWS_SLASHED_SYMLINK ) || !defined( HAVE_VFORK ) || \
                           !defined( HAVE_WORKING_FORK ) || !defined( HAVE_WORKING_VFORK ) ))
+// *************************************************************
 #error
 #error configure script feature check 1 fail
 #error critical features missing
 #error
+// this next section spits out errors based on what's not defined.
 #ifndef HAVE_ALARM
 #error  HAVE_ALARM is not defined
 #endif //  HAVE_ALARM
@@ -197,7 +203,10 @@
 #error  HAVE_WORKING_VFORK is not defined
 #endif //  HAVE_WORKING_VFORK
 #error
+// the end of that previous error section
+// *************************************************************
 #else
+// -------------------------------------------------------------
 #if !( HAVE_ALARM ) || !( HAVE_CHOWN ) || \
     !( HAVE_CLOCK_GETTIME ) || !( HAVE_DUP2 ) || !( HAVE_FORK ) || \
     !( HAVE_FTRUNCATE ) || !( HAVE_GETCWD ) || !( HAVE_GETTIMEOFDAY ) || \
@@ -213,7 +222,14 @@
 #error configure script feature check 2 fail
 #error critical features missing
 #error
-#endif // all that stuff
+
+// TODO:  individual error messages for those things 'not defined'?  It's a bit
+//        easier to see where something is defined as '0' rather than finding
+//        something that isn't there.  For now, I won't add that section, but I
+//        might do it if it becomes necessary
+
+#endif // all that stuff defined as a zero
+// -------------------------------------------------------------
 #endif // all that prior stuff
 
 #ifndef HAVE_BZERO
@@ -221,6 +237,7 @@
 #endif // !HAVE_BZERO
 
 #if !( HAVE_BZERO )
+// swap this in for 'bzero' using memset - it was checked for earlier
   #define bzero(X,Y) memset((X),0,(Y))
 #endif
 
@@ -229,14 +246,25 @@
 
 #ifdef DEBUG /* explicit DEBUG build */
 #ifdef NO_DEBUG
-#undef NO_DEBUG
+#undef NO_DEBUG // only one may be defined
 #endif // NO_DEBUG
 #endif // DEBUG
 
 // NOTE:  The debug code will be included when NO_DEBUG is *NOT* defined
 
+/** \defgroup platform_definitions Definitions
+  * \ingroup platform
+**/
 
-/** \ingroup platform
+/** \defgroup platform_types Data Types
+  * \ingroup platform
+**/
+
+/** \defgroup platform_functions Functions
+  * \ingroup platform
+**/
+
+/** \ingroup platform_definitions
   * \hideinitializer
   * \brief INVALID HANDLE VALUE equivalent
   *
@@ -245,7 +273,7 @@
 #define INVALID_HANDLE_VALUE ((int)-1)
 
 
-/** \ingroup platform
+/** \ingroup platform_definitions
   * @{
 **/
 
@@ -255,8 +283,26 @@
 
 #if defined(COMPILER_SUPPORTS_BUILTIN_EXPECT) || defined(__DOXYGEN__)
 
-#define WB_UNLIKELY(x) (__builtin_expect (!!(x), 0)) /**< optimization for code branching when condition is 'unlikely'.  use within conditionals **/
-#define WB_LIKELY(x) (__builtin_expect (!!(x), 1))   /**< optimization for code branching when condition is 'likely'.  use within conditionals **/
+/** \brief optimization for code branching when condition is 'unlikely'.  use within conditionals
+ **
+ ** \code
+    if(WB_UNLIKELY(x == 5))
+    {
+      // branch optimized to bypass this code when condition is FALSE
+    }
+ ** \endcode
+**/
+#define WB_UNLIKELY(x) (__builtin_expect (!!(x), 0))
+/** \brief optimization for code branching when condition is 'likely'.  use within conditionals
+ **
+ ** \code
+    if(WB_LIKELY(x == 5))
+    {
+      // branch optimized to execute this code when condition is TRUE
+    }
+ ** \endcode
+**/
+#define WB_LIKELY(x) (__builtin_expect (!!(x), 1))
 
 #else // !COMPILER_SUPPORTS_BUILTIN_EXPECT
 
@@ -267,7 +313,18 @@
 
 #if defined(COMPILER_SUPPORTS_UNUSED_ATTRIBUTE) || defined(__DOXYGEN__)
 
-#define WB_UNUSED __attribute__((unused))  /**< marks a variable as likely to be 'unused'.  warning abatement.  Place macro directly after the variable name **/
+/** \brief marks a variable as likely to be 'unused'.  warning abatement.  Place macro directly after the variable name
+ **
+ ** \code
+
+    int an_unused_var WB_UNUSED = 5; // no compiler warnings if I don't actually use this variable
+
+ ** \endcode
+ **
+ ** \b NOTE:  may also be used for function parameters.  In some cases a callback function may have unused\n
+ **        parameters passed to it.  Marking them with 'WB_UNUSED' helps prevent unnecessary compiler warnings.
+**/
+#define WB_UNUSED __attribute__((unused))
 
 #else // !COMPILER_SUPPORTS_UNUSED_ATTRIBUTE
 
@@ -300,14 +357,14 @@
   * @}
 **/
 
-/** \ingroup platform
+/** \ingroup platform_types
   * \brief Platform abstract 32-bit integer
   *
   * This definition identifies the data type for a 32-bit integer
 **/
 typedef int WB_INT32;
 
-/** \ingroup platform
+/** \ingroup platform_types
   * \brief Platform abstract unsigned 32-bit integer
   *
   * This definition identifies the data type for an unsigned 32-bit integer
@@ -317,20 +374,20 @@ typedef unsigned int WB_UINT32;
 
 #if defined(HAVE_LONGLONG) || defined(__DOXYGEN__) /* 'configure' tests for 'long long' datatype valid in configure script */
 
-/** \ingroup platform
+/** \ingroup platform_definitions
   * \brief defined whenever the 'WB_UINT64' data type is a 'built in' data type
 **/
 #define HAS_WB_UINT64_BUILTIN
 
 
-/** \ingroup platform
+/** \ingroup platform_types
   * \brief Platform abstract 64-bit integer
   *
   * This definition identifies the data type for a 64-bit integer
 **/
 typedef long long WB_INT64;
 
-/** \ingroup platform
+/** \ingroup platform_types
   * \brief Platform abstract unsigned 64-bit integer
   *
   * This definition identifies the data type for an unsigned 64-bit integer
@@ -345,7 +402,7 @@ typedef struct __WB_UINT64__ { WB_UINT32 dw2; WB_UINT32 dw1; } WB_UINT64;
 #endif // _LONGLONG
 
 #ifdef __DOXYGEN__
-/** \ingroup platform
+/** \ingroup platform_types
   * \brief Platform abstract unsigned integer that matches pointer size
   *
   * Definition for an integer equivalent of a pointer for platform-independent type casting without warnings
@@ -357,7 +414,7 @@ typedef unsigned long long WB_UINTPTR;
 #define __SIZEOF_POINTER__ 0
 #endif
 
-#ifdef __LP64__ /* TODO see what WIN32 vs WIN64 does */
+#if defined(__LP64__) /* TODO see what WIN32 vs WIN64 does */
 typedef WB_UINT64 WB_UINTPTR;
 #elif __SIZEOF_POINTER__ == 4 /* 4-byte pointer */
 typedef WB_UINT32 WB_UINTPTR;
@@ -367,42 +424,40 @@ typedef WB_UINT64 WB_UINTPTR;
 #endif // __DOXYGEN__
 
 
-// pointer to integer conversion without those irritating truncation warnings
-
-
-
-
+/** \ingroup platform_definitions
+  * \brief Defined in 'platform_helper.h' when the compiler supports C99 initializers
+**/
 #define WB_C99_INITIALIZERS /* allow C99-style initializers */
 
-/** \ingroup platform
+/** \ingroup platform_types
   * \brief MODULE HANDLE equivalent
   *
   * This 'typedef' refers to a MODULE
 **/
 typedef void * WB_MODULE;
 
-/** \ingroup platform
+/** \ingroup platform_types
   * \brief THREAD HANDLE equivalent
   *
   * This 'typedef' refers to a THREAD
 **/
 typedef pthread_t WB_THREAD;
 
-/** \ingroup platform
+/** \ingroup platform_types
   * \brief PROC ADDRESS equivalent
   *
   * This 'typedef' refers to a PROC ADDRESS as exported from a shared library
 **/
 typedef void (* WB_PROCADDRESS)(void);
 
-/** \ingroup platform
+/** \ingroup platform_types
   * \brief THREAD LOCAL STORAGE 'key' equivalent
   *
   * This 'typedef' refers to a THREAD LOCAL STORAGE key, identifying a storage slot
 **/
 typedef pthread_key_t   WB_THREAD_KEY;
 
-/** \ingroup platform
+/** \ingroup platform_types
   * \brief CONDITION HANDLE equivalent (similar to an 'event')
   *
   * This 'typedef' refers to a CONDITION, a triggerable synchronization resource
@@ -410,24 +465,21 @@ typedef pthread_key_t   WB_THREAD_KEY;
 typedef WB_UINT32 WB_COND; // defined as 'WB_UINT32' because of pthread_cond problems under Linux
 //typedef pthread_cond_t  WB_COND;
 
-/** \ingroup platform
+/** \ingroup platform_types
   * \brief MUTEX HANDLE equivalent
   *
   * This 'typedef' refers to a MUTEX, a lockable synchronization object
 **/
 typedef pthread_mutex_t WB_MUTEX;
 
-
 // TODO:  sizeof(int) sizeof(long) - long is 64-bit for GNUC - MS compilers make it 32-bit
-
-
 
 #ifdef __DOXYGEN__
 
-/** \ingroup platform
+/** \ingroup platform_definitions
   * \brief PACKED definition
   *
-  * This assignes the 'packed' attribute; i.e. byte-level alignment
+  * This assignes the 'packed' attribute; i.e. byte-level alignment.  Not valid for Microsoft's compilers
 **/
 #define __PACKED__ /* platform dependent; actual def must be a blank or doxygen barphs on it */
 
@@ -437,7 +489,13 @@ typedef pthread_mutex_t WB_MUTEX;
 
 #endif // __DOXYGEN__
 
+// end of section for clang and gcc compilers (and also doxygen definitions)
+// ======================================================================================
+
 #elif defined(_MSC_VER) /* Microsoft C/C++ compiler */
+
+// ======================================================================================
+// this section is dedicated to Microsoft compilers, which do things a bit different...
 
 // TODO:  add proper support for MS compiler
 #if _MSC_VER > 1300
@@ -476,24 +534,35 @@ typedef HANDLE WB_MUTEX;        // equivalent to a mutex handle
 
 #define __PACKED__ /* TODO: a definition for packing in MS-land */
 
+// end of section specific to Microsoft compilers
+// ======================================================================================
+
 #else // !defined(_MSVC_VER) && !defined(__GNUC__)
 
 #error unknown and/or unsupported compiler
-
-#define __PACKED__
 
 #endif // __GNUC__
 
 
 // put standard '#define's and typedefs here, the ones that apply to EVERYBODY
 
-/** \ingroup platform
+/** \ingroup platform_definitions
   * @{
 **/
+
 #define WB_SECURE_HASH_TIMEOUT 60000 /**< 'secure hash' maximum lifetime, in milliseconds **/
+
+/**
+  * @}
+**/
+
+/** \ingroup platform_types
+  * @{
+**/
 
 typedef char * WB_PSTR;         ///< pointer to char string - a convenience typedef
 typedef const char * WB_PCSTR;  ///< pointer to const char string - a convenience typedef
+
 /**
   * @}
 **/
@@ -629,7 +698,7 @@ const char *GetStartupAppName(void);
 //////////////////////////////////////////////////////////////////////////////
 
 
-/** \ingroup platform
+/** \ingroup platform_functions
   * \brief Returns the current 'time index' (in microseconds)
   *
   * \return An unsigned 64-bit time index value, in microseconds
@@ -645,7 +714,7 @@ WB_UINT64 WBGetTimeIndex(void);  // returns current 'time index' (in microsecond
                                  // NOTE:  it is derived from the 'gettimeofday' call on BSD, Linux, etc.
 
 
-/** \ingroup platform
+/** \ingroup platform_functions
   * \brief Delay for a specified period in microseconds
   *
   * \param uiDelay The delay period, in microseconds
@@ -662,7 +731,7 @@ WB_UINT64 WBGetTimeIndex(void);  // returns current 'time index' (in microsecond
 void WBDelay(uint32_t uiDelay);  // approximate delay for specified period (in microseconds).  may be interruptible
 
 
-/** \ingroup platform
+/** \ingroup platform_functions
   * \brief Get the number of available CPU cores
   *
   * \return The total number of available CPU cores on the system.  On a VM, only those cores that have been assigned to the VM will be counted.
@@ -1141,7 +1210,7 @@ extern "C" {
 
 // here is where I implement 'vectored' quicksort for OTHER PLATFORMS
 
-/** \ingroup platform
+/** \ingroup platform_functions
   * \brief Local implementation of qsort_r() for operating systems that do not have it
   *
   * \param base Pointer to 'base' of items to sort
@@ -1159,7 +1228,7 @@ void my_qsort_r(void *base, int nmemb, int size, void *thunk,
 
 // the rest is exactly like the BSD version
 
-/** \ingroup platform
+/** \ingroup platform_definitions
   * \brief Wrapper to declare a sort function for \ref QSORT_R
   *
   * \param fn_name  The function name
@@ -1194,7 +1263,7 @@ void my_qsort_r(void *base, int nmemb, int size, void *thunk,
 #define DECLARE_SORT_FUNCTION(fn_name,p0,p1,p2) int fn_name(void *p0, const void *p1, const void *p2)
 
 
-/** \ingroup platform
+/** \ingroup platform_definitions
   * \brief Local implementation of qsort_r() for operating systems that do not have it
   *
   * \param base Pointer to 'base' of items to sort
@@ -1228,14 +1297,14 @@ void my_qsort_r(void *base, int nmemb, int size, void *thunk,
 // INTERNAL memory/security helpers
 // *********************************
 
-/** \ingroup platform
+/** \ingroup platform_functions
   * \brief Create/obtain a 32-bit 'secure' hash for a pointer
   *
   * \param pPointer A pointer to memory that remains valid after the call
   * \returns An allocated 'hash' to the pointer.  The hash should be free'd after use.
   *
   * This function will create a 'secure' hash for a pointer.  The hash can be used asynchronously
-  * for up to WB_SECURE_HASH_TIMEOUT milliseconds, after which it the reference automatically be free'd.
+  * for up to WB_SECURE_HASH_TIMEOUT milliseconds, after which the reference will automatically be free'd.
   * In this way, an asynchronous message can contain references to pointers that are difficult to
   * 'fake' if another application were to attempt to inject Events into the queue.
   *
@@ -1255,25 +1324,30 @@ void my_qsort_r(void *base, int nmemb, int size, void *thunk,
 **/
 WB_UINT32 WBCreatePointerHash(void *pPointer);
 
-/** \ingroup platform
+/** \ingroup platform_functions
   * \brief Destroy a 32-bit 'secure' hash for a pointer
   *
   * \param uiHash The 'hash' value created by WBCreatePointerHash()
   *
-  * This function will destroy a 'secure' hash for a pointer that was created by WBCreatePointerHash()
+  * This function will reduce the reference count on a 'secure' hash for a pointer that was created
+  * by WBCreatePointerHash().  When the reference count reaches zero, the hash itself will be destroyed.
   *
   * NOTE:  destroying the hash reference does NOT free the pointer.  Failure to handle these
   *        correctly can result in memory leaks, but that is preferable to security vulnerabilities
   *
-  * You should call this function immediately, once you have completed using the 'secure' pointer hash.
-  * In some cases, this will be done for you (such as via WBWindowDispatch() with certain ClientMessage
-  * events).  In other cases, you will have to explicitly do this yourself.
+  * You should call this function immediately, once you have completed using a 'secure' pointer hash,
+  * particularly if it was received as part of an Event. In some cases, this will be done for you,
+  * such as via WBWindowDispatch() with certain ClientMessage events.  In other cases, you will
+  * have to explicitly do this yourself.
+  *
+  * If you have physically free'd (or otherwise invalidated) a hashed pointer, you should call
+  * WBDestroyPointerHashPtr() so that a hash for that pointer will not exist.
   *
   * Header File:  platform_helper.h
 **/
 void WBDestroyPointerHash(WB_UINT32 uiHash);
 
-/** \ingroup platform
+/** \ingroup platform_functions
   * \brief Destroy a 32-bit 'secure' hash for a pointer regardless of reference count
   *
   * \param pPointer A pointer for which a hash may exist
@@ -1291,7 +1365,7 @@ void WBDestroyPointerHash(WB_UINT32 uiHash);
 **/
 void WBDestroyPointerHashPtr(void *pPointer);
 
-/** \ingroup platform
+/** \ingroup platform_functions
   * \brief Obtain a pointer from a 32-bit 'secure' pointer hash value
   *
   * \param uiHash The 'hash' value created by WBCreatePointerHash()
@@ -1329,7 +1403,7 @@ void * WBGetPointerFromHash(WB_UINT32 uiHash);
 //-----------------------------------------
 
 
-/** \ingroup platform
+/** \ingroup platform_functions
   * \brief Lookup and/or allocate an internal Atom for a named string (lookups include X11 atoms)
   *
   * \param pDisplay The display to search for a matching X11 Atom
@@ -1354,7 +1428,7 @@ void * WBGetPointerFromHash(WB_UINT32 uiHash);
 **/
 Atom WBGetAtom(Display *pDisplay, const char *szAtomName);
 
-/** \ingroup platform
+/** \ingroup platform_functions
   * \brief Lookup (but do not allocate) an internal (or X11) Atom for a named string
   *
   * \param pDisplay The display to search for a matching X11 Atom
@@ -1383,7 +1457,7 @@ Atom WBGetAtom(Display *pDisplay, const char *szAtomName);
 **/
 Atom WBLookupAtom(Display *pDisplay, const char *szAtomName);
 
-/** \ingroup platform
+/** \ingroup platform_functions
   * \brief Lookup and/or allocate an internal Atom for a named string
   *
   * \param pDisplay The display to search for a matching X11 Atom
@@ -1423,8 +1497,8 @@ char * WBGetAtomName(Display *pDisplay, Atom aAtom);
 // FILE/APPLICATION SEARCH PATH AND TEMP FILES
 // *******************************************
 
-/** \ingroup platform
-  * \brief Run an application asynchronously
+/** \ingroup platform_functions
+  * \brief search for a file using the PATH environment variable
   *
   * \param szFileName A const pointer to a character string containing a file or path name
   * \returns A 'WBAlloc() pointer to a character string containing the ACTUAL path to the file
@@ -1439,7 +1513,7 @@ char * WBGetAtomName(Display *pDisplay, Atom aAtom);
 **/
 char * WBSearchPath(const char *szFileName);
 
-/** \ingroup platform
+/** \ingroup platform_functions
   * \brief Get the name for a new, unique temporary file, creating the file in the process, and save its name for later deletion
   *
   * \param szExt A const pointer to a string containing the file's extension (without the '.'), or NULL if no extension is desired.
@@ -1460,7 +1534,7 @@ char * WBSearchPath(const char *szFileName);
 char * WBTempFile(const char *szExt);
 
 
-/** \ingroup platform
+/** \ingroup platform_functions
   * \brief Get the name for a new, unique temporary file, creating the file in the process
   *
   * \param szExt A const pointer to a string containing the file's extension (without the '.'), or NULL if no extension is desired.

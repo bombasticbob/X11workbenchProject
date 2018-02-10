@@ -254,18 +254,30 @@ static int ilog2ll(WB_UINT64 y)
 #endif // 0
 
 
-void WBSetVScrollRange(WB_SCROLLINFO *pSI, int iMin, int iMax)
+int WBSetVScrollRange(WB_SCROLLINFO *pSI, int iMin, int iMax)
 {
+int iRval;
+
+  iRval = pSI->iVMin < pSI->iVMax;
+
   // TODO:  data validation
   pSI->iVMin = iMin;
   pSI->iVMax = iMax;
+
+  return (pSI->iVMin < pSI->iVMax) != iRval ? 1 : 0; // 'visibility' changed
 }
 
-void WBSetHScrollRange(WB_SCROLLINFO *pSI, int iMin, int iMax)
+int WBSetHScrollRange(WB_SCROLLINFO *pSI, int iMin, int iMax)
 {
+int iRval;
+
+  iRval = pSI->iHMin < pSI->iHMax;
+
   // TODO:  data validation
   pSI->iHMin = iMin;
   pSI->iHMax = iMax;
+
+  return (pSI->iHMin < pSI->iHMax) != iRval ? 1 : 0; // 'visibility' changed
 }
 
 void WBSetVScrollPos(WB_SCROLLINFO *pSI, int iPos)
@@ -280,7 +292,7 @@ void WBSetHScrollPos(WB_SCROLLINFO *pSI, int iPos)
   pSI->iHPos = iPos;
 }
 
-static void InternalNotifySelf(Window wID, Atom aNotify, long lData0, long lData1, long lData2, long lData3, long lData4)
+static int InternalNotifySelf(Window wID, Atom aNotify, long lData0, long lData1, long lData2, long lData3, long lData4)
 {
 Display *pDisplay = WBGetWindowDisplay(wID);
 
@@ -299,7 +311,7 @@ Display *pDisplay = WBGetWindowDisplay(wID);
   evt.data.l[3] = lData3;
   evt.data.l[4] = lData4;
 
-  WBWindowDispatch(wID, (XEvent *)&evt);
+  return WBWindowDispatch(wID, (XEvent *)&evt);
 }
 
 
@@ -850,7 +862,7 @@ XCharStruct xBounds;
 
 int WBScrollBarEvent(Window wID, XEvent *pEvent, WB_SCROLLINFO *pScrollInfo)
 {
-int iX, iY, iDirection, iPosition;
+int iRval, iX, iY, iDirection, iPosition;
 
 
   if(wID == None || !pEvent || pEvent->type != ClientMessage || !pScrollInfo)
@@ -858,7 +870,7 @@ int iX, iY, iDirection, iPosition;
     return 0; // only client message events and valid parameters
   }
 
-  if(pEvent->xclient.message_type == aWM_POINTER)
+  if(pEvent->xclient.message_type == aWB_POINTER)
   {
     if(pEvent->xclient.data.l[0] == WB_POINTER_CLICK)
     {
@@ -880,12 +892,14 @@ int iX, iY, iDirection, iPosition;
             if(WBPointInGeom(iX, iY, pScrollInfo->geomVUp))
             {
               iDirection = WB_SCROLL_BACKWARD;
-              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (up)\n", __FUNCTION__);
+              WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Event,
+                             "%s Mouse click in scroll bar (up)\n", __FUNCTION__);
             }
             else if(WBPointInGeom(iX, iY, pScrollInfo->geomVDown))
             {
               iDirection = WB_SCROLL_FORWARD;
-              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (down)\n", __FUNCTION__);
+              WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Event,
+                             "%s Mouse click in scroll bar (down)\n", __FUNCTION__);
             }
             else if(WBPointInGeom(iX, iY, pScrollInfo->geomVKnob))
             {
@@ -900,7 +914,8 @@ int iX, iY, iDirection, iPosition;
                 iPosition = pScrollInfo->iVMin; //pListInfo->nTop;
               }
 
-              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (knob)\n", __FUNCTION__);
+              WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Event,
+                             "%s Mouse click in scroll bar (knob)\n", __FUNCTION__);
 
               // TODO:  determine position of knob
             }
@@ -908,17 +923,20 @@ int iX, iY, iDirection, iPosition;
                     iY < pScrollInfo->geomVKnob.y)
             {
               iDirection = WB_SCROLL_PAGEBACK;
-              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (page up)\n", __FUNCTION__);
+              WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Event,
+                             "%s Mouse click in scroll bar (page up)\n", __FUNCTION__);
             }
             else if(iY >= pScrollInfo->geomVKnob.y + pScrollInfo->geomVKnob.height &&
                     iY < pScrollInfo->geomVDown.y)
             {
               iDirection = WB_SCROLL_PAGEFWD;
-              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (page down)\n", __FUNCTION__);
+              WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Event,
+                             "%s Mouse click in scroll bar (page down)\n", __FUNCTION__);
             }
             else
             {
-              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (unknown)\n", __FUNCTION__);
+              WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Event,
+                             "%s Mouse click in scroll bar (unknown)\n", __FUNCTION__);
             }
 
             InternalNotifySelf(wID, aSCROLL_NOTIFY, WB_SCROLL_VERTICAL, iDirection, iPosition, 0, 0);
@@ -930,12 +948,14 @@ int iX, iY, iDirection, iPosition;
             if(WBPointInGeom(iX, iY, pScrollInfo->geomHLeft))
             {
               iDirection = WB_SCROLL_BACKWARD;
-              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (left)\n", __FUNCTION__);
+              WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Event,
+                             "%s Mouse click in scroll bar (left)\n", __FUNCTION__);
             }
             else if(WBPointInGeom(iX, iY, pScrollInfo->geomHRight))
             {
               iDirection = WB_SCROLL_FORWARD;
-              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (right)\n", __FUNCTION__);
+              WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Event,
+                             "%s Mouse click in scroll bar (right)\n", __FUNCTION__);
             }
             else if(WBPointInGeom(iX, iY, pScrollInfo->geomHKnob))
             {
@@ -950,7 +970,8 @@ int iX, iY, iDirection, iPosition;
                 iPosition = pScrollInfo->iHMin; //pListInfo->nTop;
               }
 
-              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (knob)\n", __FUNCTION__);
+              WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Event,
+                             "%s Mouse click in scroll bar (knob)\n", __FUNCTION__);
 
               // TODO:  determine position of knob
             }
@@ -958,17 +979,20 @@ int iX, iY, iDirection, iPosition;
                     iX < pScrollInfo->geomHKnob.x)
             {
               iDirection = WB_SCROLL_PAGEBACK;
-              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (page left)\n", __FUNCTION__);
+              WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Event,
+                             "%s Mouse click in scroll bar (page left)\n", __FUNCTION__);
             }
             else if(iX >= pScrollInfo->geomHKnob.x + pScrollInfo->geomHKnob.width &&
                     iX < pScrollInfo->geomHRight.x)
             {
               iDirection = WB_SCROLL_PAGEFWD;
-              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (page right)\n", __FUNCTION__);
+              WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Event,
+                             "%s Mouse click in scroll bar (page right)\n", __FUNCTION__);
             }
             else
             {
-              WB_ERROR_PRINT("TEMPORARY - %s Mouse click in scroll bar (unknown)\n", __FUNCTION__);
+              WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Event,
+                             "%s Mouse click in scroll bar (unknown)\n", __FUNCTION__);
             }
 
             InternalNotifySelf(wID, aSCROLL_NOTIFY, WB_SCROLL_HORIZONTAL, iDirection, iPosition, 0, 0);
@@ -1063,7 +1087,8 @@ int iX, iY, iDirection, iPosition;
           {
             if(pEvent->xclient.data.l[0] == WB_POINTER_DRAG) // begin drag, return window ID
             {
-              WB_ERROR_PRINT("TEMPORARY - %s Mouse drag in vert scroll bar (knob)\n", __FUNCTION__);
+              WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Event,
+                             "%s Mouse drag in vert scroll bar (knob)\n", __FUNCTION__);
 
               pScrollInfo->iScrollState |= WBScrollState_LDRAG;  // set the state bit for left-drag
               return((int)wID); // enabling the drag
@@ -1078,10 +1103,13 @@ int iX, iY, iDirection, iPosition;
 
             // track the mouse position along the center of the knob, if possible
 
-            WB_ERROR_PRINT("TEMPORARY - %s Mouse motion in scroll bar (knob)\n", __FUNCTION__);
+            WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Event,
+                             "%s Mouse motion in scroll bar (knob)\n", __FUNCTION__);
 
             InternalNotifySelf(wID, aSCROLL_NOTIFY, WB_SCROLL_VERTICAL,
                                WB_SCROLL_KNOB, iPosition, 0, 0);
+
+            return 1; // handled
           }
           else if(WBPointInGeom(iX, iY, pScrollInfo->geomHKnob) ||
                   WB_LIKELY(pEvent->xclient.data.l[0] == WB_POINTER_MOVE &&
@@ -1089,7 +1117,8 @@ int iX, iY, iDirection, iPosition;
           {
             if(pEvent->xclient.data.l[0] == WB_POINTER_DRAG) // begin drag, return window ID
             {
-              WB_ERROR_PRINT("TEMPORARY - %s Mouse drag in horiz scroll bar (knob)\n", __FUNCTION__);
+              WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Event,
+                             "%s Mouse drag in horiz scroll bar (knob)\n", __FUNCTION__);
 
               pScrollInfo->iScrollState |= WBScrollState_HLDRAG;  // set the state bit for left-drag
               return((int)wID); // enabling the drag (window ID cannot be 'None')
@@ -1104,14 +1133,18 @@ int iX, iY, iDirection, iPosition;
 
             // track the mouse position along the center of the knob, if possible
 
-            WB_ERROR_PRINT("TEMPORARY - %s Mouse motion in scroll bar (knob)\n", __FUNCTION__);
+            WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Event,
+                           "%s Mouse motion in scroll bar (knob)\n", __FUNCTION__);
 
             InternalNotifySelf(wID, aSCROLL_NOTIFY, WB_SCROLL_HORIZONTAL,
                                WB_SCROLL_KNOB, iPosition, 0, 0);
+
+            return 1; // handled
           }
           else
           {
-            WB_ERROR_PRINT("TEMPORARY - %s mouse motion in scroll bar outside of knob\n", __FUNCTION__);
+            WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Event,
+                           "%s mouse motion in scroll bar outside of knob\n", __FUNCTION__);
           }
         }
       }
@@ -1132,16 +1165,26 @@ int iX, iY, iDirection, iPosition;
     }
     else if(pEvent->xclient.data.l[0] == WB_POINTER_SCROLLUP)
     {
-      InternalNotifySelf(wID, aSCROLL_NOTIFY, WB_SCROLL_VERTICAL, WB_SCROLL_BACKWARD, 0, 0, 0);
+      iRval = InternalNotifySelf(wID, aSCROLL_NOTIFY, WB_SCROLL_VERTICAL, WB_SCROLL_BACKWARD, 0, 0, 0);
+
+      if(iRval)
+      {
+        return iRval; // to indicate it was handled
+      }
     }
     else if(pEvent->xclient.data.l[0] == WB_POINTER_SCROLLDOWN)
     {
-      InternalNotifySelf(wID, aSCROLL_NOTIFY, WB_SCROLL_VERTICAL, WB_SCROLL_FORWARD, 0, 0, 0);
+      iRval = InternalNotifySelf(wID, aSCROLL_NOTIFY, WB_SCROLL_VERTICAL, WB_SCROLL_FORWARD, 0, 0, 0);
+
+      if(iRval)
+      {
+        return iRval; // to indicate it was handled
+      }
     }
 
     // TODO:  anything else?
   }
-  else if(pEvent->xclient.message_type == aWM_CHAR)
+  else if(pEvent->xclient.message_type == aWB_CHAR)
   {
     // handle cursors only - up, down, left, right, home, end, page up, page down, etc.
 
@@ -1157,6 +1200,9 @@ int iX, iY, iDirection, iPosition;
 
 
   }
+
+//  WB_ERROR_PRINT("TEMPORARY:  %s %d - NOT handled\n", __FUNCTION__, __LINE__);
+//  WBDebugDumpEvent(pEvent);
 
   return 0;
 }

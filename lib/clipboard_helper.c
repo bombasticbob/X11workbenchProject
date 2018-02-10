@@ -409,13 +409,15 @@ CLIPBOARD_DATA *pD, *pD2;
 Window wWindow = None;
 XEvent evt, evt2;
 Atom aType;
-// NOTE:  Atoms in 'window_helper.h' won't be defined, see headers above
+// NOTE:  Atoms in 'window_helper.h' won't be defined, see headers above.  They apply to the main thread.
+//        These local variables will do the job instead, since it becomes local to the thread this way
 Atom aINCR, aWBCLIP, aCLIPBOARD, aTEXT, aC_STRING, aCOMPOUND_TEXT, aTARGETS, aMULTIPLE,
      aTIMESTAMP, aPIXEL, aNULL;
 #ifdef X_HAVE_UTF8_STRING /* this indicates the extension is present */
 Atom aUTF8_STRING;
 #endif // X_HAVE_UTF8_STRING
-//Atom aPRIMARY    = XA_PRIMARY;
+// NOTE:  these atoms won't need to be loaded - they're pre-defined (left for reference)
+//Atom aPRIMARY   = XA_PRIMARY;
 //Atom aSECONDARY = XA_SECONDARY;
 //Atom aSTRING    = XA_STRING;
 //Atom aBITMAP    = XA_BITMAP;
@@ -436,10 +438,10 @@ Atom aUTF8_STRING;
     goto exit_point;
   }
 
-  // atoms
+  // Load all of the atoms for use within this thread
   aINCR             = XInternAtom(pDisplay, "INCR", False);
   aWBCLIP           = XInternAtom(pDisplay, "WB_CLIP", False);
-  aCLIPBOARD        = XInternAtom(pDisplay, "CLIPBOARD", False);
+  aCLIPBOARD        = XInternAtom(pDisplay, "CLIPBOARD", False); // should I use XA_CLIPBOARD(pDisplay) instead??
   aTEXT             = XInternAtom(pDisplay, "TEXT", False);
   aC_STRING         = XInternAtom(pDisplay, "C_STRING", False);
   aCOMPOUND_TEXT    = XInternAtom(pDisplay, "COMPOUND_TEXT", False);
@@ -530,7 +532,10 @@ Atom aUTF8_STRING;
 
   WBDebugPrint("TEMPORARY:  CLIPBOARD THREAD STARTUP took %llu ticks\n", ullTick);
 
-  // main handler loop
+  // -------------------------------------------------------
+  // main handler loop - this executes the clipboard thread
+  // -------------------------------------------------------
+
   while(!bClipboardQuitFlag)
   {
     if(WBMutexLock(&xClipboardMutex, 1000)) // wait up to 1msec to lock
@@ -1630,7 +1635,12 @@ null_data_me_own:
     }
   }
 
-  WB_ERROR_PRINT("TEMPORARY:  %s line %d - exit from main thread loop\n", __FUNCTION__, __LINE__);
+  WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Init,
+                 "INFO:  %s line %d - exit from main thread loop\n", __FUNCTION__, __LINE__);
+
+
+  // At this point the clipboard thread is done.  time to go away.  clean up.
+
 
   // resource cleanup (which should be relatively simple)
   if(WBMutexLock(&xClipboardMutex, -1)) // wait forever to lock it (very important this succeeds)
@@ -1763,7 +1773,8 @@ exit_point:
     END_XCALL_DEBUG_WRAPPER
   }
 
-  WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Init, "INFO:  %s - Clipboard Thread exit complete\n",__FUNCTION__);
+  WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Init,
+                 "INFO:  %s - Clipboard Thread exit complete\n",__FUNCTION__);
 
   return NULL;
 }

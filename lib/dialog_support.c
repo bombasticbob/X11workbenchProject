@@ -1890,7 +1890,7 @@ WB_SCROLLINFO *pScrollInfo;
   // left button click above/below/right-of/left-of knob
   // left button click on top/bottom/left/right arrow
 
-  if(pEvent->xclient.message_type == aWM_POINTER)
+  if(pEvent->xclient.message_type == aWB_POINTER)
   {
     // pointer messages - cooked mousie clickie
     WB_ERROR_PRINT("TEMPORARY:  %s mouse message %d (%08xH) %d %d %d %d %d\n",
@@ -1910,7 +1910,7 @@ WB_SCROLLINFO *pScrollInfo;
       return iRval; // return whatever 'WBScrollBarEvent' says to return
     }
   }
-  else if(pEvent->xclient.message_type == aWM_CHAR)
+  else if(pEvent->xclient.message_type == aWB_CHAR)
   {
     // handle cursors only - up, down, left, right, home, end, page up, page down, etc.
 

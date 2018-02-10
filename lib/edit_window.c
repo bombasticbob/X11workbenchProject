@@ -73,6 +73,9 @@
 
 #define  EDIT_WINDOW_LINE_SPACING 4  /* 4 spaces between each line */
 
+#define CALLBACK_CHECK_NULL(X) if(X) (X)
+#define CALLBACK_CHECK_NULL2(X) (X) ? (X)
+
 
 struct _PROPERTY_DLG_
 {
@@ -88,24 +91,24 @@ static void InternalEditWindowDestroy(WBEditWindow *pEditWindow);
 
 // UI callbacks for WBChildFrameUI
 
-static void internal_do_char(WBChildFrame *, XClientMessageEvent *);   // handler for regular WM_CHAR Client Messages (WBChildFrame *, typed-in characters)
-static void internal_scancode(WBChildFrame *, XClientMessageEvent *);  // handler for 'other scan code' WM_CHAR Client Messages (WBChildFrame *, typed-in characters)
-static void internal_bkspace(WBChildFrame *, int iACS);                // 'backspace' delete character (WBChildFrame *, backspace equivalent).  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-static void internal_del(WBChildFrame *, int iACS);                    // 'delete' char under cursor (WBChildFrame *, delete equivalent).  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-static void internal_tab(WBChildFrame *, int iACS);                    // 'tab' char, or tab navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-static void internal_enter(WBChildFrame *, int iACS);                  // 'enter' char, or 'enter' for navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+static void internal_do_char(WBChildFrame *, XClientMessageEvent *);   // handler for regular WB_CHAR Client Messages (WBChildFrame *, typed-in characters)
+static void internal_scancode(WBChildFrame *, XClientMessageEvent *);  // handler for 'other scan code' WB_CHAR Client Messages (WBChildFrame *, typed-in characters)
+static void internal_bkspace(WBChildFrame *, int iACS);                // 'backspace' delete character (WBChildFrame *, backspace equivalent).  'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+static void internal_del(WBChildFrame *, int iACS);                    // 'delete' char under cursor (WBChildFrame *, delete equivalent).  'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+static void internal_tab(WBChildFrame *, int iACS);                    // 'tab' char, or tab navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+static void internal_enter(WBChildFrame *, int iACS);                  // 'enter' char, or 'enter' for navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
 static void internal_properties(WBChildFrame *);                       // display the property sheet for the displayed document (optional)
-static void internal_uparrow(WBChildFrame *, int iACS);                // 'up' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-static void internal_downarrow(WBChildFrame *, int iACS);              // 'down' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-static void internal_leftarrow(WBChildFrame *, int iACS);              // 'left' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-static void internal_rightarrow(WBChildFrame *, int iACS);             // 'right' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-static void internal_home(WBChildFrame *, int iACS);                   // 'home' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-static void internal_end(WBChildFrame *, int iACS);                    // 'end' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-static void internal_pgup(WBChildFrame *, int iACS);                   // 'page up' navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-static void internal_pgdown(WBChildFrame *, int iACS);                 // 'page down' navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-static void internal_pgleft(WBChildFrame *, int iACS);                 // 'page left' navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-static void internal_pgright(WBChildFrame *, int iACS);                // 'page right' navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
-static void internal_help(WBChildFrame *, int iACS);                   // 'help' context (WBChildFrame *, F1).  'iACS' is the Alt/Ctrl/Shift flags. \sa aWM_CHAR
+static void internal_uparrow(WBChildFrame *, int iACS);                // 'up' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+static void internal_downarrow(WBChildFrame *, int iACS);              // 'down' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+static void internal_leftarrow(WBChildFrame *, int iACS);              // 'left' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+static void internal_rightarrow(WBChildFrame *, int iACS);             // 'right' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+static void internal_home(WBChildFrame *, int iACS);                   // 'home' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+static void internal_end(WBChildFrame *, int iACS);                    // 'end' arrow navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+static void internal_pgup(WBChildFrame *, int iACS);                   // 'page up' navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+static void internal_pgdown(WBChildFrame *, int iACS);                 // 'page down' navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+static void internal_pgleft(WBChildFrame *, int iACS);                 // 'page left' navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+static void internal_pgright(WBChildFrame *, int iACS);                // 'page right' navigation.  'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
+static void internal_help(WBChildFrame *, int iACS);                   // 'help' context (WBChildFrame *, F1).  'iACS' is the Alt/Ctrl/Shift flags. \sa aWB_CHAR
 static void internal_hover_notify(WBChildFrame *, int x, int y);       // 'mouse hover' notification (WBChildFrame *, x and y are pixel coords with respect to upper left corner)
 static void internal_hover_cancel(WBChildFrame *);                     // 'mouse hover' cancel notification (WBChildFrame *, cancel any 'hover' action)
 static int internal_is_ins_mode(WBChildFrame *);                       // returns non-zero if in 'insert' mode, 0 for 'overwrite'
@@ -119,19 +122,18 @@ static void internal_select_none(WBChildFrame *);                      // select
 static void internal_save(WBChildFrame *, const char *szFileName);     // save to specified file name (WBChildFrame *, NULL to keep same file name)
 static WB_PCSTR internal_get_file_name(WBChildFrame *);                // get (const) pointer to file name string
 static void internal_mouse_click(WBChildFrame *, int iX, int iY,
-                                 int iButtonMask, int iACS);           // 'mouse click' notification.  \sa aWM_POINTER
+                                 int iButtonMask, int iACS);           // 'mouse click' notification.  \sa aWB_POINTER
 static void internal_mouse_dblclick(WBChildFrame *, int iX, int iY,
-                                    int iButtonMask, int iACS);        // 'mouse double click' notification.  \sa aWM_POINTER
+                                    int iButtonMask, int iACS);        // 'mouse double click' notification.  \sa aWB_POINTER
 static void internal_mouse_drag(WBChildFrame *, int iX, int iY,
-                                int iButtonMask, int iACS);            // 'mouse drag' (begin) notification.  \sa aWM_POINTER
+                                int iButtonMask, int iACS);            // 'mouse drag' (begin) notification.  \sa aWB_POINTER
 static void internal_mouse_drop(WBChildFrame *, int iX, int iY,
-                                int iButtonMask, int iACS);            // 'mouse drop' (drag end) notification.  \sa aWM_POINTER
-static void internal_mouse_move(WBChildFrame *, int iX, int iY);       // 'mouse motion' notification.  \sa aWM_POINTER
-static void internal_mouse_scrollup(WBChildFrame *, int iX, int iY,
-                                    int iButtonMask, int iACS);        // 'mouse scroll up' notification.  \sa aWM_POINTER
-static void internal_mouse_scrolldown(WBChildFrame *, int iX, int iY,
-                                      int iButtonMask, int iACS);      // 'mouse scroll down' notification.  \sa aWM_POINTER
-static void internal_mouse_cancel(WBChildFrame *);                     // 'mouse cancel' notification (cancel 'drag', etc.).  \sa aWM_POINTER
+                                int iButtonMask, int iACS);            // 'mouse drop' (drag end) notification.  \sa aWB_POINTER
+static void internal_mouse_move(WBChildFrame *, int iX, int iY);       // 'mouse motion' notification.  \sa aWB_POINTER
+static void internal_scroll_vert(WBChildFrame *, int iMode, int iValue);  // 'scroll vertical' notification.  \details A higher-level scrolling notification.  'iMode' is 0 for absolute, 1 for relative.  'iValue' is the absolute (or relative) new vertical scroll position to assign  \sa aSCROLL_NOTIFY
+static void internal_scroll_horiz(WBChildFrame *, int iMode, int iValue); // 'scroll vertical' notification.  \details A higher-level scrolling notification.  'iMode' is 0 for absolute, 1 for relative.  'iValue' is the absolute (or relative) new horizontal scroll position to assign  \sa aSCROLL_NOTIFY
+
+static void internal_mouse_cancel(WBChildFrame *);                     // 'mouse cancel' notification (cancel 'drag', etc.).  \sa aWB_POINTER
 static void internal_get_row_col(WBChildFrame *pC, int *piR, int *piC);// get row/col (etc.)
 static int internal_has_selection(WBChildFrame *pC);                   // returns non-zero value if there is a selection
 static void internal_undo(WBChildFrame *);                             // perform an undo
@@ -164,7 +166,7 @@ static WBChildFrameUI internal_CFUI =
   internal_toggle_ins_mode, internal_copy_to_cb,   internal_paste_from_cb,  internal_cut_to_cb,
   internal_delete_sel,      internal_select_all,   internal_select_none,    internal_save,
   internal_get_file_name,   internal_mouse_click,  internal_mouse_dblclick, internal_mouse_drag,
-  internal_mouse_drop,      internal_mouse_move,   internal_mouse_scrollup, internal_mouse_scrolldown,
+  internal_mouse_drop,      internal_mouse_move,   internal_scroll_vert,    internal_scroll_horiz,
   internal_mouse_cancel,    internal_get_row_col,  internal_has_selection,  internal_undo,
   internal_redo,            internal_can_undo,     internal_can_redo,       internal_is_empty
 };
@@ -653,10 +655,10 @@ Display *pDisplay = WBGetWindowDisplay(wID);
 
 //      xFontSet = pE->childframe.rFontSet;
 
-      pE->xTextObject.vtable->do_expose(&(pE->xTextObject), pDisplay, wID, gc,
-                                        &geom, // the GEOM to 'paint to'
-                                        &(pE->childframe.geom),//NULL,//&geom2, // the GEOM bordering the window's viewport (NULL for ALL)
-                                        pE->childframe.rFontSet);
+      CALLBACK_CHECK_NULL(pE->xTextObject.vtable->do_expose)(&(pE->xTextObject), pDisplay, wID, gc,
+                                                             &geom, // the GEOM to 'paint to'
+                                                             &(pE->childframe.geom),//NULL,//&geom2, // the GEOM bordering the window's viewport (NULL for ALL)
+                                                             pE->childframe.rFontSet);
       WBEndPaint(wID, gc);
 
 //      if(xFontSet)
@@ -685,19 +687,26 @@ Display *pDisplay = WBGetWindowDisplay(wID);
       if(pEvent->xclient.message_type == aRESIZE_NOTIFY ||
          pEvent->xclient.message_type == aRECALC_LAYOUT)
       {
+        WB_RECT rctView;
+
+        rctView.top = CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_row)(&(pE->xTextObject)) : 0;
+        rctView.left = CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_col)(&(pE->xTextObject)) : 0;
+
+        CALLBACK_CHECK_NULL(pE->xTextObject.vtable->get_view)(&(pE->xTextObject), &rctView);
+
         // TODO:  process re-calculation of the extents, etc.
 
         FWSetChildFrameScrollInfo(&(pE->childframe),
-                                  pE->xTextObject.vtable->get_row(&(pE->xTextObject)),
-                                  pE->xTextObject.vtable->get_rows(&(pE->xTextObject)),
-                                  pE->xTextObject.vtable->get_col(&(pE->xTextObject)),
-                                  pE->xTextObject.vtable->get_cols(&(pE->xTextObject)),
+                                  rctView.top,
+                                  CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_rows)(&(pE->xTextObject)) : 0,
+                                  rctView.left,
+                                  CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_cols)(&(pE->xTextObject)) : 0,
                                   WBTextObjectCalculateLineHeight(WBFontSetAscent(pDisplay, pE->childframe.rFontSet),
                                                                   WBFontSetDescent(pDisplay, pE->childframe.rFontSet)),
                                   WBFontSetAvgCharWidth(pDisplay, pE->childframe.rFontSet));
 //                                  pE->childframe.pFont->ascent + pE->childframe.pFont->ascent + EDIT_WINDOW_LINE_SPACING,
       }
-      else if(pEvent->xclient.message_type == aWM_TIMER)
+      else if(pEvent->xclient.message_type == aWB_TIMER)
       {
         static int iTimerThingy = 0;
 
@@ -709,7 +718,7 @@ Display *pDisplay = WBGetWindowDisplay(wID);
         {
 //          WB_ERROR_PRINT("TEMPORARY:  %s - timer\n", __FUNCTION__);
 
-          pE->xTextObject.vtable->cursor_blink(&(pE->xTextObject), 1);
+          CALLBACK_CHECK_NULL(pE->xTextObject.vtable->cursor_blink)(&(pE->xTextObject), 1);
 
           if(iTimerThingy >= 0)
           {
@@ -813,12 +822,13 @@ char tbuf[1024];
   }
 
   snprintf(tbuf, sizeof(tbuf), "Row,Col: %d,%d\tlines: %d  width: %d\t%s\t",
-          iR,
-          iC,
-          pE->xTextObject.vtable->get_rows(&(pE->xTextObject)),
-          pE->xTextObject.vtable->get_cols(&(pE->xTextObject)),
-          (const char *)(pE->xTextObject.vtable->get_insmode(&(pE->xTextObject)) == InsertMode_INSERT ? "INS" :
-          (const char *)(pE->xTextObject.vtable->get_insmode(&(pE->xTextObject)) == InsertMode_OVERWRITE ? "OVR" : "???")));
+          iR, iC,
+          CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_rows)(&(pE->xTextObject)) : 0,
+          CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_cols)(&(pE->xTextObject)) : 0,
+          (const char *)((CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_insmode)(&(pE->xTextObject)) : 0)
+                         == InsertMode_INSERT ? "INS" :
+            (const char *)((CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_insmode)(&(pE->xTextObject)) : 0)
+                           == InsertMode_OVERWRITE ? "OVR" : "???")));
 
   pC->szStatusText = WBCopyString(tbuf);
 
@@ -872,8 +882,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     evt.format=32;
 
     evt.data.l[0] = bUndo;
-    evt.data.l[1] = pE->xTextObject.vtable->get_row(&(pE->xTextObject));
-    evt.data.l[2] = pE->xTextObject.vtable->get_col(&(pE->xTextObject));
+    evt.data.l[1] = CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_row)(&(pE->xTextObject)) : 0;
+    evt.data.l[2] = CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_col)(&(pE->xTextObject)) : 0;
 
     pE->pUserCallback(pC->wID, (XEvent *)&evt);
   }
@@ -909,23 +919,23 @@ char *pBuf;
     XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
     WB_ERROR_PRINT("TEMPORARY:  %s - beep\n", __FUNCTION__);
   }
-  else if(pE->xTextObject.vtable->has_select(&(pE->xTextObject)))
+  else if(CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->has_select)(&(pE->xTextObject)) : 0)
   {
 //    WB_ERROR_PRINT("TEMPORARY:  %s - set text to \"%.*s\"\n", __FUNCTION__, nChar, pBuf);
-    pE->xTextObject.vtable->set_text(&(pE->xTextObject), pBuf, nChar);
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->set_text)(&(pE->xTextObject), pBuf, nChar);
     internal_notify_change(pC, 0);
   }
   else
   {
 //    WB_ERROR_PRINT("TEMPORARY:  %s - inserting \"%.*s\"\n", __FUNCTION__, nChar, pBuf);
-    pE->xTextObject.vtable->ins_chars(&(pE->xTextObject), pBuf, nChar);
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->ins_chars)(&(pE->xTextObject), pBuf, nChar);
     internal_notify_change(pC, 0);
   }
 
 //  {
-//    char *p1 = pE->xTextObject.vtable->get_text(&(pE->xTextObject));
+//    char *p1 = CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_text)(&(pE->xTextObject)) : NULL;
 //
-//    WB_ERROR_PRINT("TEMPORARY:  %s - new text \"%s\"\n", __FUNCTION__, p1);
+//    WB_ERROR_PRINT("TEMPORARY:  %s - new text \"%s\"\n", __FUNCTION__, (const char *)(p1 ? p1 : "{null}"));
 //
 //    if(p1)
 //    {
@@ -977,7 +987,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
   else
   {
-    pE->xTextObject.vtable->del_chars(&(pE->xTextObject), -1);
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->del_chars)(&(pE->xTextObject), -1);
     internal_notify_change(pC, 0);
   }
 
@@ -1002,7 +1012,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
 
   if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift+del
   {
-    if(!pE->xTextObject.vtable->has_select(&(pE->xTextObject)))
+    if(!(CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->has_select)(&(pE->xTextObject)) : 0))
     {
       // no selection, can't "cut"
       XBell(WBGetWindowDisplay(pC->wID), -100);
@@ -1011,26 +1021,26 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     {
       // copy selection to the clipboard, then delete - same as internal_cut_to_cb()
 
-      char *p1 = pE->xTextObject.vtable->get_sel_text(&(pE->xTextObject), NULL);
+      char *p1 = CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_sel_text)(&(pE->xTextObject), NULL): NULL;
       if(p1)
       {
         WBSetClipboardData(WBGetWindowDisplay(pC->wID), aUTF8_STRING, 8, p1, strlen(p1) + 1);
 
         WBFree(p1);
 
-        pE->xTextObject.vtable->del_select(&(pE->xTextObject));
+        CALLBACK_CHECK_NULL(pE->xTextObject.vtable->del_select)(&(pE->xTextObject));
         internal_notify_change(pC, 0);
       }
     }
   }
-  else if(pE->xTextObject.vtable->has_select(&(pE->xTextObject)))
+  else if(CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->has_select)(&(pE->xTextObject)) : 0)
   {
-    pE->xTextObject.vtable->del_select(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->del_select)(&(pE->xTextObject));
     internal_notify_change(pC, 0);
   }
   else
   {
-    pE->xTextObject.vtable->del_chars(&(pE->xTextObject), 1);
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->del_chars)(&(pE->xTextObject), 1);
     internal_notify_change(pC, 0);
   }
 
@@ -1059,7 +1069,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
   else
   {
-    pE->xTextObject.vtable->ins_chars(&(pE->xTextObject), "\t", 1);
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->ins_chars)(&(pE->xTextObject), "\t", 1);
     internal_notify_change(pC, 0);
   }
 
@@ -1086,7 +1096,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
   else
   {
-    pE->xTextObject.vtable->ins_chars(&(pE->xTextObject), "\n", 1);
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->ins_chars)(&(pE->xTextObject), "\n", 1);
     internal_notify_change(pC, 0);
   }
 
@@ -1187,8 +1197,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
 
   if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-uparrow
   {
-    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->cursor_up(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->begin_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->cursor_up)(&(pE->xTextObject));
   }
   else if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_SHIFT | WB_KEYEVENT_CTRL)) // ctrl-shift-uparrow
   {
@@ -1197,13 +1207,13 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
   else if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl, shift, or alt with 'up'.  yet.
   {
-    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->end_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
     XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
   }
   else
   {
-    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->cursor_up(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->end_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->cursor_up)(&(pE->xTextObject));
   }
 
   internal_new_cursor_pos((WBEditWindow *)pC);
@@ -1225,8 +1235,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
 
   if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-downarrow
   {
-    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->cursor_down(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->begin_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->cursor_down)(&(pE->xTextObject));
   }
   else if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_SHIFT | WB_KEYEVENT_CTRL)) // ctrl-shift-downarrow
   {
@@ -1239,8 +1249,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
   else
   {
-    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->cursor_down(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->end_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->cursor_down)(&(pE->xTextObject));
   }
 
   internal_new_cursor_pos((WBEditWindow *)pC);
@@ -1262,8 +1272,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
 
   if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-leftarrow
   {
-    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->cursor_left(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->begin_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->cursor_left)(&(pE->xTextObject));
   }
   else if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_SHIFT | WB_KEYEVENT_CTRL)) // ctrl-shift-leftarrow
   {
@@ -1278,8 +1288,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
   else
   {
-    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->cursor_left(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->end_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->cursor_left)(&(pE->xTextObject));
   }
 
   internal_new_cursor_pos((WBEditWindow *)pC);
@@ -1301,8 +1311,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
 
   if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-rightarrow
   {
-    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->cursor_right(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->begin_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->cursor_right)(&(pE->xTextObject));
   }
   else if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_SHIFT | WB_KEYEVENT_CTRL)) // ctrl-shift-rightarrow
   {
@@ -1317,8 +1327,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
   else
   {
-    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->cursor_right(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->end_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->cursor_right)(&(pE->xTextObject));
   }
 
   internal_new_cursor_pos((WBEditWindow *)pC);
@@ -1340,19 +1350,19 @@ WBEditWindow *pE = (WBEditWindow *)pC;
 
   if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-home
   {
-    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->cursor_home(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->begin_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->cursor_home)(&(pE->xTextObject));
   }
   else if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_SHIFT | WB_KEYEVENT_CTRL)) // ctrl-shift-home
   {
     // select to start of document
-    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->cursor_top(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->begin_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->cursor_top)(&(pE->xTextObject));
   }
   else if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_CTRL) // control+home
   {
-    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->cursor_top(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->end_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->cursor_top)(&(pE->xTextObject));
   }
   else if(iACS & WB_KEYEVENT_ACSMASK) // not handling shift, or alt with 'home'.  yet.
   {
@@ -1362,8 +1372,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
   else
   {
-    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->cursor_home(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->end_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->cursor_home)(&(pE->xTextObject));
   }
 
   internal_new_cursor_pos((WBEditWindow *)pC);
@@ -1385,19 +1395,19 @@ WBEditWindow *pE = (WBEditWindow *)pC;
 
   if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-end
   {
-    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->cursor_end(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->begin_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->cursor_end)(&(pE->xTextObject));
   }
   else if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_SHIFT | WB_KEYEVENT_CTRL)) // ctrl-shift-end
   {
     // select to end of document
-    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->cursor_bottom(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->begin_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->cursor_bottom)(&(pE->xTextObject));
   }
   else if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_CTRL) // control+end
   {
-    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->cursor_bottom(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->end_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->cursor_bottom)(&(pE->xTextObject));
   }
   else if(iACS & WB_KEYEVENT_ACSMASK) // not handling shift, or alt with 'end'.  yet.
   {
@@ -1407,8 +1417,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
   else
   {
-    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->cursor_end(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->end_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->cursor_end)(&(pE->xTextObject));
   }
 
   internal_new_cursor_pos((WBEditWindow *)pC);
@@ -1430,8 +1440,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
 
   if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-pgup
   {
-    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->page_up(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->begin_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->page_up)(&(pE->xTextObject));
   }
   else if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl or alt.  yet.
   {
@@ -1441,8 +1451,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   {
 //    WB_ERROR_PRINT("TEMPORARY:  %s - WBChildFrame calling 'page_up'\n", __FUNCTION__);
 
-    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->page_up(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->end_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->page_up)(&(pE->xTextObject));
   }
 
   internal_new_cursor_pos((WBEditWindow *)pC);
@@ -1464,8 +1474,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
 
   if((iACS & WB_KEYEVENT_ACSMASK) == WB_KEYEVENT_SHIFT) // shift-pgdown
   {
-    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->page_down(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->begin_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->page_down)(&(pE->xTextObject));
   }
   else if(iACS & WB_KEYEVENT_ACSMASK) // not handling ctrl or alt.  yet.
   {
@@ -1475,8 +1485,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   {
 //    WB_ERROR_PRINT("TEMPORARY:  %s - WBChildFrame calling 'page_down'\n", __FUNCTION__);
 
-    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->page_down(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->end_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->page_down)(&(pE->xTextObject));
   }
 
   internal_new_cursor_pos((WBEditWindow *)pC);
@@ -1498,8 +1508,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
 
   if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_SHIFT | WB_KEYEVENT_CTRL)) // ctrl-shift-pgup
   {
-    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->page_left(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->begin_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->page_left)(&(pE->xTextObject));
   }
   else if((iACS & WB_KEYEVENT_ACSMASK) != WB_KEYEVENT_CTRL) // not handling alt with 'pgup'.  yet.
   {
@@ -1507,8 +1517,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
   else // CTRL-pgup
   {
-    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->page_left(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->end_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->page_left)(&(pE->xTextObject));
   }
 
   internal_new_cursor_pos((WBEditWindow *)pC);
@@ -1530,8 +1540,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
 
   if((iACS & WB_KEYEVENT_ACSMASK) == (WB_KEYEVENT_SHIFT | WB_KEYEVENT_CTRL)) // ctrl-shift-pgdn
   {
-    pE->xTextObject.vtable->begin_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->page_right(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->begin_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->page_right)(&(pE->xTextObject));
   }
   else if((iACS & WB_KEYEVENT_ACSMASK) != WB_KEYEVENT_CTRL) // not handling alt with 'pgup'.  yet.
   {
@@ -1539,8 +1549,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
   else
   {
-    pE->xTextObject.vtable->end_highlight(&(pE->xTextObject)); // safe to call any time, multiple times
-    pE->xTextObject.vtable->page_right(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->end_highlight)(&(pE->xTextObject)); // safe to call any time, multiple times
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->page_right)(&(pE->xTextObject));
   }
 
   internal_new_cursor_pos((WBEditWindow *)pC);
@@ -1608,7 +1618,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return -1;
   }
 
-  return pE->xTextObject.vtable->get_insmode(&(pE->xTextObject)) == InsertMode_INSERT;
+  return (CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_insmode)(&(pE->xTextObject)) : InsertMode_INSERT)
+         == InsertMode_INSERT;
 }
 
 static void internal_toggle_ins_mode(WBChildFrame *pC)
@@ -1626,8 +1637,9 @@ int iInsMode;
     return;
   }
 
-  iInsMode = pE->xTextObject.vtable->get_insmode(&(pE->xTextObject)) == InsertMode_INSERT;
-  pE->xTextObject.vtable->set_insmode(&(pE->xTextObject), iInsMode ? InsertMode_OVERWRITE : InsertMode_INSERT);
+  iInsMode = (CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_insmode)(&(pE->xTextObject)) : InsertMode_INSERT)
+             == InsertMode_INSERT;
+  CALLBACK_CHECK_NULL(pE->xTextObject.vtable->set_insmode)(&(pE->xTextObject), iInsMode ? InsertMode_OVERWRITE : InsertMode_INSERT);
 
   internal_new_cursor_pos((WBEditWindow *)pC);
   internal_update_status_text(pE);
@@ -1650,9 +1662,9 @@ char *p1;
 
   // copy selection to the clipboard
 
-  if(pE->xTextObject.vtable->has_select(&(pE->xTextObject)))
+  if(CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->has_select)(&(pE->xTextObject)) : 0)
   {
-    p1 = pE->xTextObject.vtable->get_sel_text(&(pE->xTextObject), NULL);
+    p1 = CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_sel_text)(&(pE->xTextObject), NULL) : NULL;
 
     if(p1)
     {
@@ -1737,14 +1749,14 @@ char *p1;
     {
       WBDebugDump("Edit window 'paste'", p1, nData);
 
-      if(pE->xTextObject.vtable->has_select(&(pE->xTextObject)))
+      if(CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->has_select)(&(pE->xTextObject)) : 0)
       {
-        pE->xTextObject.vtable->replace_select(&(pE->xTextObject), p1, nData);
+        CALLBACK_CHECK_NULL(pE->xTextObject.vtable->replace_select)(&(pE->xTextObject), p1, nData);
         internal_notify_change(pC, 0);
       }
       else
       {
-        pE->xTextObject.vtable->ins_chars(&(pE->xTextObject), p1, nData);
+        CALLBACK_CHECK_NULL(pE->xTextObject.vtable->ins_chars)(&(pE->xTextObject), p1, nData);
         internal_notify_change(pC, 0);
       }
 
@@ -1770,7 +1782,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-  if(!pE->xTextObject.vtable->has_select(&(pE->xTextObject)))
+  if(!(CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->has_select)(&(pE->xTextObject)) : 0))
   {
     // no selection, can't "cut"
     XBell(WBGetWindowDisplay(pC->wID), -100);
@@ -1779,14 +1791,14 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   {
     // copy selection to the clipboard, then delete - same as internal_cut_to_cb()
 
-    char *p1 = pE->xTextObject.vtable->get_sel_text(&(pE->xTextObject), NULL);
+    char *p1 = CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_sel_text)(&(pE->xTextObject), NULL) : NULL;
     if(p1)
     {
       WBSetClipboardData(WBGetWindowDisplay(pC->wID), aUTF8_STRING, 8, p1, strlen(p1) + 1);
 
       WBFree(p1);
 
-      pE->xTextObject.vtable->del_select(&(pE->xTextObject));
+      CALLBACK_CHECK_NULL(pE->xTextObject.vtable->del_select)(&(pE->xTextObject));
       internal_notify_change(pC, 0);
     }
   }
@@ -1808,14 +1820,14 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-  if(!pE->xTextObject.vtable->has_select(&(pE->xTextObject)))
+  if(!(CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->has_select)(&(pE->xTextObject)) : 0))
   {
     // no selection, can't "cut"
     XBell(WBGetWindowDisplay(pC->wID), -100);
   }
   else
   {
-    pE->xTextObject.vtable->del_select(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->del_select)(&(pE->xTextObject));
     internal_notify_change(pC, 0);
   }
 
@@ -1838,16 +1850,16 @@ WB_RECT rct;
   }
 
   rct.left = rct.top = 0;
-  rct.right = pE->xTextObject.vtable->get_cols(&(pE->xTextObject));
-  rct.bottom = pE->xTextObject.vtable->get_rows(&(pE->xTextObject));
+  rct.right = CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_cols)(&(pE->xTextObject)) : 0;
+  rct.bottom = CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_rows)(&(pE->xTextObject)) : 0;
 
   WB_ERROR_PRINT("TEMPORARY:  %s - selecting %d,%d,%d,%d\n", __FUNCTION__,
                  rct.left, rct.top, rct.right, rct.bottom);
 
-  pE->xTextObject.vtable->set_select(&(pE->xTextObject), &rct); // select 'all'
+  CALLBACK_CHECK_NULL(pE->xTextObject.vtable->set_select)(&(pE->xTextObject), &rct); // select 'all'
 
 //#if 1
-//  pE->xTextObject.vtable->get_select(&(pE->xTextObject), &rct); // get selection for testing
+//  CALLBACK_CHECK_NULL(pE->xTextObject.vtable->get_select)(&(pE->xTextObject), &rct); // get selection for testing
 //
 //  WB_ERROR_PRINT("TEMPORARY:  %s - selected %d,%d,%d,%d\n", __FUNCTION__,
 //                 rct.left, rct.top, rct.right, rct.bottom);
@@ -1870,7 +1882,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-  pE->xTextObject.vtable->set_select(&(pE->xTextObject), NULL);
+  CALLBACK_CHECK_NULL(pE->xTextObject.vtable->set_select)(&(pE->xTextObject), NULL);
 
   internal_new_cursor_pos((WBEditWindow *)pC);
 }
@@ -1923,7 +1935,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-  pE->xTextObject.vtable->mouse_click(&(pE->xTextObject), iX, iY, iButtonMask, iACS);
+  CALLBACK_CHECK_NULL(pE->xTextObject.vtable->mouse_click)(&(pE->xTextObject), iX, iY, iButtonMask, iACS);
 
   internal_new_cursor_pos((WBEditWindow *)pC);
 }
@@ -1961,7 +1973,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-  pE->xTextObject.vtable->begin_mouse_drag(&(pE->xTextObject));
+  CALLBACK_CHECK_NULL(pE->xTextObject.vtable->begin_mouse_drag)(&(pE->xTextObject));
 
   internal_new_cursor_pos((WBEditWindow *)pC);
 }
@@ -1980,7 +1992,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-  pE->xTextObject.vtable->end_mouse_drag(&(pE->xTextObject));
+  CALLBACK_CHECK_NULL(pE->xTextObject.vtable->end_mouse_drag)(&(pE->xTextObject));
 
   internal_new_cursor_pos((WBEditWindow *)pC);
 }
@@ -1999,12 +2011,66 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
-  pE->xTextObject.vtable->mouse_click(&(pE->xTextObject), iX, iY, 0, 0); // report mouse motion
+  CALLBACK_CHECK_NULL(pE->xTextObject.vtable->mouse_click)(&(pE->xTextObject), iX, iY, 0, 0); // report mouse motion
 
   internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
-static void internal_mouse_scrollup(WBChildFrame *pC, int iX, int iY, int iButtonMask, int iACS)
+static void internal_scroll_vert(WBChildFrame *pC, int iMode, int iValue)
+{
+WBEditWindow *pE = (WBEditWindow *)pC;
+
+  CALLBACK_TRACKER;
+
+  if(!WBIsValidEditWindow(pE))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+
+    return;
+  }
+
+  // TODO:  check scroll mode for scroll lock?
+
+  if(iMode == 0) // absolute
+  {
+    if(pE->xTextObject.vtable->get_view)
+    {
+      WB_RECT rctView;
+      WB_POINT ptScroll;
+
+      pE->xTextObject.vtable->get_view(&(pE->xTextObject), &rctView);
+
+      if(iValue == rctView.top) // not moving
+      {
+        return;
+      }
+
+      ptScroll.x = rctView.left;
+      ptScroll.y = iValue;
+
+      CALLBACK_CHECK_NULL(pE->xTextObject.vtable->set_view_orig)(&(pE->xTextObject), &ptScroll);
+
+      FWSetChildFrameScrollInfo(pC, ptScroll.y, pC->extent.height,
+                                pC->origin.x, pC->extent.width,
+                                pC->iRowHeight, pC->iColWidth);
+    }
+  }
+  else
+  {
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->scroll_vertical)(&(pE->xTextObject), iValue);
+
+    FWSetChildFrameScrollInfo(pC,
+                              CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_row)(&(pE->xTextObject))
+                                                   : pC->origin.y,
+                              pC->extent.height,
+                              pC->origin.x, pC->extent.width,
+                              pC->iRowHeight, pC->iColWidth);
+  }
+
+  internal_new_cursor_pos((WBEditWindow *)pC);
+}
+
+static void internal_scroll_horiz(WBChildFrame *pC, int iMode, int iValue)
 {
 WBEditWindow *pE = (WBEditWindow *)pC;
 
@@ -2018,26 +2084,42 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+  // TODO:  check scroll mode for scroll lock?
 
-
-  internal_new_cursor_pos((WBEditWindow *)pC);
-}
-
-static void internal_mouse_scrolldown(WBChildFrame *pC, int iX, int iY, int iButtonMask, int iACS)
-{
-WBEditWindow *pE = (WBEditWindow *)pC;
-
-
-  CALLBACK_TRACKER;
-
-  if(!WBIsValidEditWindow(pE))
+  if(iMode == 0) // absolute
   {
-    WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
+    if(pE->xTextObject.vtable->get_view)
+    {
+      WB_RECT rctView;
+      WB_POINT ptScroll;
 
-    return;
+      pE->xTextObject.vtable->get_view(&(pE->xTextObject), &rctView);
+
+      if(iValue == rctView.top) // not moving
+      {
+        return;
+      }
+
+      ptScroll.x = iValue;
+      ptScroll.y = rctView.top;
+
+      CALLBACK_CHECK_NULL(pE->xTextObject.vtable->set_view_orig)(&(pE->xTextObject), &ptScroll);
+
+      FWSetChildFrameScrollInfo(pC, pC->origin.y, pC->extent.height,
+                                ptScroll.x, pC->extent.width,
+                                pC->iRowHeight, pC->iColWidth);
+    }
   }
+  else
+  {
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->scroll_horizontal)(&(pE->xTextObject), iValue);
 
-
+    FWSetChildFrameScrollInfo(pC, pC->origin.y, pC->extent.height,
+                              CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_col)(&(pE->xTextObject))
+                                                   : pC->origin.x,
+                              pC->extent.width,
+                              pC->iRowHeight, pC->iColWidth);
+  }
 
   internal_new_cursor_pos((WBEditWindow *)pC);
 }
@@ -2076,12 +2158,12 @@ WBEditWindow *pE = (WBEditWindow *)pC;
 
   if(piC)
   {
-    *piC = pE->xTextObject.vtable->get_col(&(pE->xTextObject));
+    *piC = CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_col)(&(pE->xTextObject)) : 0;
   }
 
   if(piR)
   {
-    *piR = pE->xTextObject.vtable->get_row(&(pE->xTextObject));
+    *piR = CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_row)(&(pE->xTextObject)) : 0;
   }
 }
 

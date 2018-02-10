@@ -106,6 +106,9 @@ FW_MENU_HANDLER_END
 static int ChildFrameDoPointerEvent(XClientMessageEvent *pEvent, Display *pDisplay,
                                     Window wID, WBChildFrame *pC, WBChildFrameUI *pUI);
 
+static int ChildFrameDoScrollEvent(XClientMessageEvent *pEvent, Display *pDisplay,
+                                   Window wID, WBChildFrame *pC, WBChildFrameUI *pUI);
+
 static int ChildFrameDoCharEvent(XClientMessageEvent *pEvent, Display *pDisplay,
                                  Window wID, WBChildFrame *pC, WBChildFrameUI *pUI);
 
@@ -722,12 +725,12 @@ int nL, nL2, nC, nC2;
   nL /= nL2; // total number of lines displayed (if scroll bars present)
   nC /= nC2; // total number of columns displayed (if scroll bars present)
 
-  if((nL && nL <= pChildFrame->extent.height) || // # lines on screen > 0 and less than the extent's height?
-     (nC && nC <= pChildFrame->extent.width))    // # cols on screen > 0 and less than the extent's width?
+  if((nL > 0 && nL <= pChildFrame->extent.height) || // # lines on screen > 0 and less than the extent's height?
+     (nC > 0 && nC <= pChildFrame->extent.width))    // # cols on screen > 0 and less than the extent's width?
   {
     // set up the scroll bar ranges correctly
 
-    if(nC > 0)
+    if(nC > 0 && nC <= pChildFrame->extent.width)
     {
       WBSetHScrollRange(&(pChildFrame->scroll), 0, pChildFrame->extent.width);             // use entire width for range
     }
@@ -736,13 +739,32 @@ int nL, nL2, nC, nC2;
       WBSetHScrollRange(&(pChildFrame->scroll), 0, 0);  // disabled
     }
 
-    if((nL - 2) < pChildFrame->extent.height)
+    if((nL - 2) < pChildFrame->extent.height) // brings vert scroll into place if H scroll came into place
     {
-      WBSetVScrollRange(&(pChildFrame->scroll), 0, pChildFrame->extent.height - (nL - 2)); // 2 extra line - scroll is for the top
+      if(WBSetVScrollRange(&(pChildFrame->scroll), 0,
+                           pChildFrame->extent.height - (nL - 2))) // 2 extra line - scroll is for the top
+      {
+        nC--; // subtract an extra column when VScroll is visible
+
+reset_hscroll_range:
+        // if I changed the vscroll info, use this to re-set the hscroll info
+
+        if(nC > 0 && nC <= pChildFrame->extent.width)
+        {
+          WBSetHScrollRange(&(pChildFrame->scroll), 0, pChildFrame->extent.width);             // use entire width for range
+        }
+        else
+        {
+          WBSetHScrollRange(&(pChildFrame->scroll), 0, 0);  // disabled
+        }
+      }
     }
     else
     {
-      WBSetVScrollRange(&(pChildFrame->scroll), 0, 0);
+      if(WBSetVScrollRange(&(pChildFrame->scroll), 0, 0)) // disable vertical scrollbar
+      {
+        goto reset_hscroll_range;
+      }
     }
 
     // set the HPos and VPos based on what's currently visible (upper left corner)
@@ -769,7 +791,6 @@ int nL, nL2, nC, nC2;
 
   WBUpdateScrollBarGeometry(&(pChildFrame->scroll), pChildFrame->rFontSet, // for now do this
                             &(pChildFrame->geom), &(pChildFrame->geom));
-
 }
 
 void FWSetChildFrameScrollInfo(WBChildFrame *pChildFrame, int iRow, int iMaxRow, int iCol, int iMaxCol,
@@ -781,6 +802,9 @@ void FWSetChildFrameScrollInfo(WBChildFrame *pChildFrame, int iRow, int iMaxRow,
 
     return;
   }
+
+  pChildFrame->origin.y = iRow;
+  pChildFrame->origin.x = iCol;
 
   pChildFrame->extent.width = iMaxCol;
   pChildFrame->extent.height = iMaxRow;
@@ -799,12 +823,13 @@ void FWSetChildFrameScrollInfo(WBChildFrame *pChildFrame, int iRow, int iMaxRow,
   // when re-painting the client area, using 'pChildFrame->extent' and 'pChildFrame->geom'.
 
 
+
   // FINALLY, auto-scroll iRow and iCol into view [as needed]
 
-  WB_ERROR_PRINT("TODO:  %s - implement.  %p %u (%08xH)  %d, %d, %d, %d, %d, %d\n", __FUNCTION__,
-                 pChildFrame, (int)pChildFrame->wID, (int)pChildFrame->wID,
-                 iRow, iMaxRow, iCol, iMaxCol, iRowHeight, iColWidth);
 
+  WB_WARN_PRINT("TODO:  %s - implement.  %p %u (%08xH)  %d, %d, %d, %d, %d, %d\n", __FUNCTION__,
+                pChildFrame, (int)pChildFrame->wID, (int)pChildFrame->wID,
+                iRow, iMaxRow, iCol, iMaxCol, iRowHeight, iColWidth);
 }
 
 
@@ -859,29 +884,6 @@ void FWChildFrameRecalcLayout(WBChildFrame *pChildFrame)
 
   WBInvalidateRect(pChildFrame->wID, NULL, 1); // for now, do this
 
-#if 0
-
-  // notify owner of scroll changes by calling its event handler directly
-
-  if(pChildFrame->pUserCallback)
-  {
-    Display *pDisplay;
-    XClientMessageEvent evt;
-
-    pDisplay = WBGetWindowDisplay(pChildFrame->wID);
-
-    bzero(&evt, sizeof(evt));
-    evt.type = ClientMessage;
-
-    evt.display = pDisplay;
-    evt.window = pChildFrame->wID;
-    evt.message_type = aSCROLLBAR_NOTIFY;
-    evt.format = 32;
-
-    pChildFrame->pUserCallback(&evt);
-  }
-
-#endif // 0
 }
 
 void FWChildFrameStatusChanged(WBChildFrame *pChildFrame)
@@ -1073,7 +1075,7 @@ int nChar = sizeof(tbuf);
 
   if(!iRval && !pFW &&
      pEvent->type == ClientMessage &&
-     pEvent->xclient.message_type == aWM_CHAR &&
+     pEvent->xclient.message_type == aWB_CHAR &&
      pEvent->xclient.data.l[0] == XK_F10 &&             // keystroke is F10
      (pEvent->xclient.data.l[1] & WB_KEYEVENT_KEYSYM))
   {
@@ -1178,7 +1180,7 @@ int nChar = sizeof(tbuf);
         break;
 
       case ClientMessage:
-        if(pEvent->xclient.message_type == aWM_CHAR) // generated by WBDefault
+        if(pEvent->xclient.message_type == aWB_CHAR) // generated by WBDefault
         {
           if(pC->pUI)
           {
@@ -1186,11 +1188,11 @@ int nChar = sizeof(tbuf);
           }
 //          else
 //          {
-//            WB_ERROR_PRINT("TEMPORARY:  %s - WM_CHAR, no UI\n", __FUNCTION__);
+//            WB_ERROR_PRINT("TEMPORARY:  %s - WB_CHAR, no UI\n", __FUNCTION__);
 //            WBDebugDumpEvent((XEvent *)pEvent);
 //          }
         }
-        else if(pEvent->xclient.message_type == aWM_POINTER) // generated by WBDefault
+        else if(pEvent->xclient.message_type == aWB_POINTER) // generated by WBDefault
         {
           if(pC->pUI)
           {
@@ -1198,7 +1200,19 @@ int nChar = sizeof(tbuf);
           }
 //          else
 //          {
-//            WB_ERROR_PRINT("TEMPORARY:  %s - WM_POINTER, no UI\n", __FUNCTION__);
+//            WB_ERROR_PRINT("TEMPORARY:  %s - WB_POINTER, no UI\n", __FUNCTION__);
+//            WBDebugDumpEvent((XEvent *)pEvent);
+//          }
+        }
+        else if(pEvent->xclient.message_type == aSCROLL_NOTIFY) // generated by WBScrollBarEvent()
+        {
+          if(pC->pUI)
+          {
+            iRval = ChildFrameDoScrollEvent(&pEvent->xclient, WBGetWindowDisplay(wID), wID, pC, pC->pUI);
+          }
+//          else
+//          {
+//            WB_ERROR_PRINT("TEMPORARY:  %s - SCROLL_NOTIFY, no UI\n", __FUNCTION__);
 //            WBDebugDumpEvent((XEvent *)pEvent);
 //          }
         }
@@ -1248,7 +1262,6 @@ int nChar = sizeof(tbuf);
 }
 
 
-
 static int ChildFrameDoPointerEvent(XClientMessageEvent *pEvent, Display *pDisplay,
                                     Window wID, WBChildFrame *pC, WBChildFrameUI *pUI)
 {
@@ -1259,13 +1272,13 @@ int iButtonMask;
 
   if(wID == None || !pC || !pUI ||
      pEvent->type != ClientMessage ||
-     pEvent->message_type != aWM_POINTER)
+     pEvent->message_type != aWB_POINTER)
   {
     return 0; // sanity check (temporary?)
   }
 
 //#ifndef NO_DEBUG
-//  WB_ERROR_PRINT("TEMPORARY:  %s - WM_POINTER\n", __FUNCTION__);
+//  WB_ERROR_PRINT("TEMPORARY:  %s - WB_POINTER\n", __FUNCTION__);
 //  WBDebugDumpEvent((XEvent *)pEvent);
 //#endif // NO_DEBUG
 
@@ -1286,6 +1299,11 @@ int iButtonMask;
 
   iX = pEvent->data.l[3];
   iY = pEvent->data.l[4];
+
+  WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Mouse | DebugSubSystem_Frame | DebugSubSystem_Event,
+                 "INFO:  %s  EVENT=%lu (%08lxH)  iButtonMask=%x  iACS=%x  iX=%d  iY=%d\n",
+                 __FUNCTION__, (unsigned long)pEvent->data.l[0], (unsigned long)pEvent->data.l[0],
+                 iButtonMask, iACS, iX, iY);
 
   switch(pEvent->data.l[0])
   {
@@ -1347,20 +1365,26 @@ int iButtonMask;
       break;
 
     case WB_POINTER_SCROLLUP:
-      if(pUI->mouse_scrollup)
+      if(pUI->scroll_vert)
       {
-        pUI->mouse_scrollup(pC, iX, iY, iButtonMask, iACS);
+        WB_WARN_PRINT("WARNING:  %s %d - WB_POINTER_SCROLLUP\n", __FUNCTION__, __LINE__);
+        pUI->scroll_vert(pC, 1, -1); // scroll up
         return 1; // handled
       }
+
+      WB_WARN_PRINT("WARNING:  %s %d - WB_POINTER_SCROLLUP (not handled)\n", __FUNCTION__, __LINE__);
 
       break;
 
     case WB_POINTER_SCROLLDOWN:
-      if(pUI->mouse_scrollup)
+      if(pUI->scroll_vert)
       {
-        pUI->mouse_scrolldown(pC, iX, iY, iButtonMask, iACS);
+        WB_WARN_PRINT("WARNING:  %s %d - WB_POINTER_SCROLLDOWN\n", __FUNCTION__, __LINE__);
+        pUI->scroll_vert(pC, 1, 1); // scroll down
         return 1; // handled
       }
+
+      WB_WARN_PRINT("WARNING:  %s %d - WB_POINTER_SCROLLDOWN (not handled)\n", __FUNCTION__, __LINE__);
 
       break;
 
@@ -1376,6 +1400,202 @@ int iButtonMask;
   return 0; // must indicate 'did not handle' if I get here
 }
 
+static int ChildFrameDoScrollEvent(XClientMessageEvent *pEvent, Display *pDisplay,
+                                   Window wID, WBChildFrame *pC, WBChildFrameUI *pUI)
+{
+  if(pEvent->data.l[0] == WB_SCROLL_VERTICAL)
+  {
+    WB_ERROR_PRINT("TEMPORARY:  %s %d - SCROLL_NOTIFY - SCROLL_VERTICAL, %lx, %lx, %lx, %lx\n",
+                   __FUNCTION__, __LINE__,
+                   pEvent->data.l[1],
+                   pEvent->data.l[2],
+                   pEvent->data.l[3],
+                   pEvent->data.l[4]);
+
+    switch(pEvent->data.l[1])
+    {
+      case WB_SCROLL_KNOB:      //  'knob track' - knob position will be in data.l[2]
+        if(pUI->scroll_vert)
+        {
+          pUI->scroll_vert(pC, 0, (int)pEvent->data.l[2]);
+        }
+
+        break;
+
+      case WB_SCROLL_FORWARD:   //  move down, or move right
+        if(pUI->scroll_vert)
+        {
+          pUI->scroll_vert(pC, 1, 1);
+        }
+
+        break;
+
+      case WB_SCROLL_BACKWARD:  //  move up, or move left
+        if(pUI->scroll_vert)
+        {
+          pUI->scroll_vert(pC, 1, -1);
+        }
+
+        break;
+
+      case WB_SCROLL_PAGEFWD:   //  page down or page right
+        if(pUI->pgdown)
+        {
+          pUI->pgdown(pC, 0);
+        }
+
+        break;
+
+      case WB_SCROLL_PAGEBACK:  //  page up or page left
+        if(pUI->pgup)
+        {
+          pUI->pgup(pC, 0);
+        }
+
+        break;
+
+      case WB_SCROLL_FIRST:     //  scroll to first entry, i.e. home or top
+        if(pUI->scroll_vert)
+        {
+          pUI->scroll_vert(pC, 0, 0);
+        }
+
+        break;
+
+      case WB_SCROLL_LAST:      //  scroll to last entry, i.e. bottom or end
+        if(pUI->scroll_vert)
+        {
+          pUI->scroll_vert(pC, 0, -1); // indicates 'end'
+        }
+
+        break;
+
+      case WB_SCROLL_DBLCLICK:  //  double-click detection (no selection info in data.l[2])
+        return 0; // not handled
+
+      case WB_SCROLL_ABSOLUTE:  //  absolute scroll, to the absolute position in data.l[2]
+      case WB_SCROLL_RELATIVE:  //  relative scroll, relative +/- position in data.l[2]
+        if(pUI->scroll_vert)
+        {
+          pUI->scroll_vert(pC,
+                           pEvent->data.l[1] == WB_SCROLL_ABSOLUTE ? 0 : 1,
+                           (int)pEvent->data.l[2]);
+        }
+
+        break;
+
+      case WB_SCROLL_NA:        // generic 'NA' or 'UNDEFINED' value
+        WB_DEBUG_PRINT(DebugLevel_WARN | DebugSubSystem_Event | DebugSubSystem_Frame | DebugSubSystem_ScrollBar,
+                       "WARNING:  %s %d - SCROLL_NOTIFY - SCROLL_VERTICAL - WB_SCROLL_NA\n", __FUNCTION__, __LINE__);
+    }
+
+    return 1;
+  }
+  else if(pEvent->data.l[0] == WB_SCROLL_HORIZONTAL)
+  {
+    WB_ERROR_PRINT("TEMPORARY:  %s %d - SCROLL_NOTIFY - SCROLL_HORIZONTAL, %lx, %lx, %lx, %lx\n",
+                   __FUNCTION__, __LINE__,
+                   pEvent->data.l[1],
+                   pEvent->data.l[2],
+                   pEvent->data.l[3],
+                   pEvent->data.l[4]);
+
+    switch(pEvent->data.l[1])
+    {
+      case WB_SCROLL_KNOB:      //  'knob track' - knob position will be in data.l[2]
+        if(pUI->scroll_horiz)
+        {
+          pUI->scroll_horiz(pC, 0, (int)pEvent->data.l[2]);
+        }
+
+        break;
+
+      case WB_SCROLL_FORWARD:   //  move down, or move right
+        if(pUI->scroll_horiz)
+        {
+          pUI->scroll_horiz(pC, 1, 1);
+        }
+
+        break;
+
+      case WB_SCROLL_BACKWARD:  //  move up, or move left
+        if(pUI->scroll_horiz)
+        {
+          pUI->scroll_horiz(pC, 1, -1);
+        }
+
+        break;
+
+      case WB_SCROLL_PAGEFWD:   //  page down or page right
+        if(pUI->pgright)
+        {
+          pUI->pgright(pC, 0);
+        }
+
+        break;
+
+      case WB_SCROLL_PAGEBACK:  //  page up or page left
+        if(pUI->pgleft)
+        {
+          pUI->pgright(pC, 0);
+        }
+
+        break;
+
+      case WB_SCROLL_FIRST:     //  scroll to first entry, i.e. home or top
+        if(pUI->scroll_horiz)
+        {
+          pUI->scroll_horiz(pC, 0, 0);
+        }
+
+        break;
+
+      case WB_SCROLL_LAST:      //  scroll to last entry, i.e. bottom or end
+//        if(pUI->end)
+//        {
+//          pUI->end(pC, 0);
+//        }
+        if(pUI->scroll_horiz)
+        {
+          pUI->scroll_horiz(pC, 0, -1); // indicates 'end'
+        }
+
+        break;
+
+      case WB_SCROLL_DBLCLICK:  //  double-click detection (no selection info in data.l[2])
+        return 0; // not handled
+
+      case WB_SCROLL_ABSOLUTE:  //  absolute scroll, to the absolute position in data.l[2]
+      case WB_SCROLL_RELATIVE:  //  relative scroll, relative +/- position in data.l[2]
+        if(pUI->scroll_horiz)
+        {
+          pUI->scroll_horiz(pC,
+                            pEvent->data.l[1] == WB_SCROLL_ABSOLUTE ? 0 : 1,
+                            (int)pEvent->data.l[2]);
+        }
+
+        break;
+
+      case WB_SCROLL_NA:        // generic 'NA' or 'UNDEFINED' value
+        WB_DEBUG_PRINT(DebugLevel_WARN | DebugSubSystem_Event | DebugSubSystem_Frame | DebugSubSystem_ScrollBar,
+                       "WARNING:  %s %d - SCROLL_NOTIFY - SCROLL_HORIZONTAL - WB_SCROLL_NA\n", __FUNCTION__, __LINE__);
+    }
+
+    return 1;
+  }
+
+  WB_ERROR_PRINT("WARNING:  %s %d - SCROLL_NOTIFY not handled - %lx, %lx, %lx, %lx, %lx\n",
+                 __FUNCTION__, __LINE__,
+                 pEvent->data.l[0],
+                 pEvent->data.l[1],
+                 pEvent->data.l[2],
+                 pEvent->data.l[3],
+                 pEvent->data.l[4]);
+
+  return 0;
+}
+
+
 static int ChildFrameDoCharEvent(XClientMessageEvent *pEvent, Display *pDisplay,
                                  Window wID, WBChildFrame *pC, WBChildFrameUI *pUI)
 {
@@ -1386,13 +1606,13 @@ int iRval = 0;
 
   if(wID == None || !pC || !pUI ||
      pEvent->type != ClientMessage ||
-     pEvent->message_type != aWM_CHAR)
+     pEvent->message_type != aWB_CHAR)
   {
     return 0; // sanity check (temporary?)
   }
 
 //#ifndef NO_DEBUG
-//  WB_ERROR_PRINT("TEMPORARY:  %s - WM_CHAR\n", __FUNCTION__);
+//  WB_ERROR_PRINT("TEMPORARY:  %s - WB_CHAR\n", __FUNCTION__);
 //  WBDebugDumpEvent((XEvent *)pEvent);
 //#endif // NO_DEBUG
 
