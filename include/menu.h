@@ -198,7 +198,13 @@ typedef struct __WBMenu
 
 } WBMenu;
 
+/** \ingroup menu
+  * \brief TAG for WBMenu structure
+**/
 #define WBMENU_TAG     (*((const unsigned int *)"WBMM"))
+/** \ingroup menu
+  * \brief TAG for WBMenuItem structure
+**/
 #define WBMENUITEM_TAG (*((const unsigned int *)"WBMI"))
 
 

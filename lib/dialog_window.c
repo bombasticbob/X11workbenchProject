@@ -77,7 +77,7 @@
 #define THIS_SUBSYSTEM DebugSubSystem_Dialog
 
 
-/** \ingroup dlgwindow
+/** \ingroup dlgwindow_structures
   * \struct __DIALOG_WINDOW__
   * \copydoc DIALOG_WINDOW
 **/

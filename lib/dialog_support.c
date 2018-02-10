@@ -346,7 +346,7 @@ Atom aKEY_UP = None;
 */
 Atom aKEYSTROKE = None;
 
-/** \ingroup dlgatom
+/** \ingroup dialog_events
   * \hideinitializer
   * \brief DIALOG_INIT ClientMessage, sent to dialog window callback on frame create
   *
@@ -357,7 +357,7 @@ Atom aKEYSTROKE = None;
 */
 Atom aDIALOG_INIT = None;
 
-/** \ingroup dlgatom
+/** \ingroup dialog_events
   * \hideinitializer
   * \brief DLGC_PROP_NOTIFY ClientMessage, notify control of property change
   *
@@ -383,7 +383,7 @@ Atom aDLGC_PROP_NOTIFY = None;
 Atom aLIST_SELCHANGE = None;  // list selection has changed (send to self)
 
 // control command messages sent to controls to set/get info
-/** \ingroup dlgctrl
+/** \ingroup dialog_events
   * \hideinitializer
   * \brief CONTROL_SET ClientMessage - use this to set specific supported control properties by sending it to the control's window callback
   *
@@ -398,7 +398,7 @@ Atom aLIST_SELCHANGE = None;  // list selection has changed (send to self)
 */
 Atom aDLGC_CONTROL_SET = None;
 
-/** \ingroup dlgctrl
+/** \ingroup dialog_events
   * \hideinitializer
   * \brief CONTROL_GET ClientMessage - use this to get specific supported control properties by sending it to the control's window callback
   *
@@ -417,26 +417,26 @@ Atom aDLGC_CONTROL_SET = None;
 Atom aDLGC_CONTROL_GET = None;
 
 // internal-only properties (still have global scope for inline functions, etc.)
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_properties
   * \hideinitializer
   * \brief dialog control TEXT property - see WBDialogControlGetText()
   *
   * This is used internally and should not be invoked directly
 */
 Atom aDLGC_TEXT = None;  // dialog control 'text' property, i.e. 'GetText'
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_properties
   * \hideinitializer
   * \brief dialog control CAPTION property - see WBDialogControlGetCaption()
 */
 Atom aDLGC_CAPTION = None;  // dialog control 'caption' property, i.e. 'GetCaption' (not an actual property, notification only)
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_properties
   * \hideinitializer
   * \brief dialog control FONT property - reserved
   *
   * This is used internally and should not be invoked directly
 */
 Atom aDLGC_FONT = None;
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_properties
   * \hideinitializer
   * \brief dialog control SCROLLINFO property - see \ref WB_SCROLLINFO structure
   *
@@ -446,7 +446,7 @@ Atom aDLGC_FONT = None;
 */
 Atom aDLGC_SCROLLINFO = None;  // scrollbar info structure (horizontal AND vertical)
                                // (scrollbars, listboxes, combo boxes, multi-line edit)
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_properties
   * \hideinitializer
   * \brief dialog control LISTINFO property - see DLGInitControlListInfo() etc.
   *
@@ -456,7 +456,7 @@ Atom aDLGC_SCROLLINFO = None;  // scrollbar info structure (horizontal AND verti
 */
 Atom aDLGC_LISTINFO = None;    // listbox info structure
 
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_properties
   * \hideinitializer
   * \brief dialog control PATH property, for file and directory controls
   *

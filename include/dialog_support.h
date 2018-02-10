@@ -146,11 +146,11 @@ typedef struct __LISTINFO__
 
 
 // specialized structures 'derived' from WBDialogControl (internal only)
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_structures
   * \struct _WB_IMAGE_CONTROL_
   * \copydoc WBImageControl
 */
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_types
   * \typedef WBImageControl
   * \brief Static 'Image' control structure
   *
@@ -174,11 +174,11 @@ typedef struct _WB_IMAGE_CONTROL_
   Pixmap pixmap2;            ///< background (transparency) pixmap
 } WBImageControl;
 
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_structures
   * \struct _WB_PUSHBUTTON_CONTROL_
   * \copydoc WBPushButtonControl
 **/
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_types
   * \typedef WBPushButtonControl
   * \brief Button 'pushbutton' control structure
   *
@@ -202,11 +202,11 @@ typedef struct _WB_PUSHBUTTON_CONTROL_
   Pixmap pixmap2;            ///< background (transparency) pixmap
 } WBPushButtonControl;
 
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_structures
   * \struct _WB_EDIT_CONTROL_
   * \copydoc WBEditControl
 **/
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_types
   * \typedef WBEditControl
   * \brief Edit control structure
   *
@@ -229,11 +229,11 @@ typedef struct _WB_EDIT_CONTROL_
 } WBEditControl;
 
 
-/** \ingroup dlglist
+/** \ingroup dlgctrl_structures dlglist
   * \struct _WB_LIST_CURSEL_
   * \copydoc WBListCurSel
 **/
-/** \ingroup dlglist
+/** \ingroup dlgctrl_types dlglist
   * \typedef WBListCurSel
   * \brief Structure containing information about the current selection in a list
   *
@@ -263,11 +263,11 @@ typedef struct _WB_LIST_CURSEL_
 } WBListCurSel;
 
 
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_structures
   * \struct _WB_LIST_CONTROL_
   * \copydoc  WBListControl
 **/
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_types
   * \typedef  WBListControl
   * \brief List control structure
   *
@@ -296,11 +296,11 @@ typedef struct _WB_LIST_CONTROL_
 } WBListControl;
 
 
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_structures
   * \struct _WB_COMBO_CONTROL_
   * \copydoc WBComboControl
 */
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_types
   * \typedef WBComboControl
   * \brief List control structure
   *
@@ -325,11 +325,11 @@ typedef struct _WB_COMBO_CONTROL_
 } WBComboControl;
 
 
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_structures
   * \struct _WB_TREE_CONTROL_
   * \copydoc WBTreeControl
 **/
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_types
   * \typedef WBTreeControl
   * \brief Static 'Image' control structure
   *

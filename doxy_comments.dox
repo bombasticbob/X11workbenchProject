@@ -52,24 +52,31 @@
 
 
 /** \mainpage X11workbench Toolkit Documentation
-  * \details
+  * \tableofcontents
   *
   * Welcome to the main page for the X11workbench Toolkit documentation.  As you will no
-  * doubt see, this was generated using Doxygen, and the provided 'doxy.txt' file, which you
-  * are welcome to customize to any extent you see fit.
+  * doubt see, this was generated using Doxygen, using the 'doxy.txt' file that is an
+  * integral part of the project.  You are welcome to use and/or customize this documentation
+  * to any extent that you might you see fit, in accordance with the Copyright and License Terms.
   * \n
   * \n
+  * For \ref mainpage_copyright, see the appropriate section (below).
+  * \n
+  * \n
+  * \section summary Summary and Back Story
+  * \details
+  *
   * The X11workbench Toolkit is my response to the inadequacies, difficulty in learning, and
   * general overcomplexity of X11 GUI development.  Going back to my roots in OS/2 and Windows
   * programming, I have tried to take what I believe is the best (and simplest) of THAT world
   * and create a toolkit that looks, well, a LOT like what I came from, taylored specifically
   * to the world of X11.\n
-  *
+  * \n
   * The main goal is to produce a toolkit that can be copied and pasted
   * into just about any GUI project, and then used as-is to provide straightforward no-nonsense
   * windows with easily recognizable features, without carrying around a boatload of extra
   * baggage commonly found in large scale toolkits.\n
-  *
+  * \n
   * Let's face it, X11 is DIFFICULT to code for natively.  That is, it's difficult to code for
   * unlessyou don't want to do anything besides creating a simple window with nothing in it.
   * The use of a decent toolkit can shave YEARS off of a project.  However, if the toolkit causes
@@ -77,7 +84,7 @@
   * too many dependency requirements on developers (until it becomes
   * <a href="http://tvtropes.org/pmwiki/pmwiki.php/Main/NightmareFuel">nightmare fuel</a>),
   * it can ultimately lead to frustration and disappointment.\n
-  *
+  * \n
   * Hence, THIS toolkit was made as an alternative to the "boatload of garbage" that so often
   * ends up being shoved into a 'monolithic toolkit' (or API) that just has to fill every possible
   * set of shoes ever thought up.  It is common to list a projects features in the design phase,
@@ -89,7 +96,7 @@
   * that the first 70% or 80% of functionality can be done in 30% or 20% of the time.  The remaining
   * functionality (a much smaller percentage) consumes an inordinately LARGE amount of the time.  So
   * I will only focus on the 70% or 80% [when compared to other toolkits] for my own toolkit.\n
-  *
+  * \n
   * After all, if you try to please EVERYBODY by providing EVERY possible functionality they might need,
   * you'll end up with a gigantic monolithic pile of wastefulness that requires way too many resources
   * to write, run, and maintain.  And typically it is CONSTANTLY being updated to the point of insanity.
@@ -99,21 +106,22 @@
   * are free to use a monolithic, all-encompassing toolkit to do it.  Otherwise, if you want a lean and mean
   * application with a lightweight toolkit that loads fast, runs fast, and doesn't take a whole lot of effort
   * to create an application with, you'll probably want to use the X11workbench Toolkit.
-  *
+  * \n
   * There are many who ALWAYS say 'do not re-invent the wheel'.  But auto makers do that EVERY YEAR.
   * And this wheel needed to be re-invented, so I DID IT.  It took a while, and nobody came up with anything
   * better during the several YEARS I have been working on this (at least as far as I know).\n
   * \n
-  * \n
   * So, if you were looking for a monolithic toolkit that supports every possible feature on the planet, then you'll want
   * Qt or GTK or similar.  If you prefer C++ objects you might consider Motif or wxWidgets.  Otherwise, have fun with
-  * a very simple, yet very effective C language toolkit, aka the X11workbench Toolkit.  You're welcome.
+  * a relatively simple, yet very effective C language toolkit, aka the X11workbench Toolkit.  You're welcome.
   *
+  * \n
+  * \n
   *
-**/
-
-/** \page mainpage_1 Copyright and License Terms for the X11workbench Toolkit
+  * \section mainpage_copyright Copyright and License Terms
   * \details
+  *
+  * \b Copyright \b and \b License \b Terms b for \b the \b X11workbench \b Toolkit
   *
   * <b>COPYRIGHT</b>
   *
@@ -142,6 +150,23 @@
   * that uses a significant portion of the source files or the algorithms that are
   * included with this software.
   *
+  *
+  * GPL license:
+  *
+  * You may distribute this application, or any derived work, under the following
+  * GPL licenses:
+  *
+  * \li [L]GPL v2 or v2.1\n
+  * \li [L]GPL v3 or later
+  *
+  *
+  * If you use an unmodified source for the X11workbench Toolkit or the X11workbench
+  * application, providing a URL for the official source repository will consistitute
+  * compliance with the GPL license requirement of making the source available to
+  * anyone receiving a binary copy of this (or any derived) work, so long as all
+  * other requirements associated with the license are fulfilled.
+  *
+  *
   * <b>EXCLUSIONS</b>
   *
   * Specifically excluded from this requirement are files that were generated by the
@@ -167,9 +192,10 @@
   * there is any confusion as to the intent of the license, the above stated license terms take
   * precedence.
   *
-**/
-
-/** \page mainpage_1a Design Goals for the X11workbench Toolkit
+  * \n
+  * \n
+  *
+  * \section mainpage_1a Design Goals for the X11workbench Toolkit
   * \details
   *
   * \b Design \b Goals
@@ -194,9 +220,28 @@
   * The 'hello world' application should be reasonable AND SMALL, and not because special things
   * were written JUST TO MAKE THAT HAPPEN (that is called 'engineering for the demo' and I don't like doing that)\n
   *
+  * \n
+  * \n
+  *
+  * \section mainpage_3 Additional Information
+  * \details
+  *
+  * Additional information
+  *
+  * For more information on the X11workbench application or the X11workbench Toolkit, visit
+  *
+  * http://sourceforge.net/projects/x11workbench\n
+  * http://github.com/bombasticbob/X11workbenchProject\n
+  * http://www.mrp3.com/\n
+  *
+  *
+  * The latest official on-line documentation can be found at:
+  *
+  * http://bombasticbob.github.io/X11workbench
+  *
 **/
 
-/** \page mainpage_2 X11workbench Toolkit Coding Style Guidelines
+/** \page mainpage_style X11workbench Toolkit Coding Style Guidelines
   *
   * \b CODE \b APPEARANCE
   *
@@ -406,21 +451,33 @@
   *
 **/
 
-/** \page mainpage_3 Additional Information
-  * \details
+/** \page mainpage_tutorial API Tutorials and Quick-Start guides
   *
-  * Additional information
+  * \par For basic sample code, you can start here:
+  * \ref mainpage_4 \n
+  * \ref events \n
+  * \n
   *
-  * For more information on the X11workbench application or the X11workbench Toolkit, visit
+  * \par For information on the menu handling framework:
+  * \ref menu_resource \n
+  * \ref menu \n
+  * \n
   *
-  * http://sourceforge.net/projects/x11workbench\n
-  * http://github.com/bombasticbob/X11workbenchProject
-  * http://www.mrp3.com/
+  * \par For information on dialog boxes:
+  * \ref dialog_api\n
+  * \ref dialog_resource \n
+  * \n
+  *
+  * \par For process control, i.e. running external programs:
+  * \ref process \n
+  * \n
+  *
+  * \par For information on threads and synchronization
+  * \ref threads \n
+  * \n
   *
   *
-  * The latest official on-line documentation can be found at:
-  *
-  * http://bombasticbob.github.io/X11workbench
+  * (additional information and tutorials to be added at a later date)
   *
 **/
 
@@ -883,7 +940,8 @@
   * The 'WBDelay()' call is a way of ensuring that your application does not 'spin' with 100%
   * CPU utilization while waiting for an event.  This can help with battery life, and so on.
   *
-  * If you have no background processing to perform, you can use
+  * If you have no background processing to perform, you can use WBNextEvent() instead of
+  * WBCheckGetEvent(), and avoid the need of the surrounding 'if' block.
   *
   * \sa \ref mainpage_4, \ref events
   *
@@ -1202,11 +1260,18 @@
   * Structures that help to implement 'Core' functionality
 **/
 
-/** \ingroup core
-  * \defgroup xatoms ClientMessage Atoms
+/** \ingroup events
+  * \defgroup events_atoms ClientMessage Atoms
   *
   * Atoms used for XClientMessageEvent notifications\n
   * Includes details on the various message parameters
+**/
+
+/** \ingroup events
+  * \defgroup events_types Data Types and Definitions
+  *
+  * Various data types and definitions used for XClientMessageEvent notifications\n
+  *
 **/
 
 /** \ingroup core

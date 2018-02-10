@@ -62,30 +62,55 @@ extern "C" {
 
 /** \file dialog_controls.h definitions for dialog control structures and APIs */
 
-/** \defgroup dlgctrl_atom 'Control Name' Atoms for standard dialog controls
+/** \defgroup dlgctrl_atom 'Standard Control Name' Atoms
   * \ingroup dlgctrl
   *
   * 'Control Name' atoms for pre-defined (standard) dialog controls
 **/
 
-/** \defgroup dlgctrl_notify CONTROL NOTIFY Atoms for dialog controls
+/** \defgroup dlgctrl_notify Notification Atoms
   * \ingroup dlgctrl
   *
   * Control Notification (ClientMessage) Atoms for standard dialog controls
   * using the \ref aCONTROL_NOTIFY atom as the message type.
 **/
 
-
 /** \ingroup dlgctrl
+  * \defgroup dlgctrl_properties Control Window Properties
+  *
+  * Atoms and Definitions for Control Properties
+  *
+**/
+
+/** \defgroup dlgctrl_definitions Definitions
+  * \ingroup dlgctrl
+  *
+  * Definitions for dialog controls
+**/
+
+/** \defgroup dlgctrl_structures Structures
+  * \ingroup dlgctrl
+  *
+  * Definitions for dialog controls
+**/
+
+/** \defgroup dlgctrl_types Data Types
+  * \ingroup dlgctrl
+  *
+  * Data Types for dialog controls
+**/
+
+
+/** \ingroup dlgctrl_definitions
   * \brief TAG for the WBDialogControl structure
 **/
 #define DIALOG_CONTROL_TAG (*((const unsigned int *)"DLGC"))
 
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_structures
   * \struct __WB_DIALOG_PROP__
   * \copydoc WB_DIALOG_PROP
 **/
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_types
   * \typedef WB_DIALOG_PROP
   * \brief Dialog property storage structure
   *
@@ -118,11 +143,11 @@ typedef struct __WB_DIALOG_PROP__
 } WB_DIALOG_PROP;
 
 
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_structures
   * \struct __WB_DIALOG_PROPLIST__
   * \copydoc WBDialogPropList
 **/
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_types
   * \typedef WBDialogPropList
   * \brief Dialog Property List, container for \ref WB_DIALOG_PROP
   *
@@ -170,11 +195,11 @@ typedef struct __WB_DIALOG_PROPLIST__
 } WBDialogPropList;
 
 
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_structures
   * \struct __WB_DIALOG_CONTROL__
   * \copydoc WBDialogControl
 **/
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_types
   * \typedef WBDialogControl
   * \brief Structure identifying the properties of a dialog box control
   *
@@ -301,7 +326,7 @@ WBDialogControl * WBDialogControlCreate(Atom aClass, WBDialogWindow *pOwner,
 void DLGRegisterControlCallback(WBDialogControl *pDialogControl, const char *szClassName, WBWinEvent pCallback);
 
 
-/** \ingroup expose
+/** \ingroup dlgctrl expose
   * \brief Convenience function, invalidates a Geom for a dialog box control
   *
   * \param pDialogControl A pointer to the WBDialogControl structure that is associated with the dialog control window
@@ -320,7 +345,7 @@ static __inline__ void WBDialogControlInvalidateGeom(WBDialogControl *pDialogCon
   }
 }
 
-/** \ingroup expose
+/** \ingroup dlgctrl expose
   * \brief Convenience function, invalidates a region for a dialog box control
   *
   * \param pDialogControl A pointer to the WBDialogControl structure that is associated with the dialog control window
@@ -1103,7 +1128,7 @@ static __inline__ const char * DLGGetControlProperty(WBDialogWindow *pDialog, in
 }
 
 
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_definitions
   * @{
 **/
 // standard control IDs
@@ -1117,62 +1142,47 @@ static __inline__ const char * DLGGetControlProperty(WBDialogWindow *pDialog, in
 #define IDCANCEL 0x7fffffff           /**< 'CANCEL' button **/
 #define IDSTATIC -1                   /**< non-unique 'static' item; may exist more than once within a dialog resource **/
 #define IDNONE   0                    /**< 'no ID' -  this may be repeated as needed for things that need no ID **/
+/**
+  * @}
+**/
 
+// standard atoms for control types - string definitions
 
-// standard atoms for control types
-
-/** \ingroup dlgctrl_atom **/
+/** \ingroup dlgctrl_atom
+  * @{
+**/
 #define FRAME_CONTROL_STR            "Frame"             /**< Static Frame Control - \ref aFRAME_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define TEXT_CONTROL_STR             "Text"              /**< Static Text Control - \ref aTEXT_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define ICON_CONTROL_STR             "Icon"              /**< Static Icon Control - \ref aICON_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define IMAGE_CONTROL_STR            "Image"             /**< Static Image Control - \ref aIMAGE_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define EDIT_CONTROL_STR             "Edit"              /**< Edit (Text) Control - \ref aEDIT_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define PUSHBUTTON_CONTROL_STR       "PushButton"        /**< Push Button Control - \ref aPUSHBUTTON_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define DEFPUSHBUTTON_CONTROL_STR    "DefPushButton"     /**< Default Push Button Control - \ref aDEFPUSHBUTTON_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define CANCELBUTTON_CONTROL_STR     "CancelButton"      /**< Cancel Push Button Control - \ref aCANCELBUTTON_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define RADIOBUTTON_CONTROL_STR      "RadioButton"       /**< Radio Button Control - \ref aRADIOBUTTON_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define FIRSTRADIOBUTTON_CONTROL_STR "FirstRadioButton"  /**< First Radio Button Control - \ref aFIRSTRADIOBUTTON_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define CHECKBUTTON_CONTROL_STR      "CheckButton"       /**< Checkbox Button Control - \ref aCHECKBUTTON_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define TRISTATEBUTTON_CONTROL_STR   "TriStateButton"    /**< Tri-State Button Control - \ref aTRISTATEBUTTON_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define HSCROLL_CONTROL_STR          "HScroll"           /**< Horizontal Scroll Bar Control - \ref aHSCROLL_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define VSCROLL_CONTROL_STR          "VScroll"           /**< Vertical Scroll Bar Control - \ref aVSCROLL_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define SLIDER_CONTROL_STR           "Slider"            /**< Sliding Bar Control - \ref aSLIDER_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define KNOB_CONTROL_STR             "Knob"              /**< 'Volume' Knob Control - \ref aKNOB_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define LIST_CONTROL_STR             "List"              /**< List Box Control - \ref aLIST_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define COMBO_CONTROL_STR            "Combo"             /**< Combo Box Control - \ref aCOMBO_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define TREE_CONTROL_STR             "Tree"              /**< Tree Control - \ref aTREE_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define COMBOTREE_CONTROL_STR        "ComboTree"         /**< Combo Tree Control - \ref aCOMBOTREE_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define FILE_LIST_CONTROL_STR        "FileList"          /**< File List Control - \ref aFILE_LIST_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define FILE_COMBO_CONTROL_STR       "FileCombo"         /**< File Combo Control - \ref aFILE_COMBO_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define PATH_TREE_CONTROL_STR        "PathTree"          /**< Path Tree Control - \ref aPATH_TREE_CONTROL */
-/** \ingroup dlgctrl_atom **/
 #define TAB_CONTROL_STR              "Tab"               /**< Tab Control - \ref aTAB_CONTROL */
+/**
+  * @}
+**/
 
 
 // atoms and strings for standard control types (doxygen - these are documented in dialog_controls.c)
 #ifndef DIALOG_SUPPORT_C
+
 
 // static controls
 
@@ -1280,13 +1290,17 @@ extern Atom aDLGC_PATH; // PATH information for file-related controls
 
 // data.l[2] parameter definitions for aCONTROL_NOTIFY + aLIST_NOTIFY ClientMessage
 
-/** \ingroup dlgctrl_notify **/
+/** \ingroup dlgctrl_definitions
+  * @{
+**/
+
 #define WB_LIST_NONE      0 /**< 'default' notification value (no action needed) */
-/** \ingroup dlgctrl_notify **/
 #define WB_LIST_SELCHANGE 1 /**< simple notification that the selection has changed */
-/** \ingroup dlgctrl_notify **/
 #define WB_LIST_DBLCLICK  2 /**< double click by default drives an 'End Dialog' with IDOK */
 
+/**
+  * @}
+**/
 
 
 
@@ -1296,7 +1310,7 @@ extern Atom aDLGC_PATH; // PATH information for file-related controls
 
 // LISTBOX-related (applies to anything with a LIST property)
 
-/** \ingroup dlglist
+/** \ingroup dlgctrl_definitions dlglist
   * \hideinitializer
   * \brief LIST-related constants for the index of an item within a list
   *
@@ -1312,7 +1326,7 @@ enum ControlListIndex
   ControlListIndex_NONE = -1                 ///< "no selection"
 };
 
-/** \ingroup dlglist
+/** \ingroup dlgctrl_definitions dlglist
   * \hideinitializer
   * \brief Create flags specified in the call to DLGInitControlListInfo()
 */
@@ -1331,7 +1345,7 @@ enum ListInfoFlags
 };
 
 
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_definitions
   * \hideinitializer
   * \brief Control 'Get/Set' properties used by aDLGC_CONTROL_SET and aDLGC_CONTROL_GET
 */
@@ -1347,7 +1361,7 @@ enum ControlGetSetProperties
 
 
 // 'ulFlags' bits 0000ffff is "common", 00ff0000 is control-specific, ff000000 is 'reserved for custom'
-/** \ingroup dlgctrl
+/** \ingroup dlgctrl_definitions
   * \hideinitializer
   * \brief Various bit flags used for controls, defined here for convenience
   *

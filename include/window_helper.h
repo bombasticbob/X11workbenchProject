@@ -694,14 +694,14 @@ extern const Atom aNULL;             // Atom for 'NULL'
 
 // parameter enumerations for aSCROLL_NOTIFY ClientMessage
 
-/** \ingroup xatoms
+/** \ingroup events_types
   * \hideinitializer
   * \brief Enumeration for \ref aSCROLL_NOTIFY ClientMessage
   *
   * Enumeration of values used in scroll notification messages.\n
   * \sa  \ref WBScrollBarEvent()
 */
-enum
+enum WBScrollEventParam
 {
   WB_SCROLL_DEFAULT = 0,    ///< 1st parameter (bar) - 'Default Bar', currently not implemented, probably won't be used
   WB_SCROLL_HORIZONTAL = 1, ///< 1st parameter (bar) - The horizontal scroll bar for the control or window

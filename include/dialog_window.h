@@ -57,16 +57,63 @@ extern "C" {
 #endif // __cplusplus
 
 
-/** \file dialog_window.h Definitions for dialog (frame) window and intercommunication structures and APIs
+/** \file dialog_window.h Definitions for dialog (frame) window and intercommunication structures and dialog-related APIs
 **/
 
 /** \ingroup dialog
-  * \defgroup dialog_api Main Dialog API Functions and definitions
+  * \defgroup dialog_api High Level Dialog Box API Functions and definitions
   *
-  * High-level dialog box functions and definitions.  Normally you will use
-  * these to create dialog boxes of various types.
+  * This section describes High Level Dialog Box API functions and definitions.
+  * Normally you will use these to create dialog boxes of various types.
+  *
+  * A Dialog Box uses a Dialog Frame Window containing one or more controls that
+  * are identified by a 'Control ID'.  These controls will send (or post) events
+  * that can be handled by the user-specified callback function.
+  *
+  * A Dialog Box can be 'modeless', which uses the application's message loop to
+  * asynchronously process its events, or it can be 'Modal', in which case the
+  * function WBShowModal() will be used to display the dialog box while effectively
+  * 'blocking' the main message loop.
+  *
+  * To create a dialog box from a resource, see DLGCreateDialogWindow()
+  *
+  * To display a message box or generic input box, see DLGMessageBox() and DLGInputBox()
+  *
+  * Additionally, if you need a 'file picker', 'color picker', or 'font picker', you can use
+  * DLGFileDialog(), DLGColorDialog(), or DLGFontDialog() (as appropriate).
   *
 **/
+
+/** \ingroup dialog
+  * \defgroup dialog_events ClientMessage Event Atoms
+  *
+  * Atoms for ClientMessage Events associated with Dialog Boxes
+  *
+  * The following atoms are used by dialog windows in ClientMessage events,
+  * for intercommunication between controls and the dialog frame window, to
+  * command the dialog box window (or a control) to perform a specific function,
+  * or to notify the dialog box callback function of certain events
+  * (like dialog box initialization or control activation).
+ **/
+
+/** \ingroup dialog_api
+  * \defgroup dialog_api_definitions Definitions
+  *
+  * Definitions for the High Level Dialog Box API
+ **/
+
+/** \ingroup dialog_api
+  * \defgroup dialog_api_types Data Types and Structures
+  *
+  * Data Types and Structures for the High Level Dialog Box API
+ **/
+
+/** \ingroup dialog_api
+  * \defgroup dialog_api_functions Functions
+  *
+  * API Functions for the High Level Dialog Box API
+ **/
+
 
 /** \ingroup dialog
   * \defgroup dlgwindow Dialog (Frame) Windows
@@ -81,6 +128,19 @@ extern "C" {
   * using registered identifier names within the resource text.
   *
 **/
+
+/** \ingroup dlgwindow
+  * \defgroup dlgwindow_definitions Definitions
+  *
+  * Definitions for Dialog (Frame) Windows
+ **/
+
+/** \ingroup dlgwindow
+  * \defgroup dlgwindow_structures Structures
+  *
+  * Structures for Dialog (Frame) Windows
+ **/
+
 
 /** \ingroup dialog
   * \defgroup dlgctrl Dialog Box Controls
@@ -98,17 +158,8 @@ extern "C" {
   *
 **/
 
-/** \ingroup dialog
-  * \defgroup dlgatom Dialog Window ClientMessage Atoms
-  *
-  * The following atoms are used by dialog windows in ClientMessage events
-  * for intercommunication between controls and the dialog frame window, or
-  * to notify the dialog box callback function of certain events (like initialization).
-  *
-**/
 
-
-/** \ingroup dialog_api
+/** \ingroup dialog_api_definitions
   * @{
 **/
 #define DIALOG_WINDOW_TAG (*((const unsigned int *)"DLGW")) /**< tag for WB_DIALOG_WINDOW structure **/
@@ -119,7 +170,7 @@ extern "C" {
 
 
 
-/** \ingroup dlgwindow
+/** \ingroup dlgwindow_structures
   * \struct __WB_DIALOG_ENTRY__
   * \copydoc WBDialogEntry
 **/
@@ -166,7 +217,7 @@ typedef struct __WB_DIALOG_ENTRY__
 } WBDialogEntry;
 
 
-/** \ingroup dlgwindow
+/** \ingroup dlgwindow_structures
   * \struct __WB_DIALOG_WINDOW__
   * \copydoc WBDialogWindow
 **/
@@ -218,7 +269,7 @@ typedef struct __WB_DIALOG_WINDOW__
          clrBD;          ///< border pixel color
 } WBDialogWindow;
 
-/** \ingroup dlgwindow
+/** \ingroup dlgwindow_definitions
   * \enum WBDialogWindowFlags
   * \hideinitializer
   * \brief enumeration for the iFlags member of WBDialogWindow
@@ -266,7 +317,7 @@ enum WBDialogWindowFlags
   WBDialogWindow_MAX = 0x80000000L
 };
 
-/** \ingroup dlgwindow
+/** \ingroup dlgwindow_definitions
   * \enum WBDialogEntryFlags
   * \hideinitializer
   * \brief enumeration for the iFlags member of WBDialogEntry
@@ -335,7 +386,7 @@ enum WBDialogEntryFlags
 
 };
 
-/** \ingroup dialog_api
+/** \ingroup dialog_api_functions
   * \brief create a dialog window using a text resource
   *
   * \returns Pointer to WBDialogWindow structure that identifies the dialog (frame) window
@@ -646,7 +697,7 @@ Display *pDisplay = WBGetWindowDisplay(pDLG->wID);
 
 // special pre-defined dialog windows
 
-/** \ingroup dialog_api
+/** \ingroup dialog_api_types
   * \enum MessageBoxEnum
   * \hideinitializer
   * \brief Message Box flag enumeration
@@ -707,7 +758,7 @@ enum MessageBoxEnum
     MessageBox_BUTTON_MASK = 0xfe0   ///< mask for button bits
 };
 
-/** \ingroup dialog_api
+/** \ingroup dialog_api_functions
   * \brief Display a modal 'message box' dialog window with a specific title, message, and button combination
   *
   * \return The Control ID of the button that was pressed, or -1 (equivalent to 'IDCANCEL') on error
@@ -723,7 +774,7 @@ enum MessageBoxEnum
 **/
 int DLGMessageBox(int iType, Window wIDOwner, const char *szTitle, const char *szMessage);
 
-/** \ingroup dialog_api
+/** \ingroup dialog_api_functions
   * \brief Displays a special purpose dialog window that retrieves a character string as input
   *
   * \param wIDOwner Owner Window ID (or None)
@@ -744,7 +795,7 @@ char *DLGInputBox(Window wIDOwner, const char *szTitle, const char *szPrompt, co
                   int iWidth, int iMaxChar);
 
 
-/** \ingroup dialog_api
+/** \ingroup dialog_api_types
   * \enum FileDialogEnum
   * \hideinitializer
   * \brief FileDialog enumeration
@@ -770,7 +821,7 @@ enum FileDialogEnum
     FileDialog_MODIFIER_MASK = 0xff0      ///< bit mask for modifier flag
 };
 
-/** \ingroup dialog_api
+/** \ingroup dialog_api_functions
   * \brief Display a modal File Dialog window, returning a WBAlloc'd pointer to a null-byte terminated string containing a fully qualified file or path name
   *
   * \param iType See the \ref FileDialogEnum enumeration for a list of possible values
@@ -806,7 +857,7 @@ char *DLGFileDialog(int iType, Window wIDOwner, const char *szDefPath, const cha
                     const char *szExtAndDescList);
 
 
-/** \ingroup dialog_api
+/** \ingroup dialog_api_functions
   * \brief Display a modal Color Dialog window, returning the selected color in the XColor structure pointed to by 'pColor'
   *
   * \param wIDOwner The owner's Window ID (or None)
@@ -825,7 +876,7 @@ char *DLGFileDialog(int iType, Window wIDOwner, const char *szDefPath, const cha
 int DLGColorDialog(Window wIDOwner, XStandardColormap *pColorMap, XColor *pColor);
 
 
-/** \ingroup dialog_api
+/** \ingroup dialog_api_functions
   * \brief Display a modal Font Dialog window, returning the selected font in the XColor structure pointed to by 'pColor'
   *
   * \param pDisplay The Display pointer for which to query font information (NULL implies default display)
@@ -844,7 +895,7 @@ int DLGColorDialog(Window wIDOwner, XStandardColormap *pColorMap, XColor *pColor
 XFontSet DLGFontDialog(Display *pDisplay, Window wIDOwner, XFontSet fsDefault);
 
 
-/** \ingroup dialog_api
+/** \ingroup dialog_api_functions
   * \brief Display a splash screen for 5 seconds (with animation and copyright string), and then return.
   *
   * \param aXPM a pointer to an XPM array (as created by utilities like 'gimp').
