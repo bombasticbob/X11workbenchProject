@@ -1911,7 +1911,12 @@ char tbuf[256];
   {
     pDHdr = (XSETTINGS_DATAHDR *)pCur;
 
-    if((char *)(&(pDHdr->wNameLen) + 1) > pDataEnd) // make sure I can read wNameLen safely
+    // re-arranged this so it doesn't throw the following warning
+    //     warning: taking address of packed member 'wNameLen' of class or structure '__XSETTINGS_DATAHDR__'
+    //              may result in an unaligned pointer value [-Waddress-of-packed-member]
+    // was: if((char *)(&(pDHdr->wNameLen) + 1) > pDataEnd)
+
+    if(((char *)&(pDHdr->wNameLen) + sizeof(pDHdr->wNameLen)) > pDataEnd) // make sure I can read wNameLen safely
     {
       WB_ERROR_PRINT("%s:%d - %s XSETTINGS data corrupt (data buffer too small)  %p %p %d of %d\n",
                       __FILE__, __LINE__, __FUNCTION__, pCur, pDataEnd, i1, nItems);
@@ -1919,6 +1924,7 @@ char tbuf[256];
       return;
     }
 
+    // NOTE:  this COULD become unaligned access right here, but I had no warning...
     cbNameLen = pHdr->cByteOrder ? htons(pDHdr->wNameLen) : pDHdr->wNameLen;
 
     if(pDHdr->szName + cbNameLen + 1 >= pDataEnd)

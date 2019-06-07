@@ -120,11 +120,11 @@ typedef struct _WBExtent_ WB_EXTENT; // forward reference on WB_EXTENT structure
 **/
 
 /** \struct WBFont
-  * \ingroup font
+  * \ingroup font_struct
   * \copydoc WB_FONT
 **/
 /** \typedef WB_FONT
-  * \ingroup font
+  * \ingroup font_struct
   * \brief An allocated structure containing XFontStruct, XFontInfo, and XftFont [as applicable] for a specified font
   *
   * \code
@@ -169,7 +169,7 @@ typedef struct WBFont
 } * WB_FONT; // WB_FONT will always point to this struct, allocated using WBAlloc
 
 /** \typedef WB_FONTC
-  * \ingroup font
+  * \ingroup font_struct
   *
   * \brief a 'const' version of WB_FONT - note that this CAN actually be written to, so it's not truly 'const'.
   *
@@ -190,11 +190,11 @@ typedef const struct WBFont *WB_FONTC;
 // -----------------------------------------
 
 /** \struct WBFontInfo
-  * \ingroup font
+  * \ingroup font_struct
   * \copydoc WB_FONT_INFO
 **/
-/** \typedef WB_FONT
-  * \ingroup font
+/** \typedef WB_FONT_INFO
+  * \ingroup font_struct
   * \brief Internal structure, caching font information (mostly for legacy font support)
   *
   * \code

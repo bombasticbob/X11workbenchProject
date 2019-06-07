@@ -1105,9 +1105,10 @@
 /** \defgroup font Font Utilities
   * GC Utility/API functions for WB_FONT mid-level font selection and modification
   *
-  * This is the definition file for font helper functions and structures, designed
-  * to SPECIFICALY work with 'Xft' freetype fonts and rendering.  For maximum
-  * compatibility, these are abstracted using the WB_FONT object for legacy
+  * These are the definitions for font helper functions and structures, designed
+  * to SPECIFICALY work with 'Xft' freetype fonts and rendering, but also support
+  * legacy (X11) fonts and font sets.  For maximum compatibility, they have been
+  * abstracted using the (new) WB_FONT/WB_FONTC objects, particularly for legacy
   * implementations that do not have the Xft library installed, and for those fonts
   * that are native X11 fonts or font sets.
 **/
@@ -1116,13 +1117,18 @@
   * \ingroup font
   * GC Utility functions for legacy (X11) font selection and modification
   *
-  * This are the definitions for font helper functions and structures, designed
+  * These are the LEGACY definitions for font helper functions and structures, designed
   * to SPECIFICALY work with 'X11 Core' fonts and rendering.
   * Fonts under X11 (core) are generally difficult to deal with.  These utility
   * functions allow you to more easily select a font based on an existing
   * font or a general description of a font, with 'fuzzy' matching.\n
   * Additionally there is support for creating 'Font Sets' for use with Xmb, Xwc, and Xutf8
   * versions of 'Core' text rendering APIs.
+**/
+
+/** \defgroup font_struct Font Structures
+  * \ingroup font
+  * X11 Workbench Toolkit font-related structures
 **/
 
 /** \defgroup draw_text Text Drawing Utilities
