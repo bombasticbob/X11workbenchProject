@@ -13,15 +13,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -39,7 +39,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -168,13 +168,13 @@ extern Atom aMENU_ACTIVATE;            ///< Atom for 'ACTIVATE' client event
 /** \ingroup menu_bar
   * \brief Get a pointer to the default 'Menu Bar' font structure
   *
-  * \returns A pointer to the default font structure for 'Menu Bar' windows
+  * \returns A pointer to the default WB_FONTC for 'Menu Bar' windows
   *
   * Use this function to obtain a pointer to the default 'Menu Bar' font structure
   *
   * Header File:  menu_bar.h
 **/
-XFontStruct *MBGetDefaultMenuFont(void);
+WB_FONTC MBGetDefaultMenuFont(void);
 
 // menu bar window info
 

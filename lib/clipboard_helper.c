@@ -14,15 +14,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -40,7 +40,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -82,6 +82,9 @@
 #include "platform_helper.h"
 #include "draw_text.h"
 #include "text_object.h"
+
+#define MIN_EVENT_LOOP_SLEEP_PERIOD 100    /* 0.1 millisec */
+#define MAX_EVENT_LOOP_SLEEP_PERIOD 100000 /* 0.1 seconds max per loop for clipboard */
 
 
 typedef struct _ClipboardTask_ // only for getting data; setting data done immediately
@@ -199,10 +202,21 @@ char *pDisplayName;
   }
   else
   {
+    int iDelayPeriod = MIN_EVENT_LOOP_SLEEP_PERIOD;
+
     while(WBThreadRunning(hClipboardThread) &&
           bClipboardQuitFlag > 0)
     {
-      WBDelay(100); // wait for my thread to initialize
+      WBDelay(iDelayPeriod); // wait for my thread to initialize
+
+      if(iDelayPeriod < MAX_EVENT_LOOP_SLEEP_PERIOD)
+      {
+        iDelayPeriod += (iDelayPeriod >> 1);
+      }
+      else
+      {
+        iDelayPeriod = MAX_EVENT_LOOP_SLEEP_PERIOD;
+      }
     }
 
     WBFree(pDisplayName);  // ok to free it now
@@ -398,7 +412,7 @@ CLIPBOARD_TASK *pT, *pT2;
 void * ClipboardThreadProc(void *pParam)
 {
 unsigned long long ullTick;
-int iLen, iFactor;//, iErr;
+int iLen, iFactor, iDelayPeriod;
 const char *pDisplayName = (const char *)pParam;
 Display *pDisplay = NULL;
 volatile CLIPBOARD_TASK *pT;
@@ -536,13 +550,15 @@ Atom aUTF8_STRING;
   // main handler loop - this executes the clipboard thread
   // -------------------------------------------------------
 
+  iDelayPeriod = MIN_EVENT_LOOP_SLEEP_PERIOD;
+
   while(!bClipboardQuitFlag)
   {
     if(WBMutexLock(&xClipboardMutex, 1000)) // wait up to 1msec to lock
     {
       // well looks like I could NOT own the mutex
 
-      WBDelay(100); // make sure I do this at least once in this loop
+      WBDelay(100); // make sure I do this at least once in this loop, waiting for clipboard mutex
     }
     else
     {
@@ -1621,7 +1637,7 @@ null_data_me_own:
 
 //      XFlush(pDisplay);  // force flush just in case
 
-      WBDelay(1000); //if I'm not busy, use a sleep state to limit CPU utilization in the thread
+      WBDelay(iDelayPeriod); // 1000); //if I'm not busy, use a sleep state to limit CPU utilization in the thread
 
       ullTemp = WBGetTimeIndex();
       if((ullTemp - ullLastTime) > 50000) // make sure it's more than 0.05 seconds, so I don't "spin"
@@ -1632,6 +1648,21 @@ null_data_me_own:
         XSync(pDisplay, False); // force sync just in case
         END_XCALL_DEBUG_WRAPPER
       }
+
+      // each time through, advance the delay period by 50%
+
+      if(iDelayPeriod < MAX_EVENT_LOOP_SLEEP_PERIOD)
+      {
+        iDelayPeriod += (iDelayPeriod >> 1);
+      }
+      else
+      {
+        iDelayPeriod = MAX_EVENT_LOOP_SLEEP_PERIOD;
+      }
+    }
+    else
+    {
+      iDelayPeriod = MIN_EVENT_LOOP_SLEEP_PERIOD; // reset delay period to 0.1 seconds
     }
   }
 

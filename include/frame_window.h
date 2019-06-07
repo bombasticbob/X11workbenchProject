@@ -14,15 +14,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -40,7 +40,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -358,8 +358,8 @@ struct __WBChildFrameUI__; // forward declaration
       // window identifier for the 'Child Frame' window.  may contain 'None' while being destroyed
     WBFrameWindow *pOwner;
       // a pointer to the WBFrameWindow owner
-    XFontSet rFontSet;
-      // default font set for the window
+    WB_FONT pFont;
+      // default font for the window
 
     WB_GEOM geom;
       // client-area geometry (excludes scroll bars)
@@ -428,7 +428,7 @@ typedef struct __WBChildFrame__
   unsigned int ulTag;               ///< tag indicating I'm a 'Child Frame' window
   Window wID;                       ///< window identifier for the 'Child Frame' window.  may contain 'None' while being destroyed
   WBFrameWindow *pOwner;            ///< a pointer to the WBFrameWindow owner
-  XFontSet rFontSet;                ///< default font for the window
+  WB_FONT pFont;                    ///< default font for the window
 
   WB_GEOM geom;                     ///< total client-area geometry (excludes scroll bars) in 'pixels'
   WB_GEOM geomEntire;               ///< client-area geometry (excludes scroll bars)
@@ -1093,7 +1093,7 @@ void FWSetStatusText(WBFrameWindow *pFrameWindow, const char *szText);
 **/
 void FWSetStatusTabInfo(WBFrameWindow *pFrameWindow, int nTabs, const int *pTabs);
 
-// DEFAULT COLORS
+// DEFAULT COLORS AND FONTS
 
 /** \ingroup frame_window
   * \brief Get the default foreground color
@@ -1121,6 +1121,24 @@ XColor FWGetDefaultBG(void);
   * Header File:  frame_window.h
 **/
 XColor FWGetDefaultBD(void);
+
+/** \ingroup frame_window
+  * \brief Get the frame window WB_FONTC
+  *
+  * \returns WB_FONTC assigned to frame window for font
+  *
+  * Header File:  frame_window.h
+**/
+WB_FONTC FWGetFont(WBFrameWindow *pFW);
+
+/** \ingroup frame_window
+  * \brief Get the frame window bold WB_FONTC
+  *
+  * \returns WB_FONTC assigned to frame window for bold font
+  *
+  * Header File:  frame_window.h
+**/
+WB_FONTC FWGetBoldFont(WBFrameWindow *pFW);
 
 
 #if 0

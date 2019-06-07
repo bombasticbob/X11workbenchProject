@@ -13,15 +13,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -39,7 +39,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -114,7 +114,7 @@ XColor clrMenuFG, clrMenuBG, clrMenuActiveFG, clrMenuActiveBG, clrMenuBorder1, c
        clrMenuDisabledFG, clrMenuActiveDisabledFG;
 
 static int iInitColorFlag = 0;
-static XFontStruct *pDefaultMenuFont = NULL;  // default menu font
+static WB_FONT pDefaultMenuFont = NULL;  // default menu font
 
 /** \ingroup menu_bar
   * \hideinitializer
@@ -216,7 +216,7 @@ int MBInitGlobal(void)
 
   if(!pDefaultMenuFont)
   {
-    pDefaultMenuFont = WBCopyFont(WBGetDefaultFont());
+    pDefaultMenuFont = WBCopyFont(WBGetDefaultDisplay(), WBGetDefaultFont());
 
     if(!pDefaultMenuFont)
     {
@@ -324,7 +324,7 @@ int MBInitGlobal(void)
   return 1;
 }
 
-XFontStruct *MBGetDefaultMenuFont(void)
+WB_FONTC MBGetDefaultMenuFont(void)
 {
   return pDefaultMenuFont;
 }
@@ -340,7 +340,7 @@ WBMenuBarWindow *MBCreateMenuBarWindow(Window wIDParent, const char *pszResource
   XSizeHints  xsh;            /* Size hints for window manager - width of owner + 2 * height of font */
   XWMHints xwmh;
   WB_RECT rct;
-  XFontStruct *pFS;
+  WB_FONTC pFS;
 
 
   // initialize global menu objects
@@ -359,7 +359,7 @@ WBMenuBarWindow *MBCreateMenuBarWindow(Window wIDParent, const char *pszResource
   bg = clrMenuBG.pixel;// WhitePixel(pDisplay, DefaultScreen(pDisplay));  // white background for menus (for now)
 
   WBGetClientRect(wIDParent, &rct);
-  pFS = WBGetWindowFontStruct(wIDParent);
+  pFS = WBQueryWindowFont(wIDParent);
 
   if(!pDefaultMenuFont && !pFS)
   {
@@ -367,8 +367,9 @@ WBMenuBarWindow *MBCreateMenuBarWindow(Window wIDParent, const char *pszResource
     return 0;
   }
   else if(pDefaultMenuFont)
+  {
     pFS = pDefaultMenuFont;
-
+  }
 
   // set size hints to match client area, upper left corner (always)
   xsh.flags = (PPosition | PSize);
@@ -378,7 +379,7 @@ WBMenuBarWindow *MBCreateMenuBarWindow(Window wIDParent, const char *pszResource
   if(!pFS)
     xsh.height = 32;
   else
-    xsh.height = 2 * (pFS->max_bounds.ascent + pFS->max_bounds.descent);
+    xsh.height = 2 * WBFontAscent(pFS) + WBFontDescent(pFS);
 
   if(xsh.height > (rct.bottom - rct.top))
     xsh.height = rct.bottom - rct.top;
@@ -439,7 +440,7 @@ WBMenuBarWindow *MBCreateMenuBarWindow(Window wIDParent, const char *pszResource
 
   WBCreateWindowDefaultGC(pRval->wSelf, fg, bg);
 //  WBSetWindowFontStruct(pRval->wSelf, XLoadQueryFont(WBGetDefaultDisplay(), MENU_FONT));
-  WBSetWindowFontStruct(pRval->wSelf, WBCopyFont(pFS));
+  WBSetWindowFont(pRval->wSelf, pFS);
 
   // TODO:  should I _NOT_ do this if I clear the input focus flag?
   XSelectInput(pDisplay, pRval->wSelf,
@@ -1119,9 +1120,10 @@ static int MenuBarDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu, Display *pD
 {
   int i1, i2, iHPos, iVPos;
   XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
-  XFontStruct *pOldFont, *pFont;
+  WB_FONTC pFont, pTempFont;
+  WB_FONT pOldFont;
   XPoint xpt[3];
-  GC gc; // = WBGetWindowDefaultGC(wID);
+  WBGC gc; // = WBGetWindowDefaultGC(wID);
   XGCValues xgc;
   WB_GEOM geomPaint;
   char tbuf[128];
@@ -1142,15 +1144,21 @@ static int MenuBarDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu, Display *pD
     return 0;
   }
 
-  pFont = pOldFont = WBGetWindowFontStruct(wID);
+  pOldFont = NULL;
+  pFont = WBQueryWindowFont(wID);
 
-  if(!pDefaultMenuFont && !pOldFont)
+  if(!pFont)
   {
-    WB_ERROR_PRINT("%s - * BUG * no font!\n", __FUNCTION__);
-    return 0;
+    if(!pDefaultMenuFont)
+    {
+      WB_ERROR_PRINT("%s - * BUG * no font!\n", __FUNCTION__);
+      return 0;
+    }
+    else if(pDefaultMenuFont) // NOTE:  using this in lieu of window font when specified
+    {
+      pFont = pDefaultMenuFont;
+    }
   }
-  else if(pDefaultMenuFont)
-    pFont = pDefaultMenuFont;
 
   // get graphics context copy and begin painting
   gc = WBBeginPaint(wID, pEvent, &geomPaint);
@@ -1162,14 +1170,19 @@ static int MenuBarDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu, Display *pD
 
   WBClearWindow(wID, gc);
 
-  xgc.font = pFont->fid;
-  BEGIN_XCALL_DEBUG_WRAPPER
-  XChangeGC(pDisplay, gc, GCFont, &xgc);
+//  xgc.font = pFont->fid;
+//  WBChangeGC(gc, GCFont, &xgc);
+  pTempFont = WBQueryGCFont(gc); // gets un-copied font
+  if(pTempFont)
+  {
+    pOldFont = WBCopyFont(pDisplay, pTempFont); // make a copy
+    pTempFont = NULL; // so I don't accidentally re-use it
+  }
 
-  END_XCALL_DEBUG_WRAPPER
+  WBSetFont(gc, pFont);
 
   // paint the 3D-looking border
-  XSetForeground(pDisplay, gc, clrMenuBorder2.pixel);
+  WBSetForeground(gc, clrMenuBorder2.pixel);
   xpt[0].x=xwa.border_width;
   xpt[0].y=xwa.height-1-2*xwa.border_width - 1;  // exclude first point
   xpt[1].x=xwa.border_width;
@@ -1177,9 +1190,9 @@ static int MenuBarDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu, Display *pD
   xpt[2].x=xwa.width-1-2*xwa.border_width - 1;   // exclude last point
   xpt[2].y=xwa.border_width;
 
-  XDrawLines(pDisplay, wID, gc, xpt, 3, CoordModeOrigin);
+  WBDrawLines(pDisplay, wID, gc, xpt, 3, CoordModeOrigin);
 
-  XSetForeground(pDisplay, gc, clrMenuBorder3.pixel);
+  WBSetForeground(gc, clrMenuBorder3.pixel);
   xpt[0].x=xwa.width-1-2*xwa.border_width;
   xpt[0].y=xwa.border_width + 1;              // exclude first point
   xpt[1].x=xwa.width-1-2*xwa.border_width;
@@ -1187,22 +1200,22 @@ static int MenuBarDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu, Display *pD
   xpt[2].x=xwa.border_width + 1;              // exclude final point
   xpt[2].y=xwa.height-1-2*xwa.border_width;
 
-  XDrawLines(pDisplay, wID, gc, xpt, 3, CoordModeOrigin);
+  WBDrawLines(pDisplay, wID, gc, xpt, 3, CoordModeOrigin);
 
   // painting the menu items
 
-  i2 = XTextWidth(pFont, "  ", 2);  // width of 2 spaces
-  iVPos = pFont->max_bounds.ascent + pFont->max_bounds.descent;  // font height
+  i2 = WBTextWidth(pFont, "  ", 2);  // width of 2 spaces
+  iVPos = WBFontAscent(pFont) + WBFontDescent(pFont); // font height
   iVPos = (xwa.height - iVPos) >> 1;  // half of the difference - top of text
-  iVPos += pFont->max_bounds.ascent;
+  iVPos += WBFontAscent(pFont);
 
   // update the width and height of the menu bar within the window
   pSelf->iX = i2;
-  pSelf->iY = iVPos - (pFont->max_bounds.ascent + 1);
+  pSelf->iY = iVPos - (WBFontAscent(pFont) + 1);
   pSelf->iWidth = i2;  // initially
-  pSelf->iHeight = pFont->max_bounds.ascent + pFont->max_bounds.descent + 1;
+  pSelf->iHeight = WBFontAscent(pFont) + WBFontDescent(pFont) + 1;
 
-  XSetForeground(pDisplay, gc, clrMenuFG.pixel);
+  WBSetForeground(gc, clrMenuFG.pixel);
 
   for(i1=0, iHPos = i2; pMenu && pMenu->ppItems && i1 < pMenu->nItems; i1++)
   {
@@ -1217,12 +1230,12 @@ static int MenuBarDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu, Display *pD
 
     if(i1 == pSelf->iSelected)  // selected item
     {
-      XSetForeground(pDisplay, gc, clrMenuActiveBG.pixel);
-      XSetBackground(pDisplay, gc, clrMenuActiveBG.pixel);
+      WBSetForeground(gc, clrMenuActiveBG.pixel);
+      WBSetBackground(gc, clrMenuActiveBG.pixel);
 
-      XFillRectangle(pDisplay, wID, gc, pItem->iPosition, pSelf->iY, pItem->iTextWidth, pSelf->iHeight + 2);
+      WBFillRectangle(pDisplay, wID, gc, pItem->iPosition, pSelf->iY, pItem->iTextWidth, pSelf->iHeight + 2);
 
-      XSetForeground(pDisplay, gc, clrMenuActiveFG.pixel);
+      WBSetForeground(gc, clrMenuActiveFG.pixel);
     }
 
     szText = pItem->data + pItem->iMenuItemText;
@@ -1241,11 +1254,11 @@ static int MenuBarDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu, Display *pD
           if(p1 == tbuf)
             iU1 = 0;
           else
-            iU1 = XTextWidth(pFont, tbuf, p1 - tbuf);
+            iU1 = WBTextWidth(pFont, tbuf, p1 - tbuf);
 
           if(p1[1])
           {
-            iU2 = XTextWidth(pFont, p1, 1);
+            iU2 = WBTextWidth(pFont, p1, 1);
             strcpy(p1, p1 + 1);
           }
           else
@@ -1263,12 +1276,14 @@ static int MenuBarDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu, Display *pD
     if(pItem->iPosition < 0)
         pItem->iPosition = iHPos;  // also needed for mousie/clickie
     if(pItem->iTextWidth < 0)
-        pItem->iTextWidth = XTextWidth(pFont, szText, strlen(szText));
+        pItem->iTextWidth = WBTextWidth(pFont, szText, strlen(szText));
 
     // TODO:  change string into a series of XTextItem structures and
     //        then call XDrawText to draw the array of 'XTextItem's
+    // TODO:  Use a 'font set' instead, and DTDrawXXX
+
     if(*szText)
-      XDrawString(pDisplay, wID, gc, iHPos, iVPos, szText, strlen(szText));
+      WBDrawString(pDisplay, wID, gc, iHPos, iVPos, szText, strlen(szText));
 
     if(strlen(szText) < strlen(pItem->data + pItem->iMenuItemText))
     {
@@ -1277,13 +1292,13 @@ static int MenuBarDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu, Display *pD
       xpt[1].x=iHPos + iU1 + iU2;
       xpt[1].y=xpt[0].y;
 
-      XDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
+      WBDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
     }
 
     if(i1 == pSelf->iSelected)  // selected item
     {
-      XSetForeground(pDisplay, gc, clrMenuFG.pixel);
-      XSetBackground(pDisplay, gc, clrMenuBG.pixel);
+      WBSetForeground(gc, clrMenuFG.pixel);
+      WBSetBackground(gc, clrMenuBG.pixel);
     }
 
     iHPos += pItem->iTextWidth + i2;
@@ -1293,12 +1308,11 @@ static int MenuBarDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu, Display *pD
 
   // by convention, restore original objects/state
 
-  xgc.font = pOldFont->fid;
-  BEGIN_XCALL_DEBUG_WRAPPER
-  XChangeGC(pDisplay, gc, GCFont, &xgc);
+//  xgc.font = pOldFont->fid;
+//  WBChangeGC(gc, GCFont, &xgc);
+  WBSetFontNoCopy(gc, pOldFont); // now the gc owns it (no need to WBFreeFont now)
 
-  XSetForeground(pDisplay, gc, WBGetWindowFGColor(wID));  // restore it at the end
-  END_XCALL_DEBUG_WRAPPER
+  WBSetForeground(gc, WBGetWindowFGColor(wID));  // restore it at the end
 
   WBEndPaint(wID, gc);
 

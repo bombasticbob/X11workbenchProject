@@ -36,6 +36,11 @@ if HAVE_XFT_LIB
 #  X_EXTRA_LIBS += -lXft
 endif
 
+# presence of libXext library.  use --disble-libXext in configure to disable it
+if HAVE_XEXT_LIB
+  X_EXTRA_LIBS += -lXext
+endif
+
 
 # note:  was using AM_LDFLAGS but Ubuntu build borked, so using LIBS instead
 #AM_LDFLAGS = $(X_LIBS) -lm -lX11 $(X_PRE_LIBS) $(X_EXTRA_LIBS)
@@ -118,9 +123,10 @@ toolkit_lib:
 
 # pseudo target for building documentation
 
-libX11workbenchToolkit_DOCDEPEND = lib/pixmap_helper.c lib/window_helper.c lib/font_helper.c lib/edit_window.c lib/child_frame.c
-libX11workbenchToolkit_DOCDEPEND += lib/frame_window.c lib/dialog_window.c lib/dialog_impl.c lib/dialog_controls.c lib/dialog_support.c
-libX11workbenchToolkit_DOCDEPEND += lib/menu.c lib/menu_bar.c lib/menu_popup.c lib/conf_help.c lib/file_help.c lib/draw_text.c
+libX11workbenchToolkit_DOCDEPEND = lib/pixmap_helper.c lib/window_helper.c lib/font_helper.c lib/edit_window.c
+libX11workbenchToolkit_DOCDEPEND += lib/child_frame.c lib/frame_window.c lib/dialog_window.c lib/dialog_impl.c 
+libX11workbenchToolkit_DOCDEPEND += lib/dialog_controls.c lib/dialog_support.c lib/graphical_api.c lib/menu.c
+libX11workbenchToolkit_DOCDEPEND += lib/menu_bar.c lib/menu_popup.c lib/conf_help.c lib/file_help.c lib/draw_text.c
 libX11workbenchToolkit_DOCDEPEND += lib/window_dressing.c lib/platform_helper.c lib/text_object.c lib/clipboard_helper.c
 
 libX11workbenchToolkit_DOCDEPEND += include/pixmap_helper.h include/edit_window.h include/child_frame.h

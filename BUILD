@@ -13,7 +13,7 @@ If you have trouble building and/or running this software, and cannot
 determine an appropriate workaround, please contact the author.
 
 
-  sourceforge:  
+  sourceforge:
     https://x11workbench.sourceforge.net/
     https://sourceforge.net/project/x11workbench
   HEAD:
@@ -29,7 +29,7 @@ determine an appropriate workaround, please contact the author.
   documentation:
     https://bombasticbob.github.io/X11workbench
 
-  website: 
+  website:
     http://www.mrp3.com/
 
 For Debian Linux and derivatives (like Ubuntu, Mint):
@@ -74,6 +74,28 @@ and then
   make
 
 
+
+MISSING '-dev' PACKAGES
+-----------------------
+
+If the 'configure' script warns you that you need to install a '-dev'
+package, and then you install it, you will need to re-run aclocal and
+the other 'autotools' scripts (autoheader, autoconf, automake).
+This is because adding the '-dev' packages is likely to change the
+available macros for M4, and as such, all of the other 'autotools'
+script output will be affected.
+
+Typically, with a Debian-based package system, these packages will have
+names like 'libxft-dev'.  Typically, you can search for the installed
+version of the packages, then install the similarly named package with
+a '-dev' suffix.
+
+On other systems, such as those with a Red-Hat-based package system,
+this scheme may be different.  You should consult the documentation for
+that distribution on how you install developer packages.
+
+
+
 DEBUG VS RELEASE
 ----------------
 
@@ -91,6 +113,7 @@ You can then re-build the debug version using the following:
 
   make clean
   make
+
 
 
 CONFIGURE OPTIONS
@@ -121,6 +144,7 @@ NOTE:  the install option will place a copy of the configuration output header
 
 
 
+
 INSTALLATION
 ------------
 
@@ -135,6 +159,7 @@ To install the various files 'as-is' (after being built):
 
 
 
+
 RE-DISTRIBUTION
 ---------------
 
@@ -143,6 +168,7 @@ license requirements specified in COPYING.
 
 Also, please include the entire contents of THIS file with any
 re-distribution of the X11workbench application and/or toolkit.
+
 
 
 
@@ -186,9 +212,10 @@ f) maximum cross-platform compatibility (use autotool features to make
       Xorg
       Xfree86
       XMing (on Windows)
+      reserved: any other X11R7 compatible system (including Wayland, OSX)
 
    The code should also work with just about any window manager.  The
-   following window managers (at a minumum) must be supported:
+   following window managers (at a minumum) should be supported:
 
       gnome 2.x and 3.x
       Mate
@@ -204,10 +231,9 @@ g) minimal 'run dependencies'.  If you MUST add a dependency, make sure it
    Interix, and there is specific code in place to deal with this.
 
 
-Author testing has been done on the following platforms:
-  FreeBSD 7.x, 8.x, 9.x (gnome 2, fluxbox)
-  Debian (squeeze,wheezy) linux with 2.6 kernel (mate,gnome,KDE)
-  Interix (on Windows XP) with XMing
-  Cygwin (on Windows XP) with XMing
+Author testing and development has been done on the following platforms:
+  FreeBSD 11.x (Mate, Fluxbox)
+  Debian (wheezie, jessie), Ubuntu, and Mint Linux (Mate)
+
 
 

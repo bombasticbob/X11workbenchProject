@@ -13,15 +13,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -39,7 +39,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -72,8 +72,8 @@
 /** \ingroup draw_text
   * \brief calculate ideal bounds rectangle for text given a font, tab spacing, tab origin, and alignment
   *
-  * \param pDisplay the Display associated with the XFontSet
-  * \param fontSet An XFontSet (None implies system default font set)
+  * \param pDisplay the Display associated with the WB_FONT
+  * \param pFont The WB_FONT (NULL implies system default font set)
   * \param pWords The DT_WORDS structure for the text (this function modifies DT_WORD::iX, DT_WORD::iY)
   * \param iTabWidth A positive integer in 'characters', or negative integer in pixels, indicating tab width
   * \param iTabOrigin An unsigned integer indicating the tab origin, using the same units as iTabWidth, corresponding to the first character.
@@ -91,14 +91,14 @@
   * This function is used internally and should not be invoked.  It is declared 'static' and not visible outside of
   * the file it's defined in.
 **/
-static int InternalCalcIdealBounds(Display *pDisplay, XFontSet fontSet, DT_WORDS *pWords, int iTabWidth, unsigned int iTabOrigin,
+static int InternalCalcIdealBounds(Display *pDisplay, WB_FONTC pFont, DT_WORDS *pWords, int iTabWidth, unsigned int iTabOrigin,
                                    const WB_RECT *prcSource, WB_RECT *prcDest, int iAlignment, int iStartLine, int iEndLine);
 
 
 static void InternalDebugDumpWords(DT_WORDS *pWords); ///< \brief internal debug function to dump 'DT_WORDS' 'words' object
 
 
-static void __internalDoAntiAlias(Display *pDisplay, Drawable dw, GC gc, int iX, int iY, int iWidth, int iHeight);
+static void __internalDoAntiAlias(Display *pDisplay, Drawable dw, WBGC gc, int iX, int iY, int iWidth, int iHeight);
 
 
 // *******************
@@ -106,22 +106,31 @@ static void __internalDoAntiAlias(Display *pDisplay, Drawable dw, GC gc, int iX,
 // *******************
 
 // abstracting the 'draw text' process
-void DTDrawString(Display *pDisplay, Drawable drawable, XFontSet fontSet,
-                  GC gc, int x, int y, const char *pString, int nLength)
+void DTDrawString(Display *pDisplay, Drawable drawable, WB_FONTC pFont,
+                  WBGC gc, int x, int y, const char *pString, int nLength)
 {
 char tbuf[1024];
 char *pS;
 WB_EXTENT ext;
 
-#if defined(X_HAVE_UTF8_STRING)
-#define DO_DRAW_STRING Xutf8DrawString
-#else // use 'multi-byte char' equivalent
-#define DO_DRAW_STRING XmbDrawString
-#endif // UTF8 vs multi-byte
+//#if defined(X_HAVE_UTF8_STRING)
+//#define DO_DRAW_STRING Xutf8DrawString
+//#else // use 'multi-byte char' equivalent
+//#define DO_DRAW_STRING XmbDrawString
+//#endif // UTF8 vs multi-byte
 
 
-  if(!pDisplay || !pString || drawable == None || fontSet == None || gc == None || nLength <= 0)
+  if(!pDisplay || !pString || drawable == None || !pFont || !gc || nLength <= 0)
   {
+    if(pString && nLength > 0)
+    {
+      WB_ERROR_PRINT("ERROR: %s.%d returning error for \"%-.*s\"\n", __FUNCTION__, __LINE__, nLength, pString);
+    }
+    else
+    {
+      WB_ERROR_PRINT("ERROR: %s.%d returning error for %d,%p\n", __FUNCTION__, __LINE__, nLength, pString);
+    }
+
     return; // don't allow this.  just don't.
   }
 
@@ -151,8 +160,6 @@ use_the_stack_buffer:
     pS = WBAlloc(nLength);
     if(!pS)
     {
-//      pS = (char *)pString; // desperately trying to succeed (is this a security problem?)
-
       nLength = sizeof(tbuf); // shorten the string and do it anyway, but not all of it.  desperate, yeah.
       goto use_the_stack_buffer;
     }
@@ -160,22 +167,79 @@ use_the_stack_buffer:
     memcpy(pS, pString, nLength);
   }
 
-  // TODO:  make a font that is twice as big, render it on large-enough pixmap, and then
+  // TODO:  An alternate method of anti-aliasing
+  //        make a font that is twice as big, render it on large-enough pixmap, and then
   //        shrink it down onto the display surface with a raster operation that combines
   //        pixels and (effectively) gives it an anti-aliasing effect.
 
-  BEGIN_XCALL_DEBUG_WRAPPER
-  DO_DRAW_STRING(pDisplay, drawable, fontSet, gc, x, y, pS, nLength); // for now, just do this
-  END_XCALL_DEBUG_WRAPPER
+  // TODO:  need to make this so I can draw it onto an XImage
 
-  // TODO: an 'if' block for anti-aliasing support?
+#ifdef X11WORKBENCH_TOOLKIT_HAVE_XFT
+  if(pFont && pFont->pxftFont)
   {
-    WBTextExtent(fontSet, pS, nLength, &ext);
-
-    // NOTE:  the x and y are for bottom left when the function was called, not top left (as with specifying a rect or geom)
-    __internalDoAntiAlias(pDisplay, drawable, gc, x, y - ext.height, ext.width, ext.height);
+#warning TODO: IMPLEMENT THIS PART for Xft FONTS
   }
+  else
+#endif // X11WORKBENCH_TOOLKIT_HAVE_XFT
+  {
+    if(pFont->fsFont)
+    {
+      WB_ERROR_PRINT("TEMPORARY:  %s.%d using WB_DRAW_STRING for \"%-.*s\"\n", __FUNCTION__, __LINE__, nLength, pString);
 
+      BEGIN_XCALL_DEBUG_WRAPPER
+      WB_DRAW_STRING(pDisplay, drawable, pFont->fsFont, gc->gc, x, y, pS, nLength); // for now, just do this
+      END_XCALL_DEBUG_WRAPPER
+
+      if(WBFontEnableAntiAlias())
+      {
+        WBTextExtent(pFont, pS, nLength, &ext);
+
+        // NOTE:  the x and y are for bottom left when the function was called, not top left (as with specifying a rect or geom)
+        __internalDoAntiAlias(pDisplay, drawable, gc, x, y - ext.height, ext.width, ext.height);
+      }
+    }
+    else
+    {
+      XGCValues gcv, gcv2;
+
+      WB_ERROR_PRINT("TEMPORARY:  %s.%d using XDrawString for \"%-.*s\"\n", __FUNCTION__, __LINE__, nLength, pString);
+
+      if(pFont->pFontStruct) // legacy font?  switch gc to use this
+      {
+        memset(&gcv, 0, sizeof(gcv));
+        memset(&gcv2, 0, sizeof(gcv2));
+
+        BEGIN_XCALL_DEBUG_WRAPPER
+        XGetGCValues(gc->display, gc->gc, GCFont, &gcv);
+        END_XCALL_DEBUG_WRAPPER
+
+        memcpy(&gcv2, &gcv, sizeof(gcv));
+
+        // if GC font is not this one, assign it to this one
+        if(gcv2.font != pFont->pFontStruct->fid)
+        {
+          gcv2.font = pFont->pFontStruct->fid; // new font ID
+
+          BEGIN_XCALL_DEBUG_WRAPPER
+          XChangeGC(gc->display, gc->gc, GCFont, &gcv2);
+          END_XCALL_DEBUG_WRAPPER
+        }
+      }
+
+      BEGIN_XCALL_DEBUG_WRAPPER
+      XDrawString(pDisplay, drawable, gc->gc, x, y, pS, nLength); // for now, just do this
+      END_XCALL_DEBUG_WRAPPER
+
+      if(pFont->pFontStruct)
+      {
+        // put the font back
+
+        BEGIN_XCALL_DEBUG_WRAPPER
+        XChangeGC(gc->display, gc->gc, GCFont, &gcv);
+        END_XCALL_DEBUG_WRAPPER
+      }
+    }
+  }
 
   if(pS && pS != &(tbuf[0]) && pS != (char *)pString)
   {
@@ -183,36 +247,7 @@ use_the_stack_buffer:
   }
 }
 
-int DTGetTextWidth0(XFontStruct *pFont, const char *szUTF8, int nLength)
-{
-//XRectangle rctInk, rctLog;
-XFontSet fSet;
-int iRval;//, iLen;
-
-  if(nLength <= 0)
-  {
-    return 0;
-  }
-
-  fSet = WBFontSetFromFont(WBGetDefaultDisplay(), pFont);
-
-  if(!fSet)
-  {
-    WB_ERROR_PRINT("Unable to get font set!\n");
-
-    return XTextWidth(pFont, szUTF8, nLength);
-  }
-
-  iRval = DTGetTextWidth(fSet, szUTF8, nLength); // WB_TEXT_ESCAPEMENT(fSet, szUTF8, nLength);
-
-  BEGIN_XCALL_DEBUG_WRAPPER
-  XFreeFontSet(WBGetDefaultDisplay(), fSet);
-  END_XCALL_DEBUG_WRAPPER
-
-  return iRval;
-}
-
-int DTGetTextWidth(XFontSet fontSet, const char *szUTF8, int nLength)
+int DTGetTextWidth(WB_FONTC pFont, const char *szUTF8, int nLength)
 {
 int iRval;
 
@@ -221,47 +256,23 @@ int iRval;
     return 0;
   }
 
-  if(fontSet == None)
-  {
-    fontSet = WBGetDefaultFontSet(WBGetDefaultDisplay());
-
-    if(fontSet == None)
-    {
-      WB_ERROR_PRINT("ERROR:  %s - fSet is None\n", __FUNCTION__);
-
-      return 0;
-    }
-  }
-
-  iRval = WBTextWidth(fontSet, szUTF8, nLength); // WB_TEXT_ESCAPEMENT(fSet, szUTF8, nLength);
+  iRval = WBTextWidth(pFont, szUTF8, nLength); // WB_TEXT_ESCAPEMENT(fSet, szUTF8, nLength);
 
   // TODO:  any debug output
 
   return iRval;
 }
 
-void DTGetTextExtent(XFontSet fontSet, const char *szUTF8, int nLength, WB_EXTENT *pExtent)
+void DTGetTextExtent(WB_FONTC pFont, const char *szUTF8, int nLength, WB_EXTENT *pExtent)
 {
-  if(fontSet == None)
-  {
-    fontSet = WBGetDefaultFontSet(WBGetDefaultDisplay());
-
-    if(fontSet == None)
-    {
-      WB_ERROR_PRINT("ERROR:  %s - fSet is None\n", __FUNCTION__);
-
-      return;
-    }
-  }
-
-  WBTextExtent(fontSet, szUTF8, nLength, pExtent);
+  WBTextExtent(pFont, szUTF8, nLength, pExtent);
 }
 
 
 
 // determine ideal font size from desired text and geometry
 
-XFontStruct *DTCalcIdealFont(XFontStruct *pRefFont, const char *szText, WB_GEOM *geomBounds)
+WB_FONT DTCalcIdealFont(Display *pDisplay, WB_FONTC pRefFont, const char *szText, WB_GEOM *geomBounds)
 {
   if(!pRefFont)
   {
@@ -272,18 +283,6 @@ XFontStruct *DTCalcIdealFont(XFontStruct *pRefFont, const char *szText, WB_GEOM 
 
 
   return NULL; // for now
-}
-
-
-XFontSet DTCalcIdealFontSet(Display *pDisplay, XFontSet fontSet, const char *szText, WB_GEOM *geomBounds)
-{
-  if(fontSet == None)
-  {
-    fontSet = WBGetDefaultFontSet(pDisplay);
-  }
-
-
-  return None; // for now
 }
 
 
@@ -361,30 +360,7 @@ DT_WORDS *pRval = *ppWords;
 // However the focus of THIS project is "only implement what is necessary" (and forget the rest).
 
 
-DT_WORDS * DTGetWordsFromText0(XFontStruct *pFont, const char *szText, int iAlignment)
-{
-XFontSet fSet;
-DT_WORDS *pRval = NULL;
-
-
-  fSet = WBFontSetFromFont(WBGetDefaultDisplay(), pFont);
-
-  if(!fSet)
-  {
-    WB_ERROR_PRINT("ERROR:  %s - Unable to get font set!\n", __FUNCTION__);
-
-    return NULL;
-  }
-
-  pRval = DTGetWordsFromText(WBGetDefaultDisplay(), fSet, szText, iAlignment);
-
-  XFreeFontSet(WBGetDefaultDisplay(), fSet);
-
-  return pRval;
-}
-
-
-DT_WORDS * DTGetWordsFromText(Display *pDisplay, XFontSet fontSet, const char *szText, int iAlignment)
+DT_WORDS * DTGetWordsFromText(Display *pDisplay, WB_FONTC pFont, const char *szText, int iAlignment)
 {
   const char *p1, *p2;
 
@@ -527,8 +503,8 @@ DT_WORDS * DTGetWordsFromText(Display *pDisplay, XFontSet fontSet, const char *s
         }
 
         // use white space string for width
-        pRval->aWords[pRval->nCount].iWidth = DTGetTextWidth(fontSet, p2, pRval->aWords[pRval->nCount].nLength);
-        pRval->aWords[pRval->nCount].iHeight = WBFontSetHeight(pDisplay, fontSet); // total height of font
+        pRval->aWords[pRval->nCount].iWidth = DTGetTextWidth(pFont, p2, pRval->aWords[pRval->nCount].nLength);
+        pRval->aWords[pRval->nCount].iHeight = WBFontHeight(pFont); // total height of font
 
         pRval->nCount++;
       }
@@ -571,7 +547,7 @@ DT_WORDS * DTGetWordsFromText(Display *pDisplay, XFontSet fontSet, const char *s
       {
         if(!(iAlignment & DTAlignment_UNDERSCORE) || !iUnderscoreFlag)
         {
-          pRval->aWords[pRval->nCount].iWidth = DTGetTextWidth(fontSet, p2, p1 - p2);
+          pRval->aWords[pRval->nCount].iWidth = DTGetTextWidth(pFont, p2, p1 - p2);
         }
         else
         {
@@ -580,8 +556,8 @@ DT_WORDS * DTGetWordsFromText(Display *pDisplay, XFontSet fontSet, const char *s
 
           // TODO:  the hard way?
 
-          pRval->aWords[pRval->nCount].iWidth = DTGetTextWidth(fontSet, p2, p1 - p2)
-                                              - iUnderscoreFlag * DTGetTextWidth(fontSet, "_", 1);
+          pRval->aWords[pRval->nCount].iWidth = DTGetTextWidth(pFont, p2, p1 - p2)
+                                              - iUnderscoreFlag * DTGetTextWidth(pFont, "_", 1);
         }
       }
       else
@@ -589,7 +565,7 @@ DT_WORDS * DTGetWordsFromText(Display *pDisplay, XFontSet fontSet, const char *s
         pRval->aWords[pRval->nCount].iWidth = 0;
       }
 
-      pRval->aWords[pRval->nCount].iHeight = WBFontSetHeight(pDisplay, fontSet);//pFont->ascent + pFont->descent;  // for now just do this
+      pRval->aWords[pRval->nCount].iHeight = WBFontHeight(pFont);//pFont->ascent + pFont->descent;  // for now just do this
 
       pRval->nCount++;
     }
@@ -598,14 +574,14 @@ DT_WORDS * DTGetWordsFromText(Display *pDisplay, XFontSet fontSet, const char *s
   return pRval;
 }
 
-int DTCalcIdealBounds(Display *pDisplay, XFontSet fontSet, const char *szText, int iTabWidth, unsigned int iTabOrigin,
+int DTCalcIdealBounds(Display *pDisplay, WB_FONTC pFont, const char *szText, int iTabWidth, unsigned int iTabOrigin,
                       const WB_RECT *prcSource, WB_RECT *prcDest, int iAlignment)
 {
 int iRval;
 DT_WORDS *pWords;
 
 
-  pWords = DTGetWordsFromText(pDisplay, fontSet, szText, iAlignment);
+  pWords = DTGetWordsFromText(pDisplay, pFont, szText, iAlignment);
 
   if(!pWords)
   {
@@ -617,7 +593,7 @@ DT_WORDS *pWords;
 
 //  InternalDebugDumpWords(pWords);
 
-  iRval = InternalCalcIdealBounds(pDisplay, fontSet, pWords, iTabWidth, iTabOrigin, prcSource, prcDest, iAlignment, 0, -1);
+  iRval = InternalCalcIdealBounds(pDisplay, pFont, pWords, iTabWidth, iTabOrigin, prcSource, prcDest, iAlignment, 0, -1);
 
   WBFree(pWords);
 
@@ -707,7 +683,7 @@ DT_WORD *pW;
 //  * iEndLine A zero-based index for the last line on which to start calculating things (-1 for 'all')
 //  * zero if the text will fit within prcSource, -1 error, or 1 to indicate that prcDest is larger than prcSource
 
-static int InternalCalcIdealBounds(Display *pDisplay, XFontSet fontSet, DT_WORDS *pWords, int iTabWidth, unsigned int iTabOrigin,
+static int InternalCalcIdealBounds(Display *pDisplay, WB_FONTC pFont, DT_WORDS *pWords, int iTabWidth, unsigned int iTabOrigin,
                                    const WB_RECT *prcSource, WB_RECT *prcDest, int iAlignment, int iStartLine, int iEndLine)
 {
 int iFontWidth, iFontHeight, iFontAscent, iFontDescent, iLineSpacing;  // average font width/height and line spacing
@@ -738,12 +714,12 @@ DT_WORD *pW, *pW2;
 
   memcpy(&rctBounds, &rctSource, sizeof(rctBounds)); // make copy of it as 'rctSource' (for now)
 
-  if(fontSet == None)
+  if(!pFont)
   {
-    fontSet = WBGetDefaultFontSet(pDisplay);
-    if(fontSet == None)
+    pFont = WBGetDefaultFont();
+    if(!pFont)
     {
-      WB_ERROR_PRINT("%s - returns ERROR (WBGetDefaultFontSet returns None)\n", __FUNCTION__);
+      WB_ERROR_PRINT("%s - returns ERROR (no font)\n", __FUNCTION__);
       return -1;
     }
   }
@@ -756,15 +732,15 @@ DT_WORD *pW, *pW2;
 
   // get a few things straight 'round here
 
-  iFontWidth = WBFontSetAvgCharWidth(WBGetDefaultDisplay(), fontSet);
+  iFontWidth = WBFontAvgCharWidth(pFont);
 
   if(!iFontWidth)
   {
-    iFontWidth = DTGetTextWidth(fontSet, " ", 1);  // width of a single space
+    iFontWidth = DTGetTextWidth(pFont, " ", 1);  // width of a single space
   }
 
-  iFontAscent = WBFontSetAscent(pDisplay, fontSet);
-  iFontDescent = WBFontSetDescent(pDisplay, fontSet);
+  iFontAscent = WBFontAscent(pFont);
+  iFontDescent = WBFontDescent(pFont);
   iFontHeight = iFontAscent + iFontDescent; // cache for performance
 
   // for now, line spacing equals 1/2 descent or 2 pixels
@@ -954,6 +930,18 @@ do_the_tab:
     WB_ERROR_PRINT("          Lines: %d  Font ascent=%d, descent=%d, height=%d, line spacing %d\n",
                    iLines, iFontAscent, iFontDescent, iFontHeight, iLineSpacing);
   }
+  else
+  {
+    WB_DEBUG_PRINT(DebugLevel_Heavy,
+                   "INFO:  %s - source rectangle seems to fit\n", __FUNCTION__);
+    WB_DEBUG_PRINT(DebugLevel_Heavy,
+                   "          %d,%d,%d,%d bounds  vs  source %d,%d,%d,%d\n",
+                   rctBounds.left, rctBounds.top, rctBounds.right, rctBounds.bottom,
+                   rctSource.left, rctSource.top, rctSource.right, rctSource.bottom);
+    WB_DEBUG_PRINT(DebugLevel_Heavy,
+                   "          Lines: %d  Font ascent=%d, descent=%d, height=%d, line spacing %d\n",
+                   iLines, iFontAscent, iFontDescent, iFontHeight, iLineSpacing);
+  }
 
 #endif // NO_DEBUG
 
@@ -961,10 +949,9 @@ do_the_tab:
      rctBounds.bottom <= rctSource.bottom)
   {
 it_fits:
-
-//    // TEMPORARY
-//    WB_ERROR_PRINT("%s - TEMPORARY:  'it fits' bounds rectangle is %d,%d,%d,%d\n",
-//                   __FUNCTION__, rctBounds.left, rctBounds.top, rctBounds.right, rctBounds.bottom);
+    WB_DEBUG_PRINT(DebugLevel_Heavy,
+                   "%s - 'it fits' bounds rectangle is %d,%d,%d,%d\n",
+                   __FUNCTION__, rctBounds.left, rctBounds.top, rctBounds.right, rctBounds.bottom);
 
     // it looks like it can fit properly without any additional effort.
     // based on the alignment flags, I will return now with the results.
@@ -1315,10 +1302,9 @@ do_the_tab2:
 
 will_not_fit:
 
-//  // TEMPORARY
-//  WB_ERROR_PRINT("%s - TEMPORARY:  'it does not fit' bounds rectangle is %d,%d,%d,%d\n",
-//                 __FUNCTION__, rctBounds.left, rctBounds.top, rctBounds.right, rctBounds.bottom);
-
+  WB_DEBUG_PRINT(DebugLevel_Heavy,
+                 "%s - 'it does not fit' bounds rectangle is %d,%d,%d,%d\n",
+                 __FUNCTION__, rctBounds.left, rctBounds.top, rctBounds.right, rctBounds.bottom);
 
   if(!(iAlignment & DTAlignment_PRINTING))
   {
@@ -1355,7 +1341,13 @@ will_not_fit:
 }
 
 
-static void __internalDoAntiAlias(Display *pDisplay, Drawable dw, GC gc, int iX, int iY, int iWidth, int iHeight)
+//WB_DEFINE_PROFILE(anti_alias);
+//WB_DEFINE_PROFILE(anti_alias2);
+//WB_DEFINE_PROFILE(anti_alias3);
+//WB_DEFINE_PROFILE(anti_alias4);
+//WB_DEFINE_PROFILE(anti_alias5);
+
+static void __internalDoAntiAlias(Display *pDisplay, Drawable dw, WBGC gc, int iX, int iY, int iWidth, int iHeight)
 {
 XStandardColormap map;
 XImage *pImage;
@@ -1366,11 +1358,17 @@ int iX0=0, iY0=0;
 unsigned int iWidth0=0, iHeight0=0, iBorder;
 unsigned int uiDepth = 0;
 Pixmap pxTemp;
-GC gc2;
+WBGC gc2;
 Region rgnClip;
 
 
-  lPixel = WBGetGCFGColor(pDisplay, gc); // current foreground color
+//  WB_ENABLE_PROFILE(anti_alias, "overall");
+//  WB_ENABLE_PROFILE(anti_alias2, "performing XCopyArea");
+//  WB_ENABLE_PROFILE(anti_alias3, "performing WBSimpleAntiAliasImage");
+//  WB_ENABLE_PROFILE(anti_alias4, "performing WBXGetImage");
+//  WB_ENABLE_PROFILE(anti_alias5, "performing WBXPutImage");
+
+  lPixel = WBGetGCFGColor(gc); // current foreground color
 
   pxTemp = None;
   rgnClip = None;
@@ -1396,10 +1394,12 @@ Region rgnClip;
     return;
   }
 
+//  WB_START_PROFILE(anti_alias);
+
   iWidth0 = (iWidth0 + iX0) - iX; // right - 'new left' = 'new width'
   iHeight0 = (iHeight0 + iY0) - iY; // adjust so that it matches the 'remaining space' from X,Y
 
-  // to avoid errors from XGetImage, if the requested geometry is too big, reduce
+  // to avoid errors from WBXGetImage, if the requested geometry is too big, reduce
   // the width/height to the actual width/height of the Drawable
 
   if(iWidth0 < iWidth)
@@ -1444,51 +1444,69 @@ Region rgnClip;
   gc2 = WBCopyDrawableGC(pDisplay, dw, gc); // everything the same except the clip region
   if(gc2 == None)
   {
-    WB_ERROR_PRINT("ERROR: %s - unable to create temporary GC copy\n", __FUNCTION__);
+    WB_ERROR_PRINT("ERROR: %s - unable to create temporary WBGC copy\n", __FUNCTION__);
 
     goto the_end;
   }
 
+  WBSetRegion(gc2, rgnClip); // new clipping region
+
+//  WB_START_PROFILE(anti_alias2);
+
   BEGIN_XCALL_DEBUG_WRAPPER
-  XSetRegion(pDisplay, gc2, rgnClip); // new clipping region
-  XCopyArea(pDisplay, dw, pxTemp, gc2,
+  XCopyArea(pDisplay, dw, pxTemp, gc2->gc,
             iX, iY, geom.width, geom.height, 0, 0);
   END_XCALL_DEBUG_WRAPPER
+
+//  WB_STOP_PROFILE(anti_alias2);
 
 //  WB_ERROR_PRINT("TEMPORARY: %s - geom %d,%d,%d,%d  (%d,%d)\n",
 //                 __FUNCTION__, geom.x, geom.y, geom.width, geom.height, iWidth0, iHeight0);
 
 
   // create an XImage, and perform the operation on that
-  BEGIN_XCALL_DEBUG_WRAPPER
-  pImage = XGetImage(pDisplay, pxTemp, 0, 0, geom.width, geom.height, 0xffffffff, ZPixmap);
-  END_XCALL_DEBUG_WRAPPER
+
+//  WB_START_PROFILE(anti_alias4);
+  pImage = WBXGetImage(pDisplay, pxTemp, 0, 0, geom.width, geom.height, 0xffffffff, ZPixmap);
+//  WB_STOP_PROFILE(anti_alias4);
 
   if(!pImage)
   {
-    WB_ERROR_PRINT("ERROR: %s - unable to create image via XGetImage()\n", __FUNCTION__);
+    WB_ERROR_PRINT("ERROR: %s - unable to create image via WBXGetImage()\n", __FUNCTION__);
   }
   else
   {
+//    WB_START_PROFILE(anti_alias3);
+
     WBSimpleAntiAliasImage(&map, pImage, lPixel, &geom);
 
-    BEGIN_XCALL_DEBUG_WRAPPER
-    XPutImage(pDisplay, pxTemp, gc2, pImage, 0, 0, 0, 0, geom.width, geom.height);
+//    WB_STOP_PROFILE(anti_alias3);
 
-    XCopyArea(pDisplay, pxTemp, dw, gc, // this one uses 'gc' when copying BACK to 'dw'
+//    WB_START_PROFILE(anti_alias5);
+
+    WBXPutImage(pDisplay, pxTemp, gc2, pImage, 0, 0, 0, 0, geom.width, geom.height);
+
+//    WB_STOP_PROFILE(anti_alias5);
+
+    BEGIN_XCALL_DEBUG_WRAPPER
+//    WB_START_PROFILE(anti_alias2);
+    XCopyArea(pDisplay, pxTemp, dw, gc->gc, // this one uses 'gc' when copying BACK to 'dw'
               0, 0, geom.width, geom.height, iX, iY);
+//    WB_STOP_PROFILE(anti_alias2);
+    END_XCALL_DEBUG_WRAPPER
 
     // I can destroy the image now
-    XDestroyImage(pImage);
-    END_XCALL_DEBUG_WRAPPER
+    WBXDestroyImage(pImage);
   }
 
 the_end:
 
+//  WB_STOP_PROFILE(anti_alias);
+
   BEGIN_XCALL_DEBUG_WRAPPER
-  if(gc2 != None)
+  if(gc2 != NULL)
   {
-    XFreeGC(pDisplay, gc2);
+    WBFreeGC(gc2);
   }
   if(pxTemp != None)
   {
@@ -1503,90 +1521,14 @@ the_end:
 }
 
 
-void DTDrawSingleLineText0(XFontStruct *pFont, const char *szText, Display *pDisplay, GC gc, Drawable dw,
-                           int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment)
-{
-#if 0
-XGCValues xgc;
-int iAvgChar
-
-  iAvgChar = WBFontAvgCharWidth(pDisplay, pFont); // was DTGetTextWidth(pFont, " ", 1);  // width of 1 space for text border (TODO:  RTL text)
-
-  // height pFont->max_bounds.ascent + pFont->max_bounds.descent + 2;
-
-
-            iU1 = DTGetTextWidth(pFont, tbuf, p1 - tbuf);
-
-      DTDrawString(pDisplay, wID, fSet, gc, iHPos, iVPos, szText, strlen(szText));
-
-  xgc.font = pOldFont->fid;
-  BEGIN_XCALL_DEBUG_WRAPPER
-  XChangeGC(pDisplay, gc, GCFont, &xgc);
-  END_XCALL_DEBUG_WRAPPER
-#endif // 0
-  // TODO:  implement
-
-  DTDrawMultiLineText0(pFont, szText, pDisplay, gc, dw, iTabWidth, iTabOrigin, prcBounds,
-                       iAlignment | DTAlignment_SINGLELINE | DTAlignment_NO_WORD_WRAP);
-}
-
-void DTDrawSingleLineText(XFontSet fontSet, const char *szText, Display *pDisplay, GC gc, Drawable dw,
+void DTDrawSingleLineText(WB_FONTC pFont, const char *szText, Display *pDisplay, WBGC gc, Drawable dw,
                           int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment)
 {
-#if 0
-XGCValues xgc;
-int iAvgChar
-
-  iAvgChar = WBFontAvgCharWidth(pDisplay, pFont); // was DTGetTextWidth(pFont, " ", 1);  // width of 1 space for text border (TODO:  RTL text)
-
-  // height pFont->max_bounds.ascent + pFont->max_bounds.descent + 2;
-
-
-            iU1 = DTGetTextWidth(pFont, tbuf, p1 - tbuf);
-
-      DTDrawString(pDisplay, wID, fSet, gc, iHPos, iVPos, szText, strlen(szText));
-
-  xgc.font = pOldFont->fid;
-  BEGIN_XCALL_DEBUG_WRAPPER
-  XChangeGC(pDisplay, gc, GCFont, &xgc);
-  END_XCALL_DEBUG_WRAPPER
-#endif // 0
-  // TODO:  implement
-
-  DTDrawMultiLineText(fontSet, szText, pDisplay, gc, dw, iTabWidth, iTabOrigin, prcBounds,
+  DTDrawMultiLineText(pFont, szText, pDisplay, gc, dw, iTabWidth, iTabOrigin, prcBounds,
                       iAlignment | DTAlignment_SINGLELINE | DTAlignment_NO_WORD_WRAP);
 }
 
-void DTDrawMultiLineText0(XFontStruct *pFont, const char *szText, Display *pDisplay, GC gc, Drawable dw,
-                          int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment)
-{
-XFontSet fSet;
-
-  if(!pFont)
-  {
-    pFont = WBGetDefaultFont();
-    if(!pFont)
-    {
-      WB_ERROR_PRINT("%s - ERROR:  WBGetDefaultFont returns NULL\n",
-                     __FUNCTION__);
-
-      return; // bad
-    }
-  }
-
-  fSet = WBFontSetFromFont(pDisplay, pFont);
-
-  if(fSet == None)
-  {
-    WB_ERROR_PRINT("Unable to get font set!\n");
-
-    return;
-  }
-
-  DTDrawMultiLineText(fSet, szText, pDisplay, gc, dw, iTabWidth, iTabOrigin, prcBounds, iAlignment);
-}
-
-void DTDrawMultiLineText(XFontSet fSet, const char *szText, Display *pDisplay, GC gc, Drawable dw,
+void DTDrawMultiLineText(WB_FONTC pFont, const char *szText, Display *pDisplay, WBGC gc, Drawable dw,
                          int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment)
 {
 int i1, i2, i3, iH, iH2, iFontDescent; //, iW2, iFontWidth, iFontHeight;
@@ -1597,12 +1539,12 @@ XPoint xpt[3];
 XCharStruct xMaxBounds;
 
 
-  if(fSet == None)
+  if(!pFont)
   {
-    fSet = WBGetDefaultFontSet(pDisplay);
-    if(fSet == None)
+    pFont = WBGetDefaultFont();
+    if(!pFont)
     {
-      WB_ERROR_PRINT("%s - ERROR:  WBGetDefaultFontSet returns None\n",
+      WB_ERROR_PRINT("%s - ERROR:  WBGetDefaultFont returns NULL\n",
                      __FUNCTION__);
 
       return; // bad
@@ -1621,7 +1563,8 @@ XCharStruct xMaxBounds;
 //  iFontWidth = WBFontSetAvgCharWidth(pDisplay, pFont); // was DTGetTextWidth(pFont, " ", 1);  // width of a single space
 //  iFontHeight = pFont->ascent + pFont->descent;
 
-  pWords = DTGetWordsFromText(pDisplay, fSet, szText, iAlignment);
+  WB_ERROR_PRINT("TEMPORARY:  %s.%d call to DTGetWordsFromText\n", __FUNCTION__, __LINE__);
+  pWords = DTGetWordsFromText(pDisplay, pFont, szText, iAlignment);
 
   if(!pWords)
   {
@@ -1636,7 +1579,8 @@ XCharStruct xMaxBounds;
 //  WB_ERROR_PRINT("%s - TEMPORARY:  bounds rectangle is INITIALLY %d,%d,%d,%d\n",
 //                 __FUNCTION__, rcDest.left, rcDest.top, rcDest.right, rcDest.bottom);
 
-  if(InternalCalcIdealBounds(pDisplay, fSet, pWords, iTabWidth, iTabOrigin, prcBounds, &rcDest,
+  WB_ERROR_PRINT("TEMPORARY:  %s.%d call to InternalCalcIdealBounds\n", __FUNCTION__, __LINE__);
+  if(InternalCalcIdealBounds(pDisplay, pFont, pWords, iTabWidth, iTabOrigin, prcBounds, &rcDest,
                              iAlignment | DTAlignment_PRINTING, 0, -1)
     < 0)
   {
@@ -1650,8 +1594,8 @@ XCharStruct xMaxBounds;
     return; // bad (error)
   }
 
-  iFontDescent = WBFontSetDescent(pDisplay, fSet);
-  xMaxBounds = WBFontSetMaxBounds(pDisplay, fSet); // font's 'max_bounds' structure member, maximized for all of them
+  iFontDescent = WBFontDescent(pFont);
+  xMaxBounds = WBFontMaxBounds(pFont); // font's 'max_bounds' structure member, maximized for all of them
 
 //  InternalDebugDumpWords(pWords);
 
@@ -1661,6 +1605,7 @@ XCharStruct xMaxBounds;
 
   // this function assumes I do not erase the background.  TODO:  flag for that?
 
+  WB_ERROR_PRINT("TEMPORARY:  %s.%d loop to display 'words'\n", __FUNCTION__, __LINE__);
   for(i1=0; i1 < pWords->nCount; i1++)
   {
     pW = &(pWords->aWords[i1]);
@@ -1677,14 +1622,17 @@ XCharStruct xMaxBounds;
 //                       __FUNCTION__, rcDest.left + pW->iX, rcDest.top + pW->iY, pW->nLength, pW->pText);
 
         // draw the entire string. 'pW->iY' is the BASE of the font
-        DTDrawString(pDisplay, dw, fSet, gc, rcDest.left + pW->iX, rcDest.top + pW->iY,
+        DTDrawString(pDisplay, dw, pFont, gc, rcDest.left + pW->iX, rcDest.top + pW->iY,
                      pW->pText, pW->nLength);
+
+        WB_ERROR_PRINT("TEMPORARY:  %s.%d normal display of \"%-.*s\"\n", __FUNCTION__, __LINE__, pW->nLength, pW->pText);
       }
       else
       {
         iH = rcDest.left + pW->iX;
         iH2 = -1; // horizontal position of NEXT underscore to display (corresponds to character index 'i3')
 
+        WB_ERROR_PRINT("TEMPORARY:  %s.%d loop to handle underscores\n", __FUNCTION__, __LINE__);
         for(i2=0, i3=0; i2 < pW->nLength; )
         {
           if(pW->pText[i2] == '_')
@@ -1704,7 +1652,7 @@ XCharStruct xMaxBounds;
 //                           __FUNCTION__, iH, rcDest.top + pW->iY, pW->nLength - i3, (char *)(pW->pText) + i3);
 
             // print i3 through i2 - 1.  'pW->iY' is the BASE of the font
-            DTDrawString(pDisplay, dw, fSet, gc, iH, rcDest.top + pW->iY,
+            DTDrawString(pDisplay, dw, pFont, gc, iH, rcDest.top + pW->iY,
                          (const char *)(pW->pText) + i3, i2 - i3);
 
             // draw the preceding underscore
@@ -1712,16 +1660,16 @@ XCharStruct xMaxBounds;
             {
               xpt[0].x=iH2;
               xpt[0].y=rcDest.top + pW->iY + iFontDescent + 1;// + pFont->max_bounds.ascent;
-              xpt[1].x=iH + DTGetTextWidth(fSet, (char *)(pW->pText) + i3, 1); // width of character
+              xpt[1].x=iH + DTGetTextWidth(pFont, (char *)(pW->pText) + i3, 1); // width of character
               xpt[1].y=xpt[0].y;
 
-              BEGIN_XCALL_DEBUG_WRAPPER
-              XDrawLines(pDisplay, dw, gc, xpt, 2, CoordModeOrigin);
-              END_XCALL_DEBUG_WRAPPER
+              //BEGIN_XCALL_DEBUG_WRAPPER
+              WBDrawLines(pDisplay, dw, gc, xpt, 2, CoordModeOrigin);
+              //END_XCALL_DEBUG_WRAPPER
             }
 
             // advance the pointer
-            iH += DTGetTextWidth(fSet, (char *)(pW->pText) + i3, i2 - i3);
+            iH += DTGetTextWidth(pFont, (char *)(pW->pText) + i3, i2 - i3);
 
             iH2 = iH; // next underscore's position
 
@@ -1737,7 +1685,7 @@ XCharStruct xMaxBounds;
         if(i3 < pW->nLength)
         {
           // draw the last part of the string.  'pW->iY' is the BASE of the font
-          DTDrawString(pDisplay, dw, fSet, gc, iH, rcDest.top + pW->iY,
+          DTDrawString(pDisplay, dw, pFont, gc, iH, rcDest.top + pW->iY,
                        (const char *)(pW->pText) + i3, pW->nLength - i3);
 
           // draw the preceding underscore
@@ -1745,12 +1693,12 @@ XCharStruct xMaxBounds;
           {
             xpt[0].x=iH;
             xpt[0].y=rcDest.top + pW->iY + xMaxBounds.descent + 1;// + pFont->max_bounds.ascent;
-            xpt[1].x=iH + DTGetTextWidth(fSet, (char *)(pW->pText) + i3, 1); // width of character
+            xpt[1].x=iH + DTGetTextWidth(pFont, (char *)(pW->pText) + i3, 1); // width of character
             xpt[1].y=xpt[0].y;
 
-            BEGIN_XCALL_DEBUG_WRAPPER
-            XDrawLines(pDisplay, dw, gc, xpt, 2, CoordModeOrigin);
-            END_XCALL_DEBUG_WRAPPER
+            //BEGIN_XCALL_DEBUG_WRAPPER
+            WBDrawLines(pDisplay, dw, gc, xpt, 2, CoordModeOrigin);
+            //END_XCALL_DEBUG_WRAPPER
           }
         }
       }
@@ -1760,12 +1708,10 @@ XCharStruct xMaxBounds;
 
   // now that I have drawn the text, anti-alias it if I set the anti-alias flag
 
-  if(iAlignment & DTAlignment_ANTIALIAS)
+  if(WBFontEnableAntiAlias() &&
+     (iAlignment & DTAlignment_ANTIALIAS))
   {
-//    BEGIN_XCALL_DEBUG_WRAPPER
-//    XSync(pDisplay, 0);
-//    END_XCALL_DEBUG_WRAPPER
-
+    WB_ERROR_PRINT("TEMPORARY:  %s.%d call to __internalDoAntiAlias\n", __FUNCTION__, __LINE__);
     __internalDoAntiAlias(pDisplay, dw, gc,
                           rcDest.left, rcDest.top,
                           rcDest.right - rcDest.left,
@@ -1782,7 +1728,7 @@ XCharStruct xMaxBounds;
 //        (so perhaps these should be deprecated?)
 
 
-void DTPreRender(Display *pDisplay, XFontSet fontSet, DT_WORDS *pWords, int iTabWidth, int iTabOrigin,
+void DTPreRender(Display *pDisplay, WB_FONTC pFont, DT_WORDS *pWords, int iTabWidth, int iTabOrigin,
                  WB_RECT *prcBounds, int iAlignment, int iStartLine, int iEndLine)
 {
 WB_RECT rcDest;
@@ -1793,10 +1739,10 @@ WB_RECT rcDest;
     pDisplay = WBGetDefaultDisplay();
   }
 
-  if(fontSet == None)
+  if(!pFont)
   {
-    fontSet = WBGetDefaultFontSet(pDisplay);
-    if(fontSet)
+    pFont = WBGetDefaultFont();
+    if(!pFont)
     {
       WB_ERROR_PRINT("%s - ERROR:  WBGetDefaultFont returns NULL\n",
                      __FUNCTION__);
@@ -1812,7 +1758,7 @@ WB_RECT rcDest;
 
   memcpy(&rcDest, prcBounds, sizeof(rcDest));
 
-  if(InternalCalcIdealBounds(pDisplay, fontSet, pWords, iTabWidth, iTabOrigin, prcBounds, &rcDest,
+  if(InternalCalcIdealBounds(pDisplay, pFont, pWords, iTabWidth, iTabOrigin, prcBounds, &rcDest,
                              iAlignment | DTAlignment_PRINTING, iStartLine, iEndLine)
     < 0)
   {
@@ -1828,7 +1774,7 @@ WB_RECT rcDest;
   // TODO:  implement
 }
 
-void DTRender(Display *pDisplay, XFontSet fontSet, const DT_WORDS *pWords, GC gc, Drawable dw,
+void DTRender(Display *pDisplay, WB_FONTC pFont, const DT_WORDS *pWords, WBGC gc, Drawable dw,
               int iHScrollBy, int iVScrollBy, const WB_RECT *prcBounds, const WB_RECT *prcViewport, int iAlignment)
 {
   // TODO:  implement

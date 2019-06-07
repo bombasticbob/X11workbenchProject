@@ -14,15 +14,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -40,7 +40,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -1494,7 +1494,7 @@ const void * DLGGetControlListData(WBDialogControl *pCtrl, int iIndex);  // retr
 **/
 int DLGInitControlListInfo(WBDialogControl *pCtrl, int nFlags,
                            void *(*pfnAllocator)(const void *,int), void (*pfnDestructor)(void *),
-                           void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *, XFontSet),
+                           void (*pfnDisplay)(WBDialogControl *, void *, int, WBGC, WB_GEOM *, WB_FONTC),
                            int (*pfnSort)(const void *, const void *));
 
 /** \ingroup dlglist
@@ -1535,7 +1535,7 @@ int DLGInitControlListInfo(WBDialogControl *pCtrl, int nFlags,
 int DLGModifyControlListInfo(WBDialogControl *pCtrl, int bFlags, int nFlags,
                              int bAllocator, void *(*pfnAllocator)(const void *,int),
                              int bDestructor, void (*pfnDestructor)(void *),
-                             int bDisplay, void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *, XFontSet),
+                             int bDisplay, void (*pfnDisplay)(WBDialogControl *, void *, int, WBGC, WB_GEOM *, WB_FONTC),
                              int bSort, int (*pfnSort)(const void *, const void *));
 
 /** \ingroup dlglist

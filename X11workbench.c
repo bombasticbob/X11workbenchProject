@@ -12,7 +12,7 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
                            all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
@@ -388,7 +388,7 @@ FW_MENU_HANDLER_END
 
 static void usage(void)
 {
-  fputs("X11workbench - Copyright (c) 2010-2018 by S.F.T. Inc. - all rights reserved\n\n"
+  fputs("X11workbench - Copyright (c) 2010-2019 by S.F.T. Inc. - all rights reserved\n\n"
         "Usage:      X11workbench [options] filename [filename [...]]\n"
         "  where     'filename' represents one or more files or workspaces to be opened on startup\n"
         "\n"
@@ -574,9 +574,9 @@ next_argument:
   {
     char *pCopyright = WBCopyString(
 #ifdef UTF8_COPYRIGHT
-                                    "Copyright " UTF8_COPYRIGHT " 2010-2018 by Big Bad Bombastic Bob\nAll Rights Reserved"  // text string with unicode char in it U+00A9
+                                    "Copyright " UTF8_COPYRIGHT " 2010-2019 by Big Bad Bombastic Bob\nwww.mrp3.com"  // text string with unicode char in it U+00A9
 #else // UTF8_COPYRIGHT
-                                    "Copyright (c) 2010-2018 by Big Bad Bombastic Bob\nAll Rights Reserved"
+                                    "Copyright (c) 2010-2019 by Big Bad Bombastic Bob\nwww.mrp3.com"
 #endif // UTF8_COPYRIGHT
                                    );
 
@@ -595,15 +595,15 @@ next_argument:
     if(pCopyright)
     {
       DLGSplashScreen(splash_xpm,
-                    pCopyright, WhitePixel(pX11Display, DefaultScreen(pX11Display))); // white text
+                      pCopyright, WhitePixel(pX11Display, DefaultScreen(pX11Display))); // white text
 
       WBFree(pCopyright);
     }
     else
     {
       DLGSplashScreen(splash_xpm,
-                    "Copyright (c) 2010-2018 by Big Bad Bombastic Bob\nAll Rights Reserved", // 1 or 2 lines only
-                    WhitePixel(pX11Display, DefaultScreen(pX11Display))); // white text
+                      "Copyright (c) 2010-2019 by Big Bad Bombastic Bob\nwww.mrp3.com", // 1 or 2 lines only
+                      WhitePixel(pX11Display, DefaultScreen(pX11Display))); // white text
     }
   }
 #endif // NO_SPLASH
@@ -684,26 +684,29 @@ next_argument:
 
 
   //=========================
-  //   MAIN MESSAGE LOOP
+  //     MAIN EVENT LOOP
   //=========================
 
   while (!bQuitFlag /*1*/)
   {
     if(!WBCheckGetEvent(pX11Display, &event))
     {
-      // SLEEP if no event while in message loop (function returns without blocking)
+      // SLEEP if no event while in loop (function returns without blocking)
       // otherwise I can do background tasks during this loop iteration.
 
       // if I have NO BACKGROUND PROCESSES to do, I can use 'WBWaitForEvent'
+      // This function makes for an efficient 'wait for event'.  Otherwise,
+      // I'll want to implement something that has WBDelay() calls when there
+      // is nothing to do...
 
-      if(1)
-      {
+//      if(1)
+//      {
         WBWaitForEvent(pX11Display);
-      }
-      else
-      {
-        WBDelay(100); // delay 100 microseconds (0.1 milliseconds)
-      }
+//      }
+//      else
+//      {
+//        WBDelay(100); // delay 100 microseconds (0.1 milliseconds)
+//      }
 
       continue; // skip the 'WBDispatch' since there was no event
     }
@@ -730,7 +733,7 @@ next_argument:
 // CALLBACK FUNCTIONS
 ///////////////////////
 
-extern void TestFunc(Display *pDisplay, GC gc, Window wID, int iX, int iY);
+extern void TestFunc(Display *pDisplay, WBGC gc, Window wID, int iX, int iY);
 
 static int MyWindowCallback(Window wID, XEvent *pEvent)
 {
@@ -775,7 +778,7 @@ int iRval = 0;
 
   if (pEvent->type == Expose && pEvent->xexpose.count == 0)
   {
-    GC gc;
+    WBGC gc;
     WB_GEOM geom;
 
 // NOTE:  this is managed by the toolkit

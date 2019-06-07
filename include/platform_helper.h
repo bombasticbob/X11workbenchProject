@@ -6,10 +6,6 @@
 //  | .__/ |_| \__,_| \__||_|   \___/ |_|   |_| |_| |_|_____|_| |_| \___||_|| .__/  \___||_|(_)|_| |_|  //
 //  |_|                                               |_____|               |_|                         //
 //                                                                                                      //
-//          Copyright (c) 2010-2017 by 'Big Bad Bombastic Bob' Frazier - all rights reserved.           //
-//         You may use this file in any way you see fit provided that any copy or derived work          //
-//         includes the above copyright notice.                                                         //
-//                                                                                                      //
 //          This header contains platform-specific definitions that rectify various issues.             //
 //          It also contains a lot of the 'core' functionality for strings, startup, etc.               //
 //                                                                                                      //
@@ -18,15 +14,14 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -44,7 +39,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -272,10 +267,27 @@
 **/
 #define INVALID_HANDLE_VALUE ((int)-1)
 
-
 /** \ingroup platform_definitions
   * @{
 **/
+
+// -----------------
+// STRING-IZE MACROS
+// -----------------
+/** \brief stringize a macro argument
+ **
+ ** \param X A macro argument that you want substituted with a stringized version
+ **
+ ** Use this to 'stringize' a parameter passed to a macro.
+**/
+#define WB_STRINGIZE(X) WB_STRINGIZE_INTERNAL(X)
+/** \brief helper to stringize a macro argument
+ ** \internal
+ **
+ ** required for WB_STRINGIZE() to work
+**/
+#define WB_STRINGIZE_INTERNAL(X) #X
+
 
 //-------------------------------------------------
 // branch optimization macros - gcc and clang only
@@ -604,6 +616,10 @@ void __internal_startup_minimize(void);
 void __internal_startup_maximize(void);
 void __internal_startup_geometry(const char *szVal);
 
+// thwaw function ARE internal only, implemented in font_helper.c and window_helper.c
+void __internal_disable_antialias(void);
+void __internal_disable_imagecache(void);
+
 
 
 // *******************************************
@@ -708,10 +724,18 @@ const char *GetStartupAppName(void);
   * derived from the 'gettimeofday' API call for operating systems such as BSD and Linux that
   * support the POSIX standard.
   *
+  * The return value from this function is derived from the 'gettimeofday' call on POSIX systems.
+  *
+  * On systems that do not natively support a 64-bit integer type, the return value will be WB_UINT32
+  * and may actually wrap around after about 1 hour.
+  *
   * Header File:  platform_helper.h
 **/
-WB_UINT64 WBGetTimeIndex(void);  // returns current 'time index' (in microseconds) which never wraps around
-                                 // NOTE:  it is derived from the 'gettimeofday' call on BSD, Linux, etc.
+#if defined(HAS_WB_UINT64_BUILTIN) || defined(__DOXYGEN__)
+WB_UINT64 WBGetTimeIndex(void);
+#else // !defined(HAS_WB_UINT64_BUILTIN) && !defined(__DOXYGEN__)
+WB_UINT32 WBGetTimeIndex(void);
+#endif // defined(HAS_WB_UINT64_BUILTIN) || defined(__DOXYGEN__)
 
 
 /** \ingroup platform_functions
@@ -1498,6 +1522,20 @@ char * WBGetAtomName(Display *pDisplay, Atom aAtom);
 // *******************************************
 
 /** \ingroup platform_functions
+  * \brief a wrapper for 'mkdir' that makes directories recursively (as needed)
+  *
+  * \param szFileName A const pointer to a character string containing a file or path name
+  * \returns a zero value if succssful, non-zero if it failed.
+  *
+  * This is a wrapper for 'mkdir' that also handles recursive directory creation when
+  * not all paths exist already.
+  *
+  * Header File:  platform_helper.h
+**/
+int WBMkDir(const char *szFileName, int flags);
+
+
+/** \ingroup platform_functions
   * \brief search for a file using the PATH environment variable
   *
   * \param szFileName A const pointer to a character string containing a file or path name
@@ -1586,7 +1624,7 @@ char * WBTempFile0(const char *szExt);
   * \brief Run an application asynchronously
   *
   * \param szAppName A const pointer to a character string containing the path to the application
-  * \returns A valid process ID or process handle, depending upon the operating system
+  * \returns A valid process ID or process handle, depending upon the operating system.  On error it returns WB_INVALID_FILE_HANDLE
   *
   * Use this function to spawn an asynchronous process.  The function returns an invalid process ID
   * or process handle on error.  If the process ID is an allocated resource, the caller must free it.
@@ -1599,10 +1637,34 @@ char * WBTempFile0(const char *szExt);
 WB_PROCESS_ID WBRunAsync(const char *szAppName, ...);
 
 /** \ingroup process
+  * \brief Check on a running process, and return its state, and optionally the exit code
+  *
+  * \param idProcess A WB_PROCESS_ID for the running process
+  * \param pExitCode An optional pointer to a WB_INT32 to retrieve the exit code (may be NULL)
+  * \return A positive value if the process is still running, zero if the process has terminated, negative on error.
+  *
+  * Call this function to determine if an asynchronous process is still running, and possibly retrieve
+  * the exit code if it is no longer running.  On POSIX systems, the exit code is generally a single byte
+  * (other values may be reserved).  On Windows, it's officially an unsigned 32-bit integer.
+  *
+  * If a process is suspended, killed, or exits due to a system error, this function will not differentiate
+  * between normal or abnormal termination, or between running or suspended.  If you need this kind of
+  * complex application status, use 'waitpid()' (POSIX) or GetExitCodeProcess() (Windows).
+  *
+  * This function does not perform any explicit wait states when checking a process's state.  If you must block
+  * your thread's execution in order to wait for a process to exit, you should call WBSleep() (or its equivalent)
+  * within the loop to avoid 'maxing out' the CPU utilization, which would very likely use up more electricity
+  * than a more efficient wait state.
+  *
+  * See Also:  WBRunAsync(), WBRunAsyncPipe(), WBRunAsyncPipeV()
+**/
+int WBGetProcessState(WB_PROCESS_ID idProcess, WB_INT32 *pExitCode);
+
+/** \ingroup process
   * \brief Run an application synchronously, returning 'stdout' output in a character buffer.
   *
   * \param szAppName A const pointer to a character string containing the path to the application
-  * \returns A WBAlloc() pointer to a buffer containing the 'stdout' output from the application.
+  * \returns A WBAlloc() pointer to a buffer containing the 'stdout' output from the application, or NULL on error.
   *
   * Use this function to run an external process and capture its output.  This function will ignore the
   * error return code from the program, so if this information is necessary, you should write a different
@@ -1618,7 +1680,7 @@ WB_PROCESS_ID WBRunAsync(const char *szAppName, ...);
 char * WBRunResult(const char *szAppName, ...);
 
 /** \ingroup process
-  * \brief Run an application synchronously, returning 'stdout' output in a character buffer.
+  * \brief Run an application synchronously, supplying an input buffer for 'stdin', and returning 'stdout' output in a character buffer.
   *
   * \param szStdInBuf A const pointer to 0-byte terminated string/buffer containing the input for piped data.
   * \param szAppName A const pointer to a character string containing the path to the application
@@ -1629,18 +1691,19 @@ char * WBRunResult(const char *szAppName, ...);
   * error return code from the program, so if this information is necessary, you should write a different
   * function (based on this one) using 'WBRunAsync' and a wait loop, etc. that checks the application's
   * return value on exit.
+  *
   * Each additional parameter passed to this function is a parameter that is to be passed to the program.
   * The final parameter in the list must be NULL, so any call to this function will need to have at
-  * least 2 parameters.
+  * least 3 parameters.
+  *
   * On error this function returns a NULL value.  Any non-NULL value must be 'free'd by the caller using WBFree().\n
   *
-  * To create piped output, pass the result of the previous 'WBRunResult' or 'WBRunResultPipe' as the
-  * 'szStdInBuf' parameter to a subsequent 'WBRunResultPipe' call.
+  * To create simple piped output, pass the result of the previous 'WBRunResult' or 'WBRunResultWithInput()' as the
+  * 'szStdInBuf' parameter to a subsequent 'WBRunResultWithInput()' call.
   *
   * Header File:  platform_helper.h
 **/
-char * WBRunResultPipe(const char *szStdInBuf, const char *szAppName, ...);
-
+char * WBRunResultWithInput(const char *szStdInBuf, const char *szAppName, ...);
 
 /** \ingroup process
   * \brief Run an application asynchronously, specifying file handles for STDIN, STDOUT, and STDERR
@@ -1649,7 +1712,7 @@ char * WBRunResultPipe(const char *szStdInBuf, const char *szAppName, ...);
   * \param hStdOut A WB_FILE_HANDLE for STDOUT, or WB_INVALID_FILE_HANDLE
   * \param hStdErr A WB_FILE_HANDLE for STDERR, or WB_INVALID_FILE_HANDLE.  This can be the same handle as hStdErr, though interleaved output may not occur as expected.
   * \param szAppName A const pointer to a character string containing the path to the application
-  * \returns A valid process ID or process handle, depending upon the operating system
+  * \returns A valid process ID or process handle, depending upon the operating system.  On error, it returns WB_INVALID_FILE_HANDLE
   *
   * Use this function to spawn an asynchronous process in which you want to track STDIN, STDOUT,
   * and/or STDERR.  The function returns an invalid process ID or process handle
@@ -1657,11 +1720,13 @@ char * WBRunResultPipe(const char *szStdInBuf, const char *szAppName, ...);
   * Each additional parameter passed to this function will become a parameter that is to be passed to the program.
   * The final parameter in the list must be NULL to mark the end of the list, so any call to this function will
   * need to have at least 5 parameters.\n
+  * \n
   * If you do not want to re-direct a file handle, pass 'WB_INVALID_FILE_HANDLE' for its value.  It is
   * also possible to pass the SAME file handle for hStdIn, hStdOut, and hStdErr provided that it has
-  * the correct read/write access available.  File handled passed to this function will be duplicated,
-  * but not closed.  It is also safe to close the original file handles immediately after calling this
+  * the correct read/write access available.  File handles passed to this function will be duplicated,
+  * but not closed.  It is safe (and prudent) to close the original file handles immediately after calling this
   * function.\n
+  * \n
   * You can monitor 'WB_PROCESS_ID' to find out if the process is running.  Additionally, you can use
   * the output of hStdOut and hStdErr by re-directing them to anonymous pipes and monitoring their activity.
   *
@@ -1669,7 +1734,6 @@ char * WBRunResultPipe(const char *szStdInBuf, const char *szAppName, ...);
 **/
 WB_PROCESS_ID WBRunAsyncPipe(WB_FILE_HANDLE hStdIn, WB_FILE_HANDLE hStdOut, WB_FILE_HANDLE hStdErr,
                              const char *szAppName, ...);
-
 
 /** \ingroup process
   * \brief Run an application asynchronously, specifying file handles for STDIN, STDOUT, and STDERR, using a va_list for the program's parameters
@@ -1679,7 +1743,7 @@ WB_PROCESS_ID WBRunAsyncPipe(WB_FILE_HANDLE hStdIn, WB_FILE_HANDLE hStdOut, WB_F
   * \param hStdErr A WB_FILE_HANDLE for STDERR, or WB_INVALID_FILE_HANDLE.  This can be the same handle as hStdErr, though interleaved output may not occur as expected.
   * \param szAppName A const pointer to a character string containing the path to the application
   * \param va A va_list of the arguments (the final one must be NULL)
-  * \returns A valid process ID or process handle, depending upon the operating system
+  * \returns A valid process ID or process handle, depending upon the operating system.  On error, it returns WB_INVALID_FILE_HANDLE
   *
   * This function is identical to WBRunAsyncPipe() except that the variable argument list is passed as a va_list.\n
   * Use this function to spawn an asynchronous process in which you want to track STDIN, STDOUT,
@@ -1722,7 +1786,24 @@ WB_PROCESS_ID WBRunAsyncPipeV(WB_FILE_HANDLE hStdIn, WB_FILE_HANDLE hStdOut, WB_
   * \param szModuleName A const pointer to a character string containing the path for the library, module, DLL, or whatever
   * \returns A valid WB_MODULE module handle, depending upon the operating system
   *
-  * This function is identical to LoadLibrary() under Windows, and calls 'dlopen()' on POSIX systems
+  * This function is identical to LoadLibrary() under Windows, and is a wrapper for 'dlopen()' on POSIX systems.
+  *
+  * Use this to dynamically load a shared library (or DLL under Windows) at run-time from within your application.
+  *
+  * In POSIX systems, the 'dlopen' function will invoke '_init()' within the shared library, if it is present, the
+  * first time the library is mapped into the address space.  In Windows, the LoadLibrary() function calls
+  * 'DllMain()' within the DLL, with one of various parameters, typically DLL_PROCESS_ATTACH.  The semantics are
+  * much more complicated for Windows (see MSDN documentation for 'DllMain()')
+  *
+  * Additionally, for POSIX systems, the 'dlopen()' function is called with access set to (RTLD_LAZY | RTLD_LOCAL).
+  * This implies that a) each external reference is resolved when you call the appropriate function; and
+  * b) Only symbols defined in the library and it's "DAG" of needed objects will be resolvable [default behavior].
+  * If you want a different behavior, you can call 'dlopen()' yourself, and cast the return value to a WB_MODULE.
+  *
+  * Certain library and API functions may not be available in '_init()' or 'DllMain()' - see appropriate documentation
+  * for any restrictions that might apply to your shared libraries (DLLs).
+  *
+  * See also: WBGetProcAddress(), WBFreeLibrary()
   *
   * Header File:  platform_helper.h
 **/
@@ -1733,25 +1814,48 @@ WB_MODULE WBLoadLibrary(const char *szModuleName); // load a library module (sha
   *
   * \param hModule A valid WB_MODULE module handle, as returned by WBLoadLibrary()
   *
-  * This function is identical to FreeLibrary() under Windows, and calls 'dlfree()' on POSIX systems
+  * This function is identical to FreeLibrary() under Windows, and is a wrapper for 'dlfree()' on POSIX systems.
+  *
+  * Use this to free a shared library (or DLL) that was opened with WBLoadLibrary().
+  *
+  * In POSIX systems, the 'dlfree' function will invoke '_fini()' within the shared library, if it is present, the
+  * when the library is finally unmapped from the address space.  In Windows, the FreeLibrary() function calls
+  * 'DllMain()' within the DLL, with one of various parameters, typically DLL_PROCESS_DETACH.  The semantics are
+  * much more complicated for Windows (see MSDN documentation for 'DllMain()')
+  *
+  * Certain library and API functions may not be available in '_fini()' or 'DllMain()' - see appropriate documentation
+  * for any restrictions that might apply to your shared libraries (DLLs).
   *
   * Header File:  platform_helper.h
 **/
 void WBFreeLibrary(WB_MODULE hModule);
 
 /** \ingroup process
-  * \brief Loads a shared library, DLL, module, or whatever you call it on your operating system
+  * \brief Obtains a function pointer for an exported function symbol in a shared library (or DLL)
   *
   * \param hModule A valid WB_MODULE module handle, as returned by WBLoadLibrary()
   * \param szProcName A const pointer to a character string containing the proc name
-  * \returns A valid WB_MODULE module handle, depending upon the operating system
+  * \returns A function pointer as a 'WB_PROCADDRESS' type, or NULL if the symbol does not exist
   *
-  * This function is identical to GetProcAddress() under Windows, and calls 'dlproc()' on POSIX systems
+  * This function is identical to GetProcAddress() under Windows, and is a wrapper for 'dlfunc()' or 'dlsym()' on POSIX systems
   *
   * Header File:  platform_helper.h
 **/
 WB_PROCADDRESS WBGetProcAddress(WB_MODULE hModule, const char *szProcName);
 
+/** \ingroup process
+  * \brief Obtains a data pointer for an exported data symbol in a shared library (or DLL)
+  *
+  * \param hModule A valid WB_MODULE module handle, as returned by WBLoadLibrary()
+  * \param szDataName A const pointer to a character string containing the data name
+  * \returns A pointer to the data item, or NULL if the symbol does not exist.
+  *
+  * This function is identical to GetProcAddress() under Windows, with the return data type cast
+  * to 'void *'. It is a wrapper for 'dlsym()' on POSIX systems.
+  *
+  * Header File:  platform_helper.h
+**/
+void * WBGetDataAddress(WB_MODULE hModule, const char *szDataName);
 
 
 //////////////////////////////////////////////////////

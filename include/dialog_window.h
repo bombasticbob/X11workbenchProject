@@ -13,15 +13,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -39,7 +39,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -881,8 +881,8 @@ int DLGColorDialog(Window wIDOwner, XStandardColormap *pColorMap, XColor *pColor
   *
   * \param pDisplay The Display pointer for which to query font information (NULL implies default display)
   * \param wIDOwner The owner's Window ID (or None)
-  * \param fsDefault A default font set that specifies the initial font to be displayed. 'None' causes the dialog handler to choose an apropriate font set, most likely a system default.
-  * \returns A valid XFontSet on OK, or 'None' on cancel/error.  The result must be free'd using XFreeFontSet()
+  * \param pDefault A default WB_FONTC that specifies the initial font to be displayed. 'None' causes the dialog handler to choose an apropriate font set, most likely a system default.
+  * \returns A valid WB_FONT on OK, or 'None' on cancel/error.  The result must be free'd using XFreeFontSet()
   *
   * Use this function to display a 'font choice' dialog box, that will allow the user to chose the font face, size, weight,
   * and other characteristics from a list of available fonts.
@@ -892,7 +892,7 @@ int DLGColorDialog(Window wIDOwner, XStandardColormap *pColorMap, XColor *pColor
   * See Also:  WBCopyModifyFontSet(), WBFontFromFontSet()
   *
 **/
-XFontSet DLGFontDialog(Display *pDisplay, Window wIDOwner, XFontSet fsDefault);
+WB_FONT DLGFontDialog(Display *pDisplay, Window wIDOwner, WB_FONTC pDefault);
 
 
 /** \ingroup dialog_api_functions

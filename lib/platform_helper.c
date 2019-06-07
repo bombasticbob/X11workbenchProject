@@ -13,15 +13,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -39,7 +39,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -70,6 +70,7 @@
 #include <dlfcn.h> /* dynamic library support */
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #ifdef __FreeBSD__
 #include <sys/sysctl.h> // to use the 'sysctlXXX' APIs
 #endif // __FreeBSD__
@@ -185,7 +186,7 @@ char *p1;
 
   WBFreePointerHashes(); // delete pointer hashes
 
-  // finally, free up the RWLOCK that I created for RW-locking 'Interlocked' things
+  // lastly, free up the RWLOCK that I created for RW-locking 'Interlocked' things
 
   if(fInterlockedRWLockInitFlag)
   {
@@ -193,6 +194,13 @@ char *p1;
     fInterlockedRWLockInitFlag = 0; // by convention, in case I re-init [unlikely]
   }
 
+#ifndef NO_DEBUG // I only do this for builds that have DEBUG capability
+
+  // FINALLY, if I've done any debug profiling, dump the profile data
+
+  WBDumpProfileData(); // this dumps any profile data out to stderr
+
+#endif // NO_DEBUG
 }
 
 // NOTE: when this function is called first, the arguments will be parsed in order to obtain
@@ -214,7 +222,7 @@ char **argv_orig = argv;
 
 static const char * const aszCmdLineOptions[]=
 {
-  "debug","subsys","display","minimize","maximize","geometry",
+  "debug","subsys","display","minimize","maximize","geometry","no-antialias","no-imagecache",
   NULL // marks end of list
 };
 
@@ -234,7 +242,9 @@ enum
     option_display,
     option_minimize,
     option_maximize,
-    option_geometry
+    option_geometry,
+    option_no_antialias,
+    option_no_image_cache
 };
 
   // grab the name of the program and cache it.  I'll need the path info.
@@ -428,6 +438,15 @@ enum
             case option_geometry:
               __internal_startup_geometry(szVal);
               break;
+
+            case option_no_antialias:
+              __internal_disable_antialias();
+              break;
+
+            case option_no_image_cache:
+              __internal_disable_imagecache();
+              break;
+
             default:
               WBDebugPrint("Unrecognized option: --%s\n", szArg);
 
@@ -563,20 +582,26 @@ enum
 void WBToolkitUsage(void)
 {
   fputs("X11 WorkBench Toolkit options (these should precede other options)\n"
-        "--debug n       debug level (default 0, errors only)\n"
-        "                1 = minimal, 7 is maximum debug level\n"
-        "--subsys xx     subsystem to debug (implies --debug 7 if not specified)\n"
-        "                'xx' is a subsystem name or bit value (see window_helper.h)\n"
-        "                A bit value of 1 is equivalent to the lowest subsystem bit\n"
-        "                NOTE:  this option can be specified multiple times\n"
-        "                (You can specify '--subsys help' to get a list of subsystems)\n"
-        "--display xx    X11 display to use (default is DISPLAY env variable)\n"
-        "--minimize      show minimized window on startup\n"
-        "--maximize      show maximized window on startup\n"
-        "--geometry geom specify window geometry on startup\n"
-        "                geometry spec as per X specification (see X man page)\n"
-        "                typical value might be 800x600+100+50\n"
-        "                (default centers window with reasonable size)\n"
+        "    X11 STARTUP OPTIONS\n"
+        "--display xx     X11 display to use (default is DISPLAY env variable)\n"
+        "--minimize       show minimized window on startup\n"
+        "--maximize       show maximized window on startup\n"
+        "--geometry geom  specify window geometry on startup\n"
+        "                 geometry spec as per X specification (see X man page)\n"
+        "                 typical value might be 800x600+100+50\n"
+        "                 (default centers window with reasonable size)\n"
+        "    DEBUG OPTIONS\n"
+        "--debug n        debug level (default 0, errors only)\n"
+        "                 1 = minimal, 7 is maximum debug level\n"
+        "--subsys xx      subsystem to debug (implies --debug 7 if not specified)\n"
+        "                 'xx' is a subsystem name or bit value (see window_helper.h)\n"
+        "                 A bit value of 1 is equivalent to the lowest subsystem bit\n"
+        "                 NOTE:  this option can be specified multiple times\n"
+        "                 (You can specify '--subsys help' to get a list of subsystems)\n"
+        "    SPECIAL OPTIONS\n"
+        "--no-antialias   Disable anti-aliasing (may improve UI performance)\n"
+        "--no-imagecache  Disable internal image cache for window paint/expose\n"
+        "\n"
         " NOTE:  application options with separate parameters should appear after\n"
         "        any X11 Workbench Toolkit options, to avoid confusing the parser.\n"
         "\n", stderr);
@@ -698,6 +723,163 @@ static const int nCols = 16;
   WBDebugPrint("==========================================================================================\n");
 }
 
+#ifndef NO_DEBUG
+
+typedef struct __profile_info__
+{
+  const char *szFile;
+  const char *szFunction;
+  const char *szName;
+  const char *szDesc;
+#ifdef HAS_WB_UINT64_BUILTIN
+  WB_INT64 nLine; // for better alignment, assuming 64-bit pointers
+  WB_UINT64 nTime;
+  WB_INT64 nCount;
+  WB_INT64 nReserved; // for alignment
+#else // HAS_WB_UINT64_BUILTIN
+  WB_INT32 nLine;
+  WB_UINT32 nTime;
+  WB_INT32 nCount;
+  WB_INT32 nReserved; // for alignment
+#endif // HAS_WB_UINT64_BUILTIN
+} PROFILE_INFO;
+
+static PROFILE_INFO *paProfileInfo = NULL;
+static int nProfileInfo = 0, nMaxProfileInfo = 0;
+
+int WBRegisterProfileVar(const char *szFile, int nLine, const char *szFunction, const char *szName, const char *szDesc)
+{
+int iRval;
+
+  if(WB_UNLIKELY(!paProfileInfo))
+  {
+    nMaxProfileInfo = 256;
+    paProfileInfo = (PROFILE_INFO *)WBAlloc((nMaxProfileInfo + 1) * sizeof(*paProfileInfo));
+    if(!paProfileInfo)
+    {
+      return -1; // an error
+    }
+
+    bzero(paProfileInfo, (nMaxProfileInfo + 1) * sizeof(*paProfileInfo)); // make sure
+  }
+  else if(WB_UNLIKELY((nProfileInfo + 1) >= nMaxProfileInfo))
+  {
+    void *pTemp;
+
+    int nOldMaxProfileInfo = nMaxProfileInfo;
+
+    nMaxProfileInfo = (nProfileInfo + 258) & 0xffffff00; // make it 256 bigger
+
+    pTemp = WBReAlloc(paProfileInfo, (nMaxProfileInfo + 1) * sizeof(*paProfileInfo));
+
+    if(WB_UNLIKELY(!pTemp))
+    {
+      nMaxProfileInfo = nOldMaxProfileInfo;
+      return -1; // an error
+    }
+
+    paProfileInfo = (PROFILE_INFO *)pTemp; // now is permanent
+    bzero(paProfileInfo + nOldMaxProfileInfo,
+          (nMaxProfileInfo + 1 - nOldMaxProfileInfo) * sizeof(*paProfileInfo)); // the size of the new block
+  }
+
+  iRval = nProfileInfo++;
+
+  paProfileInfo[iRval].szFile = szFile;
+  paProfileInfo[iRval].szFunction = szFunction;
+  paProfileInfo[iRval].szName = szName;
+  paProfileInfo[iRval].szDesc = szDesc;
+  paProfileInfo[iRval].nLine = nLine;
+
+  paProfileInfo[iRval].nTime = 0;
+  paProfileInfo[iRval].nCount = 0;
+
+  return iRval;
+}
+
+void WBStartProfile(int nProfileID)
+{
+  if(WB_UNLIKELY(nProfileID < 0 || !paProfileInfo || nProfileID >= nMaxProfileInfo))
+  {
+    return; // bogus
+  }
+
+  if(paProfileInfo[nProfileID].nCount >= 0) // this detects 'out of order' invocation
+  {
+    paProfileInfo[nProfileID].nTime -= WBGetTimeIndex();
+    paProfileInfo[nProfileID].nCount = -(paProfileInfo[nProfileID].nCount + 1);
+  }
+}
+
+void WBStopProfile(int nProfileID)
+{
+  if(WB_UNLIKELY(nProfileID < 0 || !paProfileInfo || nProfileID >= nMaxProfileInfo))
+  {
+    return; // bogus
+  }
+
+  if(paProfileInfo[nProfileID].nCount < 0) // this detects 'out of order' invocation
+  {
+    paProfileInfo[nProfileID].nTime += WBGetTimeIndex();
+    paProfileInfo[nProfileID].nCount = -(paProfileInfo[nProfileID].nCount);
+  }
+}
+
+void WBDumpProfileData(void)
+{
+int i1, bNotYet = 1;
+
+  if(!paProfileInfo)
+  {
+    return;
+  }
+
+  for(i1=0; i1 < nProfileInfo; i1++)
+  {
+    if(WB_UNLIKELY(paProfileInfo[i1].nCount == 0))
+    {
+      continue; // skip it
+    }
+
+    // in the unlikely event that i just bailed out in the middle of a profiled function
+    if(WB_UNLIKELY(paProfileInfo[i1].nCount < 0)) // this detects I didn't call WBStopProfile() yet...
+    {
+      paProfileInfo[i1].nTime += WBGetTimeIndex();
+      paProfileInfo[i1].nCount = -(paProfileInfo[i1].nCount);
+    }
+
+    if(WB_UNLIKELY(bNotYet))
+    {
+      WBDebugPrint("\n** PROFILE INFO **\n");
+      bNotYet = 0;
+    }
+
+    WBDebugPrint("%s : %-8d %s\n    %s  %s\n"
+#ifdef HAS_WB_UINT64_BUILTIN
+                 "    nCount = %lld\n"
+                 "    nTime = %llu microseconds\n"
+#else // HAS_WB_UINT64_BUILTIN
+                 "    nCount = %ld\n"
+                 "    nTime = %lu microseconds\n"
+#endif // HAS_WB_UINT64_BUILTIN
+                 "    Average microseconds per count:  %0.1f\n\n",
+                 paProfileInfo[i1].szFile,
+                 (int)paProfileInfo[i1].nLine,
+                 paProfileInfo[i1].szFunction,
+                 paProfileInfo[i1].szName,
+                 paProfileInfo[i1].szDesc,
+                 paProfileInfo[i1].nCount,
+                 paProfileInfo[i1].nTime,
+                 (double)paProfileInfo[i1].nTime / (double)paProfileInfo[i1].nCount);
+  }
+
+  WBFree(paProfileInfo);
+  paProfileInfo = NULL; // by convention
+  nProfileInfo = 0;
+  nMaxProfileInfo = 0; // these too
+}
+
+#endif // NO_DEBUG
 
 
 //////////////////////////////////////////////////////////////////////////////
@@ -711,7 +893,11 @@ static const int nCols = 16;
 //                                                                          //
 //////////////////////////////////////////////////////////////////////////////
 
+#if defined(HAS_WB_UINT64_BUILTIN) || defined(__DOXYGEN__)
 WB_UINT64 WBGetTimeIndex(void)
+#else // !defined(HAS_WB_UINT64_BUILTIN) && !defined(__DOXYGEN__)
+WB_UINT32 WBGetTimeIndex(void)
+#endif // defined(HAS_WB_UINT64_BUILTIN) || defined(__DOXYGEN__)
 {
 struct timeval tv;
 
@@ -722,11 +908,15 @@ struct timeval tv;
   return (WB_UINT64)tv.tv_sec * (WB_UINT64)1000000
          + (WB_UINT64)tv.tv_usec;
 
-#else // it's a structure typedef
+#else // WB_UINT64 is a structure typedef; just return a 32-bit value for now
+  {
+    double d1 = tv.tv_sec * 1000000.0;
+    d1 += tv.tv_usec;
 
-// TODO:  convert to double, do the math, then convert to struct using floor, frac
-#error not implemented (yet)
-
+    return (WB_UINT32)floor(fmod(d1, (double)0xffffffff));
+    // TODO:  use floor + frac to convert to two WB_UINT32's (for now I just return the lower half)
+    // TODO:  maybe do my own long long library in this VERY UNLIKELY case?
+  }
 #endif // WB_UINT64
 }
 
@@ -801,7 +991,7 @@ char *p1, *p2;
       // read each line, then scan for 'processor' and cound 'em up
       // NOTE:  if there's a better way, I'd like to see it...
 
-      p1 = tbuf, *p2;
+      p1 = tbuf;
       while(*p1 && *p1 <= ' ')
       {
         p1++; // skip leadin white space
@@ -1596,6 +1786,21 @@ int i1, iFreeIndex;
 WB_UINT32 uiRval = 0;
 WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros / 1024
 
+
+#warning TODO:  prevent hash-jamming attacks from external processes posting tainted events
+
+  // TODO:  consider keeping a list of already-used hashes that time out over a longer
+  //        period of time.  This would prevent "hash jamming" from easily working, from
+  //        a malicious process posting X11 messages to a window that's known to accept
+  //        events with a hashed pointer in them.  Event sniffing could reveal a previously
+  //        used hash that should not be re-used under any circumstance.  Hash re-use could
+  //        then potentially be detected.
+
+  // TODO:  consider a validation data type associated with a particular hash, which the
+  //        event-receiving function could use to validate the type of data being hashed,
+  //        in the case that hash-jamming is being used, to at least prevent "the wrong data"
+  //        from being accessed by the event receiver, or specifically a page fault from
+  //        exceeding the bounds of "the wrong data".
 
   if(!pPointer)
   {
@@ -2778,7 +2983,7 @@ char tbuf[256];
 }
 
 
-// function body
+// function body - TODO:  move to pixmap_helper.c instead?
 int MyLoadPixmapFromData(Display *pDisplay, Window wID, char *aData[],
                          Pixmap *pPixmap, Pixmap *pMask, XPM_ATTRIBUTES *pAttr)
 {
@@ -2812,7 +3017,7 @@ int iRval = 0;
     return -1;
   }
 
-  if(pTrans && pMask)
+  if(pTrans && pMask) // there is transparency information - I'll need a transparency mask
   {
     pxMask = XCreatePixmapFromBitmapData(pDisplay, wID, pTrans, iW, iH,
                                          1,//BlackPixel(pDisplay, DefaultScreen(pDisplay)), mask 'allow' foreground = 1
@@ -2899,22 +3104,24 @@ int iRval = 0;
         else
         {
           // I will need to create a GC
+          // TODO:  use WBXPutImage instead?  For now, no.
           XPutImage(pDisplay, pxImage, gc, pImage, 0, 0, 0, 0, iW, iH); // and now I have a copy of it
 
-          if(pImage->data == pB)
+          if(WB_LIKELY(pImage->data == pB)) // data pointer matches my allocated data 'pB'
           {
-            pImage->data = NULL; // MUST do this before calling XDestroyImage
+            pImage->data = NULL; // MUST do this before calling XDestroyImage - I free pB later
           }
 
           XFreeGC(pDisplay, gc);
         }
 
+        // TODO:  use WBXDestroyImage instead?  For now, no.
         XDestroyImage(pImage);
       }
     }
   }
 
-  WBFree(pB);
+  WBFree(pB); // assume it wasn't realloc'd before
 
   if(pPixmap)
   {
@@ -2940,144 +3147,6 @@ int iRval = 0;
 
 
 
-#if 0
-
-///////////////////////////////////////
-// TEST FUNCTIONS FOR XPM SUBSTITUTE //
-///////////////////////////////////////
-
-void TestFunc1(Display *pDisplay, GC gc, Window wID, int iX, int iY)
-{
-#define gray_width 16
-#define gray_height 16
-#define gray_x_hot 8
-#define gray_y_hot 8
-static char gray_bits0[] = { // this failed
-    0xf8, 0x1f, 0xe3, 0xc7, 0xcf, 0xf3, 0x9f, 0xf9, 0xbf,
-    0xfd, 0x33, 0xcc, 0x7f, 0xfe, 0x7f, 0xfe, 0x7e, 0x7e,
-    0x7f, 0xfe, 0x37, 0xec, 0xbb, 0xdd, 0x9c, 0x39, 0xcf,
-    0xf3, 0xe3, 0xc7, 0xf8, 0x1f};
-
-static char gray_bits[] = // this worked (MSB byte-level)
-{
-  0x1f, 0xf8, 0xc7, 0xe3, 0xf3, 0xcf, 0xf9, 0x9f,
-  0xfd, 0xbf, 0xcc, 0x33, 0xfe, 0x7f, 0xfe, 0x7f,
-  0x7e, 0x7e, 0xfe, 0x7f, 0xec, 0x37, 0xdd, 0xbb,
-  0x39, 0x9c, 0xf3, 0xcf, 0xc7, 0xe3, 0x1f, 0xf8
-};
-unsigned long foreground, background;
-unsigned int depth;
-Pixmap pxTemp;
-
-      /* open display, determine colors and depth */
-
-  foreground = BlackPixel(pDisplay, DefaultScreen(pDisplay));
-  background = WhitePixel(pDisplay, DefaultScreen(pDisplay)); // foreground
-  depth = DefaultDepth(pDisplay, DefaultScreen(pDisplay));
-
-  fprintf(stderr, "Creating pixmap, %ld, %ld, %d\n", foreground, background, depth);
-  fflush(stderr);
-
-  // on this system a bitmap is 8 bit's per pixel, MSB bit (hopefully the same everywhere)
-
-  pxTemp = XCreatePixmapFromBitmapData(pDisplay, wID, gray_bits, gray_width, gray_height,
-                                       foreground, background, depth);
-
-  XCopyArea(pDisplay, pxTemp, wID, gc, 0, 0, gray_width, gray_height, iX, iY);
-
-  XFreePixmap(pDisplay, pxTemp);
-}
-
-#include "icon_finger.xpm" // it's a static, so I have to
-
-void TestFunc(Display *pDisplay, GC gc, Window wID, int iX, int iY)
-{
-int iW, iH;
-char *pTrans = NULL;
-char *pB;
-Pixmap pxTemp;
-
-  pB = MyXPMToData((const char **)icon_finger_xpm, &iW, &iH, &pTrans);
-
-  if(!pB)
-  {
-    fprintf(stderr, "Oh, by the way, it failed\n");
-    fflush(stderr);
-    return;
-  }
-
-  if(!pTrans)
-  {
-    WBFree(pB);
-    fprintf(stderr, "Oh, by the way, no transparency\n");
-    fflush(stderr);
-    return;
-  }
-
-
-//  pxTemp = XCreatePixmapFromBitmapData(pDisplay, wID, pTrans, iW, iH,
-//                                       BlackPixel(pDisplay, DefaultScreen(pDisplay)),
-//                                       WhitePixel(pDisplay, DefaultScreen(pDisplay)),
-//                                       DefaultDepth(pDisplay, DefaultScreen(pDisplay)));
-
-  pxTemp = XCreatePixmap(pDisplay, wID, iW, iH, DefaultDepth(pDisplay, DefaultScreen(pDisplay)));
-
-  if(!pxTemp)
-  {
-    fprintf(stderr, "Oh, by the way, no pixmap\n");
-    fflush(stderr);
-  }
-  else
-  {
-    // create an image from the pB data
-    XImage *pImage = XCreateImage(pDisplay, DefaultVisual(pDisplay, DefaultScreen(pDisplay)),
-                                  DefaultDepth(pDisplay, DefaultScreen(pDisplay)),
-                                  ZPixmap,
-                                  0,
-                                  pB,
-                                  iW, iH, 32, iW * 4);
-
-    if(!pImage)
-    {
-      fprintf(stderr, "Oh, by the way, no Image\n");
-      fflush(stderr);
-    }
-    else
-    {
-      XPutImage(pDisplay, pxTemp, gc, pImage, 0, 0, 0, 0, iW, iH); // and now I have a copy of it
-
-
-      XCopyArea(pDisplay, pxTemp, wID, gc, 0, 0, iW, iH, iX, iY); // and now I do this, proof of concept
-
-
-      if(pImage->data == pB)
-      {
-        pImage->data = NULL;
-      }
-      XDestroyImage(pImage);
-    }
-
-    XFreePixmap(pDisplay, pxTemp);
-  }
-
-  WBFree(pB);
-  WBFree(pTrans);
-
-
-//  XImage *XCreateImage(Display *display,
-//                       Visual *visual, // DefaultVisual(pDisplay, DefaultScreen(pDisplay))
-//                       unsigned int depth, // compatible depth
-//                       int format, // XYBitmap, XYPixmap, ZPixmap (one of the 3)
-//                       int offset, // # pixels to ignore at start of scanline
-//                       char *data, // obvious
-//                       unsigned int width, // obvious
-//                       unsigned int height, // obvious
-//                       int bitmap_pad, // scanline 'quantum', 8, 16, or 32
-//                       int bytes_per_line); // # of bytes in a scan line
-
-}
-
-#endif // 0
 
 
 // some code may have been adapted from libXpm source - SEE ORIGINAL COPYRIGHT NOTICE BELOW
@@ -3128,6 +3197,64 @@ Pixmap pxTemp;
 //                                                                                                               //
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+
+// NOTE:  this does NOT canonicalize the path, so '~' and whatnot need
+//        to be handled separately
+int WBMkDir(const char *szFileName, int flags)
+{
+int iRval;
+
+  if(!szFileName || !*szFileName)
+  {
+    return -1; // always an error to create a 'blank' directory
+  }
+
+#ifdef WIN32
+#error not yet implemented
+#else // WIN32
+
+  if(szFileName[0] == '/' && !szFileName[1])
+  {
+    return 0; // always succeed if attempting to create the root dir
+  }
+
+  iRval = mkdir(szFileName, flags); // attempt it
+  if(iRval && errno == ENOENT) // need to recursively create it
+  {
+    char *p1, *p2;
+    // remove one element of the path, and recursively attempt to make THAT one
+
+    p1 = WBCopyString(szFileName);
+    if(p1)
+    {
+      p2 = p1 + strlen(p1) - 1;
+      if(*p2 == '/') // already?
+      {
+        p2--;
+      }
+      while(p2 > p1 && *p2 != '/')
+      {
+        p2--;
+      }
+
+      if(p2 > p1)
+      {
+        *p2 = 0;
+        iRval = WBMkDir(p1, flags);
+
+        if(!iRval) // I was able to create things 'above this'
+        {
+          iRval = mkdir(szFileName, flags);
+        }
+      }
+
+      WBFree(p1);
+    }
+  }
+#endif // WIN32
+
+  return iRval;
+}
 
 char * WBSearchPath(const char *szFileName)
 {
@@ -4141,6 +4268,60 @@ unsigned int cbBuf;
   return pRval;
 }
 
+int WBGetProcessState(WB_PROCESS_ID idProcess, WB_INT32 *pExitCode)
+{
+#ifdef WIN32 /* the windows way */
+  DWORD dwExitCode;
+
+  if(::WaitForSingleObject(idRval, 5) != WAIT_TIMEOUT)
+  {
+    if(!GetExitCodeProcess(hProcess, &dwExitCode) ||
+       dwExitCode != STILL_ACTIVE)
+    {
+      if(pExitCode)
+      {
+        *pExitCode = (WB_INT32)dwExitCode;
+      }
+
+      return 0; //
+    }
+  }
+
+  return 1; // still running
+#else // !WIN32 (everybody else)
+  int iStat, iRval;
+
+  // for waitpid(), if WNOHANG is specified and there are no stopped, continued or exited children, 0 is returned
+
+  iStat = 0;
+
+  iRval = waitpid(idProcess, &iStat, WNOHANG); // note this might return non-zero for stopped or continued processes
+
+  if(iRval > 0 && (iRval == (int)idProcess || (int)idProcess == -1 || (int)idProcess == 0))
+  {
+    if(WIFEXITED(iStat))                   // test if process exits also.
+    {
+      if(pExitCode)
+      {
+        *pExitCode = (WB_INT32)WEXITSTATUS(iStat);
+      }
+
+      return 0; // not running
+    }
+
+    return 1; // still running
+  }
+
+  if(iRval > 0)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - waitpid returns %d, but does not match %d\n",
+                   __FUNCTION__, iRval, (int)idProcess);
+  }
+
+  return -1; // error
+#endif // WIN32
+}
+
 char *WBRunResult(const char *szAppName, ...)
 {
 char *pRval;
@@ -4158,7 +4339,7 @@ va_list va;
 
 
 
-char *WBRunResultPipe(const char *szStdInBuf, const char *szAppName, ...)
+char *WBRunResultWithInput(const char *szStdInBuf, const char *szAppName, ...)
 {
 char *pRval, *pTemp = NULL;
 va_list va;
@@ -4280,6 +4461,11 @@ WB_PROCADDRESS WBGetProcAddress(WB_MODULE hModule, const char *szProcName)
   return((WB_PROCADDRESS)GetProcAddress(hModule, szProcName));
 }
 
+void * WBGetDataAddress(WB_MODULE hModule, const char *szDataName)
+{
+  return((void *)GetProcAddress(hModule, szDataName));
+}
+
 #else  // POSIX
 
 WB_MODULE WBLoadLibrary(const char * szModuleName)
@@ -4301,6 +4487,12 @@ WB_PROCADDRESS WBGetProcAddress(WB_MODULE hModule, const char *szProcName)
   return((WB_PROCADDRESS)dlsym(hModule, szProcName));
 #endif // 'dlfunc' check
 }
+
+void * WBGetDataAddress(WB_MODULE hModule, const char *szDataName)
+{
+  return((void *)dlsym(hModule, szDataName));
+}
+
 
 #endif // POSIX, WIN32
 

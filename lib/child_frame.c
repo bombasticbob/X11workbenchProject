@@ -15,15 +15,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -41,7 +41,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -115,7 +115,7 @@ static int ChildFrameDoCharEvent(XClientMessageEvent *pEvent, Display *pDisplay,
 static WBChildFrame *pChildFrames = NULL;  // pointer to linked list of 'Child Frame' windows
 
 
-int FWInitChildFrame(WBChildFrame *pChildFrame, WBFrameWindow *pOwner, XFontSet rFontSet,
+int FWInitChildFrame(WBChildFrame *pChildFrame, WBFrameWindow *pOwner, WB_FONTC pFont,
                      const char *szFocusMenu, const WBFWMenuHandler *pHandlerArray,
                      WBWinEvent pUserCallback, int fFlags)
 {
@@ -202,13 +202,21 @@ int iRval = -1;
   pChildFrame->ulTag = CHILD_FRAME_TAG;
   pChildFrame->destructor = NULL; // make sure
 
-  if(rFontSet == None)
+  if(!pFont)
   {
-    pChildFrame->rFontSet = None;
+    pFont = FWGetFont(pOwner);    // make copy of owning frame's font
+
+    if(!pFont)
+      pFont = WBGetDefaultFont(); // make copy of default font
   }
-  else
+
+  pChildFrame->pFont = WBCopyFont(pDisplay, pFont);
+
+  if(!pChildFrame->pFont)
   {
-    pChildFrame->rFontSet = WBCopyModifyFontSet(pDisplay, rFontSet, 0, 0);
+    FWDestroyChildFrame(pChildFrame); // this unhooks everything (alloc'd things are zero'd by bzero)
+
+    return -5; // same as 'not enough memory' if I can't create a copy of the font
   }
 
   if(szFocusMenu)
@@ -355,10 +363,10 @@ Window wID;
     pChildFrame->szDisplayName = NULL;
   }
 
-  if(pChildFrame->rFontSet)
+  if(pChildFrame->pFont)
   {
-    XFreeFontSet(WBGetDefaultDisplay(), pChildFrame->rFontSet);
-    pChildFrame->rFontSet = None;
+    WBFreeFont(WBGetDefaultDisplay(), pChildFrame->pFont);
+    pChildFrame->pFont = NULL;
   }
 
   if(pChildFrame->pMenuHandler)
@@ -698,9 +706,9 @@ int nL, nL2, nC, nC2;
 
   if(pChildFrame->iRowHeight <= 0 || pChildFrame->iColWidth <= 0)
   {
-    nL2 = WBTextObjectCalculateLineHeight(WBFontSetAscent(pDisplay, pChildFrame->rFontSet),
-                                          WBFontSetDescent(pDisplay, pChildFrame->rFontSet));
-    nC2 = WBFontSetAvgCharWidth(pDisplay, pChildFrame->rFontSet);
+    nL2 = WBTextObjectCalculateLineHeight(WBFontAscent(pChildFrame->pFont),
+                                          WBFontDescent(pChildFrame->pFont));
+    nC2 = WBFontAvgCharWidth(pChildFrame->pFont);
 
     if(nL2 < 0)
     {
@@ -789,7 +797,7 @@ reset_hscroll_range:
   //        the geometry width and height, as needed
 
 
-  WBUpdateScrollBarGeometry(&(pChildFrame->scroll), pChildFrame->rFontSet, // for now do this
+  WBUpdateScrollBarGeometry(&(pChildFrame->scroll), pChildFrame->pFont, // for now do this
                             &(pChildFrame->geom), &(pChildFrame->geom));
 }
 
@@ -968,7 +976,7 @@ int nChar = sizeof(tbuf);
   if(pEvent->type == Expose)
   {
     WB_GEOM geomTemp;
-    GC gc;
+    WBGC gc;
     XColor clrBG;
 
     // first, horizontal bar
@@ -1021,10 +1029,10 @@ int nChar = sizeof(tbuf);
 
       if(gc != None)
       {
-        XSetForeground(pDisplay, gc, clrBG.pixel);
-        XSetBackground(pDisplay, gc, clrBG.pixel);
+        WBSetForeground(gc, clrBG.pixel);
+        WBSetBackground(gc, clrBG.pixel);
 
-        XFillRectangle(pDisplay, wID, gc, geomTemp.x, geomTemp.y, geomTemp.width, geomTemp.height);
+        WBFillRectangle(pDisplay, wID, gc, geomTemp.x, geomTemp.y, geomTemp.width, geomTemp.height);
 
         WBEndPaint(wID, gc);
       }

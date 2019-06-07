@@ -15,15 +15,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -41,7 +41,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -84,6 +84,7 @@ extern "C" {
     int nPos, nTop;                     // scroll position and position of top item
     int nHeight, nItemHeight;           // height (in items) and height of item (in pixels)
     int nFlags;                         // flags (sorted, etc.)
+    WB_GEOM geomDisplay;                // the (cached) geometry that defines the "display area" (not scrollbars, border)
     Window wOwner;                      // owning window [to be notified on change]
     void *(*pfnAllocator)(const void *, int); // copy constructor to call for each item that's added
                                         // typically this will call 'WBAlloc' followed by 'memcpy'
@@ -92,8 +93,8 @@ extern "C" {
                                         // typically this will point to 'WBFree'
                                         // if NULL, the caller-supplied pointer is ignored
 
-    void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, GC gcPaint, WB_GEOM *pGeom, XFontSet fontSet);
-                                        // generic function to display contents of item within 'pGeom' using GC
+    void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, WBGC gcPaint, WB_GEOM *pGeom, WB_FONTC pFont);
+                                        // generic function to display contents of item within 'pGeom' using WBGC
                                         // typically one of the listbox 'display item' functions
 
     int (*pfnSort)(const void *, const void *); // sort proc (NULL implies strcmp)
@@ -115,6 +116,7 @@ typedef struct __LISTINFO__
   int nHeight,             ///< height (in items) of display area, recalculated on resize/expose
       nItemHeight;         ///< height of a single item (in pixels)
   int nFlags;              ///< flags (sorted, etc.)
+  WB_GEOM geomDisplay;     ///< the (cached) geometry that defines the "display area" (not scrollbars, border)
   Window wOwner;           ///< owning window [to be notified on change]
   /** \brief pointer to the copy constructor to call for each item that's added
     *
@@ -130,11 +132,11 @@ typedef struct __LISTINFO__
   /** \brief display callback function to paint the entry on the display surface
     *
     * generic callback function to display the contents of the item within 'pGeom' using
-    * the provided GC.  The 'pControl' 'pData' and 'iSelected' parameters reference the
+    * the provided WBGC.  The 'pControl' 'pData' and 'iSelected' parameters reference the
     * WBDialogControl, the list entry's data pointer, and a boolean 'selection' flag, respectively.\n
     * Typically this will be on of the listbox 'DisplayItem' API functions.
   **/
-  void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, GC gcPaint, WB_GEOM *pGeom, XFontSet fontSet);
+  void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, WBGC gcPaint, WB_GEOM *pGeom, WB_FONTC pFont);
 
   /** \brief Optional sort comparison function.  NULL implies 'strcmp' */
   int (*pfnSort)(const void *, const void *); // sort proc (NULL implies strcmp)
@@ -279,7 +281,7 @@ typedef struct _WB_LIST_CURSEL_
     WBListCurSel sel;          // selection state, must follow wbDLGCtrl
     int *pSelBitmap;           // bitmap of selections (when applicable) (use 'WBAlloc/WBFree')
     int cbBitmap;              // size of bitmap (in bytes, granular at sizeof(int))
-    XFontSet fsBold;           // bold font set - assigned on the fly, struct creator must free if not 'None'
+    WB_FONT pBold;             // bold font set - assigned on the fly, struct creator must free if not 'None'
   } WBListControl;
 
   * \endcode
@@ -292,7 +294,7 @@ typedef struct _WB_LIST_CONTROL_
   WBListCurSel sel;          ///< selection state, must follow wbDLGCtrl
   int *pSelBitmap;           ///< bitmap of selections (when applicable) (use 'WBAlloc/WBFree')
   int cbBitmap;              ///< size of bitmap (in bytes, granular at sizeof(int))
-  XFontSet fsBold;           ///< bold font set - assigned on the fly, struct creator must free if not 'None'
+  WB_FONT pBold;             ///< bold font set - assigned on the fly, struct creator must free if not 'None'
 } WBListControl;
 
 
@@ -339,7 +341,7 @@ typedef struct _WB_COMBO_CONTROL_
   {
     WBDialogControl wbDLGCtrl; // Standard dialog control members
     WBListCurSel sel;          // must follow wbDLGCtrl
-    XFontSet fsBold;           // bold font set - assigned on the fly, struct creator must free if not 'None'
+    WB_FONT pBold;             // bold font set - assigned on the fly, struct creator must free if not 'None'
   } WBTreeControl;
 
   * \endcode
@@ -350,7 +352,7 @@ typedef struct _WB_TREE_CONTROL_
 {
   WBDialogControl wbDLGCtrl; ///< Standard dialog control members
   WBListCurSel sel;          ///< must follow wbDLGCtrl
-  XFontSet fsBold;           ///< bold font set - assigned on the fly, struct creator must free if not 'None'
+  WB_FONT pBold;             ///< bold font set - assigned on the fly, struct creator must free if not 'None'
 } WBTreeControl;
 
 
@@ -387,7 +389,7 @@ void DLGCDestroyProperties(WBDialogPropList *pPropList);
 **/
 LISTINFO *DLGCListInfoConstructor(Window wOwner, int nMax, int nFlags,
                                   void *(*pfnAllocator)(const void *,int), void (*pfnDestructor)(void *),
-                                  void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *, XFontSet),
+                                  void (*pfnDisplay)(WBDialogControl *, void *, int, WBGC, WB_GEOM *, WB_FONTC),
                                   int (*pfnSort)(const void *, const void *));
 
 /** \ingroup dlgctrl
@@ -411,7 +413,7 @@ void DLGCListInfoDestructor(LISTINFO *pListInfo);
   * \param iSelected A flag indicating whether the item has been selected (1 = selected, 0 = not selected)
   * \param gc The graphics context for displaying the data
   * \param pGeom a WB_GEOM representing the rectangular area to draw the item in.
-  * \param fontSet An XFontSet to use when displaying the text. May be 'None', which will use the default font set for the display
+  * \param pFont A WB_FONTC to use when displaying the text. May be 'None', which will use the default font set for the display
   * \returns void
   *
   * Pass this function's address as 'pfnDisplay' when calling DLGCListInfoConstructor to get a default
@@ -419,7 +421,7 @@ void DLGCListInfoDestructor(LISTINFO *pListInfo);
   *
   * Header File:  dialog_support.h
 **/
-void DLGCDefaultListControlDisplayProc(WBDialogControl *pList, void *pData, int iSelected, GC gc, WB_GEOM *pGeom, XFontSet fontSet);
+void DLGCDefaultListControlDisplayProc(WBDialogControl *pList, void *pData, int iSelected, WBGC gc, WB_GEOM *pGeom, WB_FONTC pFont);
 
 
 

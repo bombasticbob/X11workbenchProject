@@ -8,10 +8,6 @@
 //                                                                                          //
 //                       basic window creation and message handling                         //
 //                                                                                          //
-//    Copyright (c) 2010-2018 by 'Big Bad Bombastic Bob' Frazier - all rights reserved.     //
-//   You may use this file in any way you see fit provided that any copy or derived work    //
-//   includes the above copyright notice.                                                   //
-//                                                                                          //
 //              NOTE:  'WB' is for 'Work Bench', aka 'X11workbench Toolkit'                 //
 //                                                                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -19,15 +15,14 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -45,7 +40,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -82,6 +77,13 @@
 
 #ifndef WINDOW_HELPER_H_INCLUDED
 #define WINDOW_HELPER_H_INCLUDED
+
+
+#ifndef WIN32
+// the 'incompatible pointer types' is now an error
+#pragma GCC diagnostic error "-Wincompatible-pointer-types"
+#endif // !WIN32
+
 
 // headers that must be included or I break
 
@@ -197,6 +199,171 @@ typedef int (* WBAppEvent)(XEvent *pEvent);
 /** \defgroup core_struct_struct structures
   * \ingroup core_struct
 **/
+
+/** \struct _WBGC_
+  * \ingroup core_struct_struct
+  * \copydoc WBGC
+**/
+/** \typedef WBGC
+  * \ingroup core_struct
+  * \brief internal wrapper struct for GC with local cache
+  *
+  * The WBGC structure has been defined for a couple of reasons:
+  * First, it is a similar concept to using 'HDC' in Win32, so it can help
+  * to translate all of the GC-related operations in a 1:1 manner for Win32;
+  * Second, it enables the toolkit to cache locally EVERYTHING that might
+  * enhance performance for X11 implmentations.  Win-Win.
+  *
+  * The biggest single performance problem in X11 exists when you want to
+  * use a remote client and also want to enhance operations beyond the simple
+  * features that are natively supported by an X server, things like anti-aliasing
+  * and transparency [for example].  In order to simplify implementing these things
+  * in a way that does NOT impact performance is to cache everything locally that
+  * might otherwise result in an RPC-like call into the X Server.  The single slowest
+  * operation in this case is obtaining an XImage from a Pixmap or Window, and so this
+  * is specifically cached in the toolkit.  Additionally, functions that can perform
+  * operations on these resources locally (rather than remotely) can then leverage the
+  * cached information, often giving you a significant performance boost.
+  *
+  * The only down side is the additional housekeeping needed to track all of this.
+  *
+  * \code
+
+  typedef struct _WBGC_
+  {
+    Display *display;   // the Display associated with the WBGC (NULL implies 'Default Display')
+    Drawable dw;        // the Drawable for which this WBGC was created (None implies default Window)
+    GC gc;              // the associated 'GC'
+    XGCValues values;   // cached XGCValues for the GC
+    WB_FONT pFont;      // cached default font
+    Region clip_rgn;    // clipping region (or None to use clip_image)
+    XImage *clip_image; // cached XImage for the GC, for 'clip mask'
+    XImage *tile_image; // cached XImage for the GC, for 'tile'
+    XImage *stip_image; // cached XImage for the GC, for 'stipple'
+  } * WBGC;
+
+  * \endcode
+  *
+  * The XOrg documentation defines the XGCValues structure as follows:
+  *
+  * \code
+
+  typedef struct {
+         int function;               // logical operation
+         unsigned long plane_mask;   // plane mask
+         unsigned long foreground;   // foreground pixel
+         unsigned long background;   // background pixel
+         int line_width;             // line width (in pixels)
+         int line_style;             // LineSolid, LineOnOffDash, LineDoubleDash
+         int cap_style;              // CapNotLast, CapButt, CapRound, CapProjecting
+         int join_style;             // JoinMiter, JoinRound, JoinBevel
+         int fill_style;             // FillSolid, FillTiled, FillStippled FillOpaqueStippled
+         int fill_rule;              // EvenOddRule, WindingRule
+         int arc_mode;               // ArcChord, ArcPieSlice
+         Pixmap tile;                // tile pixmap for tiling operations
+         Pixmap stipple;             // stipple 1 plane pixmap for stippling
+         int ts_x_origin;            // offset for tile or stipple operations
+         int ts_y_origin;
+         Font font;                  // default text font for text operations
+         int subwindow_mode;         // ClipByChildren, IncludeInferiors
+         Bool graphics_exposures;    // boolean, should exposures be generated
+         int clip_x_origin;          // origin for clipping
+         int clip_y_origin;
+         Pixmap clip_mask;           // bitmap clipping; other calls for rects
+         int dash_offset;            // patterned/dashed line information
+         char dashes;
+  } XGCValues;
+
+  * \endcode
+  *
+  * Additional information regarding the drawing of lines
+  *
+  * The XOrg 'manual page' documentation for XGCValues also includes the
+  * following information:
+  *
+  * \code
+
+    The line-width is measured in pixels and either can be greater than or
+    equal to one (wide line) or can be the special value zero (thin line).
+
+    Wide lines are drawn centered on the path described by the graphics
+    request.  Unless otherwise specified by the join-style or cap-style,
+    the bounding box of a wide line with endpoints [x1, y1], [x2, y2] and
+    width w is a rectangle with vertices at the following real coordinates:
+
+    [x1-(w*sn/2), y1+(w*cs/2)], [x1+(w*sn/2), y1-(w*cs/2)],
+    [x2-(w*sn/2), y2+(w*cs/2)], [x2+(w*sn/2), y2-(w*cs/2)]
+
+    Here sn is the sine of the angle of the line, and cs is the cosine of
+    the angle of the line.  A pixel is part of the line and so is drawn if
+    the center of the pixel is fully inside the bounding box (which is
+    viewed as having infinitely thin edges).  If the center of the pixel is
+    exactly on the bounding box, it is part of the line if and only if the
+    interior is immediately to its right (x increasing direction).  Pixels
+    with centers on a horizontal edge are a special case and are part of
+    the line if and only if the interior or the boundary is immediately
+    below (y increasing direction) and the interior or the boundary is
+    immediately to the right (x increasing direction).
+
+    Thin lines (zero line-width) are one-pixel-wide lines drawn using an
+    unspecified, device-dependent algorithm.  There are only two con-
+    straints on this algorithm.
+
+    1.   If a line is drawn unclipped from [x1,y1] to [x2,y2] and if
+        another line is drawn unclipped from [x1+dx,y1+dy] to
+        [x2+dx,y2+dy], a point [x,y] is touched by drawing the first line
+        if and only if the point [x+dx,y+dy] is touched by drawing the
+        second line.
+
+    2.   The effective set of points comprising a line cannot be affected
+        by clipping.  That is, a point is touched in a clipped line if and
+        only if the point lies inside the clipping region and the point
+        would be touched by the line when drawn unclipped.
+
+    A wide line drawn from [x1,y1] to [x2,y2] always draws the same pixels
+    as a wide line drawn from [x2,y2] to [x1,y1], not counting cap-style
+    and join-style.  It is recommended that this property be true for thin
+    lines, but this is not required.  A line-width of zero may differ from
+    a line-width of one in which pixels are drawn.  This permits the use of
+    many manufacturers' line drawing hardware, which may run many times
+    faster than the more precisely specified wide lines.
+
+    In general, drawing a thin line will be faster than drawing a wide line
+    of width one.  However, because of their different drawing algorithms,
+    thin lines may not mix well aesthetically with wide lines.  If it is
+    desirable to obtain precise and uniform results across all displays, a
+    client should always use a line-width of one rather than a line-width
+    of zero.
+
+  * \endcode
+  *
+  * To be fair, the use of a line width of zero in the X11Workbench Toolkit
+  * is NOT recommended.  The XImage code will assume zero implies width=1.
+  *
+  * Also, an algorithm that allows the 'touching' of the same point many
+  * times is not impractical with an XImage; that is, the amount of code
+  * needed to check if a point were touched or will be touched is more
+  * computationally expensive than 'just touching it anyway'.  As such,
+  * the XImage code may 'touch' a point multiple times, depending.  For
+  * video hardware, especially accelerated video hardware, this could be
+  * a performance hit.  But when using an XImage as a backing store for
+  * the window contents, it makes more sense to simply draw it anyway.
+  *
+  * Additional information can be found in the aforementioned manual page.
+  *
+*/
+typedef struct _WBGC_
+{
+  Display *display;   ///< the Display associated with the WBGC (NULL implies 'Default Display')
+  Drawable dw;        ///< the Drawable for which this WBGC was created (None implies default Window)
+  GC gc;              ///< the associated 'GC'
+  XGCValues values;   ///< cached XGCValues for the GC
+  WB_FONT pFont;      ///< cached default font
+  Region clip_rgn;    ///< clipping region (or None to use clip_image) - owned by the object
+  XImage *clip_image; ///< cached XImage for the GC, for 'clip mask'
+  XImage *tile_image; ///< cached XImage for the GC, for 'tile'
+  XImage *stip_image; ///< cached XImage for the GC, for 'stipple'
+} * WBGC;
 
 /** \struct _WBPoint_
   * \ingroup core_struct_struct
@@ -534,6 +701,10 @@ static __inline__ Colormap WBDefaultColormap(Display *pDisplay)
   * structure.  Helps to clean up the initialization code and make it more 'modular'.
   * For more information on window attributes, see the X11 API Documentation, section 3.3 .
   *
+  * You should pass 'iFlags' with 'CWBorderPixel | CWBackPixel | CWColormap | CWBitGravity'
+  * to WBCreateWindow(), or use WBCreateWindow_flagsDefault, whenever you use this function
+  * to initialize the XSetWindowAttributes structure.
+  *
   * Header File:  window_helper.h
 **/
 void WBInitWindowAttributes(XSetWindowAttributes *pXSWA, unsigned long lBorderPixel,
@@ -585,33 +756,18 @@ static __inline__ Display * WBGetDefaultDisplay(void)
 }
 
 /** \ingroup defaults
-  * \brief Returns a pointer to the default font's XFontStruct
+  * \brief Returns a pointer to the default font WB_FONT for the default display.  This is a shared resource; do NOT free it nor alter it!
   *
-  * \returns A pointer to an XFontStruct, or 'NULL' on error
+  * \returns A pointer to a WB_FONT object (const), or 'NULL' on error.  This is a shared resource; do NOT free it nor alter it!
   *
-  * The default XFontStruct is allocated at startup.  This function
-  * returns a pointer to this XFontStruct, which can be used in a
-  * case where the 'in use' XFontStruct is not known, or when an
+  * The default WB_FONT is allocated at startup.  This function
+  * returns its value (not a copy), which can then be used in a
+  * case where the 'in use' WB_FONT is not known, or when an
   * overriding font has not been specified.
   *
   * Header File:  window_helper.h
 **/
-XFontStruct *WBGetDefaultFont(void);
-
-/** \ingroup defaults
-  * \brief Returns an XFontSet for the default font
-  *
-  * \param pDisplay A pointer to the Display, or NULL to use the default Display
-  * \returns An XFontSet, or 'None' on error
-  *
-  * The default XFontSet is allocated at startup from the default XFontStruct.
-  * This function returns this XFontSet, which can be used in a case where the
-  * 'in use' XFontSet is not known, or when an overriding font set has not
-  * been specified.
-  *
-  * Header File:  window_helper.h
-**/
-XFontSet WBGetDefaultFontSet(Display *pDisplay);
+WB_FONTC WBGetDefaultFont(void);
 
 /** \ingroup defaults
   * \brief Returns a special 'hidden' window used for information purposes
@@ -827,7 +983,7 @@ enum WMPropertiesWMProtocols
   // The following flags indicate WM_PROTOCOLS support
   // Assigning these directly can have unexpected consequences
   WMPropertiesWMProtocols_Mask            = 0xff,
-  WMPropertiesWMProtocols_None            = 0x0,  // the default
+  WMPropertiesWMProtocols_None            = 0x0,  ///< the default
   WMPropertiesWMProtocols_DeleteWindow    = 0x01,
   WMPropertiesWMProtocols_Reserved2       = 0x02,
   WMPropertiesWMProtocols_Reserved3       = 0x04,
@@ -838,37 +994,65 @@ enum WMPropertiesWMProtocols
   WMPropertiesWMProtocols_Reserved8       = 0x80,
 };
 
+/** \ingroup wcore
+  * \hideinitializer
+  * \brief WBCreateWindow 'iFlags' additional bits
+  *
+  * Bit flags for additional properties for 'iFlags' in WBCreateWindow.
+**/
+enum WBCreateWindow_flags
+{
+  // The following flags indicate WM_PROTOCOLS support
+  // Assigning these directly can have unexpected consequences
+  WBCreateWindow_flagsDefault             = 0, ///< equivalent to 'CWBorderPixel | CWBackPixel | CWColormap | CWBitGravity' when specified without any additional 'CW' flags
+#ifdef HAS_WB_UINT64_BUILTIN
+  WBCreateWindow_flagsNoImageCache      = 0x100000000LL,  ///< do not use a 'backing store' when drawing the window (native X11 calls)
+#endif // HAS_WB_UINT64_BUILTIN
+};
+
+// TODO:  equivalents for when WBUINT64 is NOT supported as a native 'long long' data type (rare, if ever)
 
 
 /** \ingroup wcore
   * \brief Create a window
   *
-  * \param pDisplay A pointer to the display
+  * \param pDisplay A pointer to the display (or NULL for the default display)
   * \param wIDParent The parent window, or 'None'
   * \param pProc A pointer to the event handler proc
-  * \param szClass The name of the window's class (mostly for debugging)
+  * \param szClass The name of the window's class (mostly for debugging in X11; for WIN32 this is important for other reasons)
   * \param iX The X position of the window
   * \param iY The Y position of the window
   * \param iWidth The width of the window
   * \param iHeight The height of the window
   * \param iBorder The border width of the window
   * \param iIO The I/O type of the window (Input, InputOutput, etc.)
-  * \param iFlags The flags indicating which bits are valid in the XSetWindowAttributes structure
-  * \param pXSWA A pointer to the XSetWindowAttributes structure
+  * \param iFlags The flags indicating which bits are valid in the XSetWindowAttributes structure, plus additional flags specific to the X11Workbench Toolkit (see below)
+  * \param pXSWA A pointer to the XSetWindowAttributes structure.  May be NULL if the lower 32-bits of iFlags is WBCreateWindow_flagsDefault (see below).
   * \return A valid Window ID, or 'None' on error
   *
-  * Call this function to create a window, in lieu of XCreateWindow.  It will automatically
-  * register the callback function and the class name, and sets up a few default parameters
-  * for you automatically.\n
+  * Call this function to create a window, which is similar to XCreateWindow().  It will
+  * automatically register the callback function and the class name, and sets up a few
+  * default parameters for you automatically.\n
   * The window is created with the default visual and depth for the specified display with
   * default screen and a default set of WM_HINTS.
+  *
+  * The X11Workbench Toolkit also supports a number of additional bit values for 'iFlags':
+  *
+  * WBCreateWindow_flagsDefault (which has a value of zero)
+  *   When specified alone, this uses the default value CWBorderPixel | CWBackPixel | CWColormap | CWBitGravity .
+  *   if the value of 'pXSWA' is NULL, a default XSetWindowAttributes structure will be created and initialized
+  *   for you, using WBInitWindowAttributes() and default values.
+  *
+  *
+  *
+  * \sa WBInitWindowAttributes()
   *
   * Header File:  window_helper.h
 **/
 Window WBCreateWindow(Display *pDisplay, Window wIDParent,
                       WBWinEvent pProc, const char *szClass,
                       int iX, int iY, int iWidth, int iHeight, int iBorder, int iIO,
-                      int iFlags, XSetWindowAttributes *pXSWA);
+                      WB_UINT64 iFlags, XSetWindowAttributes *pXSWA);
 
 /** \ingroup wcore
   * \brief Destroy a window
@@ -1095,24 +1279,14 @@ Display * WBGetWindowDisplay(Window wID);
 void WBSetWindowIcon(Window wID, int idIcon);
 
 /** \ingroup wcore
-  * \brief assigns the default XFontStruct to a window
+  * \brief assigns the default WB_FONT object for a window
   *
   * \param wID The Window ID from which to return the default cursor
-  * \param pFontStruct A pointer to an XFontStruct that describes the font.  This value will be 'owned' by the window.  To use the default font, assign a value of NULL
+  * \param pFont The WB_FONTC (or WB_FONT) object for the window.  A copy of this object will be owned by the window.  To use the default font set, you can assign a value of 'NULL'
   *
   * Header File:  window_helper.h
 **/
-void WBSetWindowFontStruct(Window wID, XFontStruct *pFontStruct);
-
-/** \ingroup wcore
-  * \brief assigns the default XFontSet to a window
-  *
-  * \param wID The Window ID from which to return the default cursor
-  * \param fontSet An XFontSet for the window.  This value will be 'owned' by the window.  To use the default font set, assign a value of 'None'
-  *
-  * Header File:  window_helper.h
-**/
-void WBSetWindowFontSet(Window wID, XFontSet fontSet);
+void WBSetWindowFont(Window wID, WB_FONTC pFont);
 
 /** \ingroup wcore
   * \brief Assigns a default cursor (by ID) to a window
@@ -1135,7 +1309,7 @@ void WBSetWindowDefaultCursor(Window wID, int idStandardCursor);
 int WBGetWindowDefaultCursor(Window wID);
 
 /** \ingroup wcore
-  * \brief creates a default GC for a window
+  * \brief creates a default WBGC for a window
   *
   * \param wID The Window ID for which to assign the colors
   * \param clrFG The foreground color
@@ -1146,69 +1320,38 @@ int WBGetWindowDefaultCursor(Window wID);
 void WBCreateWindowDefaultGC(Window wID, unsigned long clrFG, unsigned long clrBG);
 
 /** \ingroup wcore
-  * \brief assigns a default GC to a window
+  * \brief assigns a default WBGC to a window
   *
-  * \param wID The Window ID for which to assign the GC
-  * \param hGC The GC to assign
-  *
-  * Header File:  window_helper.h
-**/
-void WBSetWindowDefaultGC(Window wID, GC hGC);
-
-/** \ingroup wcore
-  * \brief makes a copy of the default GC so that it can be modified
-  *
-  * \param wID The Window ID from which to copy the GC
-  * \return A copy of the default GC for the specified window
+  * \param wID The Window ID for which to assign the WBGC
+  * \param hGC The WBGC to assign
   *
   * Header File:  window_helper.h
 **/
-GC WBGetWindowCopyGC(Window wID);
+void WBSetWindowDefaultGC(Window wID, WBGC hGC);
 
 /** \ingroup wcore
-  * \brief makes a copy of the specified GC for the desired window
+  * \brief makes a copy of the default WBGC so that it can be modified
   *
-  * \param wID The Window ID for which to copy the GC
-  * \param gcSrc The source 'GC'
-  * \return A copy of the GC for the specified window
+  * \param wID The Window ID from which to copy the WBGC
+  * \return A copy of the default WBGC for the specified window
+  *
+  * Header File:  window_helper.h
+**/
+WBGC WBGetWindowCopyGC(Window wID);
+
+/** \ingroup wcore
+  * \brief makes a copy of the specified WBGC for the desired window
+  *
+  * \param wID The Window ID for which to copy the WBGC
+  * \param gcSrc The source 'WBGC'
+  * \return A copy of the WBGC for the specified window
   *
   * Essentially, it works the same as WBGetWindowCopyGC() except it uses gcSrc
-  * instead of the window's 'default GC'.  (legacy, use WBCopyDrawableGC() instead)
+  * instead of the window's 'default WBGC'.  (legacy, use WBCopyDrawableGC() instead)
   *
   * Header File:  window_helper.h
 **/
 #define WBGetWindowCopyGC2(wID, gcSrc) WBCopyDrawableGC(WBGetWindowDisplay(wID), wID, gcSrc)
-
-/** \ingroup wcore
-  * \brief makes a copy of the specified GC for the desired 'Drawable'
-  *
-  * \param pDisplay A pointer to the 'Display' for the drawable.  NULL implies the default display.
-  * \param dw The 'Drawable' for which to copy the original GC (None uses the 'default' window)
-  * \param gcSrc The source 'GC'
-  * \return A copy of the GC for the specified 'Drawable'
-  *
-  * Makes a copy of the specified GC.  Useful if you want to make temporary modifications to a GC
-  * for a particular drawing operation, but don't want to actually modify the original GC.
-  *
-  * Header File:  window_helper.h
-**/
-GC WBCopyDrawableGC(Display *pDisplay, Drawable dw, GC gcSrc);
-
-/** \ingroup wcore
-  * \brief return a copy of the XFontStruct that was assigned to a GC
-  *
-  * \param pDisplay A pointer to the Display
-  * \param gc The GC to be queried
-  * \returns A pointer to an XFontStruct, or NULL on error.  non-NULL values must be freed via XFreeFont()
-  *
-  * Call this function to determine the font that has been assigned to a GC.  If
-  * there has been NO font assigned, the system default font information will be
-  * returned.  The return value is always a new pointer to an XFontStruct, or
-  * NULL on error.  The caller must free non-NULL return values via XFreeFont().
-  *
-  * Header File:  window_helper.h
-**/
-XFontStruct * WBGetGCFont(Display *pDisplay, GC gc);
 
 /** \ingroup wcore
   * \brief assign 'data pointer' for a window and specified index value
@@ -1259,42 +1402,42 @@ void WBSetWindowCursor(Window wID, int idCursor);
 void WBRestoreDefaultCursor(Window wID);
 
 /** \ingroup wcore
-  * \brief Returns the default GC currently assigned to the window
+  * \brief Returns the default WBGC currently assigned to the window (not a copy)
   *
-  * \param wID The Window ID from which to obtain the default GC
-  * \return The default GC associated with the specified window.  This is the actual GC, not a copy.
+  * \param wID The Window ID from which to obtain the default WBGC
+  * \return The default WBGC associated with the specified window.  This is the actual WBGC, not a copy.
   *
-  * Each window that is mapped within the API will have a 'default GC' associated with it.
-  * This GC should not be modified unless you want the changes to remain for the next time a GC
-  * is required.  A preferred method is to re-assign a new default GC with the new settings, or
-  * create a copy of the default GC as a 'starting point', then modify the copy as needed to
+  * Each window that is mapped within the API will have a 'default WBGC' associated with it.
+  * This WBGC should not be modified unless you want the changes to remain for the next time a WBGC
+  * is required.  A preferred method is to re-assign a new default WBGC with the new settings, or
+  * create a copy of the default WBGC as a 'starting point', then modify the copy as needed to
   * perform the desired operation.  This, in fact, will happen every time you use the API to
   * handle Expose events, via the WBBeginPaint() and WBEndPaint() functions, where the paint
-  * GC is a modified version of the default GC.
+  * WBGC is a modified version of the default WBGC.
   *
   * Header File:  window_helper.h
 **/
-GC WBGetWindowDefaultGC(Window wID);
+WBGC WBGetWindowDefaultGC(Window wID);
 
 /** \ingroup wcore
-  * \brief Returns the current XFontStruct pointer assigned to the window (may be NULL)
+  * \brief Returns the WB_FONT assigned to the window (may be NULL), not a copy
   *
-  * \param wID The Window ID from which to obtain the current XFontStruct pointer
-  * \return A pointer to the assigned XFontStruct, or NULL on error
+  * \param wID The Window ID from which to obtain a copy of the current WB_FONT object
+  * \return The assigned WB_FONT, or 'NULL' on error.
   *
   * Header File:  window_helper.h
 **/
-XFontStruct *WBGetWindowFontStruct(Window wID);
+WB_FONTC WBQueryWindowFont(Window wID);
 
 /** \ingroup wcore
-  * \brief Returns the current XFontSet assigned to the window (may be None)
+  * \brief Returns a copy of the current WB_FONT assigned to the window (may be NULL)
   *
-  * \param wID The Window ID from which to obtain the current XFontStruct pointer
-  * \return The assigned XFontSet, or 'None' on error
+  * \param wID The Window ID from which to obtain a copy of the current WB_FONT object
+  * \return A copy of the assigned WB_FONT, or 'NULL' on error.  A non-null return must be free's using WBFreeFont()
   *
   * Header File:  window_helper.h
 **/
-XFontSet WBGetWindowFontSet(Window wID);
+WB_FONT WBGetWindowFont(Window wID);
 
 /** \ingroup wcore
   * \brief Returns the currently assigned foreground color
@@ -1317,10 +1460,9 @@ unsigned long WBGetWindowFGColor(Window wID);
 unsigned long WBGetWindowBGColor(Window wID);
 
 /** \ingroup wcore
-  * \brief returns the currently assigned foreground color for a GC
+  * \brief returns the currently assigned foreground color for a WBGC
   *
-  * \param pDisplay A pointer to the Display
-  * \param gc The GC to be queried
+  * \param gc The WBGC to be queried
   * \returns The currently assigned foreground color
   *
   * If the current foreground color cannot be determined, this function will
@@ -1328,13 +1470,12 @@ unsigned long WBGetWindowBGColor(Window wID);
   *
   * Header File:  window_helper.h
 **/
-unsigned long WBGetGCFGColor(Display *pDisplay, GC gc);
+unsigned long WBGetGCFGColor(WBGC gc);
 
 /** \ingroup wcore
-  * \brief returns the currently assigned background color for a GC
+  * \brief returns the currently assigned background color for a WBGC
   *
-  * \param pDisplay A pointer to the Display
-  * \param gc The GC to be queried
+  * \param gc The WBGC to be queried
   * \returns The currently assigned background color
   *
   * If the current background color cannot be determined, this function will
@@ -1342,7 +1483,7 @@ unsigned long WBGetGCFGColor(Display *pDisplay, GC gc);
   *
   * Header File:  window_helper.h
 **/
-unsigned long WBGetGCBGColor(Display *pDisplay, GC gc);
+unsigned long WBGetGCBGColor(WBGC gc);
 
 /** \ingroup wcore
   * \brief returns a default XStandardColormap structure for the default screen of the specified display
@@ -2448,6 +2589,19 @@ Region WBRectToRegion(const WB_RECT *pRect);
 Region WBGeomToRegion(const WB_GEOM *pGeom);
 
 /** \ingroup expose
+  * \brief Simple utility to copy a region
+  *
+  * \param rgnSource A source region to copy
+  * \return A region that is a union of the source region with itself; i.e. a copy
+  *
+  * This function makes a simple copy of a region by doing a union with itself, returning the result.
+  * The caller must destroy the returned value using XDestroyRegion()
+  *
+  * Header File:  window_helper.h
+**/
+Region WBCopyRegion(Region rgnSource);
+
+/** \ingroup expose
   * \brief 'Paint' helper, generates an asynchronous Expose event for non-empty 'invalid' region
   *
   * Whenever the 'invalid' region is non-empty, you can generate an asynchronous Expose event
@@ -2473,34 +2627,34 @@ void WBUpdateWindow(Window wID);  // posts an expose event for the specified win
 void WBUpdateWindowImmediately(Window wID);  // sends expose event synchronously (can cause recursion)
 
 /** \ingroup expose
-  * \brief 'Paint' helper, creates a GC for use in updating the window in an Expose event handler
+  * \brief 'Paint' helper, creates a WBGC for use in updating the window in an Expose event handler
   *
   * \param wID Window ID associated with the Expose event
   * \param pEvent Pointer to the Expose event that's being processed
   * \param pgRet The returned bounding geometry for the invalid region being 'painted'
-  * \return A GC (graphics context) to be used in handling the Expose event
+  * \return A WBGC (graphics context) to be used in handling the Expose event
   *
-  * When processing Expose events, you should call WBBeginPaint to obtain the GC needed for all
+  * When processing Expose events, you should call WBBeginPaint to obtain the WBGC needed for all
   * of the operations needed to update (paint) the window.\n
   * This function collects all of the relevant invalid regions associated with the window that fall
   * within the 'Expose' event area, and calculates a bounding WB_GEOM rectangle for it.  It also applies
-  * the invalid region as a 'clipping' region for the returned GC.  When you call WBEndPaint(), the
+  * the invalid region as a 'clipping' region for the returned WBGC.  When you call WBEndPaint(), the
   * entire clipping region will be marked 'valid' automatically, so it is important for your 'paint'
   * function to update the entire WB_GEOM rectangle identified by pgRet.  This includes erasing the
   * background as well as drawing whatever is in the foreground.
   *
   * Header File:  window_helper.h
 **/
-GC WBBeginPaint(Window wID, XExposeEvent *pEvent, WB_GEOM *pgRet); // GC has invalid region assigned
+WBGC WBBeginPaint(Window wID, XExposeEvent *pEvent, WB_GEOM *pgRet); // WBGC has invalid region assigned
 
 /** \ingroup expose
-  * \brief 'Paint' helper, creates a GC for use in updating the window for a specified rectangular area
+  * \brief 'Paint' helper, creates a WBGC for use in updating the window for a specified rectangular area
   *
   * \param wID Window ID associated with the Expose event
   * \param pgBounds On entry, the bounding WB_GEOM for which to get a graphics context.  On return, the bounding WB_GEOM for the invalid region being 'painted'
-  * \return A GC (graphics context) to be used in painting the specific rectangular region
+  * \return A WBGC (graphics context) to be used in painting the specific rectangular region
   *
-  * When processing Expose events, you should call WBBeginPaint() to obtain the GC needed for all
+  * When processing Expose events, you should call WBBeginPaint() to obtain the WBGC needed for all
   * of the operations needed to update (paint) the window.\n
   * This particular function is more suited to updating a specific area outside of a normal Expose callback handler.
   * As an example, a frame window would use this to update the tab area or the status bar area, prior to calling the
@@ -2509,33 +2663,38 @@ GC WBBeginPaint(Window wID, XExposeEvent *pEvent, WB_GEOM *pgRet); // GC has inv
   *
   * Header File:  window_helper.h
 **/
-GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds); // GC has invalid region assigned
+WBGC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds); // WBGC has invalid region assigned
 
 /** \ingroup expose
   * \brief 'Paint' helper, frees resources and marks the update region 'valid'
   *
   * \param wID Window ID associated with the Expose event and passed to WBBeginPaint()
-  * \param gc The GC (graphics context) returned by WBBeginPaint()
+  * \param gc The WBGC (graphics context) returned by WBBeginPaint()
   *
   * Call this function, following a call to WBBeginPaint(), once the invalid area of the window
-  * has been properly rendered.  It will free resources and mark the invalid (update) region as 'valid'
+  * has been properly rendered.  It will free resources and mark the invalid (update) region as 'valid'.
+  *
+  * Additionally, if a cached XImage is being used for this window, the display will be updated
+  * using the cached image during the call to this function.
   *
   * Header File:  window_helper.h
+  *
+  * \sa WBBeginPaint() WBAssignWindowImage()
 **/
-void WBEndPaint(Window wID, GC gc);  // frees the 'paint GC' and also resets the invalid region
+void WBEndPaint(Window wID, WBGC gc);  // frees the 'paint WBGC' and also resets the invalid region
 
 /** \ingroup expose
   * \brief 'Paint' helper, erases background by painting the background color within the clipping region
   *
   * \param wID Window ID associated with the Expose event
-  * \param gc The GC (graphics context) returned by WBBeginPaint().
+  * \param gc The WBGC (graphics context) returned by WBBeginPaint().
   *
   * Call this function, following a call to WBBeginPaint(), if you want to erase the
   * background of the window.  Call this in lieu of XClearWindow() or XClearArea()
   *
   * Header File:  window_helper.h
 **/
-void WBClearWindow(Window wID, GC gc);
+void WBClearWindow(Window wID, WBGC gc);
 
 
 // RECT versions (as inline)
@@ -2605,6 +2764,614 @@ static __inline__ void WBValidateRect(Window wID, WB_RECT *pRCT)
 
   WBValidateGeom(wID, &geom);
 }
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//    ____                     _      _               ____               _               _     //
+//   / ___| _ __  __ _  _ __  | |__  (_)  ___  ___   / ___| ___   _ __  | |_  ___ __  __| |_   //
+//  | |  _ | '__|/ _` || '_ \ | '_ \ | | / __|/ __| | |    / _ \ | '_ \ | __|/ _ \\ \/ /| __|  //
+//  | |_| || |  | (_| || |_) || | | || || (__ \__ \ | |___| (_) || | | || |_|  __/ >  < | |_   //
+//   \____||_|   \__,_|| .__/ |_| |_||_| \___||___/  \____|\___/ |_| |_| \__|\___|/_/\_\ \__|  //
+//                     |_|                                                                     //
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+/** \ingroup graphics
+  * \brief Creates a WBGC, wrapper for XCreateGC()
+  *
+  * \param pDisplay A pointer to the Display, or NULL to use the default Display
+  * \param Drawable dw The Drawable for which to create the WBGC
+  * \param valuemask A bitwise mask of values to assign to the new WBGC from 'values'
+  * \param values A pointer to an XGCValues structure describing values to be assigned (may be NULL)
+  * \return A copy of the new WBGC
+  *
+  * Header File:  window_helper.h
+**/
+WBGC WBCreateGC(Display *pDisplay, Drawable dw, unsigned long valuemask,
+                const XGCValues *values);
+
+/** \ingroup graphics
+  * \brief Change a WBGC, a wrapper for XChangeGC()
+  *
+  * \param hGC The WBGC which is to be modified
+  * \param valuemask A bitwise mask of values to assign to the new WBGC from 'values'
+  * \param values A pointer to an XGCValues structure describing values to be assigned (may be NULL)
+  * \return An integer indicating success or fail
+  *
+  * Header File:  window_helper.h
+**/
+int WBChangeGC(WBGC hGC, unsigned long valuemask,
+               const XGCValues *values);
+
+/** \ingroup graphics
+  * \brief Change a WBGC, a wrapper for XGetGCValues()
+  *
+  * \param hGC The WBGC which is to be queried
+  * \param valuemask A bitwise mask of values to assign to the new WBGC from 'values'
+  * \param values A pointer to an XGCValues structure describing values to be assigned (may be NULL)
+  * \returns A Status indicating success or fail
+  *
+  * Header File:  window_helper.h
+**/
+Status WBGetGCValues(WBGC hGC, unsigned long valuemask,
+                     XGCValues *values);
+
+/** \ingroup graphics
+  * \brief return the WB_FONTC object that was assigned to a WBGC
+  *
+  * \param gc The WBGC to be queried
+  * \returns A pointer to a WB_FONTC object, or NULL on error.
+  *
+  * Call this function to determine the font that has been assigned to a WBGC.  If
+  * there has been NO font assigned, the system default font information will be
+  * returned.  A value of NULL is returned on error, or if no font is assigned.
+  *
+  * Header File:  window_helper.h
+**/
+WB_FONTC WBQueryGCFont(WBGC gc);
+
+/** \ingroup graphics
+  * \brief return a copy of the WB_FONT object that was assigned to a WBGC
+  *
+  * \param pDisplay A pointer to the Display
+  * \param gc The WBGC to be queried
+  * \returns A pointer to a WB_FONT object, or NULL on error.  non-NULL values must be freed via WBFreeFont()
+  *
+  * Call this function to determine the font that has been assigned to a WBGC.  If
+  * there has been NO font assigned, the system default font information will be
+  * returned.  The return value is always a new pointer to a WB_FONT, or
+  * NULL on error.  The caller must free non-NULL return values via WBFreeFont().
+  *
+  * Header File:  window_helper.h
+**/
+WB_FONT WBGetGCFont(Display *pDisplay, WBGC gc);
+
+/** \ingroup graphics
+  * \brief makes a copy of a WBGC, a more sensible wrapper for XCopyGC()
+  *
+  * \param hGCOrig The WBGC which is to be copied
+  * \return A copy of the original WBGC
+  *
+  * Header File:  window_helper.h
+**/
+WBGC WBCopyGC(WBGC hGCOrig);
+
+/** \ingroup graphics
+  * \brief makes a copy of a WBGC, a wrapper for XCopyGC()
+  *
+  * \param hGCOrig The WBGC which is to be copied
+  * \param unsigned long valuemask A bitwise mask of values to assign to the new WBGC from the original
+  * \param hGCDest The destination WBGC to copy to
+  * \return An integer indicating success or fail
+  *
+  * Header File:  window_helper.h
+**/
+int WBCopyGC2(WBGC hGCOrig, unsigned long valuemask, WBGC hGCDest);
+
+/** \ingroup graphics
+  * \brief makes a copy of the specified WBGC for the desired 'Drawable'
+  *
+  * \param pDisplay A pointer to the 'Display' for the drawable.  NULL implies the default display.
+  * \param dw The 'Drawable' for which to copy the original WBGC (NULL/None uses the 'default' window)
+  * \param hGCOrig The source 'WBGC'
+  * \return A copy of the WBGC for the specified 'Drawable'
+  *
+  * Makes a copy of the specified WBGC.  Useful if you want to make temporary modifications to a WBGC
+  * for a particular drawing operation, but don't want to actually modify the original WBGC.
+  *
+  * Header File:  window_helper.h
+**/
+WBGC WBCopyDrawableGC(Display *pDisplay, Drawable dw, WBGC hGCOrig);
+
+/** \ingroup graphics
+  * \brief Free resources for a WBGC, wrapper for XFreeGC()
+  *
+  * \param hGC The WBGC which is to be freed
+  *
+  * Header File:  window_helper.h
+**/
+void WBFreeGC(WBGC hGC);
+
+/** \ingroup graphics
+  * \brief Free resources for a WBGC, wrapper for XFreeGC()
+  *
+  * \param hGC The WBGC which is to be freed
+  * \returns a GContext indicating the saved graphics context associated with the WBGC
+  *
+  * Header File:  window_helper.h
+**/
+GContext WBGContextFromGC(WBGC hGC);
+
+/** \ingroup graphics
+  * \brief Assign clipping region, wrapper for XSetRegion()
+  *
+  * \param hGC The WBGC to assign a clipping Region to
+  * \param rgnClip The clipping region to assign to the WBGC
+  * \returns an integer indicating success or fail
+  *
+  * Header File:  window_helper.h
+**/
+int WBSetRegion(WBGC hGC, Region rgnClip);
+
+/** \ingroup graphics
+  * \brief Set clip origin, a wrapper for XSetClipOrigin()
+  *
+  * \param hGC The WBGC to assign a clipping Region to
+  * \param clip_x_origin The 'x' clipping origin
+  * \param clip_y_origin The 'y' clipping origin
+  * \returns an integer indicating success or fail
+  *
+  * Header File:  window_helper.h
+**/
+int WBSetClipOrigin(WBGC hGC, int clip_x_origin, int clip_y_origin);
+
+/** \ingroup graphics
+  * \brief Set clip mask, a wrapper for XSetClipMask()
+  *
+  * \param hGC The WBGC to assign a clipping Region to
+  * \param pixmap A pixmap containing the clipping mask
+  * \returns an integer indicating success or fail
+  *
+  * Header File:  window_helper.h
+**/
+int WBSetClipMask(WBGC hGC, Pixmap pixmap);
+
+/** \ingroup graphics
+  * \brief Set the 'function' for the WBGC, a wrapper for XSetFunction()
+  *
+  * \param hGC The WBGC to assign a clipping Region to
+  * \param function The 'function' for the GC - for more information, see XSetFunction()
+  * \returns an integer indicating success or fail
+  *
+  * Header File:  window_helper.h
+**/
+int WBSetFunction(WBGC hGC, int function);
+
+/** \ingroup graphics
+  * \brief Assign foreground color, a wrapper for XSetForeground()
+  *
+  * \param hGC The WBGC to assign a clipping Region to
+  * \param foreground The foreground color
+  * \returns an integer indicating success or fail
+  *
+  * Header File:  window_helper.h
+**/
+int WBSetForeground(WBGC hGC, unsigned long foreground);
+
+/** \ingroup graphics
+  * \brief Assign background color, a wrapper for XSetForeground()
+  *
+  * \param hGC The WBGC to assign a clipping Region to
+  * \param background The background color
+  * \returns an integer indicating success or fail
+  *
+  * Header File:  window_helper.h
+**/
+int WBSetBackground(WBGC hGC, unsigned long background);
+
+/** \ingroup graphics
+  * \brief Assign font to a WBGC, a wrapper for XSetFont()
+  *
+  * \param hGC The WBGC to assign a clipping Region to
+  * \param pFont The WB_FONTC to assign to the WBGC (makes a copy of it)
+  * \returns an integer indicating success or fail
+  *
+  * Header File:  window_helper.h
+**/
+int WBSetFont(WBGC hGC, WB_FONTC pFont);
+
+/** \ingroup graphics
+  * \brief Assign font to a WBGC, a wrapper for XSetFont()
+  *
+  * \param hGC The WBGC to assign a clipping Region to
+  * \param pFont The WB_FONT to assign to the WBGC directly without copying
+  * \returns an integer indicating success or fail
+  *
+  * The assigned WB_FONT will be stored directly into the WBGC and not copied first.
+  * This means that the WBGC will 'take ownership' of the WB_FONT immediately after making this
+  * call. The caller must ensure that it is safe for the WBGC object to own such a WB_FONT.
+  *
+  * Header File:  window_helper.h
+**/
+int WBSetFontNoCopy(WBGC hGC, WB_FONT pFont);
+
+/** \ingroup graphics
+  * \brief Assign font to a WBGC, a wrapper for XSetLineAttributes()
+  *
+  * \param hGC The WBGC to assign a clipping Region to
+  * \param line_width The line width, in pixels
+  * \param line_style The line style - see XSetLineAttributes()
+  * \param cap_style The cap style - see XSetLineAttributes()
+  * \param join_style The join style - see XSetLineAttributes()
+  * \returns an integer indicating success or fail
+  *
+  * Header File:  window_helper.h
+**/
+int WBSetLineAttributes(WBGC hGC, unsigned int line_width,
+                        int line_style, int cap_style, int join_style);
+
+/** \ingroup graphics
+  * \brief Assign font to a WBGC, a wrapper for XSetFont()
+  *
+  * \param hGC The WBGC to assign a clipping Region to
+  * \param dash_offset The 'dash offset' for creating dashes
+  * \param dash_list An array of 'char' values containing the dash info
+  * \param n The number of entries in 'dash_list'
+  * \returns an integer indicating success or fail
+  *
+  * Header File:  window_helper.h
+**/
+int WBSetDashes(WBGC hGC, int dash_offset, const char dash_list[], int n);
+
+
+
+/////////////////////////////////////////////////////////////////////
+//   ___                               ____           _            //
+//  |_ _|_ __ ___   __ _  __ _  ___   / ___|__ _  ___| |__   ___   //
+//   | || '_ ` _ \ / _` |/ _` |/ _ \ | |   / _` |/ __| '_ \ / _ \  //
+//   | || | | | | | (_| | (_| |  __/ | |__| (_| | (__| | | |  __/  //
+//  |___|_| |_| |_|\__,_|\__, |\___|  \____\__,_|\___|_| |_|\___|  //
+//                       |___/                                     //
+//                                                                 //
+/////////////////////////////////////////////////////////////////////
+
+
+/** \ingroup expose
+  * \brief Obtain an XImage for the entire window
+  *
+  * \param pDisplay The display associated with the specified window
+  * \param wID The window that receives the \ref aWB_TIMER XClientEvent (None == application)
+  * \return A pointer to an XImage, or NULL on error
+  *
+  * Returns the cached XImage for the window.  If none exists, one will be created
+  * and stored within the internal stuctures for the window.  Actual changes to the image
+  * will not be reflected on the display until you call WBUpdateWindowWithImage().
+  *
+  * NOTE:  You should not destroy nor cache the XImage pointer returned by this function.  It is owned by the window's internal structures.
+  *
+  * Whenever graphics operations make use of the cached image, an implicit call to WBUpdateWindowWithImage()
+  * will be made within the call to WBEndPaint().
+  *
+  * Header File:  window_helper.h
+  *
+  * \sa WBBeginPaint() WBEndPaint()
+**/
+XImage *WBGetWindowImage(Display *pDisplay, Window wID);
+
+/** \ingroup expose
+  * \brief Assign an XImage for the entire window
+  *
+  * \param pDisplay The display associated with the specified window
+  * \param wID The window that receives the \ref aWB_TIMER XClientEvent (None == application)
+  * \param pImage The XImage to assign to the window's internal information.  On success, after the function call, this pointer is 'owned' by the window and should not be destroyed.
+  * \returns A value of zero on success.  A non-zero value indicates an error.
+  *
+  * Calling this function assigns a new cached XImage as 'backing store' for the window.  It must be large enough to include the entire window's display area.
+  * On success, the assigned image will replace any existing image.  Assigning a value of 'NULL' deletes any existing cached image.
+  * If an image is too small, the function call will fail, and ownership of the XImage remains as-is.
+  * Your call to this function needs to check for errors so that any resources can be properly cleaned up, as the XImage will not be owned nor destroyed.
+  *
+  * Whenever graphics operations make use of the cached image, an implicit call to WBUpdateWindowWithImage()
+  * will be made within the call to WBEndPaint().
+  *
+  * Header File:  window_helper.h
+  *
+  * \sa WBBeginPaint() WBEndPaint()
+**/
+int WBAssignWindowImage(Display *pDisplay, Window wID, XImage *pImage);
+
+/** \ingroup expose
+  * \brief Copy an XImage into the cached XImage for the entire window
+  *
+  * \param pDisplay The display associated with the specified window
+  * \param wID The window that receives the \ref aWB_TIMER XClientEvent (None == application)
+  * \param pImage The XImage to copy into the cached XImage for the window.  Must be a pointer to a valid XImage. The specified XImage will not be changed, owned, nor destroyed.
+  * \param xSrc The 'x' offset within the source XImage to begin copying from
+  * \param ySrc The 'y' offset within the source XImage to begin copying from
+  * \param width The width within the source XImage to copy from.  a value of '-1' copies as much as possible to the destination image
+  * \param height The height within the source XImage to copy from.  a value of '-1' copies as much as possible to the destination image
+  * \param xDst The 'x' offset within the window's cached XImage to begin copying to
+  * \param yDst The 'y' offset within the window's cached XImage to begin copying to
+  * \returns A value of zero on success.  A non-zero value indicates an error.
+  *
+  * Calling this function copies the specified XImage's data into the cached image of the window.  If the window does not already have a cached
+  * image, one will be created that containing the window's visible display data.
+  * On success, the assigned image will replace that portion of the existing image as specified by the source offset, source size, and destination offset.
+  * Images that are too large to fit into the destination will be limited within the appropriate dimensions, based on the destination image size.
+  *
+  * Whenever graphics operations make use of the cached image, an implicit call to WBUpdateWindowWithImage()
+  * will be made within the call to WBEndPaint().
+  *
+  * Header File:  window_helper.h
+  *
+  * \sa WBBeginPaint() WBEndPaint()
+**/
+int WBCopyIntoWindowImage(Display *pDisplay, Window wID, XImage *pSrcImage,
+                          int xSrc, int ySrc, int width, int height,
+                          int xOffs, int yOffs);
+
+/** \ingroup expose
+  * \brief Update the window's appearance with the contents of the cached XImage
+  *
+  * \param pDisplay The display associated with the specified window
+  * \param wID The window that receives the \ref aWB_TIMER XClientEvent (None == application)
+  *
+  * Calling this function will update the window's display area with the contents of the cached image.
+  * If there is no cached image, this function will have no effect.
+  *
+  * Whenever graphics operations make use of the cached image, an implicit call to WBUpdateWindowWithImage()
+  * will be made within the call to WBEndPaint().
+  *
+  * Header File:  window_helper.h
+  *
+  * \sa WBBeginPaint() WBEndPaint()
+**/
+void WBUpdateWindowWithImage(Display *pDisplay, Window wID);
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+//    ____                     _      _              _   _        _                           //
+//   / ___| _ __  __ _  _ __  | |__  (_)  ___  ___  | | | |  ___ | | _ __    ___  _ __  ___   //
+//  | |  _ | '__|/ _` || '_ \ | '_ \ | | / __|/ __| | |_| | / _ \| || '_ \  / _ \| '__|/ __|  //
+//  | |_| || |  | (_| || |_) || | | || || (__ \__ \ |  _  ||  __/| || |_) ||  __/| |   \__ \  //
+//   \____||_|   \__,_|| .__/ |_| |_||_| \___||___/ |_| |_| \___||_|| .__/  \___||_|   |___/  //
+//                     |_|                                          |_|                       //
+//                                                                                            //
+//  Wrapper functions for X11 'primitive' operations that can use a window's cached XImage    //
+//                                                                                            //
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+/** \ingroup expose
+  * \brief Wrapper for XDrawPoint()
+  *
+  * \param pDisplay The display associated with the specified window
+  * \param d The Drawable (or window) I'm painting.  If a window, this may use the XImage cache
+  * \param gc The Graphics context of the operation
+  * \param x The origin 'x' coordinate of the line
+  * \param y The origin 'y' coordinate of the line
+  * \returns An integer indicating success or failure
+  *
+  * This function draws a point, similar to XDrawPoint(), on the specified Drawable,
+  * with the specified graphics context indicating foreground and background colors.
+  *
+  * Header File:  window_helper.h
+  *
+**/
+
+int WBDrawPoint(Display *display, Drawable d, WBGC gc, int x, int y);
+
+
+/** \ingroup expose
+  * \brief Wrapper for XDrawPoints()
+  *
+  * \param pDisplay The display associated with the specified window
+  * \param d The Drawable (or window) I'm painting.  If a window, this may use the XImage cache
+  * \param gc The Graphics context of the operation
+  * \param points A pointer to an array of XPoint structures describing the line vertices
+  * \param npoints The number of entries in the 'points' array
+  * \param mode A constant indicating the coordinate mode, either CoordModeOrigin or CoordModePrevious - see XDrawLines().
+  * \returns An integer indicating success or failure
+  *
+  * This function draws one or more points, similar to XDrawPoints(), on the specified Drawable,
+  * with the specified graphics context indicating foreground and background colors.
+  *
+  * Header File:  window_helper.h
+  *
+**/
+
+int WBDrawPoints(Display *display, Drawable d, WBGC gc, XPoint *points,
+                 int npoints, int mode);
+
+
+/** \ingroup expose
+  * \brief Wrapper for XDrawLines()
+  *
+  * \param pDisplay The display associated with the specified window
+  * \param d The Drawable (or window) I'm painting.  If a window, this may use the XImage cache
+  * \param gc The Graphics context of the operation
+  * \param x1 The origin 'x' coordinate of the line
+  * \param y1 The origin 'y' coordinate of the line
+  * \param x2 The final 'x' coordinate of the line
+  * \param y2 The final 'y' coordinate of the line
+  * \returns An integer indicating success or failure
+  *
+  * This function draws a line, similar to XDrawLines(), on the specified Drawable,
+  * with the specified graphics context indicating foreground and background colors.
+  *
+  * Header File:  window_helper.h
+  *
+**/
+
+int WBDrawLine(Display *display, Drawable d, WBGC gc,
+               int x1, int y1, int x2, int y2);
+
+
+/** \ingroup expose
+  * \brief Wrapper for XDrawLine()
+  *
+  * \param pDisplay The display associated with the specified window
+  * \param d The Drawable (or window) I'm painting.  If a window, this may use the XImage cache
+  * \param gc The Graphics context of the operation
+  * \param points A pointer to an array of XPoint structures describing the line vertices
+  * \param npoints The number of entries in the 'points' array
+  * \param mode A constant indicating the coordinate mode, either CoordModeOrigin or CoordModePrevious - see XDrawLines().
+  * \returns An integer indicating success or failure
+  *
+  * This function draws one or more lines, similar to XDrawLines(), on the specified Drawable,
+  * with the specified graphics context indicating foreground and background colors.
+  *
+  * Header File:  window_helper.h
+  *
+**/
+
+int WBDrawLines(Display *display, Drawable d, WBGC gc, XPoint *points,
+                int npoints, int mode);
+
+
+/** \ingroup expose
+  * \brief Wrapper for XDrawRectangle()
+  *
+  * \param pDisplay The display associated with the specified window
+  * \param d The Drawable (or window) I'm painting.  If a window, this may use the XImage cache
+  * \param gc The Graphics context of the operation
+  * \param x The origin x of the operation
+  * \param y The origin y of the operation
+  * \param width The width of the rectangle
+  * \param height The height of the rectangle
+  * \returns An integer indicating success or failure
+  *
+  * This function draws a rectangle, similar to XDrawRectangle(), on the specified Drawable,
+  * with the specified graphics context indicating foreground and background colors.
+  *
+  * Header File:  window_helper.h
+  *
+**/
+
+int WBDrawRectangle(Display *display, Drawable d, WBGC gc, int x, int y,
+                    unsigned int width, unsigned int height);
+
+
+/** \ingroup expose
+  * \brief Wrapper for XFillRectangle()
+  *
+  * \param pDisplay The display associated with the specified window
+  * \param d The Drawable (or window) I'm painting.  If a window, this may use the XImage cache
+  * \param gc The Graphics context of the operation
+  * \param x The origin x of the operation
+  * \param y The origin y of the operation
+  * \param width The width of the rectangle
+  * \param height The height of the rectangle
+  * \returns An integer indicating success or failure
+  *
+  * This function draws a filled rectangle, similar to XFillRectangle(), on the specified Drawable,
+  * with the specified graphics context indicating foreground, fill, and background colors.
+  *
+  * Header File:  window_helper.h
+  *
+**/
+
+int WBFillRectangle(Display *display, Drawable d, WBGC gc, int x, int y,
+                    unsigned int width, unsigned int height);
+
+
+/** \ingroup expose
+  * \brief Wrapper for XDrawArc()
+  *
+  * \param pDisplay The display associated with the specified window
+  * \param d The Drawable (or window) I'm painting.  If a window, this may use the XImage cache
+  * \param gc The Graphics context of the operation
+  * \param x The origin x of the operation
+  * \param y The origin y of the operation
+  * \param width The width of the arc's elipse
+  * \param height The height of the arc's elipse
+  * \param angle1 The starting angle of the arc
+  * \param angle2 The ending angle of the arc
+  * \returns An integer indicating success or failure
+  *
+  * This function draws an arc, similar to XDrawArc(), on the specified Drawable,
+  * with the specified graphics context indicating foreground and background colors.
+  *
+  * Header File:  window_helper.h
+  *
+**/
+
+int WBDrawArc(Display *display, Drawable d, WBGC gc, int x, int y,
+              unsigned int width, unsigned int height,
+              int angle1, int angle2);
+
+
+/** \ingroup expose
+  * \brief Wrapper for XFillArc()
+  *
+  * \param pDisplay The display associated with the specified window
+  * \param d The Drawable (or window) I'm painting.  If a window, this may use the XImage cache
+  * \param gc The Graphics context of the operation
+  * \param x The origin x of the operation
+  * \param y The origin y of the operation
+  * \param width The width of the arc's elipse
+  * \param height The height of the arc's elipse
+  * \param angle1 The starting angle of the arc
+  * \param angle2 The ending angle of the arc
+  * \returns An integer indicating success or failure
+  *
+  * This function draws a filled arc, similar to XFillArc(), on the specified Drawable,
+  * with the specified graphics context indicating foreground, fill, and background colors.
+  *
+  * Header File:  window_helper.h
+  *
+**/
+
+int WBFillArc(Display *display, Drawable d, WBGC gc, int x, int y,
+              unsigned int width, unsigned int height,
+              int angle1, int angle2);
+
+
+/** \ingroup expose
+  * \brief Wrapper for XFillPolygon()
+  *
+  * \param pDisplay The display associated with the specified window
+  * \param d The Drawable (or window) I'm painting.  If a window, this may use the XImage cache
+  * \param gc The Graphics context of the operation
+  * \param points A pointer to an array of XPoint structures describing the polygon line vertices
+  * \param npoints The number of entries in the 'points' array
+  * \param shape A constant indicating the general shape, either Convex, Nonconvex, or Complex - see XFillPolygon()
+  * \param mode A constant indicating the coordinate mode, either CoordModeOrigin or CoordModePrevious - see XFillPolygon().
+  * \returns An integer indicating success or failure
+  *
+  * This function draws a filled polygon, similar to XFillPolygon(), on the specified Drawable,
+  * with the specified graphics context indicating foreground, fill, and background colors.
+  *
+  * Header File:  window_helper.h
+  *
+**/
+
+int WBFillPolygon(Display *display, Drawable d, WBGC gc, XPoint *points,
+                  int npoints, int shape, int mode);
+
+
+/** \ingroup expose
+  * \brief wrapper for XDrawString()
+  *
+  * \param pDisplay A pointer to the display to use for rendering the text
+  * \param d The 'Drawable' object upon which to render the text
+  * \param gc The graphics context 'WBGC' for rendering the text
+  * \param x The 'x' coordinate for the text alignment (left)
+  * \param y The 'y' coordinate for the text alignment (bottom)
+  * \param string A const pointer to a UTF-8 or multi-byte string
+  * \param length The BYTE LENGTH of the UTF-8 or mult-byte string (not character length)
+  * \returns An integer indicating success or failure
+  *
+  * Use this function in lieu of XDrawString() to draw text in a platform-independent manner,
+  * using the specified font, upon the specified 'Drawable'.  This function is the equivalent
+  * of the X11 library's XDrawString().  Internally, it calls DTDrawString().
+  *
+  * Header File:  draw_text.h
+**/
+
+int WBDrawString(Display *display, Drawable d, WBGC gc, int x, int y,
+                 const char *string, int length);
 
 
 

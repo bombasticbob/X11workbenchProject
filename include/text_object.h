@@ -13,15 +13,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -39,7 +39,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -302,8 +302,8 @@ struct _text_object_; // forward declaration
     // handling expose events for the text area
 
     void (* do_expose)(const struct _text_object_ *pThis, Display *pDisplay, Window wID,
-                       GC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
-                       XFontSet rFontSet);
+                       WBGC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
+                       WB_FONTC pFont);
 
     void (* cursor_blink)(struct _text_object_ *pThis, int bHasFocus);
 
@@ -328,7 +328,7 @@ typedef struct _text_object_vtable_
   **/
   void (* init)(struct _text_object_ *pThis);
 
-  /** \brief Call this to assign the highlight colors.  Default colors are GC's BG and FG
+  /** \brief Call this to assign the highlight colors.  Default colors are WBGC's BG and FG
     * \param pThis A pointer to the TEXT_OBJECT structure
     * \param clrHFG The XColor for the highlighted foreground
     * \param clrHBG The XColor for the highlighted background
@@ -785,12 +785,12 @@ typedef struct _text_object_vtable_
     * \param gc The graphics context to use when painting
     * \param pPaintGeom A const pointer to a WB_GEOM structure bounding the invalid area (NULL implies ALL)
     * \param pViewGeom A const pointer to a WB_GEOM structure bounding the paintable area within the window (NULL implies entire window)
-    * \param rFontSet An 'XFontSet' to use in lieu of the font assigned to the Window (None if the Window's default font is used)
+    * \param pFont A WB_FONTC to use in lieu of the font assigned to the Window (NULL if the Window's default font is used)
     *
     * Use this function in the Expose event callback for the window in order to properly
     * render the edit text.  Prior to calling this function you will need to assign the
-    * correct foreground color, and background color to the GC.  If 'rFontSet' is None,
-    * then the font must also be already assigned to the GC or to the Window; otherwise, the
+    * correct foreground color, and background color to the WBGC.  If 'pFont' is NULL,
+    * then the font must also be already assigned to the WBGC or to the Window; otherwise, the
     * specified font will be used to render the text.  Note that all fonts will be treate as if
     * they are 'fixed pitch' and so a variable pitch font will be rendered "centered" within the
     * character's position.\n
@@ -811,8 +811,8 @@ typedef struct _text_object_vtable_
     * See Also: WBTextObjectSetColorContextCallback()
   **/
   void (* do_expose)(struct _text_object_ *pThis, Display *pDisplay, Window wID,
-                     GC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
-                     XFontSet rFontSet);
+                     WBGC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
+                     WB_FONTC pFont);
 
   /** \brief Periodic callback to 'blink' the cursor
     * \param pThis A pointer to the TEXT_OBJECT structure

@@ -13,15 +13,14 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -39,7 +38,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -151,6 +150,16 @@ extern "C" {
 #define RGB_FROM_XCOLOR(X,R,G,B) { (R) = (((X).flags) & DoRed) ? ((unsigned int)(X).red) & 0xffff : 0; \
                                    (G) = (((X).flags) & DoGreen) ? ((unsigned int)(X).green) & 0xffff : 0; \
                                    (B) = (((X).flags) & DoBlue) ? ((unsigned int)(X).blue) & 0xffff : 0; }
+
+
+/** \ingroup startup
+  * \brief Frees resources allocated by \ref pixmap
+  *
+  * Call this to free resources allocated by the PXM functions.  Called by \ref WBExit()
+  *
+  * Header File:  pixmap_helper.h
+**/
+void PXM_OnExit(void);
 
 
 /** \ingroup pixmap
@@ -462,16 +471,478 @@ Pixmap PXM_ImageToPixmap0(Display *pDisplay, Drawable dw, XImage *pImage);
 XImage *PXM_PixmapToImage(Display *pDisplay, Pixmap pxImage);
 
 
+///////////////////////////////////////////////////////////////
+//   _                           _                       _   //
+//  | |     ___ __      __      | |     ___ __   __ ___ | |  //
+//  | |    / _ \\ \ /\ / /_____ | |    / _ \\ \ / // _ \| |  //
+//  | |___| (_) |\ V  V /|_____|| |___|  __/ \ V /|  __/| |  //
+//  |_____|\___/  \_/\_/        |_____|\___|  \_/  \___||_|  //
+//                                                           //
+///////////////////////////////////////////////////////////////
 
 
-/** \ingroup startup
-  * \brief Frees resources allocated by \ref pixmap
+/** \ingroup pixmap
+  * \brief Wrapper for XCreatePixmap()
   *
-  * Call this to free resources allocated by the PXM functions.  Called by \ref WBExit()
+  * \param pDisplay The display associated with the specified window
+  * \param dw The Drawable associated with the Pixmap (this defines how to create it)
+  * \param width The width of the arc's elipse
+  * \param height The height of the arc's elipse
+  * \param depth The bit depth of the Pixmap - if 0, uses DefaultDepth(pDisplay, DefaultScreen(pDisplay))
+  * \returns A Pixmap with the appropriate characteristics, or None on error.
+  *
+  * This function wraps XCreatePixmap() on X11 systems, and replicates its behavior elsewhere
+  *
+  * Header File:  pixmap_helper.h
+  *
+**/
+
+Pixmap PXM_CreatePixmap(Display *pDisplay, Drawable dw, unsigned int width,
+                        unsigned int height, unsigned int depth);
+
+/** \ingroup pixmap
+  * \brief Wrapper for XCreatePixmap()
+  *
+  * \param pDisplay The display associated with the specified window
+  * \param pxImage the Pixmap image to free resources for
+  * \returns an integer indicating success or failure
+  *
+  * This function wraps XFreePixmap() on X11 systems, and replicates its behavior elsewhere
+  *
+  * Header File:  pixmap_helper.h
+  *
+**/
+
+int PXM_FreePixmap(Display *pDisplay, Pixmap pxImage);
+
+
+/** \ingroup pixmap
+  * \brief Copy a pixmap for the specified Display and Drawable
+  *
+  * \param pDisplay The display associated with the source and destination Pixmaps
+  * \param dw The Drawable associated with the new Pixmap (this defines how to create it)
+  * \param pxImage the Pixmap image to free resources for
+  * \returns A Pixmap with the appropriate characteristics, or None on error.
+  *
+  * This function implements the functionality of XCreatPixmap() and XCopyArea() and other
+  * operations that are necessary to implement this somewhat common functionality.
+  *
+  * Header File:  pixmap_helper.h
+  *
+**/
+
+Pixmap PXM_CopyPixmap(Display *pDisplay, Drawable dw, Pixmap pxImage);
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////
+//  __  __ _  _   _____        _                     _                      //
+//  \ \/ // |/ | | ____|__  __| |_  ___  _ __   ___ (_)  ___   _ __   ___   //
+//   \  / | || | |  _|  \ \/ /| __|/ _ \| '_ \ / __|| | / _ \ | '_ \ / __|  //
+//   /  \ | || | | |___  >  < | |_|  __/| | | |\__ \| || (_) || | | |\__ \  //
+//  /_/\_\|_||_| |_____|/_/\_\ \__|\___||_| |_||___/|_| \___/ |_| |_||___/  //
+//                                                                          //
+//////////////////////////////////////////////////////////////////////////////
+
+#if defined(X11WORKBENCH_TOOLKIT_HAVE_XSHM_EXTENSION) || defined(__DOXYGEN__)
+
+/** \ingroup pixmap
+  * \brief Indicates whether the 'XShm' extensions are available (libXext)
+  *
+  * \param pDisplay The disply pointer.  NULL uses the default display.
+  * \returns A non-zero value if the extensions are available for the given display; otherwise, zero
+  *
+  * When libXext is being used, this function wraps XShmQueryExtension().  Otherwise, it returns zero.
   *
   * Header File:  pixmap_helper.h
 **/
-void PXM_OnExit(void);
+int WBXShmQueryExtension(Display *pDisplay);
+
+#else // !X11WORKBENCH_TOOLKIT_HAVE_XSHM_EXTENSION
+
+#define WBXShmQueryExtension(X) (0)
+
+#endif // X11WORKBENCH_TOOLKIT_HAVE_XSHM_EXTENSION, __DOXYGEN__
+
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//  __  __ ___                                  ____                                     _     //
+//  \ \/ /|_ _| _ __ ___    __ _   __ _   ___  / ___|  _   _  _ __   _ __    ___   _ __ | |_   //
+//   \  /  | | | '_ ` _ \  / _` | / _` | / _ \ \___ \ | | | || '_ \ | '_ \  / _ \ | '__|| __|  //
+//   /  \  | | | | | | | || (_| || (_| ||  __/  ___) || |_| || |_) || |_) || (_) || |   | |_   //
+//  /_/\_\|___||_| |_| |_| \__,_| \__, | \___| |____/  \__,_|| .__/ | .__/  \___/ |_|    \__|  //
+//                                |___/                      |_|    |_|                        //
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+/** \ingroup pixmap
+  * \brief Write contents of an XImage onto a Drawable
+  *
+  * \param pDisplay The disply pointer.  NULL uses the default display.
+  * \param dw A Drawable upon which to perform the action
+  * \param gc A GC with which to perform the action
+  * \param pImage A pointer to an XImage with which to perform the action
+  * \param src_x The X coordinate within the source image (upper, left corner)
+  * \param src_y The Y coordinate within the source image (upper, left corner)
+  * \param dest_x The X coordinate within the destination Drawable (upper, left corner)
+  * \param dest_y The Y coordinate within the destination Drawable (upper, left corner)
+  * \param width The width of the image data to transfer
+  * \param height The height of the image data to transfer
+  * \returns A non-zero value on failure, zero on success.  See XPutImage() in the X11 API documentation
+  *
+  * When libXext is being used, this function wraps XShmPutImage().  Otherwise, it calls XPutImage().
+  *
+  * Header File:  pixmap_helper.h
+**/
+int WBXPutImage(Display *pDisplay, Drawable dw, WBGC gc, XImage *pImage,
+                int src_x, int src_y, int dest_x, int dest_y,
+                unsigned int width, unsigned int height);
+
+/** \ingroup pixmap
+  * \brief Read contents of a Drawable onto an XImage.
+  *
+  * \param pDisplay The disply pointer.  NULL uses the default display.
+  * \param dw A Drawable upon which to perform the action
+  * \param x The X coordinate within the source Drawable (upper, left corner)
+  * \param y The Y coordinate within the source Drawable (upper, left corner)
+  * \param width The width of the image data to transfer
+  * \param height The height of the image data to transfer
+  * \param plane_mask The 'plane_mask' of the bits to transfer
+  * \param format The format of the image - may be XYBitmap, XYPixmap, or ZPixmap.  XYBitmap is monochrome.  ZPixmap is more efficient than XYPixmap, but requires more memory.
+  * \returns A pointer to a newly created XImage containing the copied image.  See XGetImage() in the X11 API documentation
+  *
+  * When libXext is being used, this function wraps XShmCreateImage() and XShmGetImage().  Otherwise, it calls XGetImage().
+  *
+  * The resulting XImage may use shareable memory.  If it does, the memory is managed using the WBAllocShm()
+  * (and related) functions from the X11workbench Toolkit.  You will need to use WBXDestroyImage to destroy
+  * the XImage returned by this function, rather than XDestroyImage(), to avoid any memory management conflicts.
+  *
+  * Header File:  pixmap_helper.h
+**/
+XImage *WBXGetImage(Display *pDisplay, Drawable dw,
+                    int x, int y, unsigned int width, unsigned int height,
+                    unsigned long plane_mask, int format);
+
+/** \ingroup pixmap
+  * \brief Destroy an XImage - call this instead of XDestroyImage()
+  *
+  * \param pImage A pointer to an XImage that may have been allocated using shared memory.
+  * \return A non-zero value on error, or zero on success
+  *
+  * Use this function in lieu of XDestroyImage() for an image that was returned from one
+  * of the API functions in the X11workbench Toolkit.  In some cases, the XImage may have
+  * been created using shared memory.  This would mean that the shared memory will need
+  * to be free'd up correctly using the WBFreeShm() (and related) utility functions.
+  *
+  * Header File:  pixmap_helper.h
+**/
+int WBXDestroyImage(XImage *pImage);
+
+
+/** \ingroup pixmap
+  * \brief Make a copy of an XImage
+  *
+  * \param pDisplay A pointer to the Display, or NULL to use the default display
+  * \param pImage A pointer to an XImage
+  * \return An XImage that is a copy of the original
+  *
+  * Use this function to make a copy of an XImage via XCreateImage
+  *
+  * Header File:  pixmap_helper.h
+**/
+XImage * WBXCopyImage(Display *pDisplay, XImage *pImage);
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+//  __  __ ___                                   ____                     _      _              //
+//  \ \/ /|_ _| _ __ ___    __ _   __ _   ___   / ___| _ __  __ _  _ __  | |__  (_)  ___  ___   //
+//   \  /  | | | '_ ` _ \  / _` | / _` | / _ \ | |  _ | '__|/ _` || '_ \ | '_ \ | | / __|/ __|  //
+//   /  \  | | | | | | | || (_| || (_| ||  __/ | |_| || |  | (_| || |_) || | | || || (__ \__ \  //
+//  /_/\_\|___||_| |_| |_| \__,_| \__, | \___|  \____||_|   \__,_|| .__/ |_| |_||_| \___||___/  //
+//                                |___/                           |_|                           //
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+/** \ingroup graphics
+  * \brief Create a Region from an XImage
+  *
+  * \param pImage A const pointer to the XImage to create a Region from
+  * \returns A valid Region, or None (on error).  The caller must use XDestroyRegion() with the returned value if it is not 'None', to free resources.
+  *
+  * This function creates a Region from an XImage, assuming that it consists of a union of every 'non-zero' pixel in the XImage.
+  *
+  * Header File:  pixmap_helper.h
+  *
+**/
+Region WBXImageToRegion(const XImage *pImage);
+
+
+/** \ingroup graphics
+  * \brief Create a Region from an XImage
+  *
+  * \param pImage The Region to create an XImage from
+  * \param width The width of the resulting XImage
+  * \param height The height of the resulting XImage
+  * \returns A valid XImage pointer, or NULL (on error).  The caller must use WBXDestroyImage() with the returned value if it is not 'NULL', to free resources.
+  *
+  * This function creates an 'XYPixmap' single-plane XImage that contains a '1' bit for every point that is
+  * You will need to use WBXDestroyImage() to destroy the XImage returned by this function, rather than XDestroyImage(),
+  * to avoid any memory management conflicts.
+  *
+  * Header File:  pixmap_helper.h
+  *
+**/
+XImage * WBXImageFromRegion(Region rgnSource, int width, int height);
+
+
+/** \ingroup graphics
+  * \brief XImage version for XDrawPoint()
+  *
+  * \param pImage A pointer to the XImage to draw to
+  * \param hGC A WBGC that describes the device context (mostly for line width, clipping, etc.)
+  * \param x The origin 'x' coordinate of the line
+  * \param y The origin 'y' coordinate of the line
+  * \returns An integer indicating success or failure
+  *
+  * This function draws a point, similar to XDrawPoint(), on the specified XImage,
+  * with the specified clipping and context.  A point is always a single pixel.
+  *
+  * The XImage should either have a monochrome (single plane) XYPixmap, or 24-bit color ZPixmap format.
+  *
+  * Header File:  pixmap_helper.h
+  *
+**/
+
+int WBXDrawPoint(XImage *pImage, WBGC hGC, int x, int y);
+
+
+/** \ingroup graphics
+  * \brief XImage version for XDrawPoints()
+  *
+  * \param pImage A pointer to the XImage to draw to
+  * \param hGC A WBGC that describes the device context (mostly for line width, clipping, etc.)
+  * \param points A pointer to an array of XPoint structures describing the line vertices
+  * \param npoints The number of entries in the 'points' array
+  * \param mode A constant indicating the coordinate mode, either CoordModeOrigin or CoordModePrevious - see XDrawLines().
+  * \returns An integer indicating success or failure
+  *
+  * This function draws one or more points, similar to XDrawPoints(), on the specified XImage,
+  * with the specified clipping and context.  A point is always a single pixel.
+  *
+  * The XImage should either have a monochrome (single plane) XYPixmap, or 24-bit color ZPixmap format.
+  *
+  * Header File:  pixmap_helper.h
+  *
+**/
+
+int WBXDrawPoints(XImage *pImage, WBGC hGC,
+                  XPoint *points, int npoints, int mode);
+
+
+/** \ingroup graphics
+  * \brief XImage version for XDrawLines()
+  *
+  * \param pImage A pointer to the XImage to draw to
+  * \param hGC A WBGC that describes the device context (mostly for line width, clipping, etc.)
+  * \param x1 The origin 'x' coordinate of the line
+  * \param y1 The origin 'y' coordinate of the line
+  * \param x2 The final 'x' coordinate of the line
+  * \param y2 The final 'y' coordinate of the line
+  * \returns An integer indicating success or failure
+  *
+  * This function draws a line, similar to XDrawLines(), on the specified XImage,
+  * with the specified clipping and context.
+  *
+  * The XImage should either have a monochrome (single plane) XYPixmap, or 24-bit color ZPixmap format.
+  *
+  * Header File:  pixmap_helper.h
+  *
+**/
+
+int WBXDrawLine(XImage *pImage, WBGC hGC,
+                int x1, int y1, int x2, int y2);
+
+
+/** \ingroup graphics
+  * \brief XImage version for XDrawLine()
+  *
+  * \param pImage A pointer to the XImage to draw to
+  * \param hGC A WBGC that describes the device context (mostly for line width, clipping, etc.)
+  * \param points A pointer to an array of XPoint structures describing the line vertices
+  * \param npoints The number of entries in the 'points' array
+  * \param mode A constant indicating the coordinate mode, either CoordModeOrigin or CoordModePrevious - see XDrawLines().
+  * \returns An integer indicating success or failure
+  *
+  * This function draws one or more lines, similar to XDrawLines(), on the specified XImage,
+  * with the specified clipping and context.
+  *
+  * The XImage should either have a monochrome (single plane) XYPixmap, or 24-bit color ZPixmap format.
+  *
+  * Header File:  pixmap_helper.h
+  *
+**/
+
+int WBXDrawLines(XImage *pImage, WBGC hGC,
+                 XPoint *points, int npoints, int mode);
+
+
+/** \ingroup graphics
+  * \brief XImage version for XDrawRectangle()
+  *
+  * \param pImage A pointer to the XImage to draw to
+  * \param hGC A WBGC that describes the device context (mostly for line width, clipping, etc.)
+  * \param x The origin x of the operation
+  * \param y The origin y of the operation
+  * \param width The width of the rectangle
+  * \param height The height of the rectangle
+  * \returns An integer indicating success or failure
+  *
+  * This function draws a rectangle, similar to XDrawRectangle(), on the specified XImage,
+  * with the specified clipping and context.
+  *
+  * The XImage should either have a monochrome (single plane) XYPixmap, or 24-bit color ZPixmap format.
+  *
+  * Header File:  pixmap_helper.h
+  *
+**/
+
+int WBXDrawRectangle(XImage *pImage, WBGC hGC,
+                     int x, int y, unsigned int width, unsigned int height);
+
+
+/** \ingroup graphics
+  * \brief XImage version for XFillRectangle()
+  *
+  * \param pImage A pointer to the XImage to draw to
+  * \param hGC A WBGC that describes the device context (mostly for line width, clipping, etc.)
+  * \param x The origin x of the operation
+  * \param y The origin y of the operation
+  * \param width The width of the rectangle
+  * \param height The height of the rectangle
+  * \returns An integer indicating success or failure
+  *
+  * This function draws a filled rectangle, similar to XFillRectangle(), on the specified XImage,
+  * with the specified clipping and context.
+  *
+  * The XImage should either have a monochrome (single plane) XYPixmap, or 24-bit color ZPixmap format.
+  *
+  * Header File:  pixmap_helper.h
+  *
+**/
+
+int WBXFillRectangle(XImage *pImage, WBGC hGC,
+                     int x, int y, unsigned int width, unsigned int height);
+
+
+/** \ingroup graphics
+  * \brief XImage version for XDrawArc()
+  *
+  * \param pImage A pointer to the XImage to draw to
+  * \param hGC A WBGC that describes the device context (mostly for line width, clipping, etc.)
+  * \param x The origin x of the operation
+  * \param y The origin y of the operation
+  * \param width The width of the arc's elipse
+  * \param height The height of the arc's elipse
+  * \param angle1 The starting angle of the arc
+  * \param angle2 The ending angle of the arc
+  * \returns An integer indicating success or failure
+  *
+  * This function draws an arc, similar to XDrawArc(), on the specified XImage,
+  * with the specified clipping and context.
+  *
+  * The XImage should either have a monochrome (single plane) XYPixmap, or 24-bit color ZPixmap format.
+  *
+  * Header File:  pixmap_helper.h
+  *
+**/
+
+int WBXDrawArc(XImage *pImage, WBGC hGC,
+               int x, int y, unsigned int width, unsigned int height,
+               int angle1, int angle2);
+
+
+/** \ingroup graphics
+  * \brief XImage version for XFillArc()
+  *
+  * \param pImage A pointer to the XImage to draw to
+  * \param hGC A WBGC that describes the device context (mostly for line width, clipping, etc.)
+  * \param x The origin x of the operation
+  * \param y The origin y of the operation
+  * \param width The width of the arc's elipse
+  * \param height The height of the arc's elipse
+  * \param angle1 The starting angle of the arc
+  * \param angle2 The ending angle of the arc
+  * \returns An integer indicating success or failure
+  *
+  * This function draws a filled arc, similar to XFillArc(), on the specified XImage,
+  * with the specified clipping and context.
+  *
+  * The XImage should either have a monochrome (single plane) XYPixmap, or 24-bit color ZPixmap format.
+  *
+  * Header File:  pixmap_helper.h
+  *
+**/
+
+int WBXFillArc(XImage *pImage, WBGC hGC,
+               int x, int y, unsigned int width, unsigned int height,
+               int angle1, int angle2);
+
+
+/** \ingroup graphics
+  * \brief XImage version for XFillPolygon()
+  *
+  * \param pImage A pointer to the XImage to draw to
+  * \param hGC A WBGC that describes the device context (mostly for line width, clipping, etc.)
+  * \param points A pointer to an array of XPoint structures describing the polygon line vertices
+  * \param npoints The number of entries in the 'points' array
+  * \param shape A constant indicating the general shape, either Convex, Nonconvex, or Complex - see XFillPolygon()
+  * \param mode A constant indicating the coordinate mode, either CoordModeOrigin or CoordModePrevious - see XFillPolygon().
+  * \returns An integer indicating success or failure
+  *
+  * This function draws a filled polygon, similar to XFillPolygon(), on the specified XImage,
+  * with the specified clipping and context.
+  *
+  * The XImage should either have a monochrome (single plane) XYPixmap, or 24-bit color ZPixmap format.
+  *
+  * Header File:  pixmap_helper.h
+  *
+**/
+
+int WBXFillPolygon(XImage *pImage, WBGC hGC,
+                   XPoint *points, int npoints, int shape, int mode);
+
+
+/** \ingroup graphics
+  * \brief XImage version for XDrawString() or DTDrawString()
+  *
+  * \param pImage A pointer to the XImage to draw to
+  * \param pFont A WB_FONT to use for rendering text.  May be NULL, in which case a default font set (based on the WBGC) will be used
+  * \param hGC A WBGC that describes the device context (mostly for colors, clipping, etc.)
+  * \param x The 'x' coordinate for the text alignment (left)
+  * \param y The 'y' coordinate for the text alignment (bottom)
+  * \param string A const pointer to a UTF-8 or multi-byte string
+  * \param length The BYTE LENGTH of the UTF-8 or mult-byte string (not character length)
+  * \returns An integer indicating success or failure
+  *
+  * Use this function in lieu of XDrawString() to draw text to an XImage using the specified
+  * font set, graphics context, and clipping, upon the specified 'XImage'.  This function is the equivalent
+  * of the X11 library's XDrawString().  Internally, it is very similar to DTDrawString().
+  *
+  * The XImage should either have a monochrome (single plane) XYPixmap, or 24-bit color ZPixmap format.
+  *
+  * Header File:  pixmap_helper.h
+**/
+
+int WBXDrawString(XImage *pImage, WB_FONT pFont, WBGC hGC,
+                  int x, int y, const char *string, int length);
+
+
+
+
 
 
 //-------------------

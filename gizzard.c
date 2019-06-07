@@ -17,7 +17,7 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
                            all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
@@ -70,11 +70,25 @@
 // TENTATIVE PLANS ON APPLICATION 'Gizzards' (aka 'wizards' in case of trademarks)
 //
 // 1.  tab-MDI and dialog-based applications for X11 Workbench Toolkit
+//
 // 2.  similar to above, using a "foundation class" wrapper (C++)
+//
 // 3.  MDI and dialog-based applications for wxWidgets (C++)
+//
 // 4.  similar for GTK and/or GTK+ (C++)
-// 5.  alternate platform application wizards (such as Arduino)
-// 6.  possible Android application wizards (would require installing Android SDK)
+//
+// 5.  shared lib / DLL projects.
+//     NOTE:  'dlopen' calls _init(), 'dlclose()' calls _fini() in the shared lib.
+//            MS DLLs call DllMain() with DLL_PROCESS_ATTACH or DLL_PROCESS_DETACH
+//            These need to be abstracted by whatever framework I use.
+//     NOTE 2:  MS also calls DllMain() when starting/ending a process or thread
+//              for an already-loaded DLL. See MS docs for the context and
+//              implications of these calls.
+//
+// 6.  alternate platform application wizards (such as Arduino)
+//
+// 7.  possible Android application wizards (would require installing Android SDK)
+//
 //
 // The priority, of course, is to use the X11 Workbench Toolkit.  Once it is able
 // to run under windows, there will be no real need for anything else.  The next

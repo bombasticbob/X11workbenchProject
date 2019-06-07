@@ -13,15 +13,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -39,7 +39,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -265,12 +265,11 @@ static void InternalCheckEWColorsAndAtoms(void)
 }
 
 
-WBEditWindow *WBCreateEditWindow(WBFrameWindow *pOwner, XFontStruct *pFont,
+WBEditWindow *WBCreateEditWindow(WBFrameWindow *pOwner, WB_FONT pFont,
                                  const char *szFocusMenu, const WBFWMenuHandler *pHandlerArray,
                                  int fFlags)
 {
 WBEditWindow *pRval;
-XFontSet rFontSet;
 Display *pDisplay;
 int iRet;
 
@@ -300,15 +299,6 @@ int iRet;
   pRval->szFileName = NULL;  // explicitly do this, though the bzero would've
   pRval->pUserCallback = NULL; // explicitly do this, too
 
-  if(!pFont)
-  {
-    rFontSet = None;//WBGetDefaultFontSet();
-  }
-  else
-  {
-    rFontSet = WBFontSetFromFont(pDisplay, pFont);
-  }
-
   WBInitializeInPlaceTextObject(&(pRval->xTextObject), None);
   pRval->xTextObject.vtable->set_linefeed(&(pRval->xTextObject), LineFeed_DEFAULT);
 
@@ -318,15 +308,9 @@ int iRet;
 
   // create the actual window.
 
-  iRet = FWInitChildFrame(&(pRval->childframe), pOwner, rFontSet, // NOTE:  a copy of rFontSet will be in 'childframe.rFontSet'
+  iRet = FWInitChildFrame(&(pRval->childframe), pOwner, pFont, // NOTE:  a copy of pFont will be in 'childframe.pFont'
                           szFocusMenu, pHandlerArray,
                           FWEditWindowEvent, fFlags);
-
-  if(rFontSet != None)
-  {
-    XFreeFontSet(pDisplay, rFontSet);
-    rFontSet = None;
-  }
 
   if(iRet < 0)
   {
@@ -611,10 +595,9 @@ void WBEditWindowRegisterCallback(WBEditWindow *pEditWindow, WBWinEvent pUserCal
 int FWEditWindowEvent(Window wID, XEvent *pEvent)
 {
 WBEditWindow *pE;
-GC gc;
+WBGC gc;
 WB_GEOM geom;//, geom2;
 Display *pDisplay = WBGetWindowDisplay(wID);
-//XFontSet xFontSet;
 
 
   pE = WBEditWindowFromWindowID(wID);
@@ -635,7 +618,7 @@ Display *pDisplay = WBGetWindowDisplay(wID);
       // TEMPORARY - just erase the background, for now...
       gc = WBBeginPaintGeom(wID, &geom);
 
-      XSetBackground(pDisplay, gc, clrBG.pixel);
+      WBSetBackground(gc, clrBG.pixel);
 
 //      WBGetWindowGeom(wID, &geom2);
 //
@@ -646,25 +629,18 @@ Display *pDisplay = WBGetWindowDisplay(wID);
 //      geom2.height -= 2;
 //
 // NOTE:  for some reason this un-does what happens later in do_expose() ... maybe XSync after?
-//      XSetForeground(pDisplay, gc, clrBG.pixel);
-//      XFillRectangle(pDisplay, wID, gc, geom2.x, geom2.y, geom2.width, geom2.height);
+//      WBSetForeground(gc, clrBG.pixel);
+//      WBFillRectangle(pDisplay, wID, gc, geom2.x, geom2.y, geom2.width, geom2.height);
 
-      XSetForeground(pDisplay, gc, clrFG.pixel);
+      WBSetForeground(gc, clrFG.pixel);
 
       // TODO:  'split' handling - 2 different sections must be painted separately
-
-//      xFontSet = pE->childframe.rFontSet;
 
       CALLBACK_CHECK_NULL(pE->xTextObject.vtable->do_expose)(&(pE->xTextObject), pDisplay, wID, gc,
                                                              &geom, // the GEOM to 'paint to'
                                                              &(pE->childframe.geom),//NULL,//&geom2, // the GEOM bordering the window's viewport (NULL for ALL)
-                                                             pE->childframe.rFontSet);
+                                                             pE->childframe.pFont);
       WBEndPaint(wID, gc);
-
-//      if(xFontSet)
-//      {
-//        XFreeFontSet(pDisplay, xFontSet);
-//      }
 
       return 1; // "handled"
 
@@ -701,9 +677,9 @@ Display *pDisplay = WBGetWindowDisplay(wID);
                                   CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_rows)(&(pE->xTextObject)) : 0,
                                   rctView.left,
                                   CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->get_cols)(&(pE->xTextObject)) : 0,
-                                  WBTextObjectCalculateLineHeight(WBFontSetAscent(pDisplay, pE->childframe.rFontSet),
-                                                                  WBFontSetDescent(pDisplay, pE->childframe.rFontSet)),
-                                  WBFontSetAvgCharWidth(pDisplay, pE->childframe.rFontSet));
+                                  WBTextObjectCalculateLineHeight(WBFontAscent(pE->childframe.pFont),
+                                                                  WBFontDescent(pE->childframe.pFont)),
+                                  WBFontAvgCharWidth(pE->childframe.pFont));
 //                                  pE->childframe.pFont->ascent + pE->childframe.pFont->ascent + EDIT_WINDOW_LINE_SPACING,
       }
       else if(pEvent->xclient.message_type == aWB_TIMER)

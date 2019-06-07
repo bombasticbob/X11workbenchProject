@@ -14,15 +14,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -40,7 +40,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -174,8 +174,8 @@ static void __internal_scroll_vertical(struct _text_object_ *pThis, int nRows);
 static void __internal_scroll_horizontal(struct _text_object_ *pThis, int nCols);
 
 static void __internal_do_expose(struct _text_object_ *pThis, Display *pDisplay, Window wID,
-                                 GC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
-                                 XFontSet rFontSet);
+                                 WBGC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
+                                 WB_FONTC pFont);
 static void __internal_cursor_blink(struct _text_object_ *pThis, int bHasFocus);
 static int __internal_cursor_show(int iBlinkState);
 
@@ -4750,7 +4750,7 @@ TEXT_BUFFER *pBuf;
 
 static void __internal_cursor_top(struct _text_object_ *pThis)
 {
-TEXT_BUFFER *pBuf;
+//TEXT_BUFFER *pBuf;
 
 
   if(!WBIsValidTextObject(pThis))
@@ -4767,7 +4767,7 @@ TEXT_BUFFER *pBuf;
     pThis->iRow = 0;
     pThis->iCol = 0;
 
-    pBuf = (TEXT_BUFFER *)(pThis->pText);
+//    pBuf = (TEXT_BUFFER *)(pThis->pText);
 
     if(pThis->iDragState & DragState_CURSOR)
     {
@@ -5051,17 +5051,18 @@ TEXT_BUFFER *pBuf;
 }
 
 
-static XFontSet __attribute__((noinline)) __internal_verify_get_fontset(Display *pDisplay, XFontSet rFontSet, GC gc)
+#if 0
+static XFontSet __attribute__((noinline)) __internal_verify_get_fontset(Display *pDisplay, XFontSet rFontSet, WBGC gc)
 {
 XFontSet fSet;
 
   if(rFontSet == None) /* NULL? */
   {
-    XFontStruct *pFont = WBGetGCFont(pDisplay, gc);
+    WB_FONT pFont = WBQueryGCFont(pDisplay, gc);
 
     if(!pFont)
     {
-      WB_ERROR_PRINT("%s - ERROR:  WBGetGCFont returns NULL\n", __FUNCTION__);
+      WB_ERROR_PRINT("%s - ERROR:  WBQueryGCFont returns NULL\n", __FUNCTION__);
 
       return None; // bad
     }
@@ -5083,7 +5084,9 @@ XFontSet fSet;
 
   return fSet;
 }
+#endif // 0
 
+#if 0
 int __attribute__((noinline)) __internal_get_fontset_count_and_max_asc_desc(XFontSet fSet, int *pAsc, int *pDesc)
 {
 int nFonts, i1, iAsc, iDesc;
@@ -5121,20 +5124,22 @@ char **ppNames = NULL;
 
   return nFonts;
 }
+#endif // 0
 
 static void __internal_do_expose(struct _text_object_ *pThis, Display *pDisplay, Window wID,
-                                 GC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
-                                 XFontSet rFontSet)
+                                 WBGC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
+                                 WB_FONTC pFont)
 {
 TEXT_BUFFER *pBuf = NULL;
 WB_GEOM geomV, geomP, geomC;
 char *pL = NULL;
 int iXDelta, iYDelta;
-int i1, iLen, iFontHeight, iFontWidth, nFonts, iAsc, iDesc, iX, iY, iPX, iPY;
-XFontSet fSet;
+int i1, iLen, iFontHeight, iFontWidth, iAsc, iDesc, iX, iY, iPX, iPY;
+//int nFonts;
+//XFontSet fSet;
 Pixmap pxTemp;
 unsigned long clrFG, clrBG, clrHFG, clrHBG;
-GC gc2 = None;
+WBGC gc2 = None;
 WB_RECT rctSel; // the NORMALIZED selection rectangle (calculated)
 int nEntries, iAutoScrollWidth, iWindowHeightInLines;
 
@@ -5183,31 +5188,52 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
     memcpy(&geomP, &geomV, sizeof(geomP));
   }
 
-  fSet = __internal_verify_get_fontset(pDisplay, rFontSet, gc);
-  // NOTE:  at this point I must use 'fSet' to do all of the font metrics + drawing
+//  fSet = __internal_verify_get_fontset(pDisplay, rFontSet, gc);
+//  // NOTE:  at this point I must use 'fSet' to do all of the font metrics + drawing
+//
+//
+//  // NOTE:  to find the floor of the font, I'll need to determine max iAsc and iDesc
+//  //        this next function call tells me how many fonts I have, and determines the
+//  //        max ascent and descent and stores that in iAsc and iDesc
+//  nFonts = __internal_get_fontset_count_and_max_asc_desc(fSet, &iAsc, &iDesc);
 
+  iAsc = 0;
+  iDesc = 0;
 
-  // NOTE:  to find the floor of the font, I'll need to determine max iAsc and iDesc
-  //        this next function call tells me how many fonts I have, and determines the
-  //        max ascent and descent and stores that in iAsc and iDesc
-  nFonts = __internal_get_fontset_count_and_max_asc_desc(fSet, &iAsc, &iDesc);
-
-
-  // TODO:  XFontStruct::direction indicates LTR RTL TTB or BTT for painting - for now _ONLY_ LTR_TTB will apply
-
-  if(nFonts <= 0) // no fonts?
+  if(!pFont)
   {
-    WB_ERROR_PRINT("%s - ERROR:  XFontsOfFontSet returns %d\n", __FUNCTION__, nFonts);
+    // TODO:  optimize this with cached information so it goes faster, and have
+    //        some 'font query' APIs for the GC as well
+
+    pFont = WBQueryGCFont(gc); // TODO:  optimize this
+
+    if(!pFont)
+    {
+      pFont = WBGetDefaultFont();
+    }
+  }
+
+  if(pFont)
+  {
+    iAsc  = WBFontAscent(pFont);
+    iDesc  = WBFontDescent(pFont);
+  }
+  else
+  {
+    WB_ERROR_PRINT("%s - ERROR:  no fonts!\n", __FUNCTION__);
 
     goto the_end;
   }
 
+  // TODO:  XFontStruct::direction indicates LTR RTL TTB or BTT for painting - for now _ONLY_ LTR_TTB will apply
+
+
   // NOW get the font width for a space (TODO:  average char width instead?)
-  iFontWidth = WBTextWidth(fSet, " ", 1); // WB_TEXT_ESCAPEMENT(fSet, " ", 1);
+  iFontWidth = WBTextWidth(pFont, " ", 1); // WB_TEXT_ESCAPEMENT(fSet, " ", 1);
 
   // get FG/BG color information
-  clrFG = WBGetGCFGColor(pDisplay, gc);
-  clrBG = WBGetGCBGColor(pDisplay, gc);
+  clrFG = WBGetGCFGColor(gc);
+  clrBG = WBGetGCBGColor(gc);
 
   // TODO:  compare clrHFG and clrHBG to a "NULL" XColor?
   if(!(pThis->clrHFG.flags & (DoRed | DoGreen | DoBlue)) && //!memcmp(&pThis->clrHFG, &pThis->clrHBG, sizeof(XColor)))
@@ -5222,16 +5248,15 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
     clrHFG = pThis->clrHFG.pixel;
   }
 
-  // make a copy of the GC since I'm probably going to mess with it
+  // make a copy of the WBGC since I'm probably going to mess with it
 
-  gc2 = XCreateGC(pDisplay, wID, 0, NULL);
+  gc2 = WBCreateGC(pDisplay, wID, 0, NULL);
 
   if(gc2 != None)
   {
-    // NOTE:  old docs were wrong for XCopyGC, new docs and header correct - see WBBeginPaint()
-    if(!XCopyGC(pDisplay, gc, GCAll, gc2))
+    if(!WBCopyGC2(gc, GCAll, gc2))
     {
-      XFreeGC(pDisplay, gc2);
+      WBFreeGC(gc2);
       gc2 = None;
     }
   }
@@ -5477,26 +5502,26 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
     iYDelta = geomV.y - MIN_BORDER_SPACING;
 
     // sometimes the clipping origin, when filling the background, might matter, especially if patterns are involved
-    XSetClipOrigin(pDisplay, gc2, -iXDelta, -iYDelta);  // so that it matches the display's clipping in gc
+    WBSetClipOrigin(gc2, -iXDelta, -iYDelta);  // so that it matches the display's clipping in gc
 
-    XSetForeground(pDisplay, gc2, clrBG);
-    XFillRectangle(pDisplay, pxTemp, gc2, 0, 0, iPX, iPY);
+    WBSetForeground(gc2, clrBG);
+    WBFillRectangle(pDisplay, pxTemp, gc2, 0, 0, iPX, iPY);
 
-    XSetForeground(pDisplay, gc2, clrFG);
+    WBSetForeground(gc2, clrFG);
   }
   else // FALLBACK, if no pixmap, go to window directly
   {
     iXDelta = 0;
     iYDelta = 0; // make sure, as they're used in a few places
 
-    XSetForeground(pDisplay, gc, clrBG);
-    XFillRectangle(pDisplay, wID, gc,
-                   pThis->rctWinView.left,
-                   pThis->rctWinView.top,
-                   pThis->rctWinView.right - pThis->rctWinView.left,
-                   pThis->rctWinView.bottom - pThis->rctWinView.top);
+    WBSetForeground(gc, clrBG);
+    WBFillRectangle(pDisplay, wID, gc,
+                    pThis->rctWinView.left,
+                    pThis->rctWinView.top,
+                    pThis->rctWinView.right - pThis->rctWinView.left,
+                    pThis->rctWinView.bottom - pThis->rctWinView.top);
 
-    XSetForeground(pDisplay, gc, clrFG);
+    WBSetForeground(gc, clrFG);
   }
 
 //  WB_ERROR_PRINT("TEMPORARY:  %s line %d - iXDelta is %d, iYDelta is %d\n", __FUNCTION__, __LINE__, iXDelta, iYDelta);
@@ -5558,27 +5583,27 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
         //        and the clip origin was also assigned for gc2
 //          XSetClipOrigin(pDisplay, gc2, -iXDelta, -iYDelta);  // so that it matches the display's clipping in gc
 
-        XSetForeground(pDisplay, gc2, clrHBG); // highlight background color
+        WBSetForeground(gc2, clrHBG); // highlight background color
 
-        XFillRectangle(pDisplay, pxTemp, gc2,
-                       pThis->rctHighLight.left - iXDelta,
-                       pThis->rctHighLight.top - iYDelta,
-                       pThis->rctHighLight.right - pThis->rctHighLight.left,
-                       pThis->rctHighLight.bottom - pThis->rctHighLight.top);
+        WBFillRectangle(pDisplay, pxTemp, gc2,
+                        pThis->rctHighLight.left - iXDelta,
+                        pThis->rctHighLight.top - iYDelta,
+                        pThis->rctHighLight.right - pThis->rctHighLight.left,
+                        pThis->rctHighLight.bottom - pThis->rctHighLight.top);
 
-        XSetForeground(pDisplay, gc2, clrFG);
+        WBSetForeground(gc2, clrFG);
       }
       else // FALLBACK, if no pixmap, go to window directly
       {
-        XSetForeground(pDisplay, gc, clrHBG); // highlight background color
+        WBSetForeground(gc, clrHBG); // highlight background color
 
-        XFillRectangle(pDisplay, wID, gc,
-                       pThis->rctHighLight.left,
-                       pThis->rctHighLight.top,
-                       pThis->rctHighLight.right - pThis->rctHighLight.left,
-                       pThis->rctHighLight.bottom - pThis->rctHighLight.top);
+        WBFillRectangle(pDisplay, wID, gc,
+                        pThis->rctHighLight.left,
+                        pThis->rctHighLight.top,
+                        pThis->rctHighLight.right - pThis->rctHighLight.left,
+                        pThis->rctHighLight.bottom - pThis->rctHighLight.top);
 
-        XSetForeground(pDisplay, gc, clrFG);
+        WBSetForeground(gc, clrFG);
       }
     }
 
@@ -5631,18 +5656,18 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
         {
           if(WBRectOverlapped(rctCursor, pThis->rctHighLight))
           {
-            XSetForeground(pDisplay, gc2 != None ? gc2 : gc, clrHFG);
-            XSetBackground(pDisplay, gc2 != None ? gc2 : gc, clrHBG);
+            WBSetForeground(gc2 != None ? gc2 : gc, clrHFG);
+            WBSetBackground(gc2 != None ? gc2 : gc, clrHBG);
           }
           else
           {
-            XSetForeground(pDisplay, gc2 != None ? gc2 : gc, clrFG);
-            XSetBackground(pDisplay, gc2 != None ? gc2 : gc, clrBG);
+            WBSetForeground(gc2 != None ? gc2 : gc, clrFG);
+            WBSetBackground(gc2 != None ? gc2 : gc, clrBG);
           }
 
-          XDrawLine(pDisplay, pxTemp != None ? pxTemp : wID,
-                    gc2 != None ? gc2 : gc,
-                    rctCursor.left, rctCursor.top, rctCursor.right, rctCursor.bottom);
+          WBDrawLine(pDisplay, pxTemp != None ? pxTemp : wID,
+                     gc2 != None ? gc2 : gc,
+                     rctCursor.left, rctCursor.top, rctCursor.right, rctCursor.bottom);
         }
       }
 
@@ -5653,13 +5678,13 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
 
       if(WBRectOverlapped(rctChar, pThis->rctHighLight))
       {
-        XSetForeground(pDisplay, gc2 != None ? gc2 : gc, clrHFG);
-        XSetBackground(pDisplay, gc2 != None ? gc2 : gc, clrHBG);
+        WBSetForeground(gc2 != None ? gc2 : gc, clrHFG);
+        WBSetBackground(gc2 != None ? gc2 : gc, clrHBG);
       }
       else
       {
-        XSetForeground(pDisplay, gc2 != None ? gc2 : gc, clrFG);
-        XSetBackground(pDisplay, gc2 != None ? gc2 : gc, clrBG);
+        WBSetForeground(gc2 != None ? gc2 : gc, clrFG);
+        WBSetBackground(gc2 != None ? gc2 : gc, clrBG);
       }
 
       // for NOW, draw one character at a time. But make sure it's within
@@ -5679,7 +5704,7 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
 
           if(p1 && iLen2 > 0)
           {
-            DTDrawString(pDisplay, pxTemp ? pxTemp : wID, fSet,
+            DTDrawString(pDisplay, pxTemp ? pxTemp : wID, pFont,
                          gc2 != None ? gc2 : gc,
                          iX - iXDelta, iY - iYDelta, p1, iLen2);
           }
@@ -5785,31 +5810,31 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
 
             if(pxTemp != None)
             {
-              XSetForeground(pDisplay, gc2, clrHBG); // highlight background color
-              XSetBackground(pDisplay, gc2, clrHBG);
+              WBSetForeground(gc2, clrHBG); // highlight background color
+              WBSetBackground(gc2, clrHBG);
 
-              XFillRectangle(pDisplay, pxTemp, gc2,
-                             iX - iXDelta, iY0 - iYDelta,
-                             iFontWidth, iFontHeight);
+              WBFillRectangle(pDisplay, pxTemp, gc2,
+                              iX - iXDelta, iY0 - iYDelta,
+                              iFontWidth, iFontHeight);
 
-              XSetForeground(pDisplay, gc2, clrHFG);
+              WBSetForeground(gc2, clrHFG);
             }
             else // FALLBACK, if no pixmap, go to window directly
             {
-              XSetForeground(pDisplay, gc, clrHBG); // highlight background color
-              XSetBackground(pDisplay, gc, clrHBG);
+              WBSetForeground(gc, clrHBG); // highlight background color
+              WBSetBackground(gc, clrHBG);
 
-              XFillRectangle(pDisplay, wID, gc,
-                             iX, iY0,
-                             iFontWidth, iFontHeight);
+              WBFillRectangle(pDisplay, wID, gc,
+                              iX, iY0,
+                              iFontWidth, iFontHeight);
 
-              XSetForeground(pDisplay, gc, clrHFG);
+              WBSetForeground(gc, clrHFG);
             }
           }
           else // non-highlighted character
           {
-            XSetForeground(pDisplay, gc2 != None ? gc2 : gc, clrFG);
-            XSetBackground(pDisplay, gc2 != None ? gc2 : gc, clrBG);
+            WBSetForeground(gc2 != None ? gc2 : gc, clrFG);
+            WBSetBackground(gc2 != None ? gc2 : gc, clrBG);
           }
 
 
@@ -5856,9 +5881,9 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
 
             if(__internal_cursor_show(pThis->iBlinkState)) // do I draw the cursor?
             {
-              XDrawLine(pDisplay, pxTemp != None ? pxTemp : wID,
-                        gc2 != None ? gc2 : gc,
-                        rctCursor.left, rctCursor.top, rctCursor.right, rctCursor.bottom);
+              WBDrawLine(pDisplay, pxTemp != None ? pxTemp : wID,
+                         gc2 != None ? gc2 : gc,
+                         rctCursor.left, rctCursor.top, rctCursor.right, rctCursor.bottom);
             }
 
 //              WB_ERROR_PRINT("TEMPORARY:  %s - cursor x,y = %d,%d\n", __FUNCTION__, pThis->iCursorX, pThis->iCursorY);
@@ -5872,7 +5897,7 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
 
           if(p1 && iLen2 > 0)
           {
-            DTDrawString(pDisplay, pxTemp ? pxTemp : wID, fSet,
+            DTDrawString(pDisplay, pxTemp ? pxTemp : wID, pFont,
                          gc2 != None ? gc2 : gc,
                          iX - iXDelta, iY - iYDelta, p1, iLen2);
           }
@@ -5889,36 +5914,36 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
 
           if(pxTemp != None)
           {
-            XSetForeground(pDisplay, gc2, clrHBG); // highlight background color
-            XSetBackground(pDisplay, gc2, clrHBG);
+            WBSetForeground(gc2, clrHBG); // highlight background color
+            WBSetBackground(gc2, clrHBG);
 
-            XFillRectangle(pDisplay, pxTemp, gc2,
-                           iX - iXDelta, iY0 - iYDelta,
-                           geomV.width, iFontHeight);  // entire line
+            WBFillRectangle(pDisplay, pxTemp, gc2,
+                            iX - iXDelta, iY0 - iYDelta,
+                            geomV.width, iFontHeight);  // entire line
 
-            XSetForeground(pDisplay, gc2, clrHFG);
+            WBSetForeground(gc2, clrHFG);
           }
           else // FALLBACK, if no pixmap, go to window directly
           {
-            XSetForeground(pDisplay, gc, clrHBG); // highlight background color
-            XSetBackground(pDisplay, gc, clrHBG);
+            WBSetForeground(gc, clrHBG); // highlight background color
+            WBSetBackground(gc, clrHBG);
 
-            XFillRectangle(pDisplay, wID, gc,
-                           iX, iY0,
-                           geomV.width, iFontHeight);  // entire line
+            WBFillRectangle(pDisplay, wID, gc,
+                            iX, iY0,
+                            geomV.width, iFontHeight);  // entire line
 
-            XSetForeground(pDisplay, gc, clrHFG);
+            WBSetForeground(gc, clrHFG);
           }
         }
         else
         {
-          XSetForeground(pDisplay, gc2 != None ? gc2 : gc, clrFG);
-          XSetBackground(pDisplay, gc2 != None ? gc2 : gc, clrBG);
+          WBSetForeground(gc2 != None ? gc2 : gc, clrFG);
+          WBSetBackground(gc2 != None ? gc2 : gc, clrBG);
         }
 
         if(p1 && p1 && p2 > p1)
         {
-          DTDrawString(pDisplay, pxTemp ? pxTemp : wID, fSet,
+          DTDrawString(pDisplay, pxTemp ? pxTemp : wID, pFont,
                        gc2 != None ? gc2 : gc,
                        iX - iXDelta, iY - iYDelta,
                        p1, p2 - p1);
@@ -5973,7 +5998,7 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
 
     if(iH0 > 0 && iW0 > 0)
     {
-      XCopyArea(pDisplay, pxTemp, wID, gc, // this time use GC to do the copy
+      XCopyArea(pDisplay, pxTemp, wID, gc->gc, // this time use GC to do the copy
                 iX0, iY0, iW0, iH0, iX, iY);
     }
 
@@ -5987,12 +6012,7 @@ the_end:
 
   if(gc2 != None)
   {
-    XFreeGC(pDisplay, gc2);
-  }
-
-  if(rFontSet == None) // that is, I created one
-  {
-    XFreeFontSet(pDisplay, fSet);
+    WBFreeGC(gc2);
   }
 }
 

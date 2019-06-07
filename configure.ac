@@ -43,6 +43,7 @@ ifdef([XORG_WITH_DOXYGEN],
 # --enable-noopt (default is optimization enabled)
 # --enable-libXpm (default is NOT to link to libXpm)
 # --enable-libXft (default is to link to libXft)
+# --enable-libXext (default is to link to libXext)
 # --enable-fatalwarn (default is warnings NOT fatal)
 
 
@@ -81,6 +82,15 @@ AC_ARG_ENABLE(libXft,
                *) AC_MSG_ERROR(bad value ${enableval} for --enable-libXft) ;;
                esac],
               [libXft=true])
+
+AC_ARG_ENABLE(libXext,
+              [  --disable-libXext       CUSTOM - do NOT use libXext extensions (such as the shared memory extension)],
+              [case "${enableval}" in
+               yes)  libXext=true ;;
+               no)   libXext=false ; AC_MSG_WARN([NOT linking with libXext]) ;;
+               *) AC_MSG_ERROR(bad value ${enableval} for --enable-libXext) ;;
+               esac],
+              [libXext=true])
 
 AC_ARG_ENABLE(fatalwarn,
               [  --enable-fatalwarn      CUSTOM - cause warnings to be treated as errors],
@@ -191,7 +201,9 @@ ifdef([AC_CHECK_FT2],
 
   if test x$libXft = xtrue ; then
     my_save_CFLAGS="$CFLAGS"
+    my_save_CPPFLAGS="$CPPFLAGS"
     CFLAGS="$CFLAGS $FT2_CFLAGS"
+    CPPFLAGS="$CPPFLAGS $FT2_CFLAGS"
     AC_CHECK_HEADER([X11/Xft/Xft.h],test_have_xft=true,
     [
       AC_MSG_WARN([***************************************************************************])
@@ -200,8 +212,48 @@ ifdef([AC_CHECK_FT2],
       AC_MSG_WARN([***************************************************************************])
     ])
     CFLAGS="$my_save_CFLAGS"
+    CPPFLAGS="$my_save_CPPFLAGS"
   fi
 ],[AC_MSG_WARN([Freetype M4 macros not installed - do you need the developer package?])])
+
+test_have_xext=false
+if test x$libXext = xtrue ; then
+  my_save_LDFLAGS="$LDFLAGS"
+  LDFLAGS="$LDFLAGS -L$ac_x_libraries"
+  AC_CHECK_LIB(Xext, XShmQueryExtension,
+  [
+    test_have_xext=true
+    LDFLAGS="$LDFLAGS -lX11 -lXext"
+    AC_CHECK_HEADER([X11/extensions/XShm.h],
+    [
+      AC_CHECK_FUNCS([XShmQueryExtension],
+      [
+        AC_DEFINE(X11WORKBENCH_TOOLKIT_HAVE_XSHM_EXTENSION,[1],[whether or not libXext and XShm extensions are available] )
+      ],
+      [
+        AC_MSG_WARN([Unable to properly link with libXext for XShmQueryExtension test - are the lib dependencies ok?])
+      ])
+    ],
+    [
+      AC_MSG_WARN([***************************************************************************])
+      AC_MSG_WARN([missing XShm.h - will not be building the toolkit with libXext.  You should])
+      AC_MSG_WARN([                 consider installing the developer libXext package])
+      AC_MSG_WARN([***************************************************************************])
+    ],
+    [
+      #include "X11/Xlib.h"
+      #include "sys/ipc.h"
+      #include "sys/shm.h"
+    ])
+  ],
+  [
+    AC_MSG_WARN([***************************************************************************])
+    AC_MSG_WARN([missing libXext - you should consider installing it])
+    AC_MSG_WARN([***************************************************************************])
+  ])
+  LDFLAGS="$my_save_LDFLAGS"
+fi
+
 
 
 # check for a few functions that I want to verify exist
@@ -214,12 +266,13 @@ AC_CHECK_FUNCS([nanosleep])
 AC_CHECK_LIB(rt, clock_gettime,
 [
   test_need_lrt=true
-  my_save_LDLAGS="$LDFLAGS"
+  my_save_LDFLAGS="$LDFLAGS"
   LDFLAGS="$LDLAGS -lrt"
   AC_CHECK_FUNCS([clock_gettime])
-  LDFLAGS="$my_save_LDLAGS"
+  LDFLAGS="$my_save_LDFLAGS"
 ],
 [
+  # doing it this way is simpler
   AC_CHECK_FUNCS([clock_gettime])
 ])
 
@@ -233,6 +286,7 @@ AC_CHECK_LIB(dl, dlopen,
   LDFLAGS="$my_save_LDLAGS"
 ],
 [
+  # doing it this way is simpler
   AC_CHECK_FUNCS([dlopen])
 ])
 
@@ -383,7 +437,7 @@ AC_LANG_PUSH([C])
     }]] )],
     [
       AC_MSG_RESULT([yes!!! (supported)])
-      AC_DEFINE([HAVE_LONGLONG],[1],[ HAVE_LONGLONG is defined whenever 'long long' is supported ])
+      AC_DEFINE([HAVE_LONGLONG],[1],[ defined whenever 'long long' is supported ])
     ],
     [
       AC_MSG_RESULT([no (not supported)])
@@ -423,6 +477,11 @@ if test x$test_have_xft = xtrue ; then
   LIBS="$LIBS $FT2_LIBS"
 fi
 
+if test x$test_have_xext = xtrue ; then
+  AC_DEFINE([X11WORKBENCH_TOOLKIT_HAVE_XEXT],[1],[whether or not libXext should be used])
+fi
+
+
 
 # optional things for cygwin vs the rest of the world
 case $host in
@@ -449,6 +508,9 @@ AM_CONDITIONAL(HAVE_XPM_LIB, test x$test_have_xpm = xtrue )
 # XFT library - use libXft for certain rendering operations when available
 AM_CONDITIONAL(HAVE_XFT_LIB, test x$test_have_xft = xtrue )
 
+# XExt library - use libXext for things like XShm API functions
+AM_CONDITIONAL(HAVE_XEXT_LIB, test x$test_have_xext = xtrue)
+
 # additional library linkages
 AM_CONDITIONAL(NEED_LRT, test x$test_need_lrt = xtrue)
 AM_CONDITIONAL(NEED_LDL, test x$test_need_ldl = xtrue)
@@ -465,6 +527,7 @@ AC_SUBST([IS_CYGWIN])
 AC_SUBST([NOT_CYGWIN])
 AC_SUBST([HAVE_XPM_LIB])
 AC_SUBST([HAVE_XFT_LIB])
+AC_SUBST([HAVE_XEXT_LIB])
 
 AC_SUBST([CFLAGS])
 AC_SUBST([CPPFLAGS])

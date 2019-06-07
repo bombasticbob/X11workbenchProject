@@ -14,15 +14,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -40,7 +40,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -222,8 +222,8 @@ typedef struct __DT_WORDS__
   *
   * \param pDisplay A pointer to the display to use for rendering the text
   * \param drawable The 'Drawable' object upon which to render the text
-  * \param fontSet The Font Set for which to query metrics
-  * \param gc The graphics context 'GC' for rendering the text
+  * \param pFont The WB_FONTC for which to query metrics
+  * \param gc The graphics context 'WBGC' for rendering the text
   * \param x The 'x' coordinate for the text alignment (left)
   * \param y The 'y' coordinate for the text alignment (bottom)
   * \param pString A const pointer to a UTF-8 or multi-byte string
@@ -237,14 +237,14 @@ typedef struct __DT_WORDS__
   *
   * Header File:  draw_text.h
 **/
-void DTDrawString(Display *pDisplay, Drawable drawable, XFontSet fontSet,
-                  GC gc, int x, int y, const char *pString, int nLength);
+void DTDrawString(Display *pDisplay, Drawable drawable, WB_FONTC pFont,
+                  WBGC gc, int x, int y, const char *pString, int nLength);
 
 
 /** \ingroup draw_text
   * \brief XTextWidth equivalent for MBCS and UTF-8 strings
   *
-  * \param fontSet The Font Set for which to query metrics
+  * \param pFont The WB_FONTC for which to query metrics
   * \param szUTF8 A const pointer to a UTF-8 string
   * \param nLength The BYTE LENGTH of the UTF-8 string (not character length)
   * \returns the text width, in pixels
@@ -255,12 +255,12 @@ void DTDrawString(Display *pDisplay, Drawable drawable, XFontSet fontSet,
   *
   * Header File:  draw_text.h
 **/
-int DTGetTextWidth(XFontSet fontSet, const char *szUTF8, int nLength);
+int DTGetTextWidth(WB_FONTC pFont, const char *szUTF8, int nLength);
 
 /** \ingroup draw_text
   * \brief XTextExtent equivalent for MBCS and UTF-8 strings
   *
-  * \param fontSet The Font Set for which to query metrics
+  * \param pFont The WB_FONTC for which to query metrics
   * \param szUTF8 A const pointer to a UTF-8 string
   * \param nLength The BYTE LENGTH of the UTF-8 string (not character length)
   * \param pExtent A pointer to a WB_EXTENT structure that receives the text extent
@@ -271,29 +271,29 @@ int DTGetTextWidth(XFontSet fontSet, const char *szUTF8, int nLength);
   *
   * Header File:  draw_text.h
 **/
-void DTGetTextExtent(XFontSet fontSet, const char *szUTF8, int nLength, WB_EXTENT *pExtent);
+void DTGetTextExtent(WB_FONTC pFont, const char *szUTF8, int nLength, WB_EXTENT *pExtent);
 
 
-/** \ingroup draw_text
-  * \brief Calculate the ideal font based on the text and rectangle
-  *
-  * \param pRefFont A pointer to an XFontStruct (NULL implies system default font)
-  * \param szText A pointer to a (0-byte terminated) ASCII string that may span multiple lines
-  * \param geomBounds A pointer to a \ref WB_GEOM structure that defines a bounding rectangle
-  *
-  * sometimes you want to adjust text size to fit within a particular rectangle.  This function
-  * determines how to do that by adjusting the font size.
-  *
-  * Header File:  draw_text.h
-**/
-XFontStruct *DTCalcIdealFont(XFontStruct *pRefFont, const char *szText, WB_GEOM *geomBounds);
+///** \ingroup draw_text
+//  * \brief Calculate the ideal font based on the text and rectangle
+//  *
+//  * \param pRefFont A pointer to an XFontStruct (NULL implies system default font)
+//  * \param szText A pointer to a (0-byte terminated) ASCII string that may span multiple lines
+//  * \param geomBounds A pointer to a \ref WB_GEOM structure that defines a bounding rectangle
+//  *
+//  * sometimes you want to adjust text size to fit within a particular rectangle.  This function
+//  * determines how to do that by adjusting the font size.
+//  *
+//  * Header File:  draw_text.h
+//**/
+//XFontStruct *DTCalcIdealFont(XFontStruct *pRefFont, const char *szText, WB_GEOM *geomBounds);
 
 
 /** \ingroup draw_text
   * \brief Calculate the ideal font based on the text and rectangle
   *
   * \param pDisplay A pointer to the Display associated with the font set
-  * \param fontSet The referense XFontSet (None implies system default font set)
+  * \param pFont The reference WB_FONTC (NULL implies system default font set)
   * \param szText A pointer to a (0-byte terminated) ASCII string that may span multiple lines
   * \param geomBounds A pointer to a \ref WB_GEOM structure that defines a bounding rectangle
   *
@@ -302,7 +302,7 @@ XFontStruct *DTCalcIdealFont(XFontStruct *pRefFont, const char *szText, WB_GEOM 
   *
   * Header File:  draw_text.h
 **/
-XFontSet DTCalcIdealFontSet(Display *pDisplay, XFontSet fontSet, const char *szText, WB_GEOM *geomBounds);
+WB_FONT DTCalcIdealFont(Display *pDisplay, WB_FONTC pFont, const char *szText, WB_GEOM *geomBounds);
 
 
 /** \ingroup draw_text
@@ -336,8 +336,8 @@ int DTCalcIdealBounds0(XFontStruct *pFont, const char *szText, int iTabWidth, un
 /** \ingroup draw_text
   * \brief Calculate the ideal bounding rectangle for the specified text and font
   *
-  * \param pDisplay The Display associated with the XFontSet (NULL implies default display)
-  * \param fontSet An XFontSet for which to measure the bounding rectangle (None implies system default font set)
+  * \param pDisplay The Display associated with the WB_FONTC (NULL implies default display)
+  * \param pFont A WB_FONTC for which to measure the bounding rectangle (NULL implies system default font set)
   * \param szText A pointer to a (0-byte terminated) ASCII string that may span multiple lines
   * \param iTabWidth A positive integer in 'characters', or negative integer in pixels, indicating tab width
   * \param iTabOrigin An unsigned integer indicating the tab origin, using the same units as iTabWidth, corresponding to the first character.
@@ -359,15 +359,15 @@ int DTCalcIdealBounds0(XFontStruct *pFont, const char *szText, int iTabWidth, un
   *
   * Header File:  draw_text.h
 **/
-int DTCalcIdealBounds(Display *pDisplay, XFontSet fontSet, const char *szText, int iTabWidth, unsigned int iTabOrigin,
+int DTCalcIdealBounds(Display *pDisplay, WB_FONTC pFont, const char *szText, int iTabWidth, unsigned int iTabOrigin,
                       const WB_RECT *prcSource, WB_RECT *prcDest, int iAlignment);
 
 /** \ingroup draw_text
   * \brief draw single-line text
   *
-  * \param pFont A pointer to the font to use for drawing text (NULL implies system default font)
+  * \param pFont A WB_FONTC to use for drawing text (NULL implies system default font set)
   * \param szText A pointer to a (0-byte terminated) ASCII string that may span multiple lines
-  * \param pDisplay the display associated with the GC and Drawable.
+  * \param pDisplay the display associated with the WBGC and Drawable.
   * \param gc The graphics context for the Drawable
   * \param dw The Drawable (Window or Pixmap, typically)
   * \param iTabWidth The width of a tab, negative for pixels, positive for avg char width
@@ -376,7 +376,7 @@ int DTCalcIdealBounds(Display *pDisplay, XFontSet fontSet, const char *szText, i
   * \param iAlignment The desired text alignment, one or more of the DTAlignment bit flags
   *
   * This function draws single-line text within the specified bounds rectangle on the specified
-  * drawable using the specified GC, adjusting for tab width and text alignment.\n
+  * drawable using the specified WBGC, adjusting for tab width and text alignment.\n
   * If the text cannot fit within the bounding rectangle, it will be truncated.\n
   * If you want the text to wrap, use DTDrawMultiLineText()
   *
@@ -384,40 +384,15 @@ int DTCalcIdealBounds(Display *pDisplay, XFontSet fontSet, const char *szText, i
   *
   * Header File:  draw_text.h
 **/
-void DTDrawSingleLineText0(XFontStruct *pFont, const char *szText, Display *pDisplay, GC gc, Drawable dw,
-                           int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment);
-
-/** \ingroup draw_text
-  * \brief draw single-line text
-  *
-  * \param fontSet An XFontSet to use for drawing text (None implies system default font set)
-  * \param szText A pointer to a (0-byte terminated) ASCII string that may span multiple lines
-  * \param pDisplay the display associated with the GC and Drawable.
-  * \param gc The graphics context for the Drawable
-  * \param dw The Drawable (Window or Pixmap, typically)
-  * \param iTabWidth The width of a tab, negative for pixels, positive for avg char width
-  * \param iTabOrigin The 'origin point' for tabulation corresponding to the first character in the string
-  * \param prcBounds A pointer to the bounding rectangle
-  * \param iAlignment The desired text alignment, one or more of the DTAlignment bit flags
-  *
-  * This function draws single-line text within the specified bounds rectangle on the specified
-  * drawable using the specified GC, adjusting for tab width and text alignment.\n
-  * If the text cannot fit within the bounding rectangle, it will be truncated.\n
-  * If you want the text to wrap, use DTDrawMultiLineText()
-  *
-  * NOTE:  tabs begin at the 'left most' text position, adjusted by 'iTabOrigin'.
-  *
-  * Header File:  draw_text.h
-**/
-void DTDrawSingleLineText(XFontSet fontSet, const char *szText, Display *pDisplay, GC gc, Drawable dw,
+void DTDrawSingleLineText(WB_FONTC pFontt, const char *szText, Display *pDisplay, WBGC gc, Drawable dw,
                           int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment);
 
 /** \ingroup draw_text
   * \brief draw multi-line text
   *
-  * \param pFont A pointer to the font to use for drawing text (NULL implies system default font)
+  * \param pFont A WB_FONTC to use for drawing text (NULL implies system default font set)
   * \param szText A pointer to a (0-byte terminated) ASCII string that may span multiple lines
-  * \param pDisplay the display associated with the GC and Drawable.
+  * \param pDisplay the display associated with the WBGC and Drawable.
   * \param gc The graphics context for the drawable
   * \param dw The Drawable (Window or Pixmap, typically)
   * \param iTabWidth The width of a tab, negative for pixels, positive for avg char width
@@ -426,43 +401,21 @@ void DTDrawSingleLineText(XFontSet fontSet, const char *szText, Display *pDispla
   * \param iAlignment The desired text alignment, one or more of the DTAlignment bit flags
   *
   * This function draws multi-line text within the specified bounds rectangle on the specified
-  * drawable using the specified GC, adjusting for tab width and text alignment.
+  * drawable using the specified WBGC, adjusting for tab width and text alignment.
   *
   * NOTE:  tabs begin at the 'left most' position, adjusted by 'iTabOrigin'.
   *
   * Header File:  draw_text.h
 **/
-void DTDrawMultiLineText0(XFontStruct *pFont, const char *szText, Display *pDisplay, GC gc, Drawable dw,
-                          int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment);
-
-/** \ingroup draw_text
-  * \brief draw multi-line text
-  *
-  * \param fontSet An XFontSet to use for drawing text (None implies system default font set)
-  * \param szText A pointer to a (0-byte terminated) ASCII string that may span multiple lines
-  * \param pDisplay the display associated with the GC and Drawable.
-  * \param gc The graphics context for the drawable
-  * \param dw The Drawable (Window or Pixmap, typically)
-  * \param iTabWidth The width of a tab, negative for pixels, positive for avg char width
-  * \param iTabOrigin The 'origin point' for tabulation corresponding to the first character in the string
-  * \param prcBounds A pointer to the bounding rectangle
-  * \param iAlignment The desired text alignment, one or more of the DTAlignment bit flags
-  *
-  * This function draws multi-line text within the specified bounds rectangle on the specified
-  * drawable using the specified GC, adjusting for tab width and text alignment.
-  *
-  * NOTE:  tabs begin at the 'left most' position, adjusted by 'iTabOrigin'.
-  *
-  * Header File:  draw_text.h
-**/
-void DTDrawMultiLineText(XFontSet fontSet, const char *szText, Display *pDisplay, GC gc, Drawable dw,
+void DTDrawMultiLineText(WB_FONTC pFont, const char *szText, Display *pDisplay, WBGC gc, Drawable dw,
                          int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment);
 
 
 /** \ingroup draw_text
   * \brief Parse 'DT_WORDS' structure from single-line or multi-line text
   *
-  * \param pFont A pointer to an XFontStruct to be used, or NULL for the system default font
+  * \param pDisplay A pointer to the display associated with the WB_FONTC
+  * \param pFont The WB_FONTC to be used, or NULL for the system default font set
   * \param szText A 0-byte terminated UFT8 string containing the text to be rendered
   * \param iAlignment Alignment flags (typically zero).  The only flag that really matters is DTAlignment_UNDERSCORE
   * \return A 'WBAlloc'd pointer to a DT_WORDS structure (variable length).  use 'WBFree()' to de-allocate
@@ -475,32 +428,13 @@ void DTDrawMultiLineText(XFontSet fontSet, const char *szText, Display *pDisplay
   *
   * Header File:  draw_text.h
 **/
-DT_WORDS * DTGetWordsFromText0(XFontStruct *pFont, const char *szText, int iAlignment);
-
-/** \ingroup draw_text
-  * \brief Parse 'DT_WORDS' structure from single-line or multi-line text
-  *
-  * \param pDisplay A pointer to the display associated with the XFontSet
-  * \param fontSet The XFontSet to be used, or None for the system default font set
-  * \param szText A 0-byte terminated UFT8 string containing the text to be rendered
-  * \param iAlignment Alignment flags (typically zero).  The only flag that really matters is DTAlignment_UNDERSCORE
-  * \return A 'WBAlloc'd pointer to a DT_WORDS structure (variable length).  use 'WBFree()' to de-allocate
-  * the memory block.
-  *
-  * The 'DT_WORDS' structure is intended to be used to cache rendering information, particularly for
-  * a large block of text that may be calculation-expensive to re-render.  Call 'DTPreRender()' and
-  * 'DTRender()' to manage rendering with the DT_WORDS structure.
-  *
-  *
-  * Header File:  draw_text.h
-**/
-DT_WORDS * DTGetWordsFromText(Display *pDisplay, XFontSet fontSet, const char *szText, int iAlignment);
+DT_WORDS * DTGetWordsFromText(Display *pDisplay, WB_FONTC pFont, const char *szText, int iAlignment);
 
 /** \ingroup draw_text
   * \brief Pre-render a 'DT_WORDS' structure for subsequent display
   *
   * \param pDisplay the display that you intend to render on with DTRender().  NULL uses the default display.
-  * \param fontSet An XFontSet to use for drawing text (None implies system default font set)
+  * \param pFont A WB_FONTC to use for drawing text (NULL implies system default font set)
   * \param pWords A pointer to the DT_WORDS structure.  This structure can be part of a linked list.
   * \param iTabWidth A positive integer in 'characters', or negative integer in pixels, indicating tab width
   * \param iTabOrigin An unsigned integer indicating the tab origin, using the same units as iTabWidth, corresponding to the first character.
@@ -521,14 +455,14 @@ DT_WORDS * DTGetWordsFromText(Display *pDisplay, XFontSet fontSet, const char *s
   *
   * Header File:  draw_text.h
 **/
-void DTPreRender(Display *pDisplay, XFontSet fontSet, DT_WORDS *pWords, int iTabWidth, int iTabOrigin,
+void DTPreRender(Display *pDisplay, WB_FONTC pFont, DT_WORDS *pWords, int iTabWidth, int iTabOrigin,
                  WB_RECT *prcBounds, int iAlignment, int iStartLine, int iEndLine);
 
 /** \ingroup draw_text
   * \brief Using pre-rendered 'DT_WORDS' structure, display
   *
-  * \param pDisplay the display associated with the GC and Drawable.
-  * \param fontSet An XFontSet to use for drawing text (None implies system default font set)
+  * \param pDisplay the display associated with the WBGC and Drawable.
+  * \param pFont A WB_FONTC to use for drawing text (NULL implies system default font set)
   * \param pWords A pointer to the DT_WORDS structure.  This structure can be part of a linked list.
   * \param gc The graphics context for the Drawable
   * \param dw The Drawable (Window or Pixmap, typically)
@@ -543,7 +477,7 @@ void DTPreRender(Display *pDisplay, XFontSet fontSet, DT_WORDS *pWords, int iTab
   *
   * Header File:  draw_text.h
 **/
-void DTRender(Display *pDisplay, XFontSet fontSet, const DT_WORDS *pWords, GC gc, Drawable dw,
+void DTRender(Display *pDisplay, WB_FONTC pFont, const DT_WORDS *pWords, WBGC gc, Drawable dw,
               int iHScrollBy, int iVScrollBy, const WB_RECT *prcBounds, const WB_RECT *prcViewport, int iAlignment);
 
 #ifdef __cplusplus

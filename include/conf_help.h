@@ -13,15 +13,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -39,7 +39,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -101,8 +101,21 @@ extern "C" {
 #endif // __FreeBSD__, others
 #endif // GLOBAL_XPATH
 
-#define LOCAL_PATH  "~/"
-#define LOCAL_CONF_NAME "settings" /* local conf name will be ~/.appname/settings.conf, or if that is not possible, ~/appname.conf */
+
+///////////////////////////////////////////////////////////////////////////
+// LOCAL_PATH definition - this has changed a bit
+//                         the new standard for config files is:
+//
+//                         ~/.config/application/whatever
+//                         ~/.local/share/application/whatever
+//
+//                         the old standard was ~/.application/whatever
+//
+#define LOCAL_PATH  "~/.local/share/"  /* the normal path for application-local files - was '~/' */
+#define CONFIG_PATH  "~/.config/"      /* alternate path for config files */
+//#define LOCAL_PATH  "~/"
+#define LOCAL_CONF_NAME "settings"
+/* local conf name will be ~/.local/share/appname/settings.conf, or if that is not possible, ~/appname.conf */
 
 #define CH_OPEN_TIMEOUT 5000 /* wait up to 5000 milliseconds before timing out */
 

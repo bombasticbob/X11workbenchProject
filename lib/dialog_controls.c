@@ -15,15 +15,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -41,7 +41,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -87,7 +87,7 @@
 #define DEFAULT_BUTTON_TAB_WIDTH 4 /* for drawing button text */
 
 
-static void FileListControlDisplayProc(WBDialogControl *pList, void *pData, int iSelected, GC gc, WB_GEOM *pGeom, XFontSet fontSet);
+static void FileListControlDisplayProc(WBDialogControl *pList, void *pData, int iSelected, WBGC gc, WB_GEOM *pGeom, WB_FONTC pFont);
 
 
 
@@ -940,7 +940,7 @@ BEGIN_CREATE_CONTROL(EDIT_CONTROL);
 //                 pDialogControl->clrHFG.pixel,pDialogControl->clrHBG.pixel,
 //                 pDialogControl->clrAFG.pixel,pDialogControl->clrABG.pixel);
 
-  // assign highlight colors to text object (other colors obtained from the GC)
+  // assign highlight colors to text object (other colors obtained from the WBGC)
   pPrivate->xTextObject.vtable->highlight_colors(&(pPrivate->xTextObject), pDialogControl->clrHFG, pDialogControl->clrHBG);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 1, // border width is 1
@@ -991,7 +991,7 @@ IMPLEMENT_CREATE_CONTROL(PUSHBUTTON_CONTROL)
 {
 BEGIN_CREATE_CONTROL(PUSHBUTTON_CONTROL);
 
-XFontSet fsBold;
+WB_FONT pBold;
 
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
@@ -1028,12 +1028,14 @@ XFontSet fsBold;
 
   // assign BOLD font to this one... (TODO:  query owner dialog box? get fonts from that?)
 
-  fsBold = WBCopyModifyFontSet(pDisplay, WBGetDefaultFontSet(pDisplay),
-                               0, WBFontFlag_WT_BOLD); // BOLD version
+  pBold = WBCopyModifyFont(pDisplay, WBGetDefaultFont(),
+                            0, WBFontFlag_WT_BOLD); // BOLD version
 
-  if(fsBold != None)
+  if(pBold != None)
   {
-    WBSetWindowFontSet(pDialogControl->wID, fsBold);
+    WBSetWindowFont(pDialogControl->wID, pBold);
+    WBFreeFont(pDisplay, pBold); // since the window now owns a copy of it
+    pBold = NULL; // so I don't re-use it
   }
 
   // now allow certain kinds of input messages (I should be able to handle messages at this point)
@@ -1055,7 +1057,7 @@ IMPLEMENT_CREATE_CONTROL(DEFPUSHBUTTON_CONTROL)
 {
 BEGIN_CREATE_CONTROL(DEFPUSHBUTTON_CONTROL);
 
-XFontSet fsBold;
+WB_FONT pBold;
 
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
@@ -1093,12 +1095,14 @@ XFontSet fsBold;
 
   // assign BOLD font to this one... (TODO:  query owner dialog box? get fonts from that?)
 
-  fsBold = WBCopyModifyFontSet(pDisplay, WBGetDefaultFontSet(pDisplay),
-                               0, WBFontFlag_WT_BOLD); // BOLD version
+  pBold = WBCopyModifyFont(pDisplay, WBGetDefaultFont(),
+                            0, WBFontFlag_WT_BOLD); // BOLD version
 
-  if(fsBold != None)
+  if(pBold != None)
   {
-    WBSetWindowFontSet(pDialogControl->wID, fsBold);
+    WBSetWindowFont(pDialogControl->wID, pBold);
+    WBFreeFont(pDisplay, pBold); // since the window now owns a copy of it
+    pBold = NULL; // so I don't re-use it
   }
 
   // now allow certain kinds of input messages (I should be able to handle messages at this point)
@@ -1120,7 +1124,7 @@ IMPLEMENT_CREATE_CONTROL(CANCELBUTTON_CONTROL)
 {
 BEGIN_CREATE_CONTROL(CANCELBUTTON_CONTROL);
 
-XFontSet fsBold;
+WB_FONT pBold;
 
 
   Display *pDisplay = dialog_control_get_display(pDialogControl);
@@ -1157,12 +1161,14 @@ XFontSet fsBold;
 
   // assign BOLD font to this one... (TODO:  query owner dialog box? get fonts from that?)
 
-  fsBold = WBCopyModifyFontSet(pDisplay, WBGetDefaultFontSet(pDisplay),
-                               0, WBFontFlag_WT_BOLD); // BOLD version
+  pBold = WBCopyModifyFont(pDisplay, WBGetDefaultFont(),
+                            0, WBFontFlag_WT_BOLD); // BOLD version
 
-  if(fsBold != None)
+  if(pBold != None)
   {
-    WBSetWindowFontSet(pDialogControl->wID, fsBold);
+    WBSetWindowFont(pDialogControl->wID, pBold);
+    WBFreeFont(pDisplay, pBold); // since the window now owns a copy of it
+    pBold = NULL; // so I don't re-use it
   }
 
   // now allow certain kinds of input messages (I should be able to handle messages at this point)
@@ -1474,7 +1480,7 @@ BEGIN_CREATE_CONTROL(LIST_CONTROL);
     return NULL;
   }
 
-  ((WBListControl *)pDialogControl)->fsBold = None; // make sure
+  ((WBListControl *)pDialogControl)->pBold = NULL; // make sure
 
 
   // now allow certain kinds of input messages (I should be able to handle messages at this point)
@@ -1661,7 +1667,7 @@ BEGIN_CREATE_CONTROL(TREE_CONTROL);
     return NULL;
   }
 
-  ((WBTreeControl *)pDialogControl)->fsBold = None;
+  ((WBTreeControl *)pDialogControl)->pBold = NULL;
 
   // now allow certain kinds of input messages (I should be able to handle messages at this point)
   XSelectInput(pDisplay, pDialogControl->wID,
@@ -2628,6 +2634,55 @@ static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 static int ListDoCharEvent(XClientMessageEvent *pEvent, Display *pDisplay,
                            Window wID, WBDialogControl *pSelf);
 
+static int ListGetItemIndexFromXY(LISTINFO *pListInfo, int iX, int iY)
+{
+int i1;
+
+  if(!pListInfo || pListInfo->nItemHeight <= 0)
+  {
+    return -1;
+  }
+
+  i1 = (iY - pListInfo->geomDisplay.y) / pListInfo->nItemHeight; // item number within list 'display area'
+
+  if(i1 >= 0 && i1 <= pListInfo->nHeight)
+  {
+    i1 += pListInfo->nTop;  // actual index
+
+    if(i1 >= pListInfo->nItems)
+    {
+      i1 = pListInfo->nItems - 1;
+    }
+  }
+  else
+  {
+    i1 = -1;  // as a flag
+  }
+
+  return i1;
+}
+
+static void ListInvalidateItemRect(Window wID, LISTINFO *pListInfo, int iIndex)
+{
+WB_GEOM geomItem;
+
+  if(!pListInfo || pListInfo->nItemHeight <= 0)
+  {
+    WBInvalidateGeom(wID, NULL, 0);
+    return;
+  }
+
+  if(iIndex >= pListInfo->nTop && iIndex <= pListInfo->nTop + pListInfo->nHeight)
+  {
+    geomItem.x = pListInfo->geomDisplay.x /* + 1 */;
+    geomItem.width = pListInfo->geomDisplay.width /* - 2 */;
+    geomItem.y = pListInfo->geomDisplay.y + pListInfo->nItemHeight * (iIndex - pListInfo->nTop);
+    geomItem.height = pListInfo->nItemHeight;
+
+    WBInvalidateGeom(wID, &geomItem, 0);
+  }
+}
+
 static int list_callback(Window wID, XEvent *pEvent)
 {
   int i1, iRval = 0;
@@ -2659,12 +2714,12 @@ static int list_callback(Window wID, XEvent *pEvent)
     WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
                    "%s - DestroyNotify\n", __FUNCTION__);
 
-    if(((WBListControl *)pDialogControl)->fsBold == None)
+    if(((WBListControl *)pDialogControl)->pBold)
     {
       // free up the allocated font set, if there is one
-      XFreeFontSet(pDisplay, ((WBListControl *)pDialogControl)->fsBold);
+      WBFreeFont(pDisplay, ((WBListControl *)pDialogControl)->pBold);
 
-      ((WBListControl *)pDialogControl)->fsBold = None;
+      ((WBListControl *)pDialogControl)->pBold = NULL;
     }
 
     WBSetWindowData(wID, 0, NULL);
@@ -2698,121 +2753,6 @@ static int list_callback(Window wID, XEvent *pEvent)
     return i1;
   }
 
-#if 0
-  if(pEvent->type == KeyPress)
-  {
-#ifndef NO_DEBUG
-    int iACS = 0, iKey = WBKeyEventProcessKey((XKeyEvent *)pEvent, tbuf, &nChar, &iACS);
-    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
-                   "%s KEY PRESS for KEY %d KEYCODE %d\n", __FUNCTION__, iKey, ((XKeyEvent *)pEvent)->keycode);
-
-    // TODO: extended select modifier keys, toggles, 'auto-complete' select, etc.
-
-#endif // NO_DEBUG
-    iRval = 1;  // handled
-  }
-  else if(pEvent->type == KeyRelease)
-  {
-    // KeyRelease
-
-    int iACS = 0, iKey = WBKeyEventProcessKey((XKeyEvent *)pEvent, tbuf, &nChar, &iACS);
-
-    if(nChar > 0)
-    {
-      WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
-                     "%s KEY RELEASE for KEY %d KEYCODE %d  MASK=%d (%xH)\n",
-                     __FUNCTION__, iKey, ((XKeyEvent *)pEvent)->keycode,
-                     ((XKeyEvent *)pEvent)->state, ((XKeyEvent *)pEvent)->state);
-
-//      if(iKey == 8) // backspace
-//      {
-//        // TODO:  delete char before cursor or highlighted text
-//        // for now just delete the LAST character
-//
-//        int iLen = strlen(pDialogControl->pCaption);
-//        if(iLen > 0)
-//        {
-//          pDialogControl->pCaption[iLen - 1] = 0;
-//        }
-//
-//        WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
-//                       "%s - BACKSPACE key pressed\n", __FUNCTION__);
-//      }
-//      else
-//      {
-//        // TODO:  insert or concatenate?  for now concatenate
-//        WBCatString(&(pDialogControl->pCaption), tbuf);
-//      }
-//
-//      aNotification = aTEXT_CHANGED;
-//      WBInvalidateGeom(wID, NULL, 1);
-    }
-    else
-    {
-      if(iACS & WB_KEYEVENT_KEYSYM)
-      {
-        // TODO:  international, 'dead' and other KEYSYM key assignments
-#define KEYSYM_MATCH_CURSOR_NAME(X) (iKey == XK_##X || iKey == XK_KP_##X)
-        if(KEYSYM_MATCH_CURSOR_NAME(Home))
-        {
-          WB_DEBUG_PRINT(KEYSYM_DEBUG_FLAG | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
-                         "%s - Home key pressed\n", __FUNCTION__);
-        }
-        else if(KEYSYM_MATCH_CURSOR_NAME(End))
-        {
-          WB_DEBUG_PRINT(KEYSYM_DEBUG_FLAG | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
-                         "%s - End key pressed\n", __FUNCTION__);
-        }
-        else if(KEYSYM_MATCH_CURSOR_NAME(Left)) // if HSCROLL enabled
-        {
-          WB_DEBUG_PRINT(KEYSYM_DEBUG_FLAG | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
-                         "%s - Left key pressed\n", __FUNCTION__);
-        }
-        else if(KEYSYM_MATCH_CURSOR_NAME(Right)) // if HSCROLL enabled
-        {
-          WB_DEBUG_PRINT(KEYSYM_DEBUG_FLAG | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
-                         "%s - Right key pressed\n", __FUNCTION__);
-        }
-        else if(KEYSYM_MATCH_CURSOR_NAME(Up))
-        {
-          WB_DEBUG_PRINT(KEYSYM_DEBUG_FLAG | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
-                         "%s - Up key pressed\n", __FUNCTION__);
-        }
-        else if(KEYSYM_MATCH_CURSOR_NAME(Down))
-        {
-          WB_DEBUG_PRINT(KEYSYM_DEBUG_FLAG | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
-                         "%s - Down key pressed\n", __FUNCTION__);
-        }
-        else if(KEYSYM_MATCH_CURSOR_NAME(Page_Up))
-        {
-          WB_DEBUG_PRINT(KEYSYM_DEBUG_FLAG | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
-                         "%s - Page Up key pressed\n", __FUNCTION__);
-        }
-        else if(KEYSYM_MATCH_CURSOR_NAME(Page_Down))
-        {
-          WB_DEBUG_PRINT(KEYSYM_DEBUG_FLAG | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
-                         "%s - Page Down key pressed\n", __FUNCTION__);
-        }
-        else if(KEYSYM_MATCH_CURSOR_NAME(Begin)) // beginning of current line
-        {
-          WB_DEBUG_PRINT(KEYSYM_DEBUG_FLAG | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
-                         "%s - Beginning Of Line key pressed\n", __FUNCTION__);
-        }
-#undef KEYSYM_MATCH_CURSOR_NAME
-        else
-        {
-          // is it a cursor key?  let's find out
-          WB_DEBUG_PRINT(KEYSYM_DEBUG_FLAG | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
-                         "%s - CURSOR KEY? %d (%08xH)  %d (%08xH)\n",
-                         __FUNCTION__, iKey, iKey, iACS, iACS);
-        }
-      }
-    }
-
-    iRval = 1;
-  }
-#endif // 0
-
   // processing notifications sent to me
 
   if(pEvent->type == ClientMessage &&
@@ -2834,10 +2774,10 @@ static int list_callback(Window wID, XEvent *pEvent)
 
     if(iRval > 0)
     {
-// POOBAH
       DLGNotifyOwner(pDialogControl, aCONTROL_NOTIFY, aLIST_NOTIFY,
                      pDialogControl->pDlgControlEntry->iID,
                      WB_LIST_SELCHANGE, pListInfo->nPos, 0); // synchronous notification
+
       return 1; // "handled"
     }
 
@@ -2876,6 +2816,9 @@ static int list_callback(Window wID, XEvent *pEvent)
         // use information about the list to determine where I clicked (which selected item or not)
         // TODO:  encapsulate item selection via message post
 
+        i1 = ListGetItemIndexFromXY(pListInfo, iX, iY);
+
+#if 0
         if(pListInfo && pListInfo->nItemHeight > 0)
         {
           i1 = (iY - 1) / pListInfo->nItemHeight; // item number within list 'display area'
@@ -2915,6 +2858,39 @@ static int list_callback(Window wID, XEvent *pEvent)
                            WB_LIST_SELCHANGE, pListInfo->nPos, 0); // synchronous notification
           }
         }
+#endif // 0
+
+        if(pListInfo && i1 >= 0 && i1 != pListInfo->nPos)
+        {
+          // set new selection
+
+          pListInfo->nPos = i1;
+
+          if(i1 < pListInfo->nTop) // adjust top if needed
+          {
+            pListInfo->nTop = i1;
+          }
+          else if(i1 >= pListInfo->nHeight + pListInfo->nTop)
+          {
+            pListInfo->nTop = i1 - pListInfo->nHeight + 1;
+          }
+
+          WBInvalidateGeom(wID, NULL, 0); // asynchronous re-paint
+          WBUpdateWindow(wID);  // posts expose event
+
+          DLGNotifyOwner(pDialogControl, aCONTROL_NOTIFY, aLIST_NOTIFY,
+                         pDialogControl->pDlgControlEntry->iID,
+                         WB_LIST_SELCHANGE, pListInfo->nPos, 0); // synchronous notification
+
+          ListInvalidateItemRect(wID, pListInfo, i1);
+          ListInvalidateItemRect(wID, pListInfo, pListInfo->nPos);
+        }
+        else
+        {
+          WBInvalidateGeom(wID, NULL, 0); // asynchronous re-paint
+        }
+
+        WBUpdateWindow(wID);  // posts expose event
 
         return 1;  // handled
       }
@@ -3025,36 +3001,107 @@ static int list_callback(Window wID, XEvent *pEvent)
       {
         case WB_SCROLL_FORWARD:
           pListInfo->nPos ++;
+
+          if(pListInfo->nPos >= pListInfo->nItems)
+          {
+            pListInfo->nPos = pListInfo->nItems - 1;
+          }
+
           break;
         case WB_SCROLL_BACKWARD:
           pListInfo->nPos --;
+
+          if(pListInfo->nPos < 0)
+          {
+            pListInfo->nPos = 0;
+          }
+
           break;
         case WB_SCROLL_PAGEFWD:
-          pListInfo->nPos += pListInfo->nHeight;
+          pListInfo->nTop += pListInfo->nHeight;
+
+          if(pListInfo->nTop + pListInfo->nHeight > pListInfo->nItems)
+          {
+            pListInfo->nTop = pListInfo->nItems - pListInfo->nHeight;
+          }
+
+          if(pListInfo->nPos < pListInfo->nTop)
+          {
+            pListInfo->nPos = pListInfo->nTop;
+          }
+
           break;
         case WB_SCROLL_PAGEBACK:
-          pListInfo->nPos -= pListInfo->nHeight;
+          pListInfo->nTop -= pListInfo->nHeight;
+
+          if(pListInfo->nTop < 0)
+          {
+            pListInfo->nTop = 0;
+          }
+          if(pListInfo->nPos >= pListInfo->nTop + pListInfo->nHeight)
+          {
+            pListInfo->nPos = pListInfo->nTop + pListInfo->nHeight - 1;
+            if(pListInfo->nPos >= pListInfo->nItems)
+            {
+              pListInfo->nPos = pListInfo->nItems - 1;
+            }
+          }
+
           break;
         case WB_SCROLL_FIRST:
           pListInfo->nPos = 0;
+          pListInfo->nTop = 0;
           break;
         case WB_SCROLL_LAST:
           pListInfo->nPos = pListInfo->nItems - 1;
+          pListInfo->nTop = pListInfo->nItems - pListInfo->nHeight - 1;
           break;
         case WB_SCROLL_KNOB:
           pListInfo->nTop = pEvent->xclient.data.l[2];
           pListInfo->nPos += pListInfo->nTop - iOldTop;
-          break;
+
+          goto scroll_sanity;
+
         case WB_SCROLL_RELATIVE:
+          pListInfo->nTop += pEvent->xclient.data.l[2];
           pListInfo->nPos += pEvent->xclient.data.l[2];
-          break;
+          goto scroll_sanity;
+
         case WB_SCROLL_ABSOLUTE:
           pListInfo->nPos = pEvent->xclient.data.l[2];
-          break;
+          pListInfo->nTop = pEvent->xclient.data.l[2];
+          goto scroll_sanity;
+
+        default:
+
+scroll_sanity: // placed here for convenience
+          if(pListInfo->nTop < 0)
+          {
+            pListInfo->nTop = 0;
+          }
+          else if(pListInfo->nTop + pListInfo->nHeight > pListInfo->nItems)
+          {
+            pListInfo->nTop = pListInfo->nItems - pListInfo->nHeight;
+          }
+
+          if(pListInfo->nPos < pListInfo->nTop)
+          {
+            pListInfo->nPos = pListInfo->nTop;
+          }
+          else if(pListInfo->nPos >= pListInfo->nTop + pListInfo->nHeight)
+          {
+            pListInfo->nPos = pListInfo->nTop + pListInfo->nHeight;
+
+            if(pListInfo->nPos >= pListInfo->nItems)
+            {
+              pListInfo->nPos = pListInfo->nItems - 1;
+            }
+          }
       }
 
       if(iOldTop != pListInfo->nTop || iOldPos != pListInfo->nPos)
       {
+        // sanity checks
         if(pListInfo->nPos < 0)
         {
           pListInfo->nPos = 0;
@@ -3074,7 +3121,36 @@ static int list_callback(Window wID, XEvent *pEvent)
 
         if(iOldTop != pListInfo->nTop || iOldPos != pListInfo->nPos)
         {
-          WBInvalidateGeom(wID, NULL, 0);
+          if(iOldTop != pListInfo->nTop)
+          {
+            WB_SCROLLINFO *pScrollInfo = (WB_SCROLLINFO *)WBDialogControlGetProperty2(pDialogControl, aDLGC_SCROLLINFO);
+
+            if(pListInfo->nItemHeight > 0 && pScrollInfo)
+            {
+              if(pEvent->xclient.data.l[1] == WB_SCROLL_KNOB)
+              {
+                WBValidateGeom(wID, &(pListInfo->geomDisplay)); // don't re-paint this yet
+              }
+
+              WBInvalidateVScrollGeom(wID, pScrollInfo, 0, 0);
+
+              if(pEvent->xclient.data.l[1] == WB_SCROLL_KNOB)
+              {
+                WBUpdateWindowImmediately(wID); // re-paint scroll area first
+              }
+
+              WBInvalidateGeom(wID, &(pListInfo->geomDisplay), 0);
+            }
+            else
+            {
+              WBInvalidateGeom(wID, NULL, 0);
+            }
+          }
+          else
+          {
+            ListInvalidateItemRect(wID, pListInfo, iOldPos);
+            ListInvalidateItemRect(wID, pListInfo, pListInfo->nPos);
+          }
 
           if(pEvent->xclient.data.l[1] == WB_SCROLL_KNOB)
           {
@@ -4388,11 +4464,12 @@ int iRval = 0, iACS, iKey, nChar;//, iLen;
 static int StaticDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                                Window wID, WBDialogControl *pSelf)
 {
-int iHPos, iVPos, iType;
+//int iHPos;
+int iVPos, iType;
 XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
-XFontSet fontSet;
+WB_FONTC pFont;
 XCharStruct xBounds;
-GC gc; // = WBGetWindowDefaultGC(wID);
+WBGC gc; // = WBGetWindowDefaultGC(wID);
 WB_GEOM geomPaint, geomBorder;
 
 
@@ -4405,24 +4482,27 @@ WB_GEOM geomPaint, geomBorder;
     return 0;
   }
 
-  fontSet = WBGetWindowFontSet(wID);
+  pFont = WBQueryWindowFont(wID);
 
-  if(fontSet == None)
+  if(!pFont)
   {
-    // TODO:  get font from dialog info
-    WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
-    return 0;
+    pFont = WBGetDefaultFont();
+    if(!pFont)
+    {
+      // TODO:  get font from dialog info
+      WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
+      return 0;
+    }
   }
 
-  iHPos = WBFontSetAvgCharWidth(pDisplay, fontSet);  // average char width for text border (TODO:  RTL text ??)
-  xBounds = WBFontSetMaxBounds(pDisplay, fontSet);
-
+  xBounds = WBFontMaxBounds(pFont);
 
   // get graphics context copy and begin painting
   gc = WBBeginPaint(wID, pEvent, &geomPaint);
   if(!gc)
   {
     WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
+
     return 0;
   }
 
@@ -4485,7 +4565,7 @@ WB_GEOM geomPaint, geomBorder;
 
   // painting the window text
 
-  XSetForeground(pDisplay, gc, pSelf->clrFG.pixel);
+  WBSetForeground(gc, pSelf->clrFG.pixel);
 
   // where I put the text matters based on the control type (see iHPos, iVPos)
   if(iType == STATIC_Icon || iType == STATIC_Image)
@@ -4499,7 +4579,7 @@ WB_GEOM geomPaint, geomBorder;
     {
       if(pixmap2 != None) // an icon mask exists
       {
-        GC gc2 = WBGetWindowCopyGC2(wID, gc);
+        WBGC gc2 = WBGetWindowCopyGC2(wID, gc);
 
         if(gc2 == None)
         {
@@ -4508,20 +4588,20 @@ WB_GEOM geomPaint, geomBorder;
 
         if(gc2 != None)  // painting the icon the way I think it should be...
         {
-          XSetClipOrigin(pDisplay, gc2, geomBorder.x + 2, geomBorder.y + 2);
-          XSetClipMask(pDisplay, gc2, pixmap2);
-          XCopyArea(pDisplay, pixmap, wID, gc2, 0, 0, 36, 36, geomBorder.x + 2, geomBorder.y + 2);
-          XFreeGC(pDisplay, gc2);
+          WBSetClipOrigin(gc2, geomBorder.x + 2, geomBorder.y + 2);
+          WBSetClipMask(gc2, pixmap2);
+          XCopyArea(pDisplay, pixmap, wID, gc2->gc, 0, 0, 36, 36, geomBorder.x + 2, geomBorder.y + 2);
+          WBFreeGC(gc2);
         }
         else
         {
           WB_WARN_PRINT("%s - WARNING:  unable to create GC copy to use bitmask to paint icon\n", __FUNCTION__);
-          XCopyArea(pDisplay, pixmap, wID, gc, 0, 0, 36, 36, geomBorder.x + 2, geomBorder.y + 2);
+          XCopyArea(pDisplay, pixmap, wID, gc->gc, 0, 0, 36, 36, geomBorder.x + 2, geomBorder.y + 2);
         }
       }
       else
       {
-        XCopyArea(pDisplay, pixmap, wID, gc, 0, 0, 36, 36, geomBorder.x + 2, geomBorder.y + 2);
+        XCopyArea(pDisplay, pixmap, wID, gc->gc, 0, 0, 36, 36, geomBorder.x + 2, geomBorder.y + 2);
       }
     }
   }
@@ -4569,14 +4649,14 @@ WB_GEOM geomPaint, geomBorder;
     rctText.top = geomBorder.y;
     rctText.bottom = geomBorder.y + geomBorder.height;
 
-    DTDrawMultiLineText(fontSet, pSelf->pCaption, pDisplay, gc, wID, DEFAULT_STATIC_TAB_WIDTH, 0,
+    DTDrawMultiLineText(pFont, pSelf->pCaption, pDisplay, gc, wID, DEFAULT_STATIC_TAB_WIDTH, 0,
                         &rctText, iAlign); //DTAlignment_UNDERSCORE | DTAlignment_VCENTER);
   }
 
   // by convention, restore original objects/state
 
   BEGIN_XCALL_DEBUG_WRAPPER
-  XSetForeground(pDisplay, gc, WBGetWindowFGColor(wID));  // restore it at the end
+  WBSetForeground(gc, WBGetWindowFGColor(wID));  // restore it at the end
   END_XCALL_DEBUG_WRAPPER
 
   WBEndPaint(wID, gc);
@@ -4590,8 +4670,8 @@ static int EditDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 {
 WBEditControl *pPrivate = (WBEditControl *)pSelf;
 XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
-XFontSet fontSet;
-GC gc; // = WBGetWindowDefaultGC(wID);
+WB_FONTC pFont;
+WBGC gc; // = WBGetWindowDefaultGC(wID);
 WB_GEOM geomPaint, geomBorder;
 
 
@@ -4604,21 +4684,25 @@ WB_GEOM geomPaint, geomBorder;
     return 0;
   }
 
-  fontSet = WBGetWindowFontSet(wID);
+  pFont = WBQueryWindowFont(wID);
 
-  if(fontSet == None)
+  if(!pFont)
   {
-    // TODO:  get font from dialog info
-    WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
-    return 0;
+    pFont = WBGetDefaultFont();
+    if(!pFont)
+    {
+      // TODO:  get font from dialog info
+      WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
+      return 0;
+    }
   }
-
 
   // get graphics context copy and begin painting
   gc = WBBeginPaint(wID, pEvent, &geomPaint);
   if(!gc)
   {
     WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
+
     return 0;
   }
 
@@ -4634,9 +4718,9 @@ WB_GEOM geomPaint, geomBorder;
 
 // TODO:  uncomment these when iVPos needs to be used - linux gcc warning avoidance
 //  // vertically centered text (for single-line version)
-//  iVPos = pFont->max_bounds.ascent + pFont->max_bounds.descent;  // font height
+//  iVPos = WBFontHeight(pFont);  // font height
 //  iVPos = (xwa.height - iVPos) >> 1;  // half of the difference - top of text
-//  iVPos += pFont->max_bounds.ascent;
+//  iVPos += WBFontAscent(pFont);
 
   if(pSelf->pOwner && pSelf->pDlgControlEntry)       //pSelf->ulFlags & STATIC_3DBorder)
   {
@@ -4659,17 +4743,17 @@ WB_GEOM geomPaint, geomBorder;
   geomBorder.width -= 8;
   geomBorder.height -= 8;
 
-  XSetForeground(pDisplay, gc, pSelf->clrFG.pixel);
+  WBSetForeground(gc, pSelf->clrFG.pixel);
 
   pPrivate->xTextObject.vtable->do_expose(&(pPrivate->xTextObject), pDisplay, wID,
-                                          gc, &geomPaint, &geomBorder, fontSet);
+                                          gc, &geomPaint, &geomBorder, pFont);
 
 
 #if 0
 
   // painting the window text
 
-  XSetForeground(pDisplay, gc, pSelf->clrFG.pixel);
+  WBSetForeground(gc, pSelf->clrFG.pixel);
 
   if(pSelf->pCaption) // use TEXT not caption
   {
@@ -4678,12 +4762,12 @@ WB_GEOM geomPaint, geomBorder;
 
 //    if(i1 == pSelf->iSelected)  // text selection
 //    {
-//      XSetForeground(pDisplay, gc, pSelf->clrABG.pixel);
-//      XSetBackground(pDisplay, gc, pSelf->clrABG.pixel);
+//      WBSetForeground(gc, pSelf->clrABG.pixel);
+//      WBSetBackground(gc, pSelf->clrABG.pixel);
 //
-//      XFillRectangle(pDisplay, wID, gc, pItem->iPosition, pSelf->iY, pItem->iTextWidth, pSelf->iHeight + 2);
+//      WBFillRectangle(pDisplay, wID, gc, pItem->iPosition, pSelf->iY, pItem->iTextWidth, pSelf->iHeight + 2);
 //
-//      XSetForeground(pDisplay, gc, pSelf->clrAFG.pixel);
+//      WBSetForeground(gc, pSelf->clrAFG.pixel);
 //    }
 
 #if 0
@@ -4722,13 +4806,13 @@ WB_GEOM geomPaint, geomBorder;
 
     if(*szText)
     {
-      XDrawString(pDisplay, wID, gc, iHPos, iVPos, szText, strlen(szText));
+      WBDrawString(pDisplay, wID, gc, iHPos, iVPos, szText, strlen(szText));
     }
 
 //    if(i1 == pSelf->iSelected)  // selected item
 //    {
-//      XSetForeground(pDisplay, gc, clrMenuFG.pixel);
-//      XSetBackground(pDisplay, gc, clrMenuBG.pixel);
+//      WBSetForeground(gc, clrMenuFG.pixel);
+//      WBSetBackground(gc, clrMenuBG.pixel);
 //    }
   }
 
@@ -4737,7 +4821,7 @@ WB_GEOM geomPaint, geomBorder;
   // by convention, restore original objects/state
 
   BEGIN_XCALL_DEBUG_WRAPPER
-  XSetForeground(pDisplay, gc, WBGetWindowFGColor(wID));  // restore it at the end
+  WBSetForeground(gc, WBGetWindowFGColor(wID));  // restore it at the end
   END_XCALL_DEBUG_WRAPPER
 
   WBEndPaint(wID, gc);
@@ -4751,9 +4835,9 @@ static int ButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 {
 int iType;
 XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
-XFontSet fontSet;
+WB_FONTC pFont;
 XCharStruct xBounds;
-GC gc; // = WBGetWindowDefaultGC(wID);
+WBGC gc; // = WBGetWindowDefaultGC(wID);
 WB_GEOM geomPaint, geomBorder, geomBox;
 WB_RECT rctText;
 
@@ -4767,16 +4851,20 @@ WB_RECT rctText;
     return 0;
   }
 
-  fontSet = WBGetWindowFontSet(wID);
+  pFont = WBQueryWindowFont(wID);
 
-  if(fontSet == None)
+  if(!pFont)
   {
-    // TODO:  get font from dialog info
-    WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
-    return 0;
+    pFont = WBGetDefaultFont();
+    if(!pFont)
+    {
+      // TODO:  get font from dialog info
+      WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
+      return 0;
+    }
   }
 
-  xBounds = WBFontSetMaxBounds(pDisplay, fontSet);
+  xBounds = WBFontMaxBounds(pFont);
 
   // get graphics context copy and begin painting
   gc = WBBeginPaint(wID, pEvent, &geomPaint);
@@ -4813,21 +4901,21 @@ WB_RECT rctText;
     // fill checkbox part with white, or for tri-stated state, use grey (background)
     if(iType == BUTTON_TriStateButton && (pSelf->pDlgControlEntry->iFlags & WBDialogEntry_TRISTATE))
     {
-      XSetForeground(pDisplay, gc, WBGetWindowBGColor(wID));
+      WBSetForeground(gc, WBGetWindowBGColor(wID));
     }
     else
     {
       if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_PRESSED)
       {
-        XSetForeground(pDisplay, gc, pSelf->clrAFG.pixel);
+        WBSetForeground(gc, pSelf->clrAFG.pixel);
       }
       else
       {
-        XSetForeground(pDisplay, gc, WhitePixel(pDisplay, DefaultScreen(pDisplay)));
+        WBSetForeground(gc, WhitePixel(pDisplay, DefaultScreen(pDisplay)));
       }
     }
 
-    XFillRectangle(pDisplay, wID, gc, geomBox.x, geomBox.y, geomBox.width, geomBox.height);
+    WBFillRectangle(pDisplay, wID, gc, geomBox.x, geomBox.y, geomBox.width, geomBox.height);
 
     // draw checkbox as an 'innie'
     WBDraw3DBorderRect(pDisplay, wID, gc, &geomBox, pSelf->clrBD3.pixel, pSelf->clrBD2.pixel);
@@ -4837,18 +4925,18 @@ WB_RECT rctText;
     geomBox.width -= 2;
     geomBox.height -= 2;
 
-    XSetForeground(pDisplay, gc, BlackPixel(pDisplay, DefaultScreen(pDisplay))); // make sure black foreground
+    WBSetForeground(gc, BlackPixel(pDisplay, DefaultScreen(pDisplay))); // make sure black foreground
 
     // now draw the 'x' as appropriate, but not for a tri-stated control
     if(iType != BUTTON_TriStateButton || !(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_TRISTATE))
     {
       if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_PRESSED)
       {
-        XSetForeground(pDisplay, gc, pSelf->clrABG.pixel);
+        WBSetForeground(gc, pSelf->clrABG.pixel);
       }
       else
       {
-        XSetForeground(pDisplay, gc, BlackPixel(pDisplay, DefaultScreen(pDisplay)));
+        WBSetForeground(gc, BlackPixel(pDisplay, DefaultScreen(pDisplay)));
       }
 
       if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_CHECKED)
@@ -4861,22 +4949,22 @@ WB_RECT rctText;
         xpt[1].x = geomBox.x + 3 * geomBox.width / 4 - 1;
         xpt[1].y = geomBox.y + 3 * geomBox.height / 4;
 
-        XDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
+        WBDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
 
         xpt[0].x++;
         xpt[1].x++;
-        XDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
+        WBDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
 
         xpt[0].x = geomBox.x + geomBox.width / 4;
         xpt[1].y = geomBox.y + geomBox.height / 4;
         xpt[1].x = geomBox.x + 3 * geomBox.width / 4 - 1;
         xpt[0].y = geomBox.y + 3 * geomBox.height / 4;
 
-        XDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
+        WBDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
 
         xpt[0].x++;
         xpt[1].x++;
-        XDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
+        WBDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
 
 //        // draw the 'x' as text [why not!]
 //
@@ -4918,19 +5006,19 @@ WB_RECT rctText;
     // set the 'fill' color based on the button state
     if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_PRESSED)
     {
-      XSetForeground(pDisplay, gc, pSelf->clrAFG.pixel);
+      WBSetForeground(gc, pSelf->clrAFG.pixel);
     }
     else
     {
-      XSetForeground(pDisplay, gc, WhitePixel(pDisplay, DefaultScreen(pDisplay)));
+      WBSetForeground(gc, WhitePixel(pDisplay, DefaultScreen(pDisplay)));
     }
 
     // fill in the circle bounded by geomBox.
     BEGIN_XCALL_DEBUG_WRAPPER
-    XFillArc(pDisplay, wID, gc,
-             geomBox.x, geomBox.y,
-             geomBox.width, geomBox.height,
-             0, 360 * 64); // full circle
+    WBFillArc(pDisplay, wID, gc,
+              geomBox.x, geomBox.y,
+              geomBox.width, geomBox.height,
+              0, 360 * 64); // full circle
     END_XCALL_DEBUG_WRAPPER
 
 
@@ -4950,15 +5038,15 @@ WB_RECT rctText;
 
     if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_CHECKED)
     {
-      XSetForeground(pDisplay, gc, BlackPixel(pDisplay, DefaultScreen(pDisplay)));
+      WBSetForeground(gc, BlackPixel(pDisplay, DefaultScreen(pDisplay)));
 
       BEGIN_XCALL_DEBUG_WRAPPER
-      XFillArc(pDisplay, wID, gc,
-               geomBox.x + geomBox.width / 4,
-               geomBox.y + geomBox.height / 4,
-               geomBox.width - 2 * (geomBox.width / 4),
-               geomBox.height - 2 * (geomBox.height / 4),
-               0, 360 * 64); // full circle
+      WBFillArc(pDisplay, wID, gc,
+                geomBox.x + geomBox.width / 4,
+                geomBox.y + geomBox.height / 4,
+                geomBox.width - 2 * (geomBox.width / 4),
+                geomBox.height - 2 * (geomBox.height / 4),
+                0, 360 * 64); // full circle
       END_XCALL_DEBUG_WRAPPER
     }
 
@@ -5004,12 +5092,12 @@ WB_RECT rctText;
 //  iHPos = xwa.border_width + i2;  // position of beginning of text (left side + space)
 
 #if 0
-  iVPos = pFont->max_bounds.ascent + pFont->max_bounds.descent;  // font height
+  iVPos = WBFontHeight(pFont);  // font height
   iVPos = (xwa.height - iVPos) >> 1;  // half of the difference - top of text
-  iVPos += pFont->max_bounds.ascent;
+  iVPos += WBFontAscent(pFont);
 #endif // 0
 
-  XSetForeground(pDisplay, gc, pSelf->clrFG.pixel);
+  WBSetForeground(gc, pSelf->clrFG.pixel);
 
   if(pSelf->pCaption)
   {
@@ -5044,8 +5132,8 @@ WB_RECT rctText;
       iAlign |= DTAlignment_VCENTER;
     }
 
-    XSetBackground(pDisplay, gc, pSelf->clrABG.pixel);
-    XSetForeground(pDisplay, gc, pSelf->clrAFG.pixel);
+    WBSetBackground(gc, pSelf->clrABG.pixel);
+    WBSetForeground(gc, pSelf->clrAFG.pixel);
 
 //    rctText.left = geomBorder.x + iHPos;
 //    rctText.right = rctText.left + geomBorder.width - 2 * iHPos;
@@ -5058,14 +5146,14 @@ WB_RECT rctText;
     rctText.top = geomBorder.y;
     rctText.bottom = geomBorder.y + geomBorder.height;
 
-    DTDrawMultiLineText(fontSet, szText, pDisplay, gc, wID, DEFAULT_BUTTON_TAB_WIDTH, 0,
+    DTDrawMultiLineText(pFont, szText, pDisplay, gc, wID, DEFAULT_BUTTON_TAB_WIDTH, 0,
                         &rctText, iAlign);
   }
 
   // by convention, restore original objects/state
 
   BEGIN_XCALL_DEBUG_WRAPPER
-  XSetForeground(pDisplay, gc, WBGetWindowFGColor(wID));  // restore it at the end
+  WBSetForeground(gc, WBGetWindowFGColor(wID));  // restore it at the end
   END_XCALL_DEBUG_WRAPPER
 
   WBEndPaint(wID, gc);
@@ -5079,9 +5167,9 @@ static int PushButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 {
 int i2, iHPos;
 XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
-XFontSet fontSet;
+WB_FONTC pFont;
 XCharStruct xBounds;
-GC gc; // = WBGetWindowDefaultGC(wID);
+WBGC gc; // = WBGetWindowDefaultGC(wID);
 WB_GEOM geomPaint, geomBorder;
 
 
@@ -5094,16 +5182,20 @@ WB_GEOM geomPaint, geomBorder;
     return 0;
   }
 
-  fontSet = WBGetWindowFontSet(wID); // I assigned the "bold font" to this on create
+  pFont = WBQueryWindowFont(wID); // I assigned the "bold font" to this on create
 
-  if(fontSet == None)
+  if(!pFont)
   {
-    // TODO:  get font from dialog info
-    WB_ERROR_PRINT("%s - NO FONT, line %d\n", __FUNCTION__, __LINE__);
-    return 0;
+    pFont = WBGetDefaultFont();
+    if(!pFont)
+    {
+      // TODO:  get font from dialog info
+      WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
+      return 0;
+    }
   }
 
-  xBounds = WBFontSetMaxBounds(pDisplay, fontSet);
+  xBounds = WBFontMaxBounds(pFont);
 
   // get graphics context copy and begin painting
   gc = WBBeginPaint(wID, pEvent, &geomPaint);
@@ -5161,15 +5253,15 @@ WB_GEOM geomPaint, geomBorder;
 
   // painting the window text
 
-  i2 = WBFontSetAvgCharWidth(pDisplay, fontSet);  // average char width for text border (TODO:  RTL text ??)
+  i2 = WBFontAvgCharWidth(pFont);  // average char width for text border (TODO:  RTL text ??)
   iHPos = xwa.border_width + i2;  // position of beginning of text (left side + space)
 #if 0
-  iVPos = pFont->max_bounds.ascent + pFont->max_bounds.descent;  // font height
+  iVPos = WBFontHeight(pFont);  // font height
   iVPos = (xwa.height - iVPos) >> 1;  // half of the difference - top of text
-  iVPos += pFont->max_bounds.ascent;
+  iVPos += WBFontAscent(pFont);
 #endif // 0
 
-  XSetForeground(pDisplay, gc, pSelf->clrFG.pixel);
+  WBSetForeground(gc, pSelf->clrFG.pixel);
 
   // TODO:  icon button (rather than text) or combination icon/text
 
@@ -5178,8 +5270,8 @@ WB_GEOM geomPaint, geomBorder;
     WB_RECT rctText;
     const char *szText = pSelf->pCaption;
 
-    XSetBackground(pDisplay, gc, pSelf->clrABG.pixel);
-    XSetForeground(pDisplay, gc, pSelf->clrAFG.pixel);
+    WBSetBackground(gc, pSelf->clrABG.pixel);
+    WBSetForeground(gc, pSelf->clrAFG.pixel);
 
     rctText.left = geomBorder.x + iHPos;
     rctText.right = rctText.left + geomBorder.width - 2 * iHPos;
@@ -5187,14 +5279,14 @@ WB_GEOM geomPaint, geomBorder;
                 - xBounds.descent / 2; // better centering
     rctText.bottom = rctText.top + geomBorder.height - xBounds.ascent;
 
-    DTDrawMultiLineText(fontSet, szText, pDisplay, gc, wID, DEFAULT_BUTTON_TAB_WIDTH, 0, &rctText,
+    DTDrawMultiLineText(pFont, szText, pDisplay, gc, wID, DEFAULT_BUTTON_TAB_WIDTH, 0, &rctText,
                         DTAlignment_UNDERSCORE | DTAlignment_VCENTER | DTAlignment_HCENTER);
   }
 
   // by convention, restore original objects/state
 
   BEGIN_XCALL_DEBUG_WRAPPER
-  XSetForeground(pDisplay, gc, WBGetWindowFGColor(wID));  // restore it at the end
+  WBSetForeground(gc, WBGetWindowFGColor(wID));  // restore it at the end
   END_XCALL_DEBUG_WRAPPER
 
   WBEndPaint(wID, gc);
@@ -5209,9 +5301,9 @@ static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 int i1, iVScrollWidth, iHScrollHeight;
 int nHeight, nItemHeight;
 XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
-XFontSet fontSet;
+WB_FONTC pFont;
 XCharStruct xBounds;
-GC gc;
+WBGC gc;
 Region rgnTemp;
 WB_GEOM geomPaint, geomBorder;
 WB_SCROLLINFO *pScrollInfo;
@@ -5228,16 +5320,20 @@ WB_DIALOG_PROP *pProp;
     return 0;
   }
 
-  fontSet = WBGetWindowFontSet(wID);
+  pFont = WBQueryWindowFont(wID);
 
-  if(fontSet == None)
+  if(!pFont)
   {
-    // TODO:  get font from dialog info
-    WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
-    return 0;
+    pFont = WBGetDefaultFont();
+    if(!pFont)
+    {
+      // TODO:  get font from dialog info
+      WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
+      return 0;
+    }
   }
 
-  xBounds = WBFontSetMaxBounds(pDisplay, fontSet);
+  xBounds = WBFontMaxBounds(pFont);
 
   // get graphics context copy and begin painting
   gc = WBBeginPaint(wID, pEvent, &geomPaint);
@@ -5273,7 +5369,7 @@ WB_DIALOG_PROP *pProp;
 
   // calculate a few things
 
-  iVScrollWidth = WBTextWidth(fontSet, "X", 1) * 2 + 4; // width of vertical scrollbar
+  iVScrollWidth = WBTextWidth(pFont, "X", 1) * 2 + 4; // width of vertical scrollbar
   iHScrollHeight = xBounds.ascent + xBounds.descent + 4;
 
   pProp = (WB_DIALOG_PROP *)WBDialogControlGetDialogProp(pSelf, aDLGC_LISTINFO);
@@ -5316,7 +5412,7 @@ WB_DIALOG_PROP *pProp;
   }
 
   // what is the height of the dialog box in 'items'?  For now an item's height is
-  // equal to pFont->max_bounds.ascent + pFont->max_bounds.descent + 6;
+  // equal to WBFontHeight(pFont) + 6 (which is font ascent + font descent + 6)
 
   nItemHeight = xBounds.ascent + xBounds.descent + 6;
   nHeight = (geomBorder.height - 4) / nItemHeight; // assume no horizontal scrollbar
@@ -5359,6 +5455,11 @@ WB_DIALOG_PROP *pProp;
                    - pScrollInfo->geomVBar.border
                    - geomBorder.x;
 
+  if(pListInfo) // cache the information as my 'display area' geometry
+  {
+    memcpy(&(pListInfo->geomDisplay), &geomBorder, sizeof(pListInfo->geomDisplay));
+  }
+
   // painting the window text
   // FIRST, make sure that the bounding rectangle for painting
   // does NOT exceed geomBorder by setting the new clip region
@@ -5373,13 +5474,13 @@ WB_DIALOG_PROP *pProp;
       XIntersectRegion(rgnTemp2, rgnTemp, rgnTemp);
       XDestroyRegion(rgnTemp2);
 
-      XSetRegion(pDisplay, gc, rgnTemp); // my new clipping region
+      WBSetRegion(gc, rgnTemp); // my new clipping region
     }
 
     XDestroyRegion(rgnTemp); // must destroy now
   }
 
-  XSetForeground(pDisplay, gc, pSelf->clrFG.pixel);
+  WBSetForeground(gc, pSelf->clrFG.pixel);
 
   if(pListInfo) // use TEXT not caption
   {
@@ -5404,24 +5505,24 @@ WB_DIALOG_PROP *pProp;
 
       if(i1 < pListInfo->nItems)
       {
-        if(pListInfo->pfnDisplay)//  void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, GC gcPaint, WB_GEOM *pGeom);
+        if(pListInfo->pfnDisplay)//  void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, WBGC gcPaint, WB_GEOM *pGeom);
         {
-          pListInfo->pfnDisplay(pSelf, pListInfo->aItems[i1], i1 == pListInfo->nPos, gc, &geomItem, fontSet);
+          pListInfo->pfnDisplay(pSelf, pListInfo->aItems[i1], i1 == pListInfo->nPos, gc, &geomItem, pFont);
         }
         else
         {
-          DLGCDefaultListControlDisplayProc(pSelf, pListInfo->aItems[i1], i1 == pListInfo->nPos, gc, &geomItem, fontSet);
+          DLGCDefaultListControlDisplayProc(pSelf, pListInfo->aItems[i1], i1 == pListInfo->nPos, gc, &geomItem, pFont);
         }
       }
       else
       {
-        if(pListInfo->pfnDisplay)//  void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, GC gcPaint, WB_GEOM *pGeom);
+        if(pListInfo->pfnDisplay)//  void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, WBGC gcPaint, WB_GEOM *pGeom);
         {
-          pListInfo->pfnDisplay(pSelf, NULL, 0, gc, &geomItem, fontSet);
+          pListInfo->pfnDisplay(pSelf, NULL, 0, gc, &geomItem, pFont);
         }
         else
         {
-          DLGCDefaultListControlDisplayProc(pSelf, NULL, 0, gc, &geomItem, fontSet);
+          DLGCDefaultListControlDisplayProc(pSelf, NULL, 0, gc, &geomItem, pFont);
         }
       }
     }
@@ -5430,7 +5531,7 @@ WB_DIALOG_PROP *pProp;
   // by convention, restore original objects/state
 
   BEGIN_XCALL_DEBUG_WRAPPER
-  XSetForeground(pDisplay, gc, WBGetWindowFGColor(wID));  // restore it at the end
+  WBSetForeground(gc, WBGetWindowFGColor(wID));  // restore it at the end
   END_XCALL_DEBUG_WRAPPER
 
   WBEndPaint(wID, gc);
@@ -5443,7 +5544,7 @@ WB_DIALOG_PROP *pProp;
 
 // supporting functions
 
-static void FileListControlDisplayProc(WBDialogControl *pList, void *pData, int iSelected, GC gc, WB_GEOM *pGeom, XFontSet fontSet)
+static void FileListControlDisplayProc(WBDialogControl *pList, void *pData, int iSelected, WBGC gc, WB_GEOM *pGeom, WB_FONTC pFont)
 {
 int iHPos;
 XCharStruct xBounds;
@@ -5454,17 +5555,14 @@ Display *pDisplay = WBGetWindowDisplay(wID);
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
                  "%s - Expose %d (%08xH) pData=%p\n", __FUNCTION__, (int)wID, (int)wID, pData);
 
-  if(fontSet == None)
+  if(!pFont)
   {
-    fontSet = WBGetWindowFontSet(wID);
-    if(fontSet == None)
+    pFont = WBGetDefaultFont();
+
+    if(!pFont)
     {
-      fontSet = WBGetDefaultFontSet(pDisplay);
-      if(fontSet == None)
-      {
-        WB_ERROR_PRINT("%s - NO FONT, line %d\n", __FUNCTION__, __LINE__);
-        return;
-      }
+      WB_ERROR_PRINT("%s - NO FONT, line %d\n", __FUNCTION__, __LINE__);
+      return;
     }
   }
 
@@ -5472,35 +5570,28 @@ Display *pDisplay = WBGetWindowDisplay(wID);
   {
     // get the BOLD version of the same font for directories
 
-    if(((WBListControl *)pList)->fsBold != None)
+    if(!((WBListControl *)pList)->pBold)
     {
-      fontSet = ((WBListControl *)pList)->fsBold;
-    }
-    else
-    {
-      ((WBListControl *)pList)->fsBold = WBCopyModifyFontSet(pDisplay, fontSet, 0, WBFontFlag_WT_BOLD); // BOLD version
-      if(((WBListControl *)pList)->fsBold == None)
+      ((WBListControl *)pList)->pBold = WBCopyModifyFont(pDisplay, pFont, 0, WBFontFlag_WT_BOLD); // BOLD version
+      if(!((WBListControl *)pList)->pBold)
       {
         // TODO:  make a copy without the 'bold' ???  (this should already have happened)
         WB_ERROR_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
-
         return;
       }
-      else
-      {
-        fontSet = ((WBListControl *)pList)->fsBold;
-      }
     }
+
+    pFont = ((WBListControl *)pList)->pBold;
   }
 
-  xBounds = WBFontSetMaxBounds(pDisplay, fontSet);
-  iHPos = WBFontSetAvgCharWidth(pDisplay, fontSet);  // average character width for hpos
+  xBounds = WBFontMaxBounds(pFont);
+  iHPos = WBFontAvgCharWidth(pFont);  // average character width for hpos
 
   // font setup
   BEGIN_XCALL_DEBUG_WRAPPER
 //  XClearWindow(pDisplay, wID);  // TODO:  rather than erase background, see if I need to
-  XSetForeground(pDisplay, gc, iSelected ? pList->clrHBG.pixel : pList->clrBG.pixel);
-  XFillRectangle(pDisplay, wID, gc, pGeom->x, pGeom->y, pGeom->width, pGeom->height);
+  WBSetForeground(gc, iSelected ? pList->clrHBG.pixel : pList->clrBG.pixel);
+  WBFillRectangle(pDisplay, wID, gc, pGeom->x, pGeom->y, pGeom->width, pGeom->height);
   END_XCALL_DEBUG_WRAPPER
 
   if(iSelected)
@@ -5527,13 +5618,13 @@ Display *pDisplay = WBGetWindowDisplay(wID);
 //      int i1;
       // draw a left arrow using the highlight color
 
-      XSetForeground(pDisplay, gc, iSelected ? pList->clrBG.pixel : pList->clrHBG.pixel);
+      WBSetForeground(gc, iSelected ? pList->clrBG.pixel : pList->clrHBG.pixel);
 
-      XFillRectangle(pDisplay, wID, gc,
-                     pGeom->x + iHPos + xBounds.ascent / 2,
-                     pGeom->y + pGeom->height / 2 - xBounds.ascent / 4, // half-way - ascent / 4
-                     iHPos * 2 - xBounds.ascent / 2,
-                     xBounds.ascent / 2); // half height of text
+      WBFillRectangle(pDisplay, wID, gc,
+                      pGeom->x + iHPos + xBounds.ascent / 2,
+                      pGeom->y + pGeom->height / 2 - xBounds.ascent / 4, // half-way - ascent / 4
+                      iHPos * 2 - xBounds.ascent / 2,
+                      xBounds.ascent / 2); // half height of text
 
       // now make an 'arrow' (TODO: 3D-looking? I would need more colors...)
 
@@ -5546,20 +5637,20 @@ Display *pDisplay = WBGetWindowDisplay(wID);
       aPoints[3].x = aPoints[0].x;
       aPoints[3].y = aPoints[0].y;
 
-      XFillPolygon(pDisplay, wID, gc, aPoints, 4, Nonconvex, CoordModeOrigin);
+      WBFillPolygon(pDisplay, wID, gc, aPoints, 4, Nonconvex, CoordModeOrigin);
 
       // 3D highlights for arrow
-      XSetForeground(pDisplay, gc, iSelected ? pList->clrBD3.pixel : pList->clrBD2.pixel);
-      XDrawLine(pDisplay, wID, gc, aPoints[0].x, aPoints[0].y, aPoints[1].x - 1, aPoints[1].y);
-      XDrawLine(pDisplay, wID, gc, aPoints[1].x + 1, pGeom->y + pGeom->height / 2 - xBounds.ascent / 4,
-                pGeom->x + iHPos * 3, pGeom->y + pGeom->height / 2 - xBounds.ascent / 4);
-      XDrawLine(pDisplay, wID, gc, pGeom->x + iHPos * 3, pGeom->y + pGeom->height / 2 - xBounds.ascent / 4 + 1,
-                pGeom->x + iHPos * 3, pGeom->y + pGeom->height / 2 + xBounds.ascent / 4 - 1);
+      WBSetForeground(gc, iSelected ? pList->clrBD3.pixel : pList->clrBD2.pixel);
+      WBDrawLine(pDisplay, wID, gc, aPoints[0].x, aPoints[0].y, aPoints[1].x - 1, aPoints[1].y);
+      WBDrawLine(pDisplay, wID, gc, aPoints[1].x + 1, pGeom->y + pGeom->height / 2 - xBounds.ascent / 4,
+                 pGeom->x + iHPos * 3, pGeom->y + pGeom->height / 2 - xBounds.ascent / 4);
+      WBDrawLine(pDisplay, wID, gc, pGeom->x + iHPos * 3, pGeom->y + pGeom->height / 2 - xBounds.ascent / 4 + 1,
+                 pGeom->x + iHPos * 3, pGeom->y + pGeom->height / 2 + xBounds.ascent / 4 - 1);
 
-      XSetForeground(pDisplay, gc, iSelected ? pList->clrBD2.pixel : pList->clrBD3.pixel);
-      XDrawLine(pDisplay, wID, gc, aPoints[0].x, aPoints[0].y, aPoints[2].x - 1, aPoints[2].y);
-      XDrawLine(pDisplay, wID, gc, aPoints[1].x + 1, pGeom->y + pGeom->height / 2 + xBounds.ascent / 4,
-                pGeom->x + iHPos * 3, pGeom->y + pGeom->height / 2 + xBounds.ascent / 4);
+      WBSetForeground(gc, iSelected ? pList->clrBD2.pixel : pList->clrBD3.pixel);
+      WBDrawLine(pDisplay, wID, gc, aPoints[0].x, aPoints[0].y, aPoints[2].x - 1, aPoints[2].y);
+      WBDrawLine(pDisplay, wID, gc, aPoints[1].x + 1, pGeom->y + pGeom->height / 2 + xBounds.ascent / 4,
+                 pGeom->x + iHPos * 3, pGeom->y + pGeom->height / 2 + xBounds.ascent / 4);
     }
     else
     {
@@ -5567,14 +5658,14 @@ Display *pDisplay = WBGetWindowDisplay(wID);
 
       if(*(const char *)pData == '^') // symlink
       {
-        XSetForeground(pDisplay, gc, iSelected ? pList->clrBG.pixel : pList->clrHBG.pixel);
+        WBSetForeground(gc, iSelected ? pList->clrBG.pixel : pList->clrHBG.pixel);
       }
       else // regular file
       {
-        XSetForeground(pDisplay, gc, iSelected ? pList->clrHFG.pixel : pList->clrFG.pixel);
+        WBSetForeground(gc, iSelected ? pList->clrHFG.pixel : pList->clrFG.pixel);
       }
 
-      XSetBackground(pDisplay, gc, iSelected ? pList->clrHBG.pixel : pList->clrBG.pixel);
+      WBSetBackground(gc, iSelected ? pList->clrHBG.pixel : pList->clrBG.pixel);
 
       if(*szText)
       {
@@ -5585,15 +5676,15 @@ Display *pDisplay = WBGetWindowDisplay(wID);
         rctBounds.left = pGeom->x + iHPos;
         rctBounds.right = pGeom->x + pGeom->width - iHPos;
 
-//        XDrawString(pDisplay, wID, gc, pGeom->x + iHPos, pGeom->y + iVPos, szText, strlen(szText));
-        DTDrawSingleLineText(fontSet, szText, pDisplay, gc, wID, 0, 0, &rctBounds,
+//        WBDrawString(pDisplay, wID, gc, pGeom->x + iHPos, pGeom->y + iVPos, szText, strlen(szText));
+        DTDrawSingleLineText(pFont, szText, pDisplay, gc, wID, 0, 0, &rctBounds,
                              DTAlignment_VCENTER | DTAlignment_HLEFT);
       }
 
       if(iSelected)  // selected item
       {
-        XSetForeground(pDisplay, gc, pList->clrFG.pixel);
-        XSetBackground(pDisplay, gc, pList->clrBG.pixel);
+        WBSetForeground(gc, pList->clrFG.pixel);
+        WBSetBackground(gc, pList->clrBG.pixel);
       }
     }
   }
@@ -5601,8 +5692,9 @@ Display *pDisplay = WBGetWindowDisplay(wID);
   // by convention, restore original objects/state
 
   BEGIN_XCALL_DEBUG_WRAPPER
-  XSetForeground(pDisplay, gc, WBGetWindowFGColor(wID));  // restore it at the end
+  WBSetForeground(gc, WBGetWindowFGColor(wID));  // restore it at the end
   END_XCALL_DEBUG_WRAPPER
+
 }
 
 

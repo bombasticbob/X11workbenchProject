@@ -365,7 +365,7 @@
   * formatted and that all of the links work correctly.
   *
   * Code should be as self-documenting as possible.  Non-trivial variables should be declared
-  * using descriptive names.  Hungarian notation is encouraged, but not required.  Single-character
+  * using descriptive names.  Hungarian notation can be helpful, but is not required.  Single-character
   * variable names are DIFFICULT TO CHANGE without manual effort and should be AVOIDED, ALWAYS!\n
   * Use of non-descriptive variables such as 'i1' or 'p3' is ok so long as its usage is intuitively
   * obvious within the code.  If any confusion might arise from a casual observer, use more descriptive
@@ -529,22 +529,26 @@
   #endif // 0
 
 
-        WBExit();
+        WBExit(); // this frees toolkit resources and closes windows, etc.
+
+        // The application itself continues to run past this point
       }
 
-      if(envp && envp != envp0)
+      // Freeing up 'possibly allocated' memory for envp, argv
+
+      if(envp && envp != envp0) // was envp re-allocated by the toolkit?
       {
-        WBFree(envp);
+        WBFree(envp); // use 'WBFree' to free memory allocated by the toolkit
       }
 
-      if(argv && argv != argv0)
+      if(argv && argv != argv0) // was argv re-allocated by the toolkit?
       {
         WBFree(argv);
       }
     }
     else
     {
-      WBToolkitUsage();
+      WBToolkitUsage(); // print usage information to stderr
     }
 
     return iRval;
@@ -1099,11 +1103,21 @@
 **/
 
 /** \defgroup font Font Utilities
-  * GC Utility functions for font selection and modification
+  * GC Utility/API functions for WB_FONT mid-level font selection and modification
   *
   * This is the definition file for font helper functions and structures, designed
-  * to SPECIFICALY work with 'X11 Core' fonts and rendering.  Compatibility and
-  * support for 'Xft' fonts and rendering is currently 'reserved for future implementation'.
+  * to SPECIFICALY work with 'Xft' freetype fonts and rendering.  For maximum
+  * compatibility, these are abstracted using the WB_FONT object for legacy
+  * implementations that do not have the Xft library installed, and for those fonts
+  * that are native X11 fonts or font sets.
+**/
+
+/** \defgroup font_legacy Legacy Font Utilities
+  * \ingroup font
+  * GC Utility functions for legacy (X11) font selection and modification
+  *
+  * This are the definitions for font helper functions and structures, designed
+  * to SPECIFICALY work with 'X11 Core' fonts and rendering.
   * Fonts under X11 (core) are generally difficult to deal with.  These utility
   * functions allow you to more easily select a font based on an existing
   * font or a general description of a font, with 'fuzzy' matching.\n
@@ -1225,6 +1239,15 @@
 */
 
 /** \ingroup core
+  * \defgroup graphics Graphics Abstraction Layer
+  *
+  * These functions provide a graphics-related 'Abstraction Layer' API for performance
+  * enhancement and cross-platform implementation of the toolkit.  Rather than calling
+  * X11 library functions directly, you should use these equivalent API functions
+  * whenever possible.
+**/
+
+/** \ingroup core
   * \defgroup timer Timer Functions
   *
   * The X11workbench Toolkit API has support for one-shot and periodic timer
@@ -1239,8 +1262,8 @@
   * requires precise accuracy.
 */
 
-/** \defgroup clipboard Clipboard and Selections
-  * \ingroup core
+/** \ingroup core
+  * \defgroup clipboard Clipboard and Selections
   *
   * Clipboard and generic 'Selection' helper functions.  Use these
   * to copy data to/from the clipboard or other 'selection'.  They
@@ -1252,11 +1275,13 @@
 
 /** \ingroup core
   * \defgroup defaults Default Parameters and Definitions
+  *
   * Functions and variables associated with default parameters, and default definitions
 **/
 
 /** \ingroup core
   * \defgroup core_struct 'Core' Structures
+  *
   * Structures that help to implement 'Core' functionality
 **/
 
@@ -1276,6 +1301,7 @@
 
 /** \ingroup core
   * \defgroup wmatom Window Manager and Clipboard-related Atoms
+  *
   * Pre-defined Atoms for the Window Manager and Clipboard processing
 **/
 

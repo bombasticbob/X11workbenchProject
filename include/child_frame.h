@@ -16,15 +16,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -42,7 +42,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -146,7 +146,7 @@ extern "C" {
   *
   * \param pChildFrame a pointer to the WBChildFrame associated with the window.  Can not be NULL.
   * \param pOwner A pointer to the owning WBFrameWindow.  Can not be NULL.
-  * \param rFontSet The desired font set, or 'None' to use the default
+  * \param pFont The desired WB_FONTC font, or 'NULL' to use the default
   * \param szFocusMenu A const pointer to a text-based menu resource describing the menu that should appear when the Child Frame's tab has the focus.  Can be NULL if none.
   * \param pHandlerArray A const pointer to an array of WBFWMenuHandler structures for the 'focus' menu handler.  Can be NULL if none.
   * \param pUserCallback A pointer to the callback function that handles messages (Return 0 for default handling, != 0 if handled).  Can be NULL.
@@ -172,7 +172,7 @@ extern "C" {
   *
   * Header File:  child_frame.h
 **/
-int FWInitChildFrame(WBChildFrame *pChildFrame, WBFrameWindow *pOwner, XFontSet rFontSet,
+int FWInitChildFrame(WBChildFrame *pChildFrame, WBFrameWindow *pOwner, WB_FONTC pFont,
                      const char *szFocusMenu, const WBFWMenuHandler *pHandlerArray,
                      WBWinEvent pUserCallback, int fFlags);
 

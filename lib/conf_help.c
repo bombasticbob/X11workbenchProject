@@ -13,15 +13,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -39,7 +39,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -670,20 +670,33 @@ void * CHOpenConfFile(const char *szAppName, int iFlags)
 
   if(!(iFlags & CH_FLAGS_GLOBAL)) // not "global only"
   {
-    strcpy(szLocalPath0, szLocalPath);
-    if(!szLocalPath0[0] || szLocalPath0[strlen(szLocalPath0)-1] != '/')
+    // NOTE:  the new standard for config files is:
+    //
+    // ~/.config/application/whatever
+    // ~/.local/share/application/whatever
+    //
+    // the old standard was ~/.application/whatever
+    //
+    // TODO:  a utility to move old files to new location?  yeah probably not...
+
+
+    strcpy(szLocalPath0, szLocalPath); // ~/.local/share/
+    if(!szLocalPath0[0] || szLocalPath0[strlen(szLocalPath0)-1] != '/') // unlikely
     {
       strcat(szLocalPath0, "/");
     }
-    strcat(szLocalPath0, ".");
-    strncat(szLocalPath0, szAppName, sizeof(szLocalPath0) - strlen(szLocalPath0) - 1);
+//    strcat(szLocalPath0, "."); don't prepend a dot any more
+    strncat(szLocalPath0, szAppName, sizeof(szLocalPath0) - strlen(szLocalPath0) - 1);  // now contains ~/.local/share/appname
 
     // make sure the directory 'szLocalPath0' exists
     p4 = WBGetCanonicalPath(szLocalPath0);
     if(p4)
     {
-      mkdir(p4, 0755); // TODO:  check user's UMASK, 'stat' first to see if I need to create it, etc.
-      strncpy(szLocalPath0, p4, sizeof(szLocalPath0));
+      if(!WBIsDirectory(p4)) // see if it exists first...
+      {
+        WBMkDir(p4, 0755); // TODO:  check user's UMASK ???
+      }
+      strncpy(szLocalPath0, p4, sizeof(szLocalPath0)); // the canonical path
       WBFree(p4);
     }
 
@@ -2410,7 +2423,7 @@ static const char *InternalParseXML(CHXMLEntry **ppOrigin, int *pcbOrigin, CHXML
 CHXMLEntry *CHParseXML(const char *pXMLData, int cbLength)
 {
 CHXMLEntry *pRval = NULL;
-CHXMLEntry *pXE, *pXCur, *pXPrev;
+CHXMLEntry *pXE, *pXCur;
 int cbRval, cbData, cbNeed, cbOffs;
 const char *pEnd = pXMLData + cbLength;
 const char *pCur;
@@ -2445,7 +2458,6 @@ char *pData, *pCurData;
 
   pCur = pXMLData;
   pXCur = pRval;
-  pXPrev = NULL;
   pCurData = pData;
 
   *pData = 0; // ending zero byte - must be present at pData[length]

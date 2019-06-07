@@ -13,15 +13,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -39,7 +39,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -789,7 +789,7 @@ int WBCalcHScrollDragPos(WB_SCROLLINFO *pScrollInfo, int iX)
 }
 
 
-void WBUpdateScrollBarGeometry(WB_SCROLLINFO *pSI, XFontSet fontSetRef,
+void WBUpdateScrollBarGeometry(WB_SCROLLINFO *pSI, WB_FONTC pFont,
                                WB_GEOM *pgeomClient, WB_GEOM *pgeomUsable)
 {
 WB_GEOM geom;
@@ -798,9 +798,9 @@ XCharStruct xBounds;
 
   // TODO:  data validation
 
-  if(fontSetRef == None)
+  if(!pFont)
   {
-    fontSetRef = WBGetDefaultFontSet(WBGetDefaultDisplay());
+    pFont = WBGetDefaultFont();
   }
 
   geom.x = pgeomClient->x;
@@ -808,9 +808,9 @@ XCharStruct xBounds;
   geom.width = pgeomClient->width;
   geom.height = pgeomClient->height;
 
-  xBounds = WBFontSetMaxBounds(/*pDisplay*/WBGetDefaultDisplay(), fontSetRef);
+  xBounds = WBFontMaxBounds(pFont);
 
-  iVScrollWidth = WBTextWidth(fontSetRef, "X", 1) * 2 + 4; // standard width of vertical scrollbar
+  iVScrollWidth = WBTextWidth(pFont, "X", 1) * 2 + 4; // standard width of vertical scrollbar
   iHScrollHeight = xBounds.ascent + xBounds.descent + 4;
 
   WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_ScrollBar,
@@ -859,6 +859,68 @@ XCharStruct xBounds;
                  pSI->iVMax,       pSI->iHMax);
 }
 
+void WBInvalidateVScrollGeom(Window wID, WB_SCROLLINFO *pScrollInfo, int bAll, int bUpdate)
+{
+WB_GEOM geom;
+
+  if(wID == None || !pScrollInfo)
+  {
+    return;
+  }
+
+  // calculate geometry of the scrollbar minus the up/down buttons and border
+
+  geom.border = 0;
+
+  if(bAll)
+  {
+    geom.x = pScrollInfo->geomVBar.x;
+    geom.y = pScrollInfo->geomVBar.y;
+    geom.width = pScrollInfo->geomVBar.width;
+    geom.height = pScrollInfo->geomVBar.height;
+  }
+  else
+  {
+    geom.x = pScrollInfo->geomVBar.x;
+    geom.y = pScrollInfo->geomVUp.y + pScrollInfo->geomVUp.height;
+    geom.width = pScrollInfo->geomVBar.width;
+    geom.height = pScrollInfo->geomVDown.y - geom.y;
+  }
+
+  WBInvalidateGeom(wID, &geom, bUpdate); // invalidate scroll area before notifying
+}
+
+void WBInvalidateHScrollGeom(Window wID, WB_SCROLLINFO *pScrollInfo, int bAll, int bUpdate)
+{
+WB_GEOM geom;
+
+  if(wID == None || !pScrollInfo)
+  {
+    return;
+  }
+
+  // calculate geometry of the scrollbar minus the left/right buttons and border
+
+  geom.border = 0;
+
+  if(bAll)
+  {
+    geom.x = pScrollInfo->geomHBar.x;
+    geom.y = pScrollInfo->geomHBar.y;
+    geom.width = pScrollInfo->geomHBar.width;
+    geom.height = pScrollInfo->geomHBar.height;
+  }
+  else
+  {
+    geom.x = pScrollInfo->geomHLeft.x + pScrollInfo->geomHLeft.width;
+    geom.y = pScrollInfo->geomHBar.y;
+    geom.width = pScrollInfo->geomHRight.x - geom.x;
+    geom.height = pScrollInfo->geomHBar.height;
+  }
+
+  WBInvalidateGeom(wID, &geom, bUpdate); // invalidate scroll area before notifying
+}
+
 
 int WBScrollBarEvent(Window wID, XEvent *pEvent, WB_SCROLLINFO *pScrollInfo)
 {
@@ -870,6 +932,7 @@ int iRval, iX, iY, iDirection, iPosition;
     return 0; // only client message events and valid parameters
   }
 
+  // TODO handle mouse-up events ??
   if(pEvent->xclient.message_type == aWB_POINTER)
   {
     if(pEvent->xclient.data.l[0] == WB_POINTER_CLICK)
@@ -884,7 +947,7 @@ int iRval, iX, iY, iDirection, iPosition;
 
         if(WB_LIKELY(pScrollInfo != NULL))
         {
-          iDirection = WB_SCROLL_NA;
+          iDirection = (int)WB_SCROLL_NA;
           iPosition = 0;
 
           if(WBPointInGeom(iX, iY, pScrollInfo->geomVBar))
@@ -906,7 +969,6 @@ int iRval, iX, iY, iDirection, iPosition;
               // ON THE KNOB - VScroll
 
               iDirection = WB_SCROLL_KNOB;
-//              iPosition = pScrollInfo->iVMin; //pListInfo->nTop; // NO!
               iPosition = WBCalcVScrollDragPos(pScrollInfo, iY);
 
               if(iPosition < 0)
@@ -916,8 +978,6 @@ int iRval, iX, iY, iDirection, iPosition;
 
               WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Event,
                              "%s Mouse click in scroll bar (knob)\n", __FUNCTION__);
-
-              // TODO:  determine position of knob
             }
             else if(iY >= pScrollInfo->geomVUp.y + pScrollInfo->geomVUp.height &&
                     iY < pScrollInfo->geomVKnob.y)
@@ -1211,14 +1271,14 @@ int iRval, iX, iY, iDirection, iPosition;
 // this assumes WB_SCROLLINFO is valid.  To make it so, call WBUpdateScrollBarGeometry() or similar
 
 void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable wID,
-                       GC gc, WB_GEOM *pgeomClient)
+                       WBGC gc, WB_GEOM *pgeomClient)
 {
   CheckInitScrollColors();
 
   // fill scrollbar with background color
-  XSetForeground(pDisplay, gc, clrScrollBG.pixel);
-  XFillRectangle(pDisplay, wID, gc, pScrollInfo->geomHBar.x - 1, pScrollInfo->geomHBar.y,
-                 pScrollInfo->geomHBar.width + 1, pScrollInfo->geomHBar.height);
+  WBSetForeground(gc, clrScrollBG.pixel);
+  WBFillRectangle(pDisplay, wID, gc, pScrollInfo->geomHBar.x - 1, pScrollInfo->geomHBar.y,
+                  pScrollInfo->geomHBar.width + 1, pScrollInfo->geomHBar.height);
 
   // draw 3D borders around everything
 
@@ -1276,14 +1336,14 @@ void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable w
 // NOTE:  this assumes WB_SCROLLINFO is valid.  To make it so, call WBUpdateScrollBarGeometry() or similar
 
 void WBPaintVScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable wID,
-                       GC gc, WB_GEOM *pgeomClient)
+                       WBGC gc, WB_GEOM *pgeomClient)
 {
   CheckInitScrollColors();
 
   // fill scrollbar with background color
-  XSetForeground(pDisplay, gc, clrScrollBG.pixel);
-  XFillRectangle(pDisplay, wID, gc, pScrollInfo->geomVBar.x - 1, pScrollInfo->geomVBar.y,
-                 pScrollInfo->geomVBar.width + 1, pScrollInfo->geomVBar.height);
+  WBSetForeground(gc, clrScrollBG.pixel);
+  WBFillRectangle(pDisplay, wID, gc, pScrollInfo->geomVBar.x - 1, pScrollInfo->geomVBar.y,
+                  pScrollInfo->geomVBar.width + 1, pScrollInfo->geomVBar.height);
 
   // draw 3D borders around everything
 
@@ -1351,7 +1411,7 @@ void WBPaintVScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable w
 //                                                                                                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void WBDrawBorderRect(Display *pDisplay, Drawable wID, GC gc,
+void WBDrawBorderRect(Display *pDisplay, Drawable wID, WBGC gc,
                       WB_GEOM *pgeomBorder, unsigned long lBorderColor)
 {
 XPoint xpt[5];
@@ -1361,7 +1421,7 @@ XPoint xpt[5];
     return; // parameter validation
   }
 
-  XSetForeground(pDisplay, gc, lBorderColor);
+  WBSetForeground(gc, lBorderColor);
 
   xpt[0].x=pgeomBorder->x;
   xpt[0].y=pgeomBorder->y;
@@ -1383,10 +1443,10 @@ XPoint xpt[5];
   xpt[4].x = xpt[0].x;
   xpt[4].y = xpt[0].y + 1;   // exclude final point
 
-  XDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
+  WBDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
 }
 
-void WBDraw3DBorderRect(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomBorder,
+void WBDraw3DBorderRect(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomBorder,
                         unsigned long lBorderColor1, unsigned long lBorderColor2)
 {
 XPoint xpt[4];
@@ -1399,7 +1459,7 @@ int iR, iG, iB;
     return; // parameter validation
   }
 
-  XSetForeground(pDisplay, gc, lBorderColor1);
+  WBSetForeground(gc, lBorderColor1);
   xpt[0].x = pgeomBorder->x;
   xpt[0].y = pgeomBorder->y
            + pgeomBorder->height - 1 - 1;  // exclude first point
@@ -1411,9 +1471,9 @@ int iR, iG, iB;
            + pgeomBorder->width - 1 - 1;   // exclude last point
   xpt[2].y = xpt[1].y;
 
-  XDrawLines(pDisplay, wID, gc, xpt, 3, CoordModeOrigin);
+  WBDrawLines(pDisplay, wID, gc, xpt, 3, CoordModeOrigin);
 
-  XSetForeground(pDisplay, gc, lBorderColor2);
+  WBSetForeground(gc, lBorderColor2);
 
   xpt[0].x = pgeomBorder->x
            + pgeomBorder->width - 1;
@@ -1426,7 +1486,7 @@ int iR, iG, iB;
   xpt[2].x = pgeomBorder->x + 1;              // exclude final point
   xpt[2].y = xpt[1].y;
 
-  XDrawLines(pDisplay, wID, gc, xpt, 3, CoordModeOrigin);
+  WBDrawLines(pDisplay, wID, gc, xpt, 3, CoordModeOrigin);
 
   // Use the RGB info to calculate an 'average' color for the corners
 
@@ -1460,7 +1520,7 @@ int iR, iG, iB;
 //                 (unsigned int)lBorderColor1, (unsigned int)lBorderColor2,
 //                 (unsigned int)clr.pixel, clr.red, clr.green, clr.blue);
 
-  XSetForeground(pDisplay, gc, clr.pixel);
+  WBSetForeground(gc, clr.pixel);
 
   xpt[0].x = pgeomBorder->x;
   xpt[1].y = pgeomBorder->y;
@@ -1468,13 +1528,13 @@ int iR, iG, iB;
   xpt[1].x = xpt[0].x + pgeomBorder->width - 1;
   xpt[0].y = xpt[1].y + pgeomBorder->height - 1;
 
-  XDrawPoints(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
+  WBDrawPoints(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
 
-  XSetForeground(pDisplay, gc, lBorderColor1);
+  WBSetForeground(gc, lBorderColor1);
 
 }
 
-void WBDrawBorderElipse(Display *pDisplay, Drawable wID, GC gc,
+void WBDrawBorderElipse(Display *pDisplay, Drawable wID, WBGC gc,
                         WB_GEOM *pgeomBorder, unsigned long lBorderColor)
 {
   if(!pgeomBorder || !pDisplay || wID == None || gc == None)
@@ -1482,15 +1542,15 @@ void WBDrawBorderElipse(Display *pDisplay, Drawable wID, GC gc,
     return; // parameter validation
   }
 
-  XSetForeground(pDisplay, gc, lBorderColor);
+  WBSetForeground(gc, lBorderColor);
 
-  XDrawArc(pDisplay, wID, gc,
-           pgeomBorder->x, pgeomBorder->y,
-           pgeomBorder->width, pgeomBorder->height,
-           0, 360 * 64); // draw a full circle within the geom bounds
+  WBDrawArc(pDisplay, wID, gc,
+            pgeomBorder->x, pgeomBorder->y,
+            pgeomBorder->width, pgeomBorder->height,
+            0, 360 * 64); // draw a full circle within the geom bounds
 }
 
-void WBDraw3DBorderElipse(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomBorder,
+void WBDraw3DBorderElipse(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomBorder,
                           unsigned long lBorderColor1, unsigned long lBorderColor2)
 {
   if(!pgeomBorder || !pDisplay || wID == None || gc == None)
@@ -1499,40 +1559,40 @@ void WBDraw3DBorderElipse(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeom
   }
 
   // use lBorderColor1 from 45 to 225, and lBorderColor2 from 225 back to 45
-  // (positive angles indicate counterclockwise rotation for XDrawArc)
+  // (positive angles indicate counterclockwise rotation for WBDrawArc)
 
-  XSetForeground(pDisplay, gc, lBorderColor2);
+  WBSetForeground(gc, lBorderColor2);
 
-  XDrawArc(pDisplay, wID, gc,
-           pgeomBorder->x, pgeomBorder->y,
-           pgeomBorder->width, pgeomBorder->height,
-           0, 360 * 64); // entire circle
+  WBDrawArc(pDisplay, wID, gc,
+            pgeomBorder->x, pgeomBorder->y,
+            pgeomBorder->width, pgeomBorder->height,
+            0, 360 * 64); // entire circle
 
-  XSetForeground(pDisplay, gc, lBorderColor1);
+  WBSetForeground(gc, lBorderColor1);
 
-  XDrawArc(pDisplay, wID, gc,
-           pgeomBorder->x, pgeomBorder->y,
-           pgeomBorder->width, pgeomBorder->height,
-           45 * 64, 180 * 64); // upper half-circle 45 to 180
+  WBDrawArc(pDisplay, wID, gc,
+            pgeomBorder->x, pgeomBorder->y,
+            pgeomBorder->width, pgeomBorder->height,
+            45 * 64, 180 * 64); // upper half-circle 45 to 180
 
-  XDrawArc(pDisplay, wID, gc,
-           pgeomBorder->x, pgeomBorder->y,
-           pgeomBorder->width, pgeomBorder->height,
-           -135 * 64, -180 * 64); // upper half-circle 180 to 225 (-135)
+  WBDrawArc(pDisplay, wID, gc,
+            pgeomBorder->x, pgeomBorder->y,
+            pgeomBorder->width, pgeomBorder->height,
+            -135 * 64, -180 * 64); // upper half-circle 180 to 225 (-135)
 
-//  XSetForeground(pDisplay, gc, lBorderColor2);
+//  WBSetForeground(gc, lBorderColor2);
 //
-//  XDrawArc(pDisplay, wID, gc,
-//           pgeomBorder->x, pgeomBorder->y,
-//           pgeomBorder->width, pgeomBorder->height,
-//           -45 * 64, -225 * 64); // lower half-circle
-////           225 * 64, 45 * 64); // lower half-circle
+//  WBDrawArc(pDisplay, wID, gc,
+//            pgeomBorder->x, pgeomBorder->y,
+//            pgeomBorder->width, pgeomBorder->height,
+//            -45 * 64, -225 * 64); // lower half-circle
+////            225 * 64, 45 * 64); // lower half-circle
 }
 
-void WBDrawDashedRect(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect, unsigned long lColor)
+void WBDrawDashedRect(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor)
 {
 static const char dash_list[4]={1,2,2,1};
-GC gc2;
+WBGC gc2;
 
 
   gc2 = WBGetWindowCopyGC2(wID, gc);
@@ -1540,12 +1600,12 @@ GC gc2;
   if(gc2)
   {
     WBDrawBorderRect(pDisplay, wID, gc2, pgeomRect, WhitePixel(pDisplay, DefaultScreen(pDisplay)));
-    XSetDashes(pDisplay, gc2, 1, dash_list, 4);
-    XSetLineAttributes(pDisplay, gc2, 1, LineOnOffDash, CapNotLast, JoinBevel);
-    XSetBackground(pDisplay, gc2, WhitePixel(pDisplay, DefaultScreen(pDisplay)));
+    WBSetDashes(gc2, 1, dash_list, 4);
+    WBSetLineAttributes(gc2, 1, LineOnOffDash, CapNotLast, JoinBevel);
+    WBSetBackground(gc2, WhitePixel(pDisplay, DefaultScreen(pDisplay)));
     WBDrawBorderRect(pDisplay, wID, gc2, pgeomRect, lColor);
 
-    XFreeGC(pDisplay, gc2);
+    WBFreeGC(gc2);
   }
   else
   {
@@ -1553,16 +1613,16 @@ GC gc2;
   }
 }
 
-void WBDrawLeftArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect, unsigned long lColor)
+void WBDrawLeftArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor)
 {
 XPoint xpt[5];
 long lBG, lFG;
 
-  lBG = WBGetGCBGColor(pDisplay, gc);
-  lFG = WBGetGCFGColor(pDisplay, gc); // save color context
+  lBG = WBGetGCBGColor(gc);
+  lFG = WBGetGCFGColor(gc); // save color context
 
-  XSetForeground(pDisplay, gc, lColor);
-  XSetBackground(pDisplay, gc, lColor);
+  WBSetForeground(gc, lColor);
+  WBSetBackground(gc, lColor);
 
   // LEFT ARROW
   xpt[0].x = pgeomRect->x + (pgeomRect->width >> 2);
@@ -1576,23 +1636,23 @@ long lBG, lFG;
   xpt[4].x = xpt[0].x;
   xpt[4].y = xpt[0].y;
 
-  XDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
-  XFillPolygon(pDisplay, wID, gc, xpt, 5, /*Convex*/Nonconvex, CoordModeOrigin);
+  WBDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
+  WBFillPolygon(pDisplay, wID, gc, xpt, 5, /*Convex*/Nonconvex, CoordModeOrigin);
 
-  XSetForeground(pDisplay, gc, lFG);
-  XSetBackground(pDisplay, gc, lBG); // restore color context
+  WBSetForeground(gc, lFG);
+  WBSetBackground(gc, lBG); // restore color context
 }
 
-void WBDrawUpArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect, unsigned long lColor)
+void WBDrawUpArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor)
 {
 XPoint xpt[5];
 long lBG, lFG;
 
-  lBG = WBGetGCBGColor(pDisplay, gc);
-  lFG = WBGetGCFGColor(pDisplay, gc); // save color context
+  lBG = WBGetGCBGColor(gc);
+  lFG = WBGetGCFGColor(gc); // save color context
 
-  XSetForeground(pDisplay, gc, lColor);
-  XSetBackground(pDisplay, gc, lColor);
+  WBSetForeground(gc, lColor);
+  WBSetBackground(gc, lColor);
 
   xpt[0].x = pgeomRect->x + (pgeomRect->width >> 2) + (pgeomRect->width >> 2);
   xpt[0].y = pgeomRect->y + (pgeomRect->height >> 2);
@@ -1605,23 +1665,23 @@ long lBG, lFG;
   xpt[4].x = xpt[0].x;
   xpt[4].y = xpt[0].y;
 
-  XDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
-  XFillPolygon(pDisplay, wID, gc, xpt, 5, /*Convex*/Nonconvex, CoordModeOrigin);
+  WBDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
+  WBFillPolygon(pDisplay, wID, gc, xpt, 5, /*Convex*/Nonconvex, CoordModeOrigin);
 
-  XSetForeground(pDisplay, gc, lFG);
-  XSetBackground(pDisplay, gc, lBG); // restore color context
+  WBSetForeground(gc, lFG);
+  WBSetBackground(gc, lBG); // restore color context
 }
 
-void WBDrawRightArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect, unsigned long lColor)
+void WBDrawRightArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor)
 {
 XPoint xpt[5];
 long lBG, lFG;
 
-  lBG = WBGetGCBGColor(pDisplay, gc);
-  lFG = WBGetGCFGColor(pDisplay, gc); // save color context
+  lBG = WBGetGCBGColor(gc);
+  lFG = WBGetGCFGColor(gc); // save color context
 
-  XSetForeground(pDisplay, gc, lColor);
-  XSetBackground(pDisplay, gc, lColor);
+  WBSetForeground(gc, lColor);
+  WBSetBackground(gc, lColor);
 
   // RIGHT ARROW
   xpt[0].x = pgeomRect->x + pgeomRect->width - 1 - (pgeomRect->width >> 2);
@@ -1635,23 +1695,23 @@ long lBG, lFG;
   xpt[4].x = xpt[0].x;
   xpt[4].y = xpt[0].y;
 
-  XDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
-  XFillPolygon(pDisplay, wID, gc, xpt, 5, /*Convex*/Nonconvex, CoordModeOrigin);
+  WBDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
+  WBFillPolygon(pDisplay, wID, gc, xpt, 5, /*Convex*/Nonconvex, CoordModeOrigin);
 
-  XSetForeground(pDisplay, gc, lFG);
-  XSetBackground(pDisplay, gc, lBG); // restore color context
+  WBSetForeground(gc, lFG);
+  WBSetBackground(gc, lBG); // restore color context
 }
 
-void WBDrawDownArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect, unsigned long lColor)
+void WBDrawDownArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor)
 {
 XPoint xpt[5];
 long lBG, lFG;
 
-  lBG = WBGetGCBGColor(pDisplay, gc);
-  lFG = WBGetGCFGColor(pDisplay, gc); // save color context
+  lBG = WBGetGCBGColor(gc);
+  lFG = WBGetGCFGColor(gc); // save color context
 
-  XSetForeground(pDisplay, gc, lColor);
-  XSetBackground(pDisplay, gc, lColor);
+  WBSetForeground(gc, lColor);
+  WBSetBackground(gc, lColor);
 
   xpt[0].x = pgeomRect->x + (pgeomRect->width >> 2) + (pgeomRect->width >> 2);
   xpt[0].y = pgeomRect->y + pgeomRect->height - 1 - (pgeomRect->height >> 2);
@@ -1664,18 +1724,18 @@ long lBG, lFG;
   xpt[4].x = xpt[0].x;
   xpt[4].y = xpt[0].y;
 
-  XDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
-  XFillPolygon(pDisplay, wID, gc, xpt, 5, /*Convex*/Nonconvex, CoordModeOrigin);
+  WBDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
+  WBFillPolygon(pDisplay, wID, gc, xpt, 5, /*Convex*/Nonconvex, CoordModeOrigin);
 
-  XSetForeground(pDisplay, gc, lFG);
-  XSetBackground(pDisplay, gc, lBG); // restore color context
+  WBSetForeground(gc, lFG);
+  WBSetBackground(gc, lBG); // restore color context
 }
 
-void WBDraw3DBorderTab(Display *pDisplay, Drawable dw, GC gc, WB_GEOM *pgeomOutline,
+void WBDraw3DBorderTab(Display *pDisplay, Drawable dw, WBGC gc, WB_GEOM *pgeomOutline,
                        int fFocus, unsigned long lFGColor, unsigned long lBGColor,
                        unsigned long lBorderColor1, unsigned long lBorderColor2,
                        unsigned long lHighlightColor,
-                       XFontSet fontSet, XFontSet fontSetBold,
+                       WB_FONTC pFont, WB_FONTC pFontBold,
                        Atom aGraphic, const char *szText)
 {
 XPoint xpt[13];
@@ -1684,21 +1744,21 @@ unsigned long lHighlightColor2;
 int iFontHeight, bFocus;
 int i1, i2, iR, iG, iB, iY, iU, iV, iYBG, iY0, iU0, iV0;
 Region rgnClip;
-GC gc2;
+WBGC gc2;
 WB_RECT rctTemp;
 
 
-  if(fontSet == None)
+  if(!pFont)
   {
-    fontSet = WBGetDefaultFontSet(pDisplay);
+    pFont = WBGetDefaultFont();
   }
 
-  if(fontSetBold == None)
+  if(!pFontBold)
   {
-    fontSetBold = WBGetDefaultFontSet(pDisplay);
+    pFontBold = WBGetDefaultFont();
   }
 
-  iFontHeight = WBFontSetHeight(pDisplay, fontSet);
+  iFontHeight = WBFontHeight(pFont);
 
 
   // begin by creating a region that consists of my 'rounded rect' polygon
@@ -1761,12 +1821,14 @@ WB_RECT rctTemp;
   }
 
   // select the clip region
-  XSetRegion(pDisplay, gc2, rgnClip);
+  WBSetRegion(gc2, rgnClip);
 
   // set 'bFocus' to indicate if I have focus.  'fFocus' also indicates 'x' button state
   // 0 or < -1 is "I do not have focus".  -1 or > 0 is "I have focus".  negative is 'x button clicked'
 
   bFocus = fFocus > 0 || fFocus == -1;
+
+  lHighlightColor2 = lHighlightColor; // initially, to avoid warnings later.  it's only assigned/used when bFocus is TRUE
 
   if(bFocus)
   {
@@ -1866,7 +1928,7 @@ WB_RECT rctTemp;
 //                     iY, iU, iV,
 //                     clrTemp.red, clrTemp.green, clrTemp.blue, clrTemp.pixel, clrTemp.pixel);
 
-      XSetForeground(pDisplay, gc2, clrTemp.pixel); // select this color
+      WBSetForeground(gc2, clrTemp.pixel); // select this color
 
       xpt2[0].x = pgeomOutline->x + 1;
       xpt2[0].y = i1;
@@ -1880,7 +1942,7 @@ WB_RECT rctTemp;
       }
 
       // draw the line
-      XDrawLines(pDisplay, dw, gc2, xpt2, 2, CoordModeOrigin); // stop at point 6 (don't paint 6 to 7)
+      WBDrawLines(pDisplay, dw, gc2, xpt2, 2, CoordModeOrigin); // stop at point 6 (don't paint 6 to 7)
     }
   }
 
@@ -1918,8 +1980,8 @@ WB_RECT rctTemp;
 
   // make a copy of the GC
 
-  XSetForeground(pDisplay, gc2, lFGColor);
-  XSetBackground(pDisplay, gc2, lBGColor);
+  WBSetForeground(gc2, lFGColor);
+  WBSetBackground(gc2, lBGColor);
 
   // Use the RGB info to calculate an 'average' color for the corner transition
 
@@ -1951,29 +2013,29 @@ WB_RECT rctTemp;
 
   // next, draw polygon using 3D colors
 
-  XSetForeground(pDisplay, gc2, lBorderColor1);
-  XDrawLines(pDisplay, dw, gc2, xpt, 7, CoordModeOrigin); // stop at point 6 (don't paint 6 to 7)
+  WBSetForeground(gc2, lBorderColor1);
+  WBDrawLines(pDisplay, dw, gc2, xpt, 7, CoordModeOrigin); // stop at point 6 (don't paint 6 to 7)
 
-  XSetForeground(pDisplay, gc2, lBorderColor2);
-  XDrawLines(pDisplay, dw, gc2, xpt + 8, 2, CoordModeOrigin); // stop at point 6 (don't paint 6 or 7)
+  WBSetForeground(gc2, lBorderColor2);
+  WBDrawLines(pDisplay, dw, gc2, xpt + 8, 2, CoordModeOrigin); // stop at point 6 (don't paint 6 or 7)
 
   if(bFocus)
   {
     // for non-focus, draw the bottom (7 to 8) using border color 2.  for focus, draw as background color
 
-    XSetForeground(pDisplay, gc2, lBGColor);
+    WBSetForeground(gc2, lBGColor);
   }
 
-  XDrawLines(pDisplay, dw, gc2, xpt + 9, 2, CoordModeOrigin); // the bottom line
+  WBDrawLines(pDisplay, dw, gc2, xpt + 9, 2, CoordModeOrigin); // the bottom line
 
   // paint pixels 6 and 7 with the 'average' color
-  XSetForeground(pDisplay, gc2, clrAvg.pixel);
-  XDrawPoints(pDisplay, dw, gc2, xpt + 6, 2, CoordModeOrigin);
+  WBSetForeground(gc2, clrAvg.pixel);
+  WBDrawPoints(pDisplay, dw, gc2, xpt + 6, 2, CoordModeOrigin);
 
   if(!bFocus)
   {
     // when not in focus, also do avg color for the first pixel.  this completes the 3D effect 'color transition'
-    XDrawPoints(pDisplay, dw, gc2, xpt, 1, CoordModeOrigin);
+    WBDrawPoints(pDisplay, dw, gc2, xpt, 1, CoordModeOrigin);
   }
 
 
@@ -1999,11 +2061,11 @@ WB_RECT rctTemp;
     rctTemp.right--;
     rctTemp.bottom--;
 
-    XSetBackground(pDisplay, gc2, lBGColor);
-//    XSetForeground(pDisplay, gc2, lHighlightColor2);
-    XSetForeground(pDisplay, gc2, lBGColor);
+    WBSetBackground(gc2, lBGColor);
+//    WBSetForeground(gc2, lHighlightColor2);
+    WBSetForeground(gc2, lBGColor);
 
-    DTDrawSingleLineText(fontSet, szText, pDisplay, gc2, dw, 0, 0, &rctTemp,
+    DTDrawSingleLineText(pFont, szText, pDisplay, gc2, dw, 0, 0, &rctTemp,
                          DTAlignment_HCENTER | DTAlignment_VCENTER | DTAlignment_ANTIALIAS);
 
     rctTemp.left += 2;
@@ -2011,11 +2073,11 @@ WB_RECT rctTemp;
     rctTemp.right += 2;
     rctTemp.bottom += 2;
 
-//    XSetForeground(pDisplay, gc2, lBGColor);
-    XSetForeground(pDisplay, gc2, lHighlightColor2);
+//    WBSetForeground(gc2, lBGColor);
+    WBSetForeground(gc2, lHighlightColor2);
 
     // for now just do centered text
-    DTDrawSingleLineText(fontSet, szText, pDisplay, gc2, dw, 0, 0, &rctTemp,
+    DTDrawSingleLineText(pFont, szText, pDisplay, gc2, dw, 0, 0, &rctTemp,
                          DTAlignment_HCENTER | DTAlignment_VCENTER | DTAlignment_ANTIALIAS);
 
 
@@ -2024,17 +2086,17 @@ WB_RECT rctTemp;
     rctTemp.right--;
     rctTemp.bottom--;
 
-//    XSetBackground(pDisplay, gc2, lHighlightColor2);
+//    WBSetBackground(gc2, lHighlightColor2);
   }
   else
   {
-    XSetBackground(pDisplay, gc2, lBGColor);
+    WBSetBackground(gc2, lBGColor);
   }
 
-  XSetForeground(pDisplay, gc2, lFGColor);
+  WBSetForeground(gc2, lFGColor);
 
   // for now just do centered text
-  DTDrawSingleLineText(fontSet, szText, pDisplay, gc2, dw, 0, 0, &rctTemp,
+  DTDrawSingleLineText(pFont, szText, pDisplay, gc2, dw, 0, 0, &rctTemp,
                        DTAlignment_HCENTER | DTAlignment_VCENTER | DTAlignment_ANTIALIAS);
 
 
@@ -2047,26 +2109,26 @@ WB_RECT rctTemp;
 
   if(fFocus < 0) // clicking 'x' ?
   {
-    XSetForeground(pDisplay, gc2, lHighlightColor);
-    XSetBackground(pDisplay, gc2, lHighlightColor);
+    WBSetForeground(gc2, lHighlightColor);
+    WBSetBackground(gc2, lHighlightColor);
   }
   else
   {
-    XSetForeground(pDisplay, gc2, lBGColor);
-    XSetBackground(pDisplay, gc2, lBGColor);
+    WBSetForeground(gc2, lBGColor);
+    WBSetBackground(gc2, lBGColor);
   }
 
   // fill in with selected colors
 
-  XFillRectangle(pDisplay, dw, gc2, rctTemp.left, rctTemp.top, rctTemp.right - rctTemp.left, rctTemp.bottom - rctTemp.top);
+  WBFillRectangle(pDisplay, dw, gc2, rctTemp.left, rctTemp.top, rctTemp.right - rctTemp.left, rctTemp.bottom - rctTemp.top);
 
   if(fFocus < 0) // clicking 'x' ?
   {
-    XSetForeground(pDisplay, gc2, lBGColor);
+    WBSetForeground(gc2, lBGColor);
   }
   else
   {
-    XSetForeground(pDisplay, gc2, lHighlightColor);
+    WBSetForeground(gc2, lHighlightColor);
   }
 
   // now draw the '+' using a BOLD font
@@ -2076,11 +2138,11 @@ WB_RECT rctTemp;
   rctTemp.top -= 2;
   rctTemp.bottom += 2; // big enough to 'center' properly
 
-  DTDrawSingleLineText(fontSetBold, "x", pDisplay, gc2, dw, 0, 0, &rctTemp,
+  DTDrawSingleLineText(pFontBold, "x", pDisplay, gc2, dw, 0, 0, &rctTemp,
                        DTAlignment_HCENTER | DTAlignment_VCENTER);
 
 
-  XFreeGC(pDisplay, gc2);
+  WBFreeGC(gc2);
   XDestroyRegion(rgnClip);
 
 

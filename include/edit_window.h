@@ -13,15 +13,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -39,7 +39,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -92,7 +92,7 @@ extern "C" {
 //typedef struct
 //{
 //  Window wSelf, wOwner;             // window identifiers for self, owner
-//  XFontStruct *pFont;               // default font for the window
+//  WB_FONT pFont;                    // default font for the window
 //  WBLineBuffer *pStart, *pEnd;      // pointers to start and end of linked buffer list
 //  WBLineBuffer *pBufArray;          // array of buffers for visible lines
 //  int nBufArray;                    // maximum size of buffer array
@@ -199,7 +199,7 @@ extern Atom aEW_EDIT_CHANGE;
   *
   * Header File:  edit_window.h
 **/
-WBEditWindow *WBCreateEditWindow(WBFrameWindow *pOwner, XFontStruct *pFont,
+WBEditWindow *WBCreateEditWindow(WBFrameWindow *pOwner, WB_FONT pFont,
                                  const char *szFocusMenu, const WBFWMenuHandler *pHandlerArray,
                                  int fFlags);
 

@@ -16,15 +16,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -42,7 +42,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -1171,7 +1171,7 @@ void * DLGCDefaultListInfoAllocator(const void *pData, int cbData)
 
 int DLGInitControlListInfo(WBDialogControl *pCtrl, int nFlags,
                            void *(*pfnAllocator)(const void *,int), void (*pfnDestructor)(void *),
-                           void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *, XFontSet),
+                           void (*pfnDisplay)(WBDialogControl *, void *, int, WBGC, WB_GEOM *, WB_FONTC),
                            int (*pfnSort)(const void *, const void *))
 {
 WB_DIALOG_PROP propTemp;
@@ -1207,7 +1207,7 @@ int i1;
 int DLGModifyControlListInfo(WBDialogControl *pCtrl, int bFlags, int nFlags,
                              int bAllocator, void *(*pfnAllocator)(const void *,int),
                              int bDestructor, void (*pfnDestructor)(void *),
-                             int bDisplay, void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *, XFontSet),
+                             int bDisplay, void (*pfnDisplay)(WBDialogControl *, void *, int, WBGC, WB_GEOM *, WB_FONTC),
                              int bSort, int (*pfnSort)(const void *, const void *))
 {
 WB_DIALOG_PROP propTemp;
@@ -1285,7 +1285,7 @@ LISTINFO *pLI;
 
 LISTINFO *DLGCListInfoConstructor(Window wOwner, int nMax, int nFlags,
                                   void *(*pfnAllocator)(const void *,int), void (*pfnDestructor)(void *),
-                                  void (*pfnDisplay)(WBDialogControl *, void *, int, GC, WB_GEOM *, XFontSet),
+                                  void (*pfnDisplay)(WBDialogControl *, void *, int, WBGC, WB_GEOM *, WB_FONTC),
                                   int (*pfnSort)(const void *, const void *))
 {
 LISTINFO *pRval = WBAlloc(sizeof(*pRval) + nMax * sizeof(const void *));
@@ -1369,8 +1369,8 @@ void **paData;
 //                                      // typically this will point to 'WBFree'
 //                                      // if NULL, the caller-supplied pointer is ignored
 //
-//  void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, GC gcPaint, WB_GEOM *pGeom);
-//                                      // generic function to display contents of item within 'pGeom' using GC
+//  void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, WBGC gcPaint, WB_GEOM *pGeom);
+//                                      // generic function to display contents of item within 'pGeom' using WBGC
 //                                      // typically one of the listbox 'display item' functions
 //
 //  int (*pfnSort)(const void *, const void *); // sort proc (NULL implies strcmp)
@@ -1783,7 +1783,7 @@ int iSel = DLGGetControlListSelection(pCtrl);
 // the default list control display proc
 ////////////////////////////////////////
 
-void DLGCDefaultListControlDisplayProc(WBDialogControl *pList, void *pData, int iSelected, GC gc, WB_GEOM *pGeom, XFontSet fontSet)
+void DLGCDefaultListControlDisplayProc(WBDialogControl *pList, void *pData, int iSelected, WBGC gc, WB_GEOM *pGeom, WB_FONTC pFont)
 {
 int iHPos;
 Window wID = pList->wID;
@@ -1793,30 +1793,30 @@ Display *pDisplay = WBGetWindowDisplay(wID);
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
                  "%s - Expose %d (%08xH) pData=%p\n", __FUNCTION__, (int)wID, (int)wID, pData);
 
-  if(fontSet == None)
+  if(!pFont)
   {
-    fontSet = WBGetWindowFontSet(wID);
+    pFont = WBQueryWindowFont(wID);
 
-    if(fontSet == None)
+    if(!pFont)
     {
-      fontSet = WBGetDefaultFontSet(pDisplay);
+      pFont = WBGetDefaultFont();
     }
   }
 
-  if(fontSet == None)
+  if(!pFont)
   {
     // TODO:  get font from dialog info
     WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
     return;
   }
 
-  iHPos = WBFontSetAvgCharWidth(pDisplay, fontSet);  // average character width is new horiz pos
+  iHPos = WBFontAvgCharWidth(pFont);  // average character width is new horiz pos
 
   // font setup
   BEGIN_XCALL_DEBUG_WRAPPER
 //  XClearWindow(pDisplay, wID);  // TODO:  rather than erase background, see if I need to
-  XSetForeground(pDisplay, gc, iSelected ? pList->clrHBG.pixel : pList->clrBG.pixel);
-  XFillRectangle(pDisplay, wID, gc, pGeom->x, pGeom->y, pGeom->width, pGeom->height);
+  WBSetForeground(gc, iSelected ? pList->clrHBG.pixel : pList->clrBG.pixel);
+  WBFillRectangle(pDisplay, wID, gc, pGeom->x, pGeom->y, pGeom->width, pGeom->height);
   END_XCALL_DEBUG_WRAPPER
 
   if(iSelected)
@@ -1843,26 +1843,26 @@ Display *pDisplay = WBGetWindowDisplay(wID);
     rctBounds.bottom = pGeom->y + pGeom->height;
 
 
-    XSetForeground(pDisplay, gc, iSelected ? pList->clrHFG.pixel : pList->clrFG.pixel);
-    XSetBackground(pDisplay, gc, iSelected ? pList->clrHBG.pixel : pList->clrBG.pixel);
+    WBSetForeground(gc, iSelected ? pList->clrHFG.pixel : pList->clrFG.pixel);
+    WBSetBackground(gc, iSelected ? pList->clrHBG.pixel : pList->clrBG.pixel);
 
     if(*szText)
     {
-      DTDrawSingleLineText(fontSet, szText, pDisplay, gc, wID, 0, 0, &rctBounds,
+      DTDrawSingleLineText(pFont, szText, pDisplay, gc, wID, 0, 0, &rctBounds,
                            DTAlignment_VCENTER | DTAlignment_HLEFT);
     }
 
     if(iSelected)  // selected item
     {
-      XSetForeground(pDisplay, gc, pList->clrFG.pixel);
-      XSetBackground(pDisplay, gc, pList->clrBG.pixel);
+      WBSetForeground(gc, pList->clrFG.pixel);
+      WBSetBackground(gc, pList->clrBG.pixel);
     }
   }
 
   // by convention, restore original objects/state
 
   BEGIN_XCALL_DEBUG_WRAPPER
-  XSetForeground(pDisplay, gc, WBGetWindowFGColor(wID));  // restore it at the end
+  WBSetForeground(gc, WBGetWindowFGColor(wID));  // restore it at the end
   END_XCALL_DEBUG_WRAPPER
 }
 
@@ -1875,7 +1875,7 @@ Display *pDisplay = WBGetWindowDisplay(wID);
 
 int DLGScrollBarHandler(Window wID, WBDialogControl *pCtrl, XEvent *pEvent)
 {
-int iRval, iX, iY, iDirection, iPosition;
+int iRval;
 WB_SCROLLINFO *pScrollInfo;
 
 
@@ -1933,8 +1933,8 @@ WB_SCROLLINFO *pScrollInfo;
         int iShift = lAltCtrlShift & WB_KEYEVENT_SHIFT;
         int iCtrl = lAltCtrlShift & WB_KEYEVENT_CTRL;
         int iAlt = lAltCtrlShift & WB_KEYEVENT_ALT;
-        int iBar = WB_SCROLL_NA;
-        int iDirection = WB_SCROLL_NA;
+        int iBar = (int)WB_SCROLL_NA;
+        int iDirection = (int)WB_SCROLL_NA;
 
         switch(lKey)
         {

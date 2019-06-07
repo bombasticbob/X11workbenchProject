@@ -13,15 +13,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -39,7 +39,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -1116,8 +1116,8 @@ int iR, iG, iB, iSat, iLum;
 XImage *pImage;
 
 
-  pImage = XGetImage(WBGetDefaultDisplay(), None, 0, 0, COLOR_IMAGE_SIZE, COLOR_IMAGE_SIZE,
-                     0xffffffff, XYPixmap);
+  pImage = WBXGetImage(WBGetDefaultDisplay(), None, 0, 0, COLOR_IMAGE_SIZE, COLOR_IMAGE_SIZE,
+                       0xffffffff, XYPixmap);
 
   if(pImage == None)
   {
@@ -1163,8 +1163,8 @@ int iR, iG, iB, iChroma, iRow;
 XImage *pImage;
 
 
-  pImage = XGetImage(pDisplay, None, 0, 0, COLOR_IMAGE_SIZE, CHROMA_RIBBON_HEIGHT,
-                     0xffffffff, XYPixmap);
+  pImage = WBXGetImage(pDisplay, None, 0, 0, COLOR_IMAGE_SIZE, CHROMA_RIBBON_HEIGHT,
+                       0xffffffff, XYPixmap);
 
   if(pImage == None)
   {
@@ -1304,7 +1304,7 @@ int iRval;
 
 static void ColorDialogAssignColorboxPixmap(Display *pDisplay, WBDialogControl *pCtrl, unsigned long lPixel)
 {
-GC gc;
+WBGC gc;
 Pixmap pxTemp;
 XGCValues xgcv;
 int iW = COLORBOX_PIXMAP_WIDTH;
@@ -1333,9 +1333,9 @@ int iH = COLORBOX_PIXMAP_HEIGHT;
   xgcv.function = GXcopy; // copy
   xgcv.cap_style = CapProjecting;
 
-  gc = XCreateGC(pDisplay, pCtrl->wID,
-                 (GCForeground | GCBackground | GCCapStyle | GCFunction | GCLineWidth),
-                 &xgcv);
+  gc = WBCreateGC(pDisplay, pCtrl->wID,
+                  (GCForeground | GCBackground | GCCapStyle | GCFunction | GCLineWidth),
+                  &xgcv);
 
   if(gc == None)
   {
@@ -1357,7 +1357,7 @@ int iH = COLORBOX_PIXMAP_HEIGHT;
   }
   else
   {
-    XFillRectangle(pDisplay, pxTemp, gc, 0, 0, iW, iH);
+    WBFillRectangle(pDisplay, pxTemp, gc, 0, 0, iW, iH);
 
     // set pixmap for control now - control will own it.
 
@@ -1366,7 +1366,7 @@ int iH = COLORBOX_PIXMAP_HEIGHT;
 
   WBDialogControlInvalidateGeom(pCtrl, NULL, 1); // paints immediately
 
-  XFreeGC(pDisplay, gc);
+  WBFreeGC(gc);
 }
 
 static void ColorDialogAssignLumaSatPixmap(Display *pDisplay, WBDialogControl *pCtrl, int iS, int iV)
@@ -1924,7 +1924,7 @@ Window wIDDlg;
 //////////////
 
 
-XFontSet DLGFontDialog(Display *pDisplay, Window wIDOwner, XFontSet fsDefault)
+WB_FONT DLGFontDialog(Display *pDisplay, Window wIDOwner, WB_FONTC pDefault)
 {
   return None;
 }
@@ -1949,7 +1949,7 @@ typedef struct _SPLASH_
   int iW, iH; // width/height of bitmap
   int iDepth; // depth, needed to create compatible pixmaps
   int nIter; // total # of iterations thus far
-  XFontSet fontSet;//Struct *pFont;
+  WB_FONT pFont;//Struct *pFont;
   int nGleam;      // current gleam center position
   WB_GEOM geomBorder;
   XStandardColormap cmap;
@@ -2023,7 +2023,7 @@ unsigned int ai1[3];
   data.clrWhite = WhitePixel(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
   data.iW = xattr.width;
   data.iH = xattr.height;
-  data.fontSet = None;  // must do this
+  data.pFont = NULL;  // must do this
   data.nGleam = 0;
   data.pImage = NULL;
   data.pImageData = NULL;
@@ -2108,7 +2108,7 @@ unsigned int ai1[3];
   BEGIN_XCALL_DEBUG_WRAPPER
   if(data.pImage)
   {
-    XDestroyImage(data.pImage);
+    WBXDestroyImage(data.pImage);
   }
 
   if(data.pixmap != None)
@@ -2123,9 +2123,9 @@ unsigned int ai1[3];
     data.pixmap2 = None;
   }
 
-  if(data.fontSet)
+  if(data.pFont)
   {
-    XFreeFontSet(WBGetDefaultDisplay(), data.fontSet);
+    WBFreeFont(WBGetDefaultDisplay(), data.pFont);
   }
   END_XCALL_DEBUG_WRAPPER
 }
@@ -2186,8 +2186,8 @@ struct _SPLASH_ *pData = (struct _SPLASH_ *)WBGetWindowData(wID, 0);
 static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
                                Window wID, struct _SPLASH_ *pData)
 {
-XFontSet fontSet;
-GC gc;
+WB_FONT pFont;
+WBGC gc;
 Pixmap pxTemp;
 XGCValues xgcv;
 WB_GEOM geomText;
@@ -2201,21 +2201,22 @@ int iX, iY, iTimeStart, iTimeEnd;
 
 //  gc = WBBeginPaint(wID, pEvent, &geomPaint);  // gnome b0rks this - window has absolute coordinates!
 
-  if(pData->fontSet == None && pData->szCopyright && *(pData->szCopyright))
+  if(pData->pFont == NULL && pData->szCopyright && *(pData->szCopyright))
   {
-    fontSet = DTCalcIdealFontSet(WBGetDefaultDisplay(), WBGetDefaultFontSet(WBGetDefaultDisplay()),
-                                 pData->szCopyright, &geomText);
+    pFont = DTCalcIdealFont(WBGetDefaultDisplay(), WBGetDefaultFont(),
+                            pData->szCopyright, &geomText);
 
-    if(fontSet == None)
+    if(!pFont)
     {
-      fontSet = WBFontSetFromFont(WBGetDefaultDisplay(), WBGetDefaultFont()); // makes a copy of the font set, basically
+      pFont = WBCopyFont(pDisplay, WBGetDefaultFont()); // makes a copy of the default font
     }
 
-    pData->fontSet = fontSet;
+    pData->pFont = pFont; // owned by the object now, so don't free it
   }
-
-  fontSet = pData->fontSet; // cache it for later
-
+  else
+  {
+    pFont = pData->pFont; // cache it for later
+  }
 
   bzero(&xgcv, sizeof(xgcv));
 //  if(pFont)
@@ -2229,9 +2230,9 @@ int iX, iY, iTimeStart, iTimeEnd;
   xgcv.function = GXcopy; // copy
   xgcv.cap_style = CapProjecting;
 
-  gc = XCreateGC(pDisplay, wID,
-                 (/*(xgcv.font ? GCFont | GCFillStyle : 0) | */GCForeground | GCBackground | GCCapStyle | GCFunction | GCLineWidth),
-                 &xgcv);
+  gc = WBCreateGC(pDisplay, wID,
+                  (/*(xgcv.font ? GCFont | GCFillStyle : 0) | */GCForeground | GCBackground | GCCapStyle | GCFunction | GCLineWidth),
+                  &xgcv);
 
   if(!gc)
   {
@@ -2258,21 +2259,26 @@ int iX, iY, iTimeStart, iTimeEnd;
   }
   else
   {
+    BEGIN_XCALL_DEBUG_WRAPPER
     pxTemp = XCreatePixmap(pDisplay, wID, pData->iW + 4, pData->iH + 4,
                            DefaultDepth(pDisplay, DefaultScreen(pDisplay)));
+    END_XCALL_DEBUG_WRAPPER
 
     if(pxTemp == None)
     {
       WB_ERROR_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
-      XFreeGC(pDisplay, gc);
+
+      WBFreeGC(gc);
       return 0;
     }
 
     if(pData->pixmap != None)  // just in case
     {
-      XCopyArea(pDisplay, pData->pixmap, pxTemp, gc,
+      BEGIN_XCALL_DEBUG_WRAPPER
+      XCopyArea(pDisplay, pData->pixmap, pxTemp, gc->gc,
                 0, 0, pData->iW, pData->iH,
                 pData->geomBorder.x + 2, pData->geomBorder.y + 2);
+      END_XCALL_DEBUG_WRAPPER
     }
     else
     {
@@ -2285,28 +2291,32 @@ int iX, iY, iTimeStart, iTimeEnd;
     xgcv.function = GXcopy; // copy
     xgcv.cap_style = CapProjecting;
 
-    XChangeGC(pDisplay, gc, GCCapStyle | GCFunction | GCLineWidth, &xgcv);
+    WBChangeGC(gc, GCCapStyle | GCFunction | GCLineWidth, &xgcv);
 
-    XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, 0,0, pData->iW + 3, 0);
-    XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, pData->iW + 3, 0, pData->iW + 3, pData->iH + 3);
-    XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, pData->iW + 3, pData->iH + 3, 0, pData->iH + 3);
-    XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, 0, pData->iH + 3, 0, 0);
+    WBDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, 0,0, pData->iW + 3, 0);
+    WBDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, pData->iW + 3, 0, pData->iW + 3, pData->iH + 3);
+    WBDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, pData->iW + 3, pData->iH + 3, 0, pData->iH + 3);
+    WBDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, 0, pData->iH + 3, 0, 0);
 
     pData->pixmap2 = pxTemp; // temporarily cache it here (I'll juggle it after allocating 2nd pixmap)
 
     // next, I must create a *new* temporary pixmap as my 'working' pixmap.  the previous one is the 'reference' pixmap
 
+    BEGIN_XCALL_DEBUG_WRAPPER
     pxTemp = XCreatePixmap(pDisplay, wID, pData->iW + 4, pData->iH + 4,
                            DefaultDepth(pDisplay, DefaultScreen(pDisplay)));
+    END_XCALL_DEBUG_WRAPPER
 
     if(pxTemp == None)
     {
       WB_ERROR_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
 
+      BEGIN_XCALL_DEBUG_WRAPPER
       XFreePixmap(WBGetDefaultDisplay(), pData->pixmap2); // restartability
+      END_XCALL_DEBUG_WRAPPER
       pData->pixmap2 = None;
 
-      XFreeGC(pDisplay, gc);
+      WBFreeGC(gc);
       return 0;
     }
 
@@ -2319,14 +2329,20 @@ int iX, iY, iTimeStart, iTimeEnd;
     pData->pixmap2 = pxTemp;        // and the 'working' copy into 'pixmap2' (which is also 'pxTemp')
 
     // make an exact duplicate without any clipping regions
-    XCopyArea(pDisplay, pData->pixmap, pxTemp, gc,
+    BEGIN_XCALL_DEBUG_WRAPPER
+    XCopyArea(pDisplay, pData->pixmap, pxTemp, gc->gc,
               0, 0, pData->iW + 4, pData->iH + 4, 0, 0);  // make a good copy of it at least once
+    END_XCALL_DEBUG_WRAPPER
   }
 
   if(pData->nIter <= 1)
   {
-//    WBClearWindow(wID, gc);  GC doesn't have a clip region yet, don't do this
+// TODO:  verify this is still a problem
+//    WBClearWindow(wID, gc);  WBGC doesn't have a clip region yet, don't do this
+
+    BEGIN_XCALL_DEBUG_WRAPPER
     XClearWindow(pDisplay, wID);  // erase background
+    END_XCALL_DEBUG_WRAPPER
   }
   else if(pData->nIter == SPLASH_FRAMERATE / 2) // after first half second
   {
@@ -2340,7 +2356,7 @@ int iX, iY, iTimeStart, iTimeEnd;
 
     // copyright string is 1 or 2 lines, for now use whatever font I end up with and draw lines separately
 
-    if(fontSet != None)
+    if(pFont)
     {
       WB_RECT rctBounds;
       rctBounds.left = geomText.x;
@@ -2348,7 +2364,7 @@ int iX, iY, iTimeStart, iTimeEnd;
       rctBounds.right = rctBounds.left + geomText.width;
       rctBounds.bottom = rctBounds.top + geomText.height;
 
-      DTDrawMultiLineText(fontSet, pData->szCopyright, pDisplay, gc, pData->pixmap,
+      DTDrawMultiLineText(pFont, pData->szCopyright, pDisplay, gc, pData->pixmap,
                           -8, 0, &rctBounds, DTAlignment_VCENTER | DTAlignment_HCENTER);
 #if 0
       p1 = pData->szCopyright;
@@ -2362,23 +2378,23 @@ int iX, iY, iTimeStart, iTimeEnd;
       if(!p2 || !*p2)
       {
         iX = geomText.x + (geomText.width - XTextWidth(pFont, p1, strlen(p1))) / 2;
-        iY = geomText.y + (geomText.height - pFont->max_bounds.ascent + pFont->max_bounds.descent) / 2
-           + pFont->max_bounds.ascent; // bottom of text
+        iY = geomText.y + (geomText.height - WBFontAscent(pFont) + WBFontDescent(pFont) / 2
+           + WBFontAscent(pFont); // bottom of text
 
-        XDrawString(pDisplay, pxTemp ? pxTemp : wID, gc, iX, iY, p1, strlen(p1));
+        WBDrawString(pDisplay, pxTemp ? pxTemp : wID, gc, iX, iY, p1, strlen(p1));
       }
       else
       {
         iX = geomText.x + (geomText.width - XTextWidth(pFont, p1, strlen(p1))) / 2;
-        iY = geomText.y + (geomText.height - 2 * (pFont->max_bounds.ascent + pFont->max_bounds.descent)) / 2
-           + pFont->max_bounds.ascent; // bottom of text
+        iY = geomText.y + (geomText.height - 2 * WBFontHeight(pFont)) / 2
+           + WBFontAscent(pFont); // bottom of text
 
-        XDrawString(pDisplay, pxTemp ? pxTemp : wID, gc, iX, iY, p1, strlen(p1));
+        WBDrawString(pDisplay, pxTemp ? pxTemp : wID, gc, iX, iY, p1, strlen(p1));
 
         iX = geomText.x + (geomText.width - XTextWidth(pFont, p2, strlen(p2))) / 2;
-        iY += pFont->max_bounds.ascent + pFont->max_bounds.descent;
+        iY += WBFontHeight(pFont);
 
-        XDrawString(pDisplay, pxTemp ? pxTemp : wID, gc, iX, iY, p2, strlen(p2));
+        WBDrawString(pDisplay, pxTemp ? pxTemp : wID, gc, iX, iY, p2, strlen(p2));
       }
 
       if(p2)
@@ -2394,13 +2410,15 @@ int iX, iY, iTimeStart, iTimeEnd;
 
     // make an exact duplicate without any clipping regions
 
-    XCopyArea(pDisplay, pData->pixmap, pxTemp, gc,
+    BEGIN_XCALL_DEBUG_WRAPPER
+    XCopyArea(pDisplay, pData->pixmap, pxTemp, gc->gc,
               0, 0, pData->iW + 4, pData->iH + 4, 0, 0);
+    END_XCALL_DEBUG_WRAPPER
 
     // now, grab an XImage for it
 
-    pData->pImage = XGetImage(pDisplay, pxTemp, 0, 0, pData->iW + 4, pData->iH + 4,
-                              0xffffffff, XYPixmap);
+    pData->pImage = WBXGetImage(pDisplay, pxTemp, 0, 0, pData->iW + 4, pData->iH + 4,
+                                0xffffffff, XYPixmap);
   }
 
   // TODO:  consider creating clip regions to improve performance
@@ -2423,9 +2441,9 @@ int iX, iY, iTimeStart, iTimeEnd;
     {
       if(pData->pImage)
       {
-        XPutImage(pDisplay, pData->pixmap2, gc, pData->pImage, 0, 0, 0, 0, pData->iW + 4, pData->iH + 4);
+        WBXPutImage(pDisplay, pData->pixmap2, gc, pData->pImage, 0, 0, 0, 0, pData->iW + 4, pData->iH + 4);
 
-        XDestroyImage(pData->pImage); // destroy it now that I'm done with it
+        WBXDestroyImage(pData->pImage); // destroy it now that I'm done with it
         pData->pImage = NULL;         // no longer stored (already cleaned up)
       }
     }
@@ -2446,9 +2464,9 @@ int iX, iY, iTimeStart, iTimeEnd;
 
       if(!pData->pImage)
       {
-        pData->pImage = XGetImage(pDisplay, pData->pixmap2, 0, 0, pData->iW + 4, pData->iH + 4,
-                                  0xffffffff, // I've tried 0, 1, and THIS value - no apparent difference
-                                  XYPixmap); // TODO:  use ZPixmap instead?
+        pData->pImage = WBXGetImage(pDisplay, pData->pixmap2, 0, 0, pData->iW + 4, pData->iH + 4,
+                                    0xffffffff, // I've tried 0, 1, and THIS value - no apparent difference
+                                    XYPixmap); // TODO:  use ZPixmap instead?
       }
 
       pI = pData->pImage;
@@ -2496,7 +2514,7 @@ int iX, iY, iTimeStart, iTimeEnd;
 
         // NOW I get the fun of directly manipulating my image.  W00T!
 
-        // effectively I do this:  XDrawLine(pDisplay, pxTemp, gc, -2, iY, iX, -2) and it's 19 pixels wide
+        // effectively I do this:  WBDrawLine(pDisplay, pxTemp, gc, -2, iY, iX, -2) and it's 19 pixels wide
 
         // So the line has a width of '2*GLEAM_WIDTH + 1' pixels.  The pixels represent a white reflection
         // centering at the coordinates I specified above, that is the line from -2, iY to iX, -2 .  This
@@ -2571,8 +2589,11 @@ int iX, iY, iTimeStart, iTimeEnd;
 
 //        llTick -= WBGetTimeIndex();
 
-        XPutImage(pDisplay, pData->pixmap2, gc, pI, 0, 0, 0, 0, pData->iW + 4, pData->iH + 4);
+        WBXPutImage(pDisplay, pData->pixmap2, gc, pI, 0, 0, 0, 0, pData->iW + 4, pData->iH + 4);
+
+        BEGIN_XCALL_DEBUG_WRAPPER
         XFlush(pDisplay); // make sure
+        END_XCALL_DEBUG_WRAPPER
 
 //        llTick += WBGetTimeIndex();
 
@@ -2583,7 +2604,7 @@ int iX, iY, iTimeStart, iTimeEnd;
         }
         else
         {
-          XDestroyImage(pI);
+          WBXDestroyImage(pI);
           pData->pImage = NULL; // no longer stored (a fallback)
         }
 
@@ -2604,11 +2625,11 @@ int iX, iY, iTimeStart, iTimeEnd;
 
       if(!bInvert)
       {
-        XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, -2, iY, iX, -2);
+        WBDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, -2, iY, iX, -2);
       }
       else
       {
-        XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, iX, pData->iH + 4, pData->iW + 4, iY);
+        WBDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, iX, pData->iH + 4, pData->iW + 4, iY);
       }
 
       XSetForeground(pDisplay, gc, pData->clrWhite & 0x808080);
@@ -2621,11 +2642,11 @@ int iX, iY, iTimeStart, iTimeEnd;
 
       if(!bInvert)
       {
-        XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, -2, iY, iX, -2);
+        WBDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, -2, iY, iX, -2);
       }
       else
       {
-        XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, iX, pData->iH + 4, pData->iW + 4, iY);
+        WBDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, iX, pData->iH + 4, pData->iW + 4, iY);
       }
 
       XSetForeground(pDisplay, gc, pData->clrWhite & 0xc0c0c0);
@@ -2638,11 +2659,11 @@ int iX, iY, iTimeStart, iTimeEnd;
 
       if(!bInvert)
       {
-        XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, -2, iY, iX, -2);
+        WBDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, -2, iY, iX, -2);
       }
       else
       {
-        XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, iX, pData->iH + 4, pData->iW + 4, iY);
+        WBDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, iX, pData->iH + 4, pData->iW + 4, iY);
       }
 
       XSetForeground(pDisplay, gc, pData->clrWhite);
@@ -2655,11 +2676,11 @@ int iX, iY, iTimeStart, iTimeEnd;
 
       if(!bInvert)
       {
-        XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, -2, iY, iX, -2);
+        WBDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, -2, iY, iX, -2);
       }
       else
       {
-        XDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, iX, pData->iH + 4, pData->iW + 4, iY);
+        WBDrawLine(pDisplay, pxTemp ? pxTemp : wID, gc, iX, pData->iH + 4, pData->iW + 4, iY);
       }
 #endif // 0
     }
@@ -2667,11 +2688,14 @@ int iX, iY, iTimeStart, iTimeEnd;
 
   if(pxTemp) // using the 2nd pixmap to do the work, thus making the whole screen update at once
   {
-    XCopyArea(pDisplay, pxTemp, wID, gc, 0, 0, pData->iW + 4, pData->iH + 4, pData->geomBorder.x, pData->geomBorder.y);
+    XCopyArea(pDisplay, pxTemp, wID, gc->gc, 0, 0, pData->iW + 4, pData->iH + 4, pData->geomBorder.x, pData->geomBorder.y);
   }
 
-  XFreeGC(pDisplay, gc);
+  WBFreeGC(gc);
+
+  BEGIN_XCALL_DEBUG_WRAPPER
   XSync(pDisplay, 0); // force update NOW
+  END_XCALL_DEBUG_WRAPPER
   WBValidateGeom(wID, NULL);
 //  WBEndPaint(wID, gc);
 

@@ -13,15 +13,14 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -39,7 +38,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -92,9 +91,15 @@
 #include "conf_help.h"
 
 
+#define MIN_EVENT_LOOP_SLEEP_PERIOD 100    /* 0.1 millisec */
+#define MAX_EVENT_LOOP_SLEEP_PERIOD 5000 /* 5 msec */
+//#define MAX_EVENT_LOOP_SLEEP_PERIOD 100000 /* 0.1 sec */
+
 const char *sz_xcall_func = NULL;
 int i_xcall_line = 0;
 
+
+//#define USE_WINDOW_XIMAGE /* comment this out to disable using an XImage to perform graphiic operations on a window */
 
 
 // **************************************************************************
@@ -127,8 +132,9 @@ int i_xcall_line = 0;
 /*                                                                    */
 /**********************************************************************/
 
-XFontStruct *pDefaultFont = NULL;  // default font
-XFontSet fontsetDefault = None;    // default font set, derived from default font
+//XFontStruct *pDefaultFont = NULL;  // default font
+//XFontSet fontsetDefault = None;    // default font set, derived from default font
+WB_FONT pDefaultFont = NULL;
 Display *pDefaultDisplay = NULL;
 
 int iStartupMinMax = 0; // main window open min/max/normal flag
@@ -718,12 +724,13 @@ Atom aNULL=None;             // Atom for 'NULL'
     Window wID;                                // window to which the structure is mapped
     const char *szClassName;                   // window 'class name', mostly for debug and tracing, points to NULL or persistent name string
     Display *pDisplay;                         // display associated with this window
+    WB_UINT64 iFlags;                          // 'iFlags' specified when window was created (for reference)
+    XImage *pImage;                            // locally cached XImage for the window
     Window wParent;                            // cached window parent ID
-    GC hGC;                                    // default graphics context
+    WBGC hGC;                                  // default graphics context
     unsigned long clrFG;                       // default foreground color (also assigned to GC)
     unsigned long clrBG;                       // default background color (also assigned to GC)
-    XFontStruct *pFontStruct;                  // Assigned font structure.  NULL implies global 'pDefaultFont'
-    XFontSet fontSet;                          // Assigned font set structure.  None implies global 'fontsetDefault'
+    WB_FONT pFont;                             // default font for window
     XWMHints *pWMHints;                        // XWMHints structure (cached)
     Pixmap pxIcon;                             // icon pixmap (may be None)
     Pixmap pxMask;                             // icon mask pixmap (may be None)
@@ -757,12 +764,13 @@ typedef struct __internal_window_entry__     // the structure that identifies th
   Window wID;                                ///< window to which the structure is mapped
   const char *szClassName;                   ///< window 'class name', mostly for debug and tracing, points to NULL or persistent name string
   Display *pDisplay;                         ///< display associated with this window
+  WB_UINT64 iFlags;                          ///< 'iFlags' specified when window was created (for reference)
+  XImage *pImage;                            ///< locally cached XImage for the window
   Window wParent;                            ///< cached window parent ID
-  GC hGC;                                    ///< default graphics context
+  WBGC hGC;                                  ///< default graphics context
   unsigned long clrFG;                       ///< default foreground color (also assigned to GC)
   unsigned long clrBG;                       ///< default background color (also assigned to GC)
-  XFontStruct *pFontStruct;                  ///< Assigned font structure.  NULL implies global 'pDefaultFont'
-  XFontSet fontSet;                          ///< Assigned font set structure.  None implies global 'fontsetDefault'
+  WB_FONT pFont;                             ///< default font for window, NULL to use pDefaultFont
   XWMHints *pWMHints;                        ///< XWMHints structure (cached)
   Pixmap pxIcon;                             ///< icon pixmap (may be None)
   Pixmap pxMask;                             ///< icon mask pixmap (may be None)
@@ -970,6 +978,7 @@ void __InternalDestroyWindow(Display *pDisp, Window wID, _WINDOW_ENTRY_ *pEntry)
 /*                                                                              */
 /********************************************************************************/
 
+static int disable_imagecache = 0;
 static int (*pOldDisplayIOErrorHandler)(Display *) = NULL;
 static int WBXIOErrorHandler(Display *pDisp);
 static int WBXErrorHandler(Display *pDisplay, XErrorEvent *pError);
@@ -1016,6 +1025,13 @@ void __internal_startup_geometry(const char *szVal)
 }
 
 
+void __internal_disable_imagecache(void)
+{
+  disable_imagecache = 1;
+}
+
+
+
 // MAIN WINDOW INITIALIZATION FUNCTION - call this after WBParseStandardArguments() to be
 // fully compliant with X11 command line standards.
 
@@ -1030,6 +1046,9 @@ Display *pRval;
 
 
   WBPlatformOnInit(); // initialize a few important 'platform helper' things
+
+  __internal_font_helper_init(); // initialize font helper
+
 
   bQuitFlag = FALSE; // in case I re-init an app.  note the variable is in 'platform_helper.c'
 
@@ -1138,7 +1157,7 @@ int WBInitDisplay(Display *pDisplay)
   /*
    * Load the font to use.  See Sections 10.2 & 6.5.1 of the X11 docs
    */
-//  pDefaultFont = XLoadQueryFont(pDisplay, WB_DEFAULT_FONT);
+
   pDefaultFont = WBLoadFont(pDisplay, WB_DEFAULT_FONT, WB_DEFAULT_FONT_SIZE, 0);
 
   if(!pDefaultFont)
@@ -1158,7 +1177,7 @@ int WBInitDisplay(Display *pDisplay)
     }
   }
 
-  fontsetDefault = WBFontSetFromFont(pDisplay, pDefaultFont);
+//  fontsetDefault = WBFontSetFromFont(pDisplay, pDefaultFont);
 
   // NOTE:  the documentation for 'XInternAtom' does _NOT_ include a provision to
   //        free up unused atoms.  There's no obvious way to get rid of the ones that
@@ -1303,36 +1322,46 @@ int WBInitDisplay(Display *pDisplay)
 }
 
 
-XFontStruct *WBGetDefaultFont(void)
+WB_FONTC WBGetDefaultFont(void)
 {
-  extern XFontStruct *pDefaultFont;  // default font
-
   if(!pDefaultFont)
   {
     WB_ERROR_PRINT("%s - pDefaultFont is NULL\n", __FUNCTION__);
   }
 
-  return(pDefaultFont);
+  return (WB_FONTC)pDefaultFont;
 }
 
-XFontSet WBGetDefaultFontSet(Display *pDisplay)
-{
-extern XFontSet fontsetDefault; // TODO:  per-display font sets?
+//XFontStruct *WBGetDefaultFont(void)
+//{
+//  extern XFontStruct *pDefaultFont;  // default font
+//
+//  if(!pDefaultFont)
+//  {
+//    WB_ERROR_PRINT("%s - pDefaultFont is NULL\n", __FUNCTION__);
+//  }
+//
+//  return(pDefaultFont);
+//}
 
-  if(!pDisplay || pDisplay == pDefaultDisplay)
-  {
-    if(fontsetDefault == None)
-    {
-      WB_ERROR_PRINT("%s - fontsetDefault is None\n", __FUNCTION__);
-    }
-
-    return fontsetDefault;
-  }
-
-  WB_ERROR_PRINT("TODO:  %s - support use of non-default Display (returning 'None')\n", __FUNCTION__);
-
-  return None; // for now...
-}
+//XFontSet WBGetDefaultFontSet(Display *pDisplay)
+//{
+//extern XFontSet fontsetDefault; // TODO:  per-display font sets?
+//
+//  if(!pDisplay || pDisplay == pDefaultDisplay)
+//  {
+//    if(fontsetDefault == None)
+//    {
+//      WB_ERROR_PRINT("%s - fontsetDefault is None\n", __FUNCTION__);
+//    }
+//
+//    return fontsetDefault;
+//  }
+//
+//  WB_ERROR_PRINT("TODO:  %s - support use of non-default Display (returning 'None')\n", __FUNCTION__);
+//
+//  return None; // for now...
+//}
 
 Window WBGetHiddenHelperWindow(void)
 {
@@ -1350,6 +1379,7 @@ void __InternalDestroyWindow(Display *pDisp, Window wID, _WINDOW_ENTRY_ *pEntry)
   Atom aNCW;
   XClientMessageEvent xMsg;
   Status st;
+  XImage *pTempImage;
   int i1;
 
 
@@ -1426,6 +1456,19 @@ destroy_without_wm:
 
     // TODO:  if pEntry is not NULL, do I wait for it to REALLY get destroyed?
 
+    if(pEntry)
+    {
+      pTempImage = pEntry->pImage;
+      pEntry->pImage = NULL;
+
+      if(pTempImage)
+      {
+        BEGIN_XCALL_DEBUG_WRAPPER
+        XDestroyImage(pTempImage); // buh-bye!
+        END_XCALL_DEBUG_WRAPPER
+      }
+    }
+
     return;
   }
 
@@ -1488,7 +1531,7 @@ destroy_without_wm:
     {
       XEvent evt;
 
-      WBDelay(100); // wait 0.1 msec
+      WBDelay(MIN_EVENT_LOOP_SLEEP_PERIOD); // wait 0.1 msec
 
       // look for (and dispatch) destroy notify messages for my window
       if(XCheckTypedEvent(pDisp, DestroyNotify, &evt))
@@ -1511,6 +1554,7 @@ destroy_without_wm:
 #endif // 0
 
   {
+
 //    WB_DEBUG_PRINT(DebugLevel_WARN | DebugSubSystem_Window,
 //                   "WARNING - %s - did not destroy window via WM, calling XDestroyWindow for %d (%s)\n",
 //                   __FUNCTION__, (int)wID, pEntry->szClassName);
@@ -1526,6 +1570,18 @@ destroy_without_wm:
     BEGIN_XCALL_DEBUG_WRAPPER
     XSync(pDefaultDisplay, FALSE);  // try sync'ing to avoid certain problems
     END_XCALL_DEBUG_WRAPPER
+
+    // if there's a cached XImage for this window, destroy it
+
+    pTempImage = pEntry->pImage;
+    pEntry->pImage = NULL;
+
+    if(pTempImage)
+    {
+      BEGIN_XCALL_DEBUG_WRAPPER
+      XDestroyImage(pTempImage); // buh-bye!
+      END_XCALL_DEBUG_WRAPPER
+    }
   }
 }
 
@@ -1584,15 +1640,16 @@ int i1;
 // TODO:  cache font sets within the font helper, and manage all of them there.
 //  Font_OnExit(pDefaultDisplay); // call this _BEFORE_ I close the display
 
-  if(fontsetDefault != None)
-  {
-    XFreeFontSet(pDefaultDisplay, fontsetDefault);
-    fontsetDefault = None;
-  }
+//  if(fontsetDefault != None)
+//  {
+//    XFreeFontSet(pDefaultDisplay, fontsetDefault);
+//    fontsetDefault = None;
+//  }
 
   if(pDefaultFont)
   {
-    XFreeFont(pDefaultDisplay, pDefaultFont);
+//    XFreeFont(pDefaultDisplay, pDefaultFont);
+    WBFreeFont(pDefaultDisplay, pDefaultFont);
     pDefaultFont = NULL;
   }
 
@@ -1753,6 +1810,7 @@ void WBInitSizeHints(XSizeHints *pSH, Display *pDisplay, int iMinHeight, int iMi
 int WBShowModal(Window wID, int bMenuSplashFlag)
 {
 int iRval = -1;
+int iSleepPeriod;
 WB_GEOM geom;
 _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
@@ -1821,6 +1879,8 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
 //  WB_ERROR_PRINT("TEMPORARY:  %s - begin modal event processing\n", __FUNCTION__);
 
+  iSleepPeriod = MIN_EVENT_LOOP_SLEEP_PERIOD; // initial value, in microseconds
+
   while(!bQuitFlag)
   {
     XEvent event;
@@ -1847,9 +1907,20 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
     if(!__InternalCheckGetEvent(pEntry->pDisplay, &event, wID))
     {
-      WBDelay(100);  // 100 microsecs (0.1 milliseconds)
+      WBDelay(iSleepPeriod);  // 100 microsecs (0.1 milliseconds) initially, grows over time
+      if(iSleepPeriod < MAX_EVENT_LOOP_SLEEP_PERIOD) // up to 'MAX_EVENT_LOOP_SLEEP_PERIOD' microseconds
+      {
+        iSleepPeriod += (iSleepPeriod >> 1); // increase by 50%
+      }
+      else
+      {
+        iSleepPeriod = MAX_EVENT_LOOP_SLEEP_PERIOD; // the maximum
+      }
+
       continue;
     }
+
+    iSleepPeriod = MIN_EVENT_LOOP_SLEEP_PERIOD; // reset to the initial value
 
     // check for application events - these will continue to happen
     // even during a modal loop.
@@ -2437,6 +2508,7 @@ _WINDOW_ENTRY_ *pRval = NULL;
     pRval = sWBHashEntries + i1;
     pRval->wID = wID;  // mark it "mine"
     pRval->pDisplay = pDefaultDisplay;  // for now - TODO get the real display
+    pRval->pImage = NULL;               // pre-assign the cached image to NULL
 
     InternalRestoreWindowDefaults(i1);
 
@@ -2461,15 +2533,20 @@ static void __WindowEntryRestoreDefaultResources(int iIndex)
   }
 
   BEGIN_XCALL_DEBUG_WRAPPER
-  if(sWBHashEntries[iIndex].fontSet != None && sWBHashEntries[iIndex].fontSet != fontsetDefault)  // must delete it
+//  if(sWBHashEntries[iIndex].fontSet != None && sWBHashEntries[iIndex].fontSet != fontsetDefault)  // must delete it
+//  {
+//    XFreeFontSet(pDisp, sWBHashEntries[iIndex].fontSet);
+//    sWBHashEntries[iIndex].fontSet = None;
+//  }
+//  if(sWBHashEntries[iIndex].pFontStruct && sWBHashEntries[iIndex].pFontStruct != pDefaultFont)  // must delete it
+//  {
+//    XFreeFont(pDisp, sWBHashEntries[iIndex].pFontStruct);
+//    sWBHashEntries[iIndex].pFontStruct = NULL;
+//  }
+  if(sWBHashEntries[iIndex].pFont && sWBHashEntries[iIndex].pFont != pDefaultFont)  // must delete it
   {
-    XFreeFontSet(pDisp, sWBHashEntries[iIndex].fontSet);
-    sWBHashEntries[iIndex].fontSet = None;
-  }
-  if(sWBHashEntries[iIndex].pFontStruct && sWBHashEntries[iIndex].pFontStruct != pDefaultFont)  // must delete it
-  {
-    XFreeFont(pDisp, sWBHashEntries[iIndex].pFontStruct);
-    sWBHashEntries[iIndex].pFontStruct = NULL;
+    WBFreeFont(pDisp, sWBHashEntries[iIndex].pFont);
+    sWBHashEntries[iIndex].pFont = NULL;
   }
   if(sWBHashEntries[iIndex].pxIcon)
   {
@@ -2501,6 +2578,11 @@ static void __WindowEntryRestoreDefaultResources(int iIndex)
     WB_WARN_PRINT("WARNING:  paint region non-zero in __WindowEntryRestoreDefaultResources\n");
     XDestroyRegion(sWBHashEntries[iIndex].rgnPaint);
     sWBHashEntries[iIndex].rgnPaint = 0;
+  }
+  if(sWBHashEntries[iIndex].pImage != NULL)
+  {
+    XDestroyImage(sWBHashEntries[iIndex].pImage);
+    sWBHashEntries[iIndex].pImage = NULL;
   }
   END_XCALL_DEBUG_WRAPPER
 
@@ -2610,7 +2692,7 @@ static struct timeval tvLastTime = {0,0};
 //                     __FUNCTION__, i1,
 //                     (int)sWBHashEntries[i1].wID, (int)sWBHashEntries[i1].wID);
 
-      __WindowEntryRestoreDefaultResources(i1);  // make sure no resources are allocated
+//      __WindowEntryRestoreDefaultResources(i1);  // make sure no resources are allocated - actually next function does this already
       __WindowEntryDestructor(i1); // finalizes destruction and marks it 'unused'
     }
   }
@@ -2619,16 +2701,45 @@ static struct timeval tvLastTime = {0,0};
 Window WBCreateWindow(Display *pDisplay, Window wIDParent,
                       WBWinEvent pProc, const char *szClass,
                       int iX, int iY, int iWidth, int iHeight, int iBorder, int iIO,
-                      int iFlags, XSetWindowAttributes *pXSWA)
+                      WB_UINT64 iFlags, XSetWindowAttributes *pXSWA)
 {
 Window idRval;
 _WINDOW_ENTRY_ *pEntry;
 WB_GEOM geom;
+unsigned long valuemask;
+XSetWindowAttributes xswa;
 
 
-  if(!iFlags)
+  if(!pDisplay)
   {
-    iFlags = CWBorderPixel | CWBackPixel | CWColormap | CWBitGravity;  // for now...
+    pDisplay = WBGetDefaultDisplay();
+
+    if(!pDisplay) // in case the library wasn't initialized
+    {
+      return None;
+    }
+  }
+
+// POOBAH
+#ifdef HAS_WB_UINT64_BUILTIN
+  valuemask = (unsigned long)(iFlags & 0xffffffffL);
+#else // HAS_WB_UINT64_BUILTIN
+  valuemask = iFlags.dw2; // assume low endian (for now)
+#endif // HAS_WB_UINT64_BUILTIN
+
+  if(!valuemask)
+  {
+    valuemask = CWBorderPixel | CWBackPixel | CWColormap | CWBitGravity;  // for now...
+    if(!pXSWA)
+    {
+      pXSWA = &xswa;
+
+      WBInitWindowAttributes(&xswa,
+                             BlackPixel(pDisplay, DefaultScreen(pDisplay)),
+                             WhitePixel(pDisplay, DefaultScreen(pDisplay)),
+                             DefaultColormap(pDisplay, DefaultScreen(pDisplay)),
+                             CenterGravity);
+    }
   }
 
   idRval = XCreateWindow(pDisplay,
@@ -2637,7 +2748,7 @@ WB_GEOM geom;
                          DefaultDepth(pDisplay, DefaultScreen(pDisplay)),
                          iIO,
                          DefaultVisual(pDisplay, DefaultScreen(pDisplay)),
-                         iFlags,
+                         valuemask,
                          pXSWA);
 
   if(idRval != None)
@@ -2658,6 +2769,7 @@ WB_GEOM geom;
     }
     else
     {
+      pEntry->iFlags = iFlags;     // cache it
       pEntry->pDisplay = pDisplay; // make sure
 
       if(!pEntry->pWMHints) // normally THIS WILL BE THE CASE
@@ -3565,7 +3677,7 @@ int WBCheckGetEvent(Display *pDisplay, XEvent *pEvent)
 
 void WBWaitForEvent(Display *pDisplay)
 {
-int iTemp;
+int iTemp, iSleepPeriod;
 
   // First, see if I have any priority or other queued events
 
@@ -3573,6 +3685,8 @@ int iTemp;
 
   // check internal queues first, if there's something there
   // these queues won't change without calling WBCheckGetEvent()
+
+  iSleepPeriod = MIN_EVENT_LOOP_SLEEP_PERIOD; // the initial value
 
   while(WB_LIKELY(iTemp >= 0))
   {
@@ -3596,8 +3710,6 @@ int iTemp;
     iTemp = axWBEvt[iTemp].iNext;
   }
 
-  iTemp = 10; // see below
-
   while(!bQuitFlag) // forever, unless I quit
   {
     // check timers and internal event queues
@@ -3612,32 +3724,32 @@ int iTemp;
       return;
     }
 
-    // call XSync before checking if events have been queued
-    // I do this every 10 loops, waiting ~1msec per loop
-
-    if(iTemp >= 10)
-    {
-      BEGIN_XCALL_DEBUG_WRAPPER
-      XSync(pDisplay, 0);  // make sure I'm sync'd up before waiting
-      END_XCALL_DEBUG_WRAPPER
-
-      iTemp = 0;
-    }
-    else
-    {
-      iTemp++;
-    }
-
-    if(XEventsQueued(pDisplay, QueuedAlready))
+    if(XEventsQueued(pDisplay, QueuedAfterFlush)) // this appears to be the most efficient method to use
     {
       return; // I have events waiting!
     }
 
-    WBDelay(1000);  // 1000 microsecs - 1 millisecond
+    // perform a variable delay, up to MAX_EVENT_LOOP_SLEEP_PERIOD, before checking again, so I don't 'spin'
+    // we start with the min period, so we'll more effectively capture 'bunches' of events, which would be
+    // typical for UI actions - this makes it appear 'snappier'.  But when no events happen, the sleep period
+    // will increase until it hits 'MAX_EVENT_LOOP_SLEEP_PERIOD', which should be tweeked accordingly to get
+    // minimum CPU usage while "idling" (and yet still respond to important things).
+
+    WBDelay(iSleepPeriod);  // 100 microsecs (0.1 milliseconds) initially, grows over time
+
+    if(iSleepPeriod < MAX_EVENT_LOOP_SLEEP_PERIOD) // up to 'MAX_EVENT_LOOP_SLEEP_PERIOD' microseconds
+    {
+      iSleepPeriod += (iSleepPeriod >> 2); // increase by 25%
+    }
+    else
+    {
+      iSleepPeriod = MAX_EVENT_LOOP_SLEEP_PERIOD; // the maximum
+    }
   }
 }
 
 // "internal" version that allows me to do things different for modal loops
+// it prioritizes events based on what type they are, to make UI response 'snappier'
 
 int __InternalCheckGetEvent(Display *pDisplay, XEvent *pEvent, Window wIDModal)
 {
@@ -3647,30 +3759,26 @@ static unsigned long long ullLastTime = 0;
 
   do
   {
-    iQueued = XEventsQueued(pDisplay, QueuedAlready);
-
-    if(!iQueued && iFirstTime)
+    BEGIN_XCALL_DEBUG_WRAPPER
+    if(iFirstTime)
     {
-      unsigned long long ullTemp = WBGetTimeIndex();
-      if((ullTemp - ullLastTime) > 50000) // make sure it's more than 0.05 seconds, so I don't "spin"
-      {
-        ullLastTime = ullTemp;
+      iQueued = XEventsQueued(pDisplay, QueuedAfterFlush); // QueuedAfterFlush on the first pass
 
-        BEGIN_XCALL_DEBUG_WRAPPER
-//        XFlush(pDisplay);
-        XSync(pDisplay, 0);  // no events?  attempt a sync (but only do this once per loop)
-        END_XCALL_DEBUG_WRAPPER
-      }
-
-      iQueued = XEventsQueued(pDisplay, QueuedAlready);
+      iFirstTime = 0; // assign it here so I only do this code section once
+    }
+    else
+    {
+      iQueued = XEventsQueued(pDisplay, QueuedAlready); // see if events are queued already (first, no flushing)
     }
 
-    iFirstTime = 0; // only XSync once per loop and only if I need to
+    END_XCALL_DEBUG_WRAPPER
 
     // check for selection events first...
 
+    BEGIN_XCALL_DEBUG_WRAPPER
     iRval = iQueued && // SelectionNotify, SelectionClear, SelectionRequest
             XCheckIfEvent(pDisplay, pEvent, __WBCheckIfEventPredicate0, NULL);
+    END_XCALL_DEBUG_WRAPPER
 
     if(!iRval)
     {
@@ -3686,9 +3794,11 @@ static unsigned long long ullLastTime = 0;
 
       // then check for actual events in the X11 event queue
 
+      BEGIN_XCALL_DEBUG_WRAPPER
       iRval = iQueued /*XEventsQueued(pDisplay, QueuedAlready)*/ &&
               (XCheckIfEvent(pDisplay, pEvent, __WBCheckIfEventPredicate, NULL) ||
                XCheckMaskEvent(pDisplay, ExposureMask, pEvent));
+      END_XCALL_DEBUG_WRAPPER
     }
 
     if(iRval)
@@ -3737,13 +3847,16 @@ static unsigned long long ullLastTime = 0;
 
       if(pEvent->type == Expose)  // expose events get special handling
       {
+        // EXPOSE EVENTS - some special handling
+
         WBProcessExposeEvent((XExposeEvent *)pEvent); // this consolidates incoming Expose events
 
         // after processing the expose event, use XSync to immediately sync back up
         // in case there are more events NOT received yet.  Only for EXPOSE though.
 
         BEGIN_XCALL_DEBUG_WRAPPER
-        XSync(pDisplay, 0);
+        XFlush(pDisplay);      // send the events to the server (asynchronously)
+//        XSync(pDisplay, 0);  // this way, I am waiting for the window painting to actually happen
         END_XCALL_DEBUG_WRAPPER
 
         iRval = 0;
@@ -3756,9 +3869,12 @@ static unsigned long long ullLastTime = 0;
     }
     else // no display events
     {
+      // use XEventsQueued to see if I have events.  Use 'QueueAfterFlush' which appears to be the
+      // most efficient way of doing this.
+
       if(XEventsQueued(pDisplay, QueuedAfterFlush) > 0)  // flushes and attempts to read more events into queue
       {
-        continue;  // more events were read in, so go for it
+        continue;  // more events were read in, so loop back to the beginning
       }
 
       // regular 'next event' processing
@@ -4742,10 +4858,10 @@ int WBDefault(Window wID, XEvent *pEvent)
   if (pEvent->type == Expose && pEvent->xexpose.count == 0)
   {
     // for now, just erase the background using whatever background color is currently assigned
-    if(pEntry && pEntry->hGC != None)
+    if(pEntry && pEntry->hGC != NULL)
     {
-      GC gc = WBBeginPaint(wID, &(pEvent->xexpose), NULL);
-      if(gc != None)
+      WBGC gc = WBBeginPaint(wID, &(pEvent->xexpose), NULL);
+      if(gc != NULL)
       {
         WBClearWindow(wID, gc);
         WBEndPaint(wID, gc);
@@ -4753,7 +4869,7 @@ int WBDefault(Window wID, XEvent *pEvent)
     }
     else
     {
-      WB_ERROR_PRINT("TEMPORARY: %s - window has NO assigned GC, calling XClearWindow\n", __FUNCTION__);
+//      WB_ERROR_PRINT("TEMPORARY: %s - window has NO assigned GC, calling XClearWindow\n", __FUNCTION__);
 
       XClearWindow(pDisplay, wID);  // TODO:  rather than erase background, see if I need to
     }
@@ -5471,56 +5587,78 @@ void WBSetWindowIcon(Window wID, int idIcon)
   }
 }
 
-void WBSetWindowFontStruct(Window wID, XFontStruct *pFontStruct)
+//void WBSetWindowFontStruct(Window wID, XFontStruct *pFontStruct)
+//{
+//  _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
+//
+//  if(pEntry)
+//  {
+//    if(pEntry->pFontStruct && pEntry->pFontStruct != pDefaultFont)  // must delete it
+//    {
+//      XFreeFont(pEntry->pDisplay, pEntry->pFontStruct);
+//    }
+//
+//    if(pEntry->fontSet != None && pEntry->fontSet != fontsetDefault)
+//    {
+//      XFreeFontSet(pEntry->pDisplay, pEntry->fontSet);
+//    }
+//
+//    pEntry->fontSet = None; // always, before I do the next part
+//
+//    pEntry->pFontStruct = pFontStruct;
+//
+//    if(pFontStruct)
+//    {
+//      pEntry->fontSet = WBFontSetFromFont(pEntry->pDisplay, pFontStruct);
+//    }
+//  }
+//}
+
+//void WBSetWindowFontSet(Window wID, XFontSet fontSet)
+//{
+//  _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
+//
+//  if(pEntry)
+//  {
+//    if(pEntry->pFontStruct && pEntry->pFontStruct != pDefaultFont)  // must delete it
+//    {
+//      XFreeFont(pEntry->pDisplay, pEntry->pFontStruct);
+//    }
+//
+//    if(pEntry->fontSet != None && pEntry->fontSet != fontsetDefault)
+//    {
+//      XFreeFontSet(pEntry->pDisplay, pEntry->fontSet);
+//    }
+//
+//    pEntry->pFontStruct = NULL;
+//
+//    if(fontSet != None)
+//    {
+//      pEntry->fontSet = fontSet;
+//      pEntry->pFontStruct = WBFontFromFontSet(pEntry->pDisplay, fontSet);
+//    }
+//  }
+//}
+
+void WBSetWindowFont(Window wID, WB_FONTC pFont)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
   if(pEntry)
   {
-    if(pEntry->pFontStruct && pEntry->pFontStruct != pDefaultFont)  // must delete it
+    if(pEntry->pFont && pEntry->pFont != pDefaultFont)  // must delete it
     {
-      XFreeFont(pEntry->pDisplay, pEntry->pFontStruct);
+      WBFreeFont(pEntry->pDisplay, pEntry->pFont);
     }
 
-    if(pEntry->fontSet != None && pEntry->fontSet != fontsetDefault)
-    {
-      XFreeFontSet(pEntry->pDisplay, pEntry->fontSet);
-    }
-
-    pEntry->fontSet = None; // always, before I do the next part
-
-    pEntry->pFontStruct = pFontStruct;
-
-    if(pFontStruct)
-    {
-      pEntry->fontSet = WBFontSetFromFont(pEntry->pDisplay, pFontStruct);
-    }
-  }
-}
-
-void WBSetWindowFontSet(Window wID, XFontSet fontSet)
-{
-  _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
-
-  if(pEntry)
-  {
-    if(pEntry->pFontStruct && pEntry->pFontStruct != pDefaultFont)  // must delete it
-    {
-      XFreeFont(pEntry->pDisplay, pEntry->pFontStruct);
-    }
-
-    if(pEntry->fontSet != None && pEntry->fontSet != fontsetDefault)
-    {
-      XFreeFontSet(pEntry->pDisplay, pEntry->fontSet);
-    }
-
-    pEntry->pFontStruct = NULL;
-
-    if(fontSet != None)
-    {
-      pEntry->fontSet = fontSet;
-      pEntry->pFontStruct = WBFontFromFontSet(pEntry->pDisplay, fontSet);
-    }
+//    if(pFont) TODO:  do I use NULL or make a copy of the default instead?
+//    {
+      pEntry->pFont = WBCopyFont(pEntry->pDisplay, pFont); // for now do it THIS way
+//    }
+//    else
+//    {
+//      pEntry->pFont = NULL;
+//    }
   }
 }
 
@@ -5535,30 +5673,42 @@ void WBCreateWindowDefaultGC(Window wID, unsigned long clrFG, unsigned long clrB
 
   if(pEntry->hGC)
   {
-    XFreeGC(pEntry->pDisplay, pEntry->hGC);
+    WBFreeGC(pEntry->hGC);
+    // I shall re-assign this below, no need to NULL it
   }
 
   // the GC's font will be used with regular 'XDrawText' and 'XDrawString' calls
   // The associated Font Set must be queried separately for calls to XmbXXX or Xutf8XXX functions
 
-  if(!pEntry->pFontStruct)
-  {
-    gcv.font = pDefaultFont->fid;
-  }
-  else
-  {
-    gcv.font = pEntry->pFontStruct->fid;
-  }
+  memset(&gcv, 0, sizeof(gcv));
 
   gcv.foreground = clrFG;
   gcv.background = clrBG;
 
-  pEntry->hGC = XCreateGC(pEntry->pDisplay, wID, (GCFont | GCForeground | GCBackground), &gcv);
-  pEntry->clrFG = clrFG;
+// This is what I did before, and it's left commented for future reference
+//  if(!pEntry->pFontStruct)
+//  {
+//    gcv.font = pDefaultFont->fid;
+//  }
+//  else
+//  {
+//    gcv.font = pEntry->pFontStruct->fid;
+//  }
+
+#warning does the default GC _REALLY_ need to have a default X11 (legacy) font ID assigned in the XGCValues struct???
+  pEntry->hGC = WBCreateGC(pEntry->pDisplay, wID, (/*GCFont |*/ GCForeground | GCBackground), &gcv);
+
+// TEMPORARY - for debugging a specific problem
+  if(pEntry->hGC && ((CARD32)pEntry->hGC->values.clip_mask & 0xe0000000))
+  {
+    WB_ERROR_PRINT("ERROR:  %s - hGC clip_mask is NOT VALID\n", __FUNCTION__);
+  }
+
+  pEntry->clrFG = clrFG; // cache this info in 'pEntry' as well
   pEntry->clrBG = clrBG;
 }
 
-void WBSetWindowDefaultGC(Window wID, GC hGC)
+void WBSetWindowDefaultGC(Window wID, WBGC hGC)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
@@ -5566,10 +5716,16 @@ void WBSetWindowDefaultGC(Window wID, GC hGC)
   {
     if(pEntry->hGC)
     {
-      XFreeGC(pEntry->pDisplay, pEntry->hGC);
+      WBFreeGC(pEntry->hGC);
     }
 
     pEntry->hGC = hGC;
+
+// TEMPORARY - for debugging a specific problem
+    if(hGC && ((CARD32)hGC->values.clip_mask & 0xe0000000))
+    {
+      WB_ERROR_PRINT("ERROR:  %s - hGC clip_mask is NOT VALID\n", __FUNCTION__);
+    }
   }
 }
 
@@ -5583,7 +5739,7 @@ void WBSetWindowData(Window wID, int iIndex, void *pData)
   }
 }
 
-GC WBGetWindowDefaultGC(Window wID)
+WBGC WBGetWindowDefaultGC(Window wID)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
@@ -5595,120 +5751,21 @@ GC WBGetWindowDefaultGC(Window wID)
   return(NULL);
 }
 
-GC WBGetWindowCopyGC(Window wID)
+WBGC WBGetWindowCopyGC(Window wID)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
-  GC gcRval = 0;
+  WBGC gcRval = 0;
 
   if(!pEntry)
   {
     return NULL;
   }
 
-  gcRval = XCreateGC(pEntry->pDisplay, wID, 0, NULL);
-  if(gcRval)
-  {
-    int i1 = XCopyGC(pEntry->pDisplay, pEntry->hGC, GCAll /*0x7fffff*/, gcRval);  // 23 bits in the mask
-    if(i1 != 0)
-    {  // NOTE:  docs say that args 3 and 4 are reversed, but header says THIS way
-       //        I have to believe that the header file is correct
-
-      WB_ERROR_PRINT("ERROR:  %s -  XCopyGC for window %d (%08xH) returns %d\n", __FUNCTION__, (int)wID, (int)wID, i1);
-
-      XFreeGC(pEntry->pDisplay, gcRval);
-      gcRval = 0;
-    }
-  }
+//  WB_WARN_PRINT("TEMPORARY:  %s - calling WBCopyGC()\n", __FUNCTION__);
+  gcRval = WBCopyGC(pEntry->hGC);
 
   return(gcRval);
 }
-
-GC WBCopyDrawableGC(Display *pDisplay, Drawable dw, GC gcSrc)
-{
-GC gcRval;
-
-  if(!pDisplay)
-  {
-    pDisplay = WBGetDefaultDisplay();
-  }
-
-  gcRval = XCreateGC(pDisplay, dw, 0, NULL);
-
-  if(gcRval != None)
-  {
-    int i1 = XCopyGC(pDisplay, gcSrc, GCAll /*0x7fffff*/, gcRval);  // 23 bits in the mask
-
-    if(i1 > 1)// != 0)  TODO: find out why it gives me that ridiculous error code 1
-    {  // NOTE:  docs say that args 3 and 4 are reversed, but header says THIS way
-       //        I have to believe that the header file is correct
-
-      WB_ERROR_PRINT("ERROR:  %s -  XCopyGC for Drawable %d (%08xH) returns %d\n", __FUNCTION__, (int)dw, (int)dw, i1);
-
-      XFreeGC(pDisplay, gcRval);
-      gcRval = None;
-    }
-  }
-  else
-  {
-    WB_ERROR_PRINT("ERROR:  %s - XCreateGC for Drawable %d (%08xH) returns NULL\n", __FUNCTION__, (int)dw, (int)dw);
-  }
-
-  return(gcRval);
-}
-
-XFontStruct * WBGetGCFont(Display *pDisplay, GC gc)
-{
-XGCValues val;
-Status ret;
-XFontStruct *pF, *pRval;
-
-
-  if(!pDisplay)
-  {
-    pDisplay = WBGetDefaultDisplay();
-  }
-
-  BEGIN_XCALL_DEBUG_WRAPPER
-  ret = XGetGCValues(pDisplay, gc, GCFont, &val);
-  END_XCALL_DEBUG_WRAPPER
-
-  if(!ret || val.font == None)
-  {
-    return WBCopyFont(WBGetDefaultFont());
-  }
-
-  pRval = NULL;
-
-  BEGIN_XCALL_DEBUG_WRAPPER
-  pF = XQueryFont(pDisplay, val.font);
-
-  if(pF)
-  {
-    unsigned long lName = 0;
-    if(XGetFontProperty(pF, XA_FONT, &lName))
-    {
-      char *pName = WBGetAtomName(WBGetDefaultDisplay(), (Atom)lName);
-      if(pName)
-      {
-        pRval = XLoadQueryFont(pDisplay, pName);
-
-        WBFree(pName);
-      }
-    }
-
-    XFreeFontInfo(NULL, pF, 1); // to JUST free "the info" (required for XQueryFont)
-    // NOTE:  do not assign NULL to pF here, it's a flag below
-  }
-  END_XCALL_DEBUG_WRAPPER
-
-  if(!pF)
-  {
-    return WBCopyFont(WBGetDefaultFont());
-  }
-
-  return pRval; // caller must delete this using XFreeFont()
-}
-
 
 unsigned long WBGetWindowFGColor(Window wID)
 {
@@ -5734,44 +5791,63 @@ unsigned long WBGetWindowBGColor(Window wID)
   return(0);
 }
 
-unsigned long WBGetGCFGColor(Display *pDisplay, GC gc)
+unsigned long WBGetGCFGColor(WBGC gc)
 {
-XGCValues val;
-Status ret;
+//XGCValues val;
+//Status ret;
+//
+//
+//  BEGIN_XCALL_DEBUG_WRAPPER
+//  ret = XGetGCValues(pDisplay, gc, GCForeground, &val);
+//  END_XCALL_DEBUG_WRAPPER
+//
+//  if(!ret)
+//  {
+//    // use pre-defined color for BLACK
+//
+//    return BlackPixel(pDisplay, DefaultScreen(pDisplay));
+//  }
+//
+//  return val.foreground;
 
-
-  BEGIN_XCALL_DEBUG_WRAPPER
-  ret = XGetGCValues(pDisplay, gc, GCForeground, &val);
-  END_XCALL_DEBUG_WRAPPER
-
-  if(!ret)
+  if(gc != NULL)
   {
-    // use pre-defined color for BLACK
-
-    return BlackPixel(pDisplay, DefaultScreen(pDisplay));
+    return gc->values.foreground;
   }
-
-  return val.foreground;
+  else
+  {
+    return BlackPixel(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
+  }
 }
 
-unsigned long WBGetGCBGColor(Display *pDisplay, GC gc)
+unsigned long WBGetGCBGColor(WBGC gc)
 {
-XGCValues val;
-Status ret;
+//XGCValues val;
+//Status ret;
+//
+//
+//  BEGIN_XCALL_DEBUG_WRAPPER
+//  ret = XGetGCValues(pDisplay, gc, GCBackground, &val);
+//  END_XCALL_DEBUG_WRAPPER
+//
+//  if(!ret)
+//  {
+//    // use pre-defined color for WHITE
+//
+//    return WhitePixel(pDisplay, DefaultScreen(pDisplay));
+//  }
+//
+//  return val.background;
 
 
-  BEGIN_XCALL_DEBUG_WRAPPER
-  ret = XGetGCValues(pDisplay, gc, GCBackground, &val);
-  END_XCALL_DEBUG_WRAPPER
-
-  if(!ret)
+  if(gc != NULL)
   {
-    // use pre-defined color for WHITE
-
-    return WhitePixel(pDisplay, DefaultScreen(pDisplay));
+    return gc->values.background;
   }
-
-  return val.background;
+  else
+  {
+    return WhitePixel(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
+  }
 }
 
 
@@ -6059,39 +6135,53 @@ int i1, nMaps = 0;
 }
 
 
-XFontStruct *WBGetWindowFontStruct(Window wID)
+WB_FONTC WBQueryWindowFont(Window wID)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
-  if(pEntry && pEntry->pFontStruct)
+  if(pEntry && pEntry->pFont)
   {
-    return(pEntry->pFontStruct);
+    return pEntry->pFont;
+  }
+
+  return NULL;
+}
+
+WB_FONT WBGetWindowFont(Window wID)
+{
+  _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
+
+  if(pEntry && pEntry->pFont)
+  {
+    return WBCopyFont(pEntry->pDisplay, pEntry->pFont);
   }
 
   if(!pDefaultFont)
   {
     WB_ERROR_PRINT("%s - default font is NULL\n", __FUNCTION__);
+
+    return NULL;
   }
 
-  return(pDefaultFont);  // use global font structure
+  return WBCopyFont(pEntry->pDisplay, pDefaultFont);
 }
 
-XFontSet WBGetWindowFontSet(Window wID)
-{
-  _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
-
-  if(pEntry && pEntry->fontSet != None)
-  {
-    return(pEntry->fontSet);
-  }
-
-  if(fontsetDefault == None)
-  {
-    WB_ERROR_PRINT("%s - default font is NULL\n", __FUNCTION__);
-  }
-
-  return(fontsetDefault);  // use global font set
-}
+//XFontSet WBGetWindowFontSet(Window wID)
+//{
+//  _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
+//
+//  if(pEntry && pEntry->fontSet != None)
+//  {
+//    return(pEntry->fontSet);
+//  }
+//
+//  if(fontsetDefault == None)
+//  {
+//    WB_ERROR_PRINT("%s - default font is NULL\n", __FUNCTION__);
+//  }
+//
+//  return(fontsetDefault);  // use global font set
+//}
 
 void WBSetWindowClassName(Window wID, const char *szClassName)
 {
@@ -7061,6 +7151,7 @@ void WBUpdateWindow(Window wID)
   XExposeEvent evt;
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
+  BEGIN_XCALL_DEBUG_WRAPPER
   XFlush(WBGetWindowDisplay(wID));
 
   if(pEntry)
@@ -7109,6 +7200,7 @@ void WBUpdateWindow(Window wID)
     }
 
   }
+  END_XCALL_DEBUG_WRAPPER
 }
 
 void WBUpdateWindowImmediately(Window wID)
@@ -7123,13 +7215,17 @@ void WBUpdateWindowImmediately(Window wID)
 #define WB_IS_WINDOW_BEING_DESTROYED(X) ((X).iWindowState == WB_WINDOW_DESTROYING)
 #define WB_IS_WINDOW_DESTROYED(X) ((X).iWindowState == WB_WINDOW_DESTROYED || (X).iWindowState == WB_WINDOW_DELETE)
 
+  BEGIN_XCALL_DEBUG_WRAPPER
   XFlush(WBGetWindowDisplay(wID));
+  END_XCALL_DEBUG_WRAPPER
 
   if(pEntry &&
      WB_IS_WINDOW_MAPPED(*pEntry) &&
      pEntry->rgnClip != None && !XEmptyRegion(pEntry->rgnClip))
   {
+    BEGIN_XCALL_DEBUG_WRAPPER
     XClipBox(pEntry->rgnClip, &xrct);
+    END_XCALL_DEBUG_WRAPPER
 
     // generate an 'expose' event and post it
 
@@ -7168,6 +7264,7 @@ void WBInvalidateGeom(Window wID, const WB_GEOM *pGeom, int bPaintNow)
 
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
+  BEGIN_XCALL_DEBUG_WRAPPER
   XFlush(WBGetWindowDisplay(wID));
 
   if(pEntry)
@@ -7221,6 +7318,7 @@ void WBInvalidateGeom(Window wID, const WB_GEOM *pGeom, int bPaintNow)
       }
     }
   }
+  END_XCALL_DEBUG_WRAPPER
 }
 
 void WBInvalidateRegion(Window wID, Region rgn, int bPaintFlag)
@@ -7229,7 +7327,9 @@ void WBInvalidateRegion(Window wID, Region rgn, int bPaintFlag)
 
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
+  BEGIN_XCALL_DEBUG_WRAPPER
   XFlush(WBGetWindowDisplay(wID));
+  END_XCALL_DEBUG_WRAPPER
 
   if(pEntry)
   {
@@ -7240,7 +7340,9 @@ void WBInvalidateRegion(Window wID, Region rgn, int bPaintFlag)
 
     if(pEntry->rgnClip)
     {
+      BEGIN_XCALL_DEBUG_WRAPPER
       XUnionRegion(rgn, pEntry->rgnClip, pEntry->rgnClip);
+      END_XCALL_DEBUG_WRAPPER
 
       if(bPaintFlag)
       {
@@ -7259,7 +7361,9 @@ void WBValidateGeom(Window wID, const WB_GEOM *pGeom)
 
   pEntry = WBGetWindowEntry(wID);
 
+  BEGIN_XCALL_DEBUG_WRAPPER
   XFlush(WBGetWindowDisplay(wID));
+  END_XCALL_DEBUG_WRAPPER
 
   if(pEntry)
   {
@@ -7274,7 +7378,9 @@ void WBValidateGeom(Window wID, const WB_GEOM *pGeom)
     {
       if(pEntry->rgnClip)
       {
+        BEGIN_XCALL_DEBUG_WRAPPER
         XDestroyRegion(pEntry->rgnClip);
+        END_XCALL_DEBUG_WRAPPER
       }
 
       pEntry->rgnClip = XCreateRegion(); // put an empty one there
@@ -7287,13 +7393,16 @@ void WBValidateGeom(Window wID, const WB_GEOM *pGeom)
     xrct.width = (unsigned short)pGeom->width;
     xrct.height = (unsigned short)pGeom->height;
 
+    BEGIN_XCALL_DEBUG_WRAPPER
     rgnTemp = XCreateRegion();
+    END_XCALL_DEBUG_WRAPPER
 
     if(!rgnTemp)
     {
       return; // oops (error)
     }
 
+    BEGIN_XCALL_DEBUG_WRAPPER
     XUnionRectWithRegion(&xrct, rgnTemp, rgnTemp);
     XSubtractRegion(rgnTemp, pEntry->rgnClip, pEntry->rgnClip);
 
@@ -7305,6 +7414,7 @@ void WBValidateGeom(Window wID, const WB_GEOM *pGeom)
 //      XDestroyRegion(pEntry->rgnClip);
 //      pEntry->rgnClip = 0;
     }
+    END_XCALL_DEBUG_WRAPPER
   }
 }
 
@@ -7316,7 +7426,9 @@ void WBValidateRegion(Window wID, Region rgn)
 
   pEntry = WBGetWindowEntry(wID);
 
+  BEGIN_XCALL_DEBUG_WRAPPER
   XFlush(WBGetWindowDisplay(wID));
+  END_XCALL_DEBUG_WRAPPER
 
   if(pEntry)
   {
@@ -7331,7 +7443,9 @@ void WBValidateRegion(Window wID, Region rgn)
     {
       if(pEntry->rgnClip)
       {
+        BEGIN_XCALL_DEBUG_WRAPPER
         XDestroyRegion(pEntry->rgnClip);
+        END_XCALL_DEBUG_WRAPPER
       }
 
       pEntry->rgnClip = XCreateRegion(); // put an empty one there
@@ -7339,6 +7453,7 @@ void WBValidateRegion(Window wID, Region rgn)
       return;
     }
 
+    BEGIN_XCALL_DEBUG_WRAPPER
     XSubtractRegion(rgn, pEntry->rgnClip, pEntry->rgnClip);
     if(XEmptyRegion(pEntry->rgnClip))
     {
@@ -7346,6 +7461,7 @@ void WBValidateRegion(Window wID, Region rgn)
 //      XDestroyRegion(pEntry->rgnClip);
 //      pEntry->rgnClip = XCreateRegion(); // put an empty one there
     }
+    END_XCALL_DEBUG_WRAPPER
   }
 }
 
@@ -7353,7 +7469,9 @@ Region WBGetInvalidRegion(Window wID)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
+  BEGIN_XCALL_DEBUG_WRAPPER
   XFlush(WBGetWindowDisplay(wID));
+  END_XCALL_DEBUG_WRAPPER
 
   if(pEntry && pEntry->rgnClip)
   {
@@ -7365,7 +7483,9 @@ Region WBGetInvalidRegion(Window wID)
     }
     else
     {
+      BEGIN_XCALL_DEBUG_WRAPPER
       XUnionRegion(pEntry->rgnClip, rgnRval, rgnRval);
+      END_XCALL_DEBUG_WRAPPER
     }
 
     return rgnRval;
@@ -7378,7 +7498,9 @@ Region WBGetPaintRegion(Window wID)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
+  BEGIN_XCALL_DEBUG_WRAPPER
   XFlush(WBGetWindowDisplay(wID));
+  END_XCALL_DEBUG_WRAPPER
 
   if(pEntry && pEntry->rgnPaint)
   {
@@ -7390,7 +7512,9 @@ Region WBGetPaintRegion(Window wID)
     }
     else
     {
+      BEGIN_XCALL_DEBUG_WRAPPER
       XUnionRegion(pEntry->rgnPaint, rgnRval, rgnRval);
+      END_XCALL_DEBUG_WRAPPER
     }
 
     return rgnRval;
@@ -7401,15 +7525,29 @@ Region WBGetPaintRegion(Window wID)
 
 Region WBCopyRegion(Region rgnSource)
 {
-  Region rgnRval = XCreateRegion();
+Region rgnRval;
+
+  if((CARD32)rgnSource & 0xe0000000) // see man page for XGetGCValues and the implication of invalid XIDs
+  {
+    WB_ERROR_PRINT("ERROR:  %s - invalid source region %d (%08xH), no region created\n",
+                   __FUNCTION__, (int)rgnSource, (int)rgnSource);
+
+    return NULL;
+  }
+
+  BEGIN_XCALL_DEBUG_WRAPPER
+  rgnRval = XCreateRegion();
+  END_XCALL_DEBUG_WRAPPER
 
   if(rgnRval == None)
   {
-    WB_ERROR_PRINT("ERROR:  %s - no region created\n", __FUNCTION__);
+    WB_ERROR_PRINT("ERROR:  %s - unable to create region\n", __FUNCTION__);
   }
   else
   {
+    BEGIN_XCALL_DEBUG_WRAPPER
     XUnionRegion(rgnSource, rgnRval, rgnRval);
+    END_XCALL_DEBUG_WRAPPER
   }
 
   return rgnRval;
@@ -7425,7 +7563,9 @@ Region rgnRval;
     return None;
   }
 
+  BEGIN_XCALL_DEBUG_WRAPPER
   rgnRval = XCreateRegion();
+  END_XCALL_DEBUG_WRAPPER
 
   if(rgnRval == None)
   {
@@ -7438,7 +7578,9 @@ Region rgnRval;
     xrct.width = (unsigned short)(pRect->right - pRect->left);
     xrct.height = (unsigned short)(pRect->bottom - pRect->top);
 
+    BEGIN_XCALL_DEBUG_WRAPPER
     XUnionRectWithRegion(&xrct, rgnRval, rgnRval);
+    END_XCALL_DEBUG_WRAPPER
   }
 
   return rgnRval;
@@ -7454,7 +7596,9 @@ Region rgnRval;
     return None;
   }
 
+  BEGIN_XCALL_DEBUG_WRAPPER
   rgnRval = XCreateRegion();
+  END_XCALL_DEBUG_WRAPPER
 
   if(rgnRval == None)
   {
@@ -7467,7 +7611,9 @@ Region rgnRval;
     xrct.width = (unsigned short)pGeom->width;
     xrct.height = (unsigned short)pGeom->height;
 
+    BEGIN_XCALL_DEBUG_WRAPPER
     XUnionRectWithRegion(&xrct, rgnRval, rgnRval);
+    END_XCALL_DEBUG_WRAPPER
   }
 
   return rgnRval;
@@ -7475,10 +7621,10 @@ Region rgnRval;
 
 // paint helpers
 
-GC WBBeginPaint(Window wID, XExposeEvent *pEvent, WB_GEOM *pgBounds)
+WBGC WBBeginPaint(Window wID, XExposeEvent *pEvent, WB_GEOM *pgBounds)
 {
 WB_GEOM geomTemp;
-GC gcRval;
+WBGC gcRval;
 
 
   if(!pEvent || pEvent->type != Expose)
@@ -7504,20 +7650,22 @@ GC gcRval;
   return gcRval;
 }
 
-GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // GC will get the 'invalid' region assigned as clip region
+WBGC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // WBGC will get the 'invalid' region assigned as clip region
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
-  GC gcRval;
+  WBGC gcRval;
   Region rgnPaint;
   XRectangle xrct;
 
 
   if(!pEntry || !pgBounds)
   {
-    return None;
+    return NULL;
   }
 
+  BEGIN_XCALL_DEBUG_WRAPPER
   XSync(WBGetWindowDisplay(wID), 0);
+  END_XCALL_DEBUG_WRAPPER
 
   if(!pEntry->rgnClip || XEmptyRegion(pEntry->rgnClip)) // clipping region is empty?
   {
@@ -7539,23 +7687,19 @@ GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // GC will get the 'invalid' 
 
     if(!pEntry->rgnClip)
     {
+      BEGIN_XCALL_DEBUG_WRAPPER
       pEntry->rgnClip = XCreateRegion(); // create an empty region
+      END_XCALL_DEBUG_WRAPPER
     }
   }
 
-  gcRval = XCreateGC(pEntry->pDisplay, wID, 0, NULL);
-  if(gcRval)
+//  WB_WARN_PRINT("TEMPORARY:  %s - calling WBCopyGC()\n", __FUNCTION__);
+  gcRval = WBCopyGC(pEntry->hGC);
+
+  if(!gcRval)
   {
-    if(!XCopyGC(pEntry->pDisplay, pEntry->hGC, GCAll /*0x7fffff*/, gcRval))  // 23 bits in the mask
-    {  // NOTE:  docs say that args 3 and 4 are reversed, but header says THIS way
-       //        I have to believe that the header file is correct
-      XFreeGC(pEntry->pDisplay, gcRval);
-
-      WB_WARN_PRINT("%s - * BUG * at line %d - unable to copy GC for window %d (%08xH)\n",
-                    __FUNCTION__, __LINE__, (int)wID, (int)wID);
-
-      gcRval = 0;
-    }
+    WB_WARN_PRINT("%s - * BUG * at line %d - unable to copy GC for window %d (%08xH)\n",
+                  __FUNCTION__, __LINE__, (int)wID, (int)wID);
   }
 
   // using pEntry->rgnClip create a paint region
@@ -7566,13 +7710,18 @@ GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // GC will get the 'invalid' 
     WB_WARN_PRINT("%s - * BUG * at line %d - non-zero paint region for window %d (%08xH)\n",
                   __FUNCTION__, __LINE__, (int)wID, (int)wID);
 
+    BEGIN_XCALL_DEBUG_WRAPPER
     XDestroyRegion(pEntry->rgnPaint);
-    pEntry->rgnPaint = 0;
+    END_XCALL_DEBUG_WRAPPER
+
+    pEntry->rgnPaint = None;
   }
 
   if(gcRval)
   {
+    BEGIN_XCALL_DEBUG_WRAPPER
     rgnPaint = XCreateRegion();
+    END_XCALL_DEBUG_WRAPPER
 
     if(rgnPaint)
     {
@@ -7585,18 +7734,23 @@ GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // GC will get the 'invalid' 
 
 //        WB_ERROR_PRINT("TEMPORARY:  %s - no clip region\n", __FUNCTION__);
 
+        BEGIN_XCALL_DEBUG_WRAPPER
         XUnionRectWithRegion(&xrct, rgnPaint, rgnPaint);  // the paint rectangle as a region
+        END_XCALL_DEBUG_WRAPPER
       }
       else
       {
         Region rgnTemp = XCreateRegion();
         if(!rgnTemp)
         {
+          BEGIN_XCALL_DEBUG_WRAPPER
           XDestroyRegion(rgnPaint);
-          rgnPaint = NULL;
+          END_XCALL_DEBUG_WRAPPER
 
-          XFreeGC(pEntry->pDisplay, gcRval);
-          gcRval = 0;
+          rgnPaint = None;
+
+          WBFreeGC(gcRval);
+          gcRval = NULL;
 
           WB_ERROR_PRINT("ERROR:  %s - could not create clip region\n", __FUNCTION__);
         }
@@ -7608,6 +7762,7 @@ GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // GC will get the 'invalid' 
           xrct.width  = pgBounds->width;
           xrct.height = pgBounds->height;
 
+          BEGIN_XCALL_DEBUG_WRAPPER
           XUnionRectWithRegion(&xrct, rgnTemp, rgnTemp);  // the paint rectangle as a region
           XUnionRegion(pEntry->rgnClip, rgnPaint, rgnPaint);  // a copy of the invalid region
           XIntersectRegion(rgnTemp, rgnPaint, rgnPaint);      // INTERSECT with xrct (usually from the Expose event)
@@ -7616,6 +7771,7 @@ GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // GC will get the 'invalid' 
           // (if called by WBBeginPaint, 'pgBounds' will be the rectangular area from the Expose event)
 
           XDestroyRegion(rgnTemp);
+          END_XCALL_DEBUG_WRAPPER
         }
       }
     }
@@ -7630,19 +7786,26 @@ GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // GC will get the 'invalid' 
 
 
       pEntry->rgnPaint = rgnPaint;
-      BEGIN_XCALL_DEBUG_WRAPPER
-      XSetClipOrigin(pEntry->pDisplay, gcRval, 0, 0);
-      XSetRegion(pEntry->pDisplay, gcRval, rgnPaint);
-      END_XCALL_DEBUG_WRAPPER
+      if(gcRval != NULL)
+      {
+        // assign the clipping region to the GC
+
+//        BEGIN_XCALL_DEBUG_WRAPPER
+        WBSetClipOrigin(gcRval, 0, 0);
+        WBSetRegion(gcRval, rgnPaint);
+//        END_XCALL_DEBUG_WRAPPER
+      }
     }
   }
 
-  if(gcRval != None && pgBounds)
+  if(gcRval != NULL && pgBounds)
   {
-    // assign the clipping region to the GC and get the 'bounds' from the expose event
+    // get the 'bounds' from the expose event
     // and intersect them.  This should prevent me from re-painting several times
 
+    BEGIN_XCALL_DEBUG_WRAPPER
     XClipBox(rgnPaint, &xrct);
+    END_XCALL_DEBUG_WRAPPER
 
     pgBounds->x     = xrct.x;
     pgBounds->y     = xrct.y;
@@ -7651,16 +7814,16 @@ GC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // GC will get the 'invalid' 
     pgBounds->border = 0;
   }
 
-  if(gcRval == None)
+  if(gcRval == NULL)
   {
-    WB_WARN_PRINT("%s - WARNING:  zero gcRval for window %d (%08xH)\n",
+    WB_WARN_PRINT("%s - WARNING:  NULL gcRval for window %d (%08xH)\n",
                   __FUNCTION__, (int)wID, (int)wID);
   }
 
   return gcRval;
 }
 
-void WBClearWindow(Window wID, GC gc)
+void WBClearWindow(Window wID, WBGC gc)
 {
 unsigned long clrFG, clrBG;
 _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
@@ -7677,8 +7840,8 @@ XRectangle xrct;
 
   pDisplay = pEntry->pDisplay; // cache it
 
-  clrFG = WBGetGCFGColor(pDisplay, gc);
-  clrBG = WBGetGCBGColor(pDisplay, gc);
+  clrFG = WBGetGCFGColor(gc);
+  clrBG = WBGetGCBGColor(gc);
 
   BEGIN_XCALL_DEBUG_WRAPPER
   XClipBox(pEntry->rgnPaint, &xrct);
@@ -7708,23 +7871,21 @@ XRectangle xrct;
 
   // now erase the background according to the clip rectangle
 
-  BEGIN_XCALL_DEBUG_WRAPPER
-  XSetForeground(pDisplay, gc, clrBG);
+//  BEGIN_XCALL_DEBUG_WRAPPER
+  WBSetForeground(gc, clrBG);
 
   if(xrct.width > 0 && xrct.height > 0)
   {
 //    WB_ERROR_PRINT("TEMPORARY: %s - clearing window %08xH geom %d, %d, %d, %d\n",
 //                   __FUNCTION__, (WB_UINT32)wID, xrct.x, xrct.y, xrct.width, xrct.height);
 
-    XFillRectangle(pDisplay, wID, gc, xrct.x, xrct.y, xrct.width, xrct.height);
+    WBFillRectangle(pDisplay, wID, gc, xrct.x, xrct.y, xrct.width, xrct.height);
   }
 
-  XSetForeground(pDisplay, gc, clrFG);
-  END_XCALL_DEBUG_WRAPPER
-
+  WBSetForeground(gc, clrFG);
 }
 
-void WBEndPaint(Window wID, GC gc)
+void WBEndPaint(Window wID, WBGC gc)
 {
   // validate the paint region and remove it from the 'invalid' region
 
@@ -7732,9 +7893,19 @@ void WBEndPaint(Window wID, GC gc)
 
   if(pEntry->rgnClip != None)
   {
+    if(pEntry->pImage)
+    {
+      // for now update with everything; later, just update the modified rgnPaint paint region?
+      // (it would have to be an intersection between the paint region and the clipping region)
+
+      WBUpdateWindowWithImage(pEntry->pDisplay, wID);
+    }
+
     if(pEntry->rgnPaint != None)
     {
+      BEGIN_XCALL_DEBUG_WRAPPER
       XSubtractRegion(pEntry->rgnClip, pEntry->rgnPaint, pEntry->rgnClip);
+      END_XCALL_DEBUG_WRAPPER
 
 // TODO:  should I leave the empty region anyway, or not?  leaving it might work better...
 //
@@ -7772,15 +7943,193 @@ void WBEndPaint(Window wID, GC gc)
 
   if(pEntry->rgnPaint != None)
   {
+    BEGIN_XCALL_DEBUG_WRAPPER
     XDestroyRegion(pEntry->rgnPaint);
+    END_XCALL_DEBUG_WRAPPER
+
     pEntry->rgnPaint = None;
   }
 
   if(gc)
   {
-    XFreeGC(pEntry->pDisplay, gc);
+    WBFreeGC(gc);
   }
 }
+
+
+/**********************************************************************/
+/*                                                                    */
+/*          Cached XImage handling for paint and graphics             */
+/*                                                                    */
+/**********************************************************************/
+
+// POOBAH
+XImage *WBGetWindowImage(Display *pDisplay, Window wID)
+{
+_WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
+
+  if(!pEntry || pEntry->iWindowState == WB_WINDOW_DESTROYED) // so that there is no attempt to use the window
+  {
+    return NULL;
+  }
+
+  if(pEntry->iFlags & WBCreateWindow_flagsNoImageCache)
+  {
+    return NULL; // always
+  }
+
+#ifdef USE_WINDOW_XIMAGE
+  if(!disable_imagecache && !(pEntry->pImage)) // this allows me to do a 'soft disable' of the image cache
+  {
+    Window winRoot = None;
+    int iX0=0, iY0=0;
+    unsigned int iWidth0=0, iHeight0=0, iBorder;
+    unsigned int uiDepth = 0;
+
+    if(!pDisplay)
+    {
+      pDisplay = pEntry->pDisplay;
+      if(!pDisplay)
+      {
+        pDisplay = WBGetDefaultDisplay();
+      }
+    }
+
+    BEGIN_XCALL_DEBUG_WRAPPER
+    XGetGeometry(pDisplay, wID, &winRoot, &iX0, &iY0, &iWidth0, &iHeight0, &iBorder, &uiDepth);
+
+    // TODO:  if the window has never been painted, create a blank pixmap and fill with the background color
+    //        It may also be possible (for a completely invalid window) to erase its pixmap and then create
+    //        a 'blank' one of the appropriate size without grabbing the bits off of the X server
+
+    pEntry->pImage = WBXGetImage(pDisplay, wID, 0, 0, iWidth0, iHeight0, 0xffffffff, ZPixmap);
+    // NOTE:  this may fail if part of the window extends past the screen size.  In those cases, it may
+    //        be necessary to 'fudge' it a bit.
+    // TODO:  test for and handle this condition
+    END_XCALL_DEBUG_WRAPPER
+
+    // NOTE:  the XImage has width and height members indicating such. when window is re-sized, these can be
+    //        compared, and if the new window size is larger than the pixmap (or just different) either a
+    //        new pixmap can be derived from the old one, or it can simply be deleted and re-created when needed.
+  }
+#endif // USE_WINDOW_XIMAGE
+
+  return pEntry->pImage;
+}
+
+
+int WBAssignWindowImage(Display *pDisplay, Window wID, XImage *pImage)
+{
+_WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
+
+
+  if(!pEntry || (pEntry->iFlags & WBCreateWindow_flagsNoImageCache))
+  {
+    return -1; // not using an image, can't assign one
+  }
+
+
+  return -1; // for now
+}
+
+
+int WBCopyIntoWindowImage(Display *pDisplay, Window wID, XImage *pSrcImage,
+                          int xSrc, int ySrc, int width, int height,
+                          int xOffs, int yOffs)
+{
+_WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
+
+
+  if(!pEntry || (pEntry->iFlags & WBCreateWindow_flagsNoImageCache))
+  {
+    return -1; // not using an image, can't assign one nor copy
+    // TODO:  handle this situation using a Pixmap and copy to window instead??
+  }
+
+
+  return -1; // for now
+}
+
+
+void WBUpdateWindowWithImage(Display *pDisplay, Window wID)
+{
+_WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
+
+  // TODO:  see __internalDoAntiAlias in draw_text.c for similar operations
+
+  if(!pEntry || pEntry->iWindowState == WB_WINDOW_DESTROYED) // so that there is no attempt to use the window
+  {
+    if(!pEntry)
+    {
+      WB_WARN_PRINT("WARNING:  %s - no 'window entry' for Window %d (%08xH)\n",
+                    __FUNCTION__, (unsigned int)wID, (unsigned int)wID);
+    }
+    else
+    {
+      WB_DEBUG_PRINT(DebugLevel_Medium, "WARNING:  %s - NOT updating 'destroyed' Window %d (%08xH)\n",
+                    __FUNCTION__, (unsigned int)wID, (unsigned int)wID);
+    }
+
+    return;
+  }
+
+  // use the current (default) graphics context.  if not valid, fail.
+  // TODO:  make a copy and ONLY update the current 'invalid' region instead??
+  //        this might actually speed things up a LOT
+
+  if(pEntry->hGC == None) // no default GC - can't do this
+  {
+    WB_DEBUG_PRINT(DebugLevel_Light, "WARNING:  %s - no GC for Window %d (%08xH)\n",
+                  __FUNCTION__, (unsigned int)wID, (unsigned int)wID);
+    return;
+  }
+
+  if(!(pEntry->pImage))
+  {
+    WB_WARN_PRINT("WARNING:  %s - no XImage for %d (%08xH) - this should never happen\n",
+                  __FUNCTION__, (unsigned int)wID, (unsigned int)wID);
+  }
+  else
+  {
+    Window winRoot = None;
+    int iX0=0, iY0=0;
+    unsigned int iWidth0=0, iHeight0=0, iBorder;
+    unsigned int uiDepth = 0;
+
+    if(!pDisplay)
+    {
+      pDisplay = pEntry->pDisplay;
+      if(!pDisplay)
+      {
+        pDisplay = WBGetDefaultDisplay();
+      }
+    }
+
+    BEGIN_XCALL_DEBUG_WRAPPER
+    // TODO:  always use cached information from pEntry ???
+    XGetGeometry(pDisplay, wID, &winRoot, &iX0, &iY0, &iWidth0, &iHeight0, &iBorder, &uiDepth);
+    END_XCALL_DEBUG_WRAPPER
+
+    // if the image size is too small, reduce width and height accordingly
+
+    if(WB_UNLIKELY(pEntry->pImage->width < iWidth0))
+    {
+      iWidth0 = pEntry->pImage->width;
+    }
+
+    if(WB_UNLIKELY(pEntry->pImage->height < iHeight0))
+    {
+      iHeight0 = pEntry->pImage->height;
+    }
+
+    // TODO:  limit the update to the bounding rectangle of the invalid/clipping region.  This
+    //        might be fastest.  But, when the invalid/clip region is empty, do it ALL.
+
+    WBXPutImage(pDisplay, wID, pEntry->hGC, pEntry->pImage, 0, 0, iX0, iY0, iWidth0, iHeight0);
+    // NOTE:  this process should be very fast by comparison to getting the image from the drawable (window)
+  }
+}
+
 
 
 /**********************************************************************/
@@ -8709,20 +9058,27 @@ static const char * __internal_event_type_string(int iEventType)
 }
 
 
-void WBDebugDumpGC(Display *pDisplay, GC hGC)
+void WBDebugDumpGC(Display *pDisplay, WBGC hGC)
 {
 XGCValues xgcv;
 
+  if(!hGC)
+  {
+    WBDebugPrint("GC DUMP - NULL hGC\n");
+    return;
+  }
+
   bzero(&xgcv, sizeof(xgcv));
+  memcpy(&xgcv, &(hGC->values), sizeof(xgcv));
 
-  XGetGCValues(pDisplay, hGC,
-               GCFunction | GCPlaneMask | GCForeground | GCBackground | GCLineWidth | GCLineStyle | GCCapStyle
-               | GCJoinStyle | GCFillStyle | GCFillRule | GCTile | GCStipple | GCTileStipXOrigin | GCTileStipYOrigin
-               | GCFont | GCSubwindowMode | GCGraphicsExposures | GCClipXOrigin | GCClipYOrigin /*| GCClipMask*/
-               | GCDashOffset /*| GCDashList*/ | GCArcMode,
-               &xgcv);
+  WBGetGCValues(hGC,
+                GCFunction | GCPlaneMask | GCForeground | GCBackground | GCLineWidth | GCLineStyle | GCCapStyle
+                | GCJoinStyle | GCFillStyle | GCFillRule | GCTile | GCStipple | GCTileStipXOrigin | GCTileStipYOrigin
+                | GCFont | GCSubwindowMode | GCGraphicsExposures | GCClipXOrigin | GCClipYOrigin /*| GCClipMask*/
+                | GCDashOffset /*| GCDashList*/ | GCArcMode,
+                &xgcv);
 
-  WBDebugPrint("GC DUMP - GC       = %ld (%08lxH)\n", (long)hGC, (long)hGC);
+  WBDebugPrint("WBGC DUMP - GC     = %ld (%08lxH)\n", (long)(hGC->gc), (long)(hGC->gc));
   WBDebugPrint("function           = %d (%08xH)\n", xgcv.function, xgcv.function);
   WBDebugPrint("plane_mask         = %ld (%016lxH)\n", xgcv.plane_mask, xgcv.plane_mask);
   WBDebugPrint("foreground         = %ld (%016lxH)\n", xgcv.foreground, xgcv.foreground);

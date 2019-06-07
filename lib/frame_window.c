@@ -13,15 +13,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -39,7 +39,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -130,9 +130,8 @@ typedef struct __FRAME_WINDOW__
   int nTabBarButtonFlags;            // button flags for tab bar ('pressed')
 
   // fonts and font sets and metrics
-  XFontStruct *pFont;                // cached font for regular font
-  XFontStruct *pBoldFont;            // cached font for bold font
-  XFontSet fontSet, fontSetBold;     // cached font sets for standard and bold font
+  WB_FONT pFont;                     // cached font for regular font
+  WB_FONT pBoldFont;                 // cached font for bold font
   int nAvgCharWidth;                 // cached average character width for the specified font
   int nFontHeight;                   // cached font height for fonts
   int nFontAscent;                   // cached font ascent
@@ -278,27 +277,16 @@ Display *pDisplay;
 
   if(pTemp->pFont)
   {
-    XFreeFont(pDisplay, pTemp->pFont);
+    WBFreeFont(pDisplay, pTemp->pFont);
     pTemp->pFont = NULL;
   }
 
   if(pTemp->pBoldFont)
   {
-    XFreeFont(pDisplay, pTemp->pBoldFont);
+    WBFreeFont(pDisplay, pTemp->pBoldFont);
     pTemp->pBoldFont = NULL;
   }
 
-  if(pTemp->fontSet != None)
-  {
-    XFreeFontSet(pDisplay, pTemp->fontSet);
-    pTemp->fontSet = None;
-  }
-
-  if(pTemp->fontSetBold != None)
-  {
-    XFreeFontSet(pDisplay, pTemp->fontSetBold);
-    pTemp->fontSetBold = None;
-  }
 }
 
 void WBFrameWindowExit()
@@ -445,6 +433,40 @@ XColor FWGetDefaultBD(void)
   return clrBD;
 }
 
+WB_FONTC FWGetFont(WBFrameWindow *pFW)
+{
+FRAME_WINDOW *pFrameWindow;
+
+
+  pFrameWindow = InternalGet_FRAME_WINDOW(pFW);
+
+  if(!pFrameWindow)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
+
+    return NULL;
+  }
+
+  return pFrameWindow->pFont;
+}
+
+WB_FONTC FWGetBoldFont(WBFrameWindow *pFW)
+{
+FRAME_WINDOW *pFrameWindow;
+
+
+  pFrameWindow = InternalGet_FRAME_WINDOW(pFW);
+
+  if(!pFrameWindow)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
+
+    return NULL;
+  }
+
+  return pFrameWindow->pBoldFont;
+}
+
 
 static FRAME_WINDOW *InternalGet_FRAME_WINDOW(WBFrameWindow *pFW)
 {
@@ -528,22 +550,14 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
 
   // fonts, font sets, and related info
 
-  pNew->pFont = WBCopyFont(WBGetDefaultFont()); // make copy of default font
+  pNew->pFont = WBCopyFont(WBGetDefaultDisplay(), WBGetDefaultFont()); // make copy of default font
 
   if(pNew->pFont)
   {
-    pNew->fontSet = WBFontSetFromFont(pDisplay, pNew->pFont);
-
-    pNew->pBoldFont = WBLoadModifyFont(pDisplay, WBGetDefaultFont(), 0, WBFontFlag_WT_BOLD);
-
-    if(pNew->pBoldFont)
-    {
-      pNew->fontSetBold = WBFontSetFromFont(pDisplay, pNew->pBoldFont);
-    }
+    pNew->pBoldFont = WBCopyModifyFont(pDisplay, WBGetDefaultFont(), 0, WBFontFlag_WT_BOLD);
   }
 
-  if(!pNew->pFont || !pNew->pBoldFont ||
-     pNew->fontSet == None || pNew->fontSetBold == None)
+  if(!pNew->pFont || !pNew->pBoldFont)
   {
     WB_ERROR_PRINT("ERROR: %s - unable to create frame window (font functions failed)\r\n", __FUNCTION__);
 
@@ -554,9 +568,9 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
 
   // cache font metrics.  use 'fontSet'
 
-  pNew->nAvgCharWidth = WBFontSetAvgCharWidth(pDisplay, pNew->fontSet);
-  pNew->nFontAscent = WBFontSetAscent(pDisplay, pNew->fontSet);
-  pNew->nFontDescent = WBFontSetDescent(pDisplay, pNew->fontSet);
+  pNew->nAvgCharWidth = WBFontAvgCharWidth(pNew->pFont);
+  pNew->nFontAscent = WBFontAscent(pNew->pFont);
+  pNew->nFontDescent = WBFontDescent(pNew->pFont);
   pNew->nFontHeight = pNew->nFontAscent + pNew->nFontDescent; // TODO:  use 'max bounds' info??
 
 
@@ -570,14 +584,18 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
   pFrames = pNew;
 
 
-  // NOW I get to create the actual window with its GC and callback proc
+  // NOW I get to create the actual window with its WBGC and callback proc
 
-  bzero(&xswa, sizeof(xswa));
+//  bzero(&xswa, sizeof(xswa));
+//
+//  xswa.border_pixel = clrBD.pixel;
+//  xswa.background_pixel = clrBG.pixel;
+//  xswa.colormap = DefaultColormap(pDisplay, DefaultScreen(pDisplay));
+//  xswa.bit_gravity = CenterGravity;
 
-  xswa.border_pixel = clrBD.pixel;
-  xswa.background_pixel = clrBG.pixel;
-  xswa.colormap = DefaultColormap(pDisplay, DefaultScreen(pDisplay));
-  xswa.bit_gravity = CenterGravity;
+  WBInitWindowAttributes(&xswa, clrBD.pixel, clrBG.pixel,
+                         DefaultColormap(pDisplay, DefaultScreen(pDisplay)),
+                         CenterGravity);
 
   pNew->wbFW.wID = WBCreateWindow(pDisplay, None, FWDefaultCallback, "FrameWindow",
                                   iX, iY, iWidth, iHeight, 1, InputOutput,
@@ -855,12 +873,12 @@ FRAME_WINDOW *pFrameWindow;
 static void InternalCalcStatusBarRect(FRAME_WINDOW *pFrameWindow, WB_RECT *pRect)
 {
 int iBarHeight;
-XFontStruct *pFont;
+//WB_FONT pFont;
 
 
   WBGetClientRect(pFrameWindow->wbFW.wID, pRect); // get the rectangle for the client area
 
-  pFont = pFrameWindow->pFont; //WBGetDefaultFont();
+//  pFont = pFrameWindow->pFont; // TODO:  do I still need this??
 
   iBarHeight = pFrameWindow->nFontHeight + 8; // 8 pixels more than overall font height
 
@@ -878,7 +896,7 @@ Window wIDMenu;
 WB_RECT rct, rct2;
 WBMenuBarWindow *pMB;
 int iBarHeight, nVisibleTabs;
-XFontStruct *pFont;
+//WB_FONT pFont;
 
 
   if(pFrameWindow->bTabBarRectAntiRecurse)
@@ -905,7 +923,7 @@ XFontStruct *pFont;
     return;
   }
 
-  pFont = pFrameWindow->pFont;
+//  pFont = pFrameWindow->pFont;
 
   iBarHeight = pFrameWindow->nFontHeight + 14; // 14 pixels more than overall font height
 
@@ -1046,8 +1064,9 @@ XFontStruct *pFont;
     }
 
     // grew window and more than the previous visible tabs are visible now?
-    if(pFrameWindow->nLeftTab + nVisibleTabs >= pFrameWindow->nRightTab)
-    {
+    if((unsigned int)pFrameWindow->nLeftTab + (unsigned int)nVisibleTabs >= (unsigned int)pFrameWindow->nRightTab)
+    { // NOTE:  promoted to 'unsigned int' to avoid gcc's overflow warnings - none of these values are negative at this point
+
       // extend left to include more tabs
       pFrameWindow->nLeftTab = pFrameWindow->nRightTab - nVisibleTabs + 1;
 
@@ -1917,6 +1936,7 @@ FRAME_WINDOW *pFrameWindow;
 
 
 
+
 ////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                    //
 //   _____                     _     _   _                    _  _  _                 //
@@ -2206,7 +2226,7 @@ static void InternalPaintTabBar(FRAME_WINDOW *pFrameWindow, XExposeEvent *pEvent
 {
 WB_RECT rct0, rctExpose;
 WB_GEOM geom0;
-GC gc0;
+WBGC gc0;
 
 
   if(WBFrameWindow_NO_TABS & pFrameWindow->wbFW.iFlags) // window has no tab bar?
@@ -2283,7 +2303,7 @@ GC gc0;
     Display *pDisplay = WBGetWindowDisplay(pFrameWindow->wbFW.wID);
     Drawable dw;
     WB_GEOM geom, g2;
-    GC gc;
+    WBGC gc;
     WB_RECT rct, rctTemp;
     XColor clr;
     int iDepth;
@@ -2291,14 +2311,12 @@ GC gc0;
 
     gc = WBGetWindowCopyGC2(pFrameWindow->wbFW.wID, gc0);
 
-    if(gc != None)
-    {
-      BEGIN_XCALL_DEBUG_WRAPPER
-      XCopyGC(pDisplay, gc0,
-              GCFont | GCFillStyle | GCForeground | GCBackground | GCCapStyle | GCFunction | GCLineWidth,
-              gc);
-      END_XCALL_DEBUG_WRAPPER
-    }
+//    if(gc != None)
+//    {
+//      WBCopyGC2(gc0,
+//                GCFont | GCFillStyle | GCForeground | GCBackground | GCCapStyle | GCFunction | GCLineWidth,
+//                gc);
+//    }
 
     iDepth = DefaultDepth(pDisplay, DefaultScreen(pDisplay));  // NOTE:  depth may be too small...
     WB_DEBUG_PRINT((DebugLevel_Heavy | DebugSubSystem_Expose), "InternalPaintTabBar() - depth is %d\n", iDepth);
@@ -2314,7 +2332,7 @@ GC gc0;
       BEGIN_XCALL_DEBUG_WRAPPER
       if(gc != None)
       {
-        XFreeGC(pDisplay, gc);
+        WBFreeGC(gc);
       }
 
       if(dw != None)
@@ -2348,7 +2366,7 @@ GC gc0;
       rgn = WBRectToRegion(&rct);
 
       BEGIN_XCALL_DEBUG_WRAPPER
-      XSetRegion(pDisplay, gc, rgn); // new GC has different clip region
+      WBSetRegion(gc, rgn); // new GC has different clip region
       END_XCALL_DEBUG_WRAPPER
 
       if(rgn != None)
@@ -2363,11 +2381,11 @@ GC gc0;
     // fill the rectangle with the background color
 
     BEGIN_XCALL_DEBUG_WRAPPER
-    XSetForeground(pDisplay, gc, clrBG.pixel);
+    WBSetForeground(gc, clrBG.pixel);
 
-    XFillRectangle(pDisplay, dw, gc, rct.left, rct.top, rct.right - rct.left, rct.bottom - rct.top);
+    WBFillRectangle(pDisplay, dw, gc, rct.left, rct.top, rct.right - rct.left, rct.bottom - rct.top);
 
-    XSetForeground(pDisplay, gc, clrFG.pixel);
+    WBSetForeground(gc, clrFG.pixel);
     END_XCALL_DEBUG_WRAPPER
 
     // draw some lines in some colors for the border
@@ -2453,7 +2471,7 @@ GC gc0;
 //                   clr.red, clr.green, clr.blue, clr.pixel);
 
     BEGIN_XCALL_DEBUG_WRAPPER
-    XSetForeground(pDisplay, gc, clr.pixel/*clrFG.pixel*/); // for now use foreground color; later, ??
+    WBSetForeground(gc, clr.pixel/*clrFG.pixel*/); // for now use foreground color; later, ??
     END_XCALL_DEBUG_WRAPPER
 
     rctTemp.left = g2.x;
@@ -2462,12 +2480,12 @@ GC gc0;
     rctTemp.bottom = g2.y + g2.height;
 
     // put a 'splat' in the middle of this button using the 'bold' font
-    DTDrawSingleLineText(pFrameWindow->fontSetBold,
+    DTDrawSingleLineText(pFrameWindow->pBoldFont,
                          "+", pDisplay, gc, dw, 0, 0, &rctTemp,
                          DTAlignment_HCENTER | DTAlignment_VCENTER);
 
     BEGIN_XCALL_DEBUG_WRAPPER
-    XSetForeground(pDisplay, gc, clrFG.pixel); // by convention, (re)set FG color again [for text I need this]
+    WBSetForeground(gc, clrFG.pixel); // by convention, (re)set FG color again [for text I need this]
     END_XCALL_DEBUG_WRAPPER
 
     // TODO:  draw the actual tabs and the text within them
@@ -2510,7 +2528,7 @@ GC gc0;
                             pFrameWindow->nCloseTab == i1 ? -2 : 0,  // -2 if I'm deleting the tab (no focus)
                             clrFG.pixel, clrBG.pixel,
                             clrBD2.pixel, clrBD3.pixel, clrABG.pixel,
-                            pFrameWindow->fontSet, pFrameWindow->fontSetBold,
+                            pFrameWindow->pFont, pFrameWindow->pBoldFont,
                             pC->aImageAtom, pC->szDisplayName);
         }
       }
@@ -2531,7 +2549,7 @@ GC gc0;
                             pFrameWindow->nCloseTab == i1 ? -1 : 1,  // -1 if I'm deleting the tab, positive otherwise
                             clrFG.pixel, clrBG.pixel,
                             clrBD2.pixel, clrBD3.pixel, clrABG.pixel,
-                            pFrameWindow->fontSet, pFrameWindow->fontSetBold,
+                            pFrameWindow->pFont, pFrameWindow->pBoldFont,
                             pC->aImageAtom, pC->szDisplayName);
         }
       }
@@ -2543,7 +2561,8 @@ GC gc0;
     {
       BEGIN_XCALL_DEBUG_WRAPPER
       // copy my drawn pixmap onto the window
-      XCopyArea(pDisplay, dw, pFrameWindow->wbFW.wID, gc0,
+      // TODO:  re-do this so it's done via an image instead?
+      XCopyArea(pDisplay, dw, pFrameWindow->wbFW.wID, gc0->gc,
                 rct.left, rct.top, rct.right - rct.left, rct.bottom - rct.top,
                 rct0.left, rct0.top);
       END_XCALL_DEBUG_WRAPPER
@@ -2554,13 +2573,16 @@ GC gc0;
     BEGIN_XCALL_DEBUG_WRAPPER
     if(gc != gc0)
     {
-      XFreeGC(pDisplay, gc);
+      WBFreeGC(gc);
       gc = None;
     }
 
     if(dw != pFrameWindow->wbFW.wID)
     {
+      BEGIN_XCALL_DEBUG_WRAPPER
       XFreePixmap(pDisplay, (Pixmap)dw);
+      END_XCALL_DEBUG_WRAPPER
+
       dw = None;
     }
     END_XCALL_DEBUG_WRAPPER
@@ -2592,7 +2614,7 @@ static void InternalPaintStatusBar(FRAME_WINDOW *pFrameWindow, XExposeEvent *pEv
 {
 WB_RECT rct, rctExpose, rctTemp, rctPrev;
 WB_GEOM geom;
-GC gc;
+WBGC gc;
 int i1;
 const char *pszStatus;
 
@@ -2657,7 +2679,7 @@ const char *pszStatus;
   }
   else
   {
-    XFontStruct *pFont = pFrameWindow->pFont;
+    WB_FONT pFont = pFrameWindow->pFont;
     Display *pDisplay = WBGetWindowDisplay(pFrameWindow->wbFW.wID);
     XPoint xpt[3];
 
@@ -2668,7 +2690,7 @@ const char *pszStatus;
     // draw some lines in some colors for the border
 
     // paint the 3D-looking border
-    XSetForeground(pDisplay, gc, clrBD2.pixel);
+    WBSetForeground(gc, clrBD2.pixel);
     xpt[0].x=rct.left;
     xpt[0].y=rct.bottom - 2;  // exclude first point
     xpt[1].x=rct.left;
@@ -2676,9 +2698,9 @@ const char *pszStatus;
     xpt[2].x=rct.right - 2;   // exclude last point
     xpt[2].y=rct.top;
 
-    XDrawLines(pDisplay, pFrameWindow->wbFW.wID, gc, xpt, 3, CoordModeOrigin);
+    WBDrawLines(pDisplay, pFrameWindow->wbFW.wID, gc, xpt, 3, CoordModeOrigin);
 
-    XSetForeground(pDisplay, gc, clrBD3.pixel);
+    WBSetForeground(gc, clrBD3.pixel);
     xpt[0].x=rct.right - 1;
     xpt[0].y=rct.top + 1;              // exclude first point
     xpt[1].x=rct.right - 1;
@@ -2686,9 +2708,9 @@ const char *pszStatus;
     xpt[2].x=rct.left + 1;              // exclude final point
     xpt[2].y=rct.bottom - 1;
 
-    XDrawLines(pDisplay, pFrameWindow->wbFW.wID, gc, xpt, 3, CoordModeOrigin);
+    WBDrawLines(pDisplay, pFrameWindow->wbFW.wID, gc, xpt, 3, CoordModeOrigin);
 
-    XSetForeground(pDisplay, gc, clrFG.pixel); // by convention, set it to FG [for text I need this]
+    WBSetForeground(gc, clrFG.pixel); // by convention, set it to FG [for text I need this]
 
     if(pFont)
     {
@@ -2715,7 +2737,7 @@ const char *pszStatus;
           pszStatus = DEFAULT_STATUS_STRING; // default status text when none defined
         }
 
-        DTDrawSingleLineText(pFrameWindow->fontSet,
+        DTDrawSingleLineText(pFont,
                              pszStatus, pDisplay,
                              gc, pFrameWindow->wbFW.wID,
                              iFixedTab, 0, // fixed tab widths
@@ -2739,7 +2761,7 @@ const char *pszStatus;
             rctTemp.left = pTabs[i1].left;
             rctTemp.right = pTabs[i1].right;
 
-            DTDrawSingleLineText(pFrameWindow->fontSet, ppCols[i1],
+            DTDrawSingleLineText(pFont, ppCols[i1],
                                  pDisplay, gc, pFrameWindow->wbFW.wID,
                                  0, 0, // no tabs (won't be any)
                                  &rctTemp, DTAlignment_VCENTER | pTabs[i1].align);

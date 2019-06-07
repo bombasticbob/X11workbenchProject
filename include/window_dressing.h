@@ -13,15 +13,15 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -39,7 +39,7 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -299,7 +299,7 @@ void WBCalcHScrollBar(WB_SCROLLINFO *pScrollInfo, WB_GEOM *pgeomClient, int iVSc
   * \brief Update the scroll bar geometry within the WB_SCROLLINFO structure
   *
   * \param pSI A pointer to the WB_SCROLLINFO structure
-  * \param fontSetRef The reference font set for scroll bar size.  Pass None to use the 'Default' font set.
+  * \param pFontRef The reference WB_FONTC for scroll bar size.  Pass None to use the 'Default' font set.
   * \param pgeomClient The geometry of the client area where the scroll bars will be displayed.
   * \param pgeomUsable Returns the resulting 'usable' client area after scroll bar geometry calculations are done.
   *
@@ -308,8 +308,32 @@ void WBCalcHScrollBar(WB_SCROLLINFO *pScrollInfo, WB_GEOM *pgeomClient, int iVSc
   *
   * Header File:  window_dressing.h
 **/
-void WBUpdateScrollBarGeometry(WB_SCROLLINFO *pSI, XFontSet fontSetRef,
+void WBUpdateScrollBarGeometry(WB_SCROLLINFO *pSI, WB_FONTC pFontRef,
                                WB_GEOM *pgeomClient, WB_GEOM *pgeomUsable);
+
+/** \ingroup window_dressing
+  * \brief Utility function to invalidate the geometry for the vertical scroll bar
+  *
+  * \param wID The Window ID for the scroll bar owner
+  * \param pScrollInfo A pointer to the WB_SCROLLINFO structure for the window's scroll bars
+  * \param bAll A flag to indicate whether the entire scrollbar should be invalidated; zero only invalidates the 'knob' area
+  * \param bUpdate The 'update' flag to be sent to WBInvalidateGeom()
+  *
+  * Call this function to (efficiently) invalidate the vertical scroll bar geometry for re-painting
+**/
+void WBInvalidateVScrollGeom(Window wID, WB_SCROLLINFO *pScrollInfo, int bAll, int bUpdate);
+
+/** \ingroup window_dressing
+  * \brief Utility function to invalidate the geometry for the horizontal scroll bar
+  *
+  * \param wID The Window ID for the scroll bar owner
+  * \param pScrollInfo A pointer to the WB_SCROLLINFO structure for the window's scroll bars
+  * \param bAll A flag to indicate whether the entire scrollbar should be invalidated; zero only invalidates the 'knob' area
+  * \param bUpdate The 'update' flag to be sent to WBInvalidateGeom()
+  *
+  * Call this function to (efficiently) invalidate the horizontal scroll bar geometry for re-painting
+**/
+void WBInvalidateHScrollGeom(Window wID, WB_SCROLLINFO *pScrollInfo, int bAll, int bUpdate);
 
 /** \ingroup window_dressing
   * \brief Event handler for scroll bars
@@ -335,7 +359,7 @@ int WBScrollBarEvent(Window wID, XEvent *pEvent, WB_SCROLLINFO *pScrollInfo);
   * \param pScrollInfo A pointer to the WB_SCROLLINFO structure to be initialized
   * \param pDisplay A pointer to the current display (or NULL to use the default Display)
   * \param wID the Drawable, typically the Window ID for the target window
-  * \param gc The GC (graphics context) to use
+  * \param gc The WBGC (graphics context) to use
   * \param pgeomClient A pointer to the WB_GEOM for the client area
   *
   * Use this function to paint the vertical scroll bar within the specified window, based on WB_SCROLLINFO
@@ -343,7 +367,7 @@ int WBScrollBarEvent(Window wID, XEvent *pEvent, WB_SCROLLINFO *pScrollInfo);
   * Header File:  window_dressing.h
 **/
 void WBPaintVScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable wID,
-                       GC gc, WB_GEOM *pgeomClient);
+                       WBGC gc, WB_GEOM *pgeomClient);
 
 /** \ingroup window_dressing
   * \brief Paint the horizontal scroll bar within a window based on WB_SCROLLINFO
@@ -351,7 +375,7 @@ void WBPaintVScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable w
   * \param pScrollInfo A pointer to the WB_SCROLLINFO structure to be initialized
   * \param pDisplay A pointer to the current display (or NULL to use the default Display)
   * \param wID the Drawable, typically the Window ID for the target window
-  * \param gc The GC (graphics context) to use
+  * \param gc The WBGC (graphics context) to use
   * \param pgeomClient A pointer to the WB_GEOM for the client area
   *
   * Use this function to paint the horizontal scroll bar within the specified window, based on WB_SCROLLINFO
@@ -359,7 +383,7 @@ void WBPaintVScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable w
   * Header File:  window_dressing.h
 **/
 void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable wID,
-                       GC gc, WB_GEOM *pgeomClient);
+                       WBGC gc, WB_GEOM *pgeomClient);
 
 // borders and '3D' rectangle/polygon art
 
@@ -368,7 +392,7 @@ void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable w
   *
   * \param pDisplay A pointer to the current display (or NULL to use the default Display)
   * \param wID the Drawable, typically the Window ID for the target window
-  * \param gc The GC (graphics context) to use
+  * \param gc The WBGC (graphics context) to use
   * \param pgeomBorder A WB_GEOM that identifies the border rectangle to draw
   * \param lBorderColor A 'Pixel' color value to use when painting the border
   *
@@ -376,7 +400,7 @@ void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable w
   *
   * Header File:  window_dressing.h
 **/
-void WBDrawBorderRect(Display *pDisplay, Drawable wID, GC gc,
+void WBDrawBorderRect(Display *pDisplay, Drawable wID, WBGC gc,
                       WB_GEOM *pgeomBorder, unsigned long lBorderColor);
 
 /** \ingroup window_dressing
@@ -384,7 +408,7 @@ void WBDrawBorderRect(Display *pDisplay, Drawable wID, GC gc,
   *
   * \param pDisplay A pointer to the current display (or NULL to use the default Display)
   * \param wID the Drawable, typically the Window ID for the target window
-  * \param gc The GC (graphics context) to use
+  * \param gc The WBGC (graphics context) to use
   * \param pgeomBorder A WB_GEOM that identifies the border rectangle to draw
   * \param lBorderColor1 A 'Pixel' color value to use when painting the border (upper, left)
   * \param lBorderColor2 A 'Pixel' color value to use when painting the border (lower, right)
@@ -393,7 +417,7 @@ void WBDrawBorderRect(Display *pDisplay, Drawable wID, GC gc,
   *
   * Header File:  window_dressing.h
 **/
-void WBDraw3DBorderRect(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomBorder,
+void WBDraw3DBorderRect(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomBorder,
                         unsigned long lBorderColor1, unsigned long lBorderColor2);
 
 /** \ingroup window_dressing
@@ -401,7 +425,7 @@ void WBDraw3DBorderRect(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomBo
   *
   * \param pDisplay A pointer to the current display (or NULL to use the default Display)
   * \param wID the Drawable, typically the Window ID for the target window
-  * \param gc The GC (graphics context) to use
+  * \param gc The WBGC (graphics context) to use
   * \param pgeomBorder A WB_GEOM that identifies the bounding rectangle for the elipse to draw
   * \param lBorderColor A 'Pixel' color value to use when painting the border
   *
@@ -409,7 +433,7 @@ void WBDraw3DBorderRect(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomBo
   *
   * Header File:  window_dressing.h
 **/
-void WBDrawBorderElipse(Display *pDisplay, Drawable wID, GC gc,
+void WBDrawBorderElipse(Display *pDisplay, Drawable wID, WBGC gc,
                         WB_GEOM *pgeomBorder, unsigned long lBorderColor);
 
 /** \ingroup window_dressing
@@ -417,7 +441,7 @@ void WBDrawBorderElipse(Display *pDisplay, Drawable wID, GC gc,
   *
   * \param pDisplay A pointer to the current display (or NULL to use the default Display)
   * \param wID the Drawable, typically the Window ID for the target window
-  * \param gc The GC (graphics context) to use
+  * \param gc The WBGC (graphics context) to use
   * \param pgeomBorder A WB_GEOM that identifies the bounding rectangle for the elipse to draw
   * \param lBorderColor1 A 'Pixel' color value to use when painting the border (upper, left)
   * \param lBorderColor2 A 'Pixel' color value to use when painting the border (lower, right)
@@ -426,7 +450,7 @@ void WBDrawBorderElipse(Display *pDisplay, Drawable wID, GC gc,
   *
   * Header File:  window_dressing.h
 **/
-void WBDraw3DBorderElipse(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomBorder,
+void WBDraw3DBorderElipse(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomBorder,
                           unsigned long lBorderColor1, unsigned long lBorderColor2);
 
 /** \ingroup window_dressing
@@ -434,7 +458,7 @@ void WBDraw3DBorderElipse(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeom
   *
   * \param pDisplay A pointer to the current display (or NULL to use the default Display)
   * \param wID the Drawable, typically the Window ID for the target window
-  * \param gc The GC (graphics context) to use
+  * \param gc The WBGC (graphics context) to use
   * \param pgeomRect A WB_GEOM that identifies the rectangle to draw
   * \param lColor A 'Pixel' color value to use when painting the dashed rectangle
   *
@@ -442,7 +466,7 @@ void WBDraw3DBorderElipse(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeom
   *
   * Header File:  window_dressing.h
 **/
-void WBDrawDashedRect(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect, unsigned long lColor);
+void WBDrawDashedRect(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor);
 
 
 /** \ingroup window_dressing
@@ -450,7 +474,7 @@ void WBDrawDashedRect(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect
   *
   * \param pDisplay A pointer to the current display (or NULL to use the default Display)
   * \param wID the Drawable, typically the Window ID for the target window
-  * \param gc The GC (graphics context) to use
+  * \param gc The WBGC (graphics context) to use
   * \param pgeomRect A WB_GEOM that identifies the rectangle within which to draw the arrow
   * \param lColor A 'Pixel' color value to use when painting the arrow as a polygon
   *
@@ -458,14 +482,14 @@ void WBDrawDashedRect(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect
   *
   * Header File:  window_dressing.h
 **/
-void WBDrawLeftArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect, unsigned long lColor);
+void WBDrawLeftArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor);
 
 /** \ingroup window_dressing
   * \brief Draw a right arrow in a window within a specified geometry
   *
   * \param pDisplay A pointer to the current display (or NULL to use the default Display)
   * \param wID the Drawable, typically the Window ID for the target window
-  * \param gc The GC (graphics context) to use
+  * \param gc The WBGC (graphics context) to use
   * \param pgeomRect A WB_GEOM that identifies the rectangle within which to draw the arrow
   * \param lColor A 'Pixel' color value to use when painting the arrow as a polygon
   *
@@ -473,14 +497,14 @@ void WBDrawLeftArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect,
   *
   * Header File:  window_dressing.h
 **/
-void WBDrawRightArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect, unsigned long lColor);
+void WBDrawRightArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor);
 
 /** \ingroup window_dressing
   * \brief Draw an up arrow in a window within a specified geometry
   *
   * \param pDisplay A pointer to the current display (or NULL to use the default Display)
   * \param wID the Drawable, typically the Window ID for the target window
-  * \param gc The GC (graphics context) to use
+  * \param gc The WBGC (graphics context) to use
   * \param pgeomRect A WB_GEOM that identifies the rectangle within which to draw the arrow
   * \param lColor A 'Pixel' color value to use when painting the arrow as a polygon
   *
@@ -488,14 +512,14 @@ void WBDrawRightArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect
   *
   * Header File:  window_dressing.h
 **/
-void WBDrawUpArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect, unsigned long lColor);
+void WBDrawUpArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor);
 
 /** \ingroup window_dressing
   * \brief Draw a down arrow in a window within a specified geometry
   *
   * \param pDisplay A pointer to the current display (or NULL to use the default Display)
   * \param wID the Drawable, typically the Window ID for the target window
-  * \param gc The GC (graphics context) to use
+  * \param gc The WBGC (graphics context) to use
   * \param pgeomRect A WB_GEOM that identifies the rectangle within which to draw the arrow
   * \param lColor A 'Pixel' color value to use when painting the arrow as a polygon
   *
@@ -503,7 +527,7 @@ void WBDrawUpArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect, u
   *
   * Header File:  window_dressing.h
 **/
-void WBDrawDownArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect, unsigned long lColor);
+void WBDrawDownArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor);
 
 
 /** \ingroup window_dressing
@@ -511,7 +535,7 @@ void WBDrawDownArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect,
   *
   * \param pDisplay A pointer to the current display (or NULL to use the default Display)
   * \param wID the Drawable, typically the Window ID for the target window
-  * \param gc The GC (graphics context) to use
+  * \param gc The WBGC (graphics context) to use
   * \param pgeomOutline A WB_GEOM that identifies the rectangular border of the tab to draw
   * \param fFocus A flag value that indicates whether or not this tab has the 'focus', and whether or not the 'x' is being 'pressed'.\n\n A value of 0 indicates 'no focus'.  A positive value is 'focus'.\n\n A negative value generally indicates 'pressing the "x" button'.  Specifically, a -1 indicates 'focus', and any other negative value indicates 'no focus' while pressing the 'x'.  This is necessary to properly implement UI feedback for the tab.  Clicking 'x' does not imply getting the focus.\n
   * \param lFGColor The current 'foreground' 'Pixel' color for text and borders
@@ -519,8 +543,8 @@ void WBDrawDownArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect,
   * \param lBorderColor1 The upper, left 'Pixel' color to use when drawing the tab
   * \param lBorderColor2 The lower, right 'Pixel' color to use when drawing the tab
   * \param lHighlightColor The 'highlight' 'Pixel' color to use for a tab that has the focus
-  * \param fontSet The 'normal' font to render text in
-  * \param fontSetBold The 'bold' font to render text in (this includes the 'x' close button on the tab)
+  * \param pFont The 'normal' WB_FONTC to render text in
+  * \param pFontBold The 'bold' WB_FONTC to render text in (this includes the 'x' close button on the tab)
   * \param aGraphic An atom for the current (registered) pixmap graphic, or 'None' for no graphic
   * \param szText A const pointer to a character string containing the descriptive text for the tab
   *
@@ -537,11 +561,11 @@ void WBDrawDownArrow(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomRect,
   *
   * Header File:  window_dressing.h
 **/
-void WBDraw3DBorderTab(Display *pDisplay, Drawable wID, GC gc, WB_GEOM *pgeomOutline,
+void WBDraw3DBorderTab(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomOutline,
                        int fFocus, unsigned long lFGColor, unsigned long lBGColor,
                        unsigned long lBorderColor1, unsigned long lBorderColor2,
                        unsigned long lHighlightColor,
-                       XFontSet fontSet, XFontSet fontSetBold,
+                       WB_FONTC pFont, WB_FONTC pFontBold,
                        Atom aGraphic, const char *szText);
 
 

@@ -13,15 +13,14 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2018 by Bob Frazier (aka 'Big Bad Bombastic Bob')
-                             all rights reserved
+    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
                'as-is', with no warranties, either implied or explicit.
                Any claims to alleged functionality or features should be
                considered 'preliminary', and might not function as advertised.
 
-  BSD-like license:
+  MIT-like license:
 
   There is no restriction as to what you can do with this software, so long
   as you include the above copyright notice and DISCLAIMER for any distributed
@@ -39,7 +38,12 @@
   'about the application' dialog boxes.
 
   Use and distribution are in accordance with GPL, LGPL, and/or the above
-  BSD-like license.  See COPYING and README files for more information.
+  MIT-like license.  See COPYING and README files for more information.
+
+  This file may have additional license requirements, due to the use of
+  potentially derived code.  Please see the code comments in the appropriate
+  source file section to identify that portion of the code that may be
+  covered by additional requirements.
 
 
   Additional information at http://sourceforge.net/projects/X11workbench
@@ -56,6 +60,18 @@
 
 // application header file
 #include "pixmap_helper.h" // this will include platform_helper.h and window_helper.h
+
+// This next section has includes for the XShmXXX functions - must do this AFTER platform_helper.h has been included
+#if !defined(WIN32) && defined(X11WORKBENCH_TOOLKIT_HAVE_XSHM_EXTENSION)
+#include <sys/ipc.h>
+#include <sys/shm.h>
+#include <X11/extensions/XShm.h>
+#endif // !defined(WIN32) && defined(X11WORKBENCH_TOOLKIT_HAVE_XSHM_EXTENSION)
+
+#ifdef X11WORKBENCH_TOOLKIT_HAVE_XFT
+#include <X11/Xft/Xft.h>
+#endif // X11WORKBENCH_TOOLKIT_HAVE_XFT
+
 
 // include pixmap data
 
@@ -186,7 +202,7 @@ static const unsigned char aAnswers[256] =
   return aAnswers[iVal & 0xff];
 }
 
-static const char aCosAnswers[0x400] = // 1024 of them
+static const char aCosAnswers[0x400] = // 1024 of them for a complete circle
 {
   127, 127, 127, 127, 127, 127, 127, 127,
   127, 127, 127, 127, 127, 127, 127, 126,
@@ -1124,7 +1140,7 @@ Pixmap PXM_ImageToPixmap(Display *pDisplay, Drawable dw, XImage *pImage,
                          unsigned long clrFGPixel, unsigned long clrBGPixel)
 {
 Pixmap pxRval;
-GC gc;
+WBGC gc;
 XGCValues gcv;
 int iW, iH;
 
@@ -1167,12 +1183,12 @@ int iW, iH;
   // NOTE:  for monochrome masks I'd likely use '1' for foreground, '0' for background
 
   BEGIN_XCALL_DEBUG_WRAPPER
-  gc = XCreateGC(pDisplay, dw, (GCForeground | GCBackground), &gcv);
+  gc = WBCreateGC(pDisplay, dw, (GCForeground | GCBackground), &gcv);
   END_XCALL_DEBUG_WRAPPER
 
-  if(gc == None)
+  if(gc == NULL)
   {
-    WB_ERROR_PRINT("%s - XCreateGC failed\n", __FUNCTION__);
+    WB_ERROR_PRINT("%s - WBCreateGC failed\n", __FUNCTION__);
 
     BEGIN_XCALL_DEBUG_WRAPPER
     XFreePixmap(pDisplay, pxRval);
@@ -1182,9 +1198,9 @@ int iW, iH;
   else
   {
     BEGIN_XCALL_DEBUG_WRAPPER
-    XPutImage(pDisplay, pxRval, gc, pImage, 0, 0, 0, 0, iW, iH); // and now I have a copy of it
+    WBXPutImage(pDisplay, pxRval, gc, pImage, 0, 0, 0, 0, iW, iH); // and now I have a copy of it
 
-    XFreeGC(pDisplay, gc);
+    WBFreeGC(gc);
     END_XCALL_DEBUG_WRAPPER
   }
 
@@ -1238,7 +1254,7 @@ unsigned int uiDepth = 0;
   else
   {
     // TODO:  do I still need iX and iY?
-    pRval = XGetImage(pDisplay, pxImage, 0, 0, iWidth, iHeight, -1L, ZPixmap);
+    pRval = WBXGetImage(pDisplay, pxImage, 0, 0, iWidth, iHeight, -1L, ZPixmap);
   }
 
   END_XCALL_DEBUG_WRAPPER
@@ -1246,11 +1262,90 @@ unsigned int uiDepth = 0;
   return pRval;
 }
 
+Pixmap PXM_CopyPixmap(Display *pDisplay, Drawable dw, Pixmap pxSource)
+{
+XGCValues gcv;
+Window winRoot;
+GC gc;
+Pixmap pxRval;
+int iRet, iX=0, iY=0;
+unsigned int iWidth=0, iHeight=0, iBorder;
+unsigned int uiDepth = 0;
+
+
+  if(!pDisplay)
+  {
+    pDisplay = WBGetDefaultDisplay();
+  }
+
+  if((CARD32)pxSource & 0xe0000000)
+  {
+    WB_ERROR_PRINT("%s - invalid Pixmap - %d (%08xH)\n", __FUNCTION__, (int)pxSource, (int)pxSource);
+
+    return None;
+  }
+
+  BEGIN_XCALL_DEBUG_WRAPPER
+  // use XGetGeometry to obtain the characteristics of the pixmap.  iX and iY SHOULD be zero...
+  iRet = XGetGeometry(pDisplay, pxSource, &winRoot, &iX, &iY, &iWidth, &iHeight, &iBorder, &uiDepth);
+  END_XCALL_DEBUG_WRAPPER
+
+  if(!iWidth || !iHeight)
+  {
+    WB_ERROR_PRINT("%s - XGetGeometry failed, pxSource=%d (%08xH), iRet=%d\n",
+                   __FUNCTION__, (int)pxSource, (int)pxSource, iRet);
+    pxRval = None;
+  }
+  else
+  {
+    BEGIN_XCALL_DEBUG_WRAPPER
+    pxRval = XCreatePixmap(pDisplay, dw, iWidth, iHeight, uiDepth); // note depth of new pixmap matches old
+    END_XCALL_DEBUG_WRAPPER
+
+    if(pxRval == None)
+    {
+      WB_ERROR_PRINT("%s - XCreatePixmap failed\n", __FUNCTION__);
+      return None;
+    }
+
+    // I will need to create a GC.  Make it a simple one that only specifies FG and BG
+
+    memset(&gcv, 0, sizeof(gcv));
+    gcv.foreground = BlackPixel(pDisplay, DefaultScreen(pDisplay));  // use these (for now)
+    gcv.background = WhitePixel(pDisplay, DefaultScreen(pDisplay));
+
+    // NOTE:  for monochrome masks I'd likely use '1' for foreground, '0' for background
+
+    BEGIN_XCALL_DEBUG_WRAPPER
+    gc = XCreateGC(pDisplay, dw, (GCForeground | GCBackground), &gcv);
+    END_XCALL_DEBUG_WRAPPER
+
+    if(gc == NULL)
+    {
+      WB_ERROR_PRINT("%s - WBCreateGC failed\n", __FUNCTION__);
+
+      BEGIN_XCALL_DEBUG_WRAPPER
+      XFreePixmap(pDisplay, pxRval);
+      END_XCALL_DEBUG_WRAPPER
+      pxRval = None;
+    }
+    else
+    {
+      BEGIN_XCALL_DEBUG_WRAPPER
+      XCopyArea(pDisplay, pxSource, pxRval, gc, 0, 0, iWidth, iHeight, 0, 0);
+      XFreeGC(pDisplay, gc);
+      END_XCALL_DEBUG_WRAPPER
+    }
+  }
+
+  return pxRval;
+}
+
 void WBSimpleAntiAliasPixmap(Display *pDisplay, const XStandardColormap *pMap, Pixmap pxImage, unsigned long lPixel, WB_GEOM *pGeom)
 {
 WB_GEOM geom;
 XImage *pImage = NULL;
-GC gc;
+WBGC gc;
 XGCValues gcv;
 XStandardColormap map;
 
@@ -1301,7 +1396,7 @@ XStandardColormap map;
 
   // create an XImage, and perform the operation on that
   BEGIN_XCALL_DEBUG_WRAPPER
-  pImage = XGetImage(pDisplay, pxImage, geom.x, geom.y, geom.width, geom.height, 0xffffffff, ZPixmap);
+  pImage = WBXGetImage(pDisplay, pxImage, geom.x, geom.y, geom.width, geom.height, 0xffffffff, ZPixmap);
   // NOTE:  'ZPixmap' is WAY faster than XYPixmap, but takes up more RAM
   END_XCALL_DEBUG_WRAPPER
 
@@ -1318,7 +1413,7 @@ XStandardColormap map;
   gcv.background = lPixel; // for now just do this
 
   BEGIN_XCALL_DEBUG_WRAPPER
-  gc = XCreateGC(pDisplay, pxImage, (GCForeground | GCBackground), &gcv);
+  gc = WBCreateGC(pDisplay, pxImage, (GCForeground | GCBackground), &gcv);
   END_XCALL_DEBUG_WRAPPER
 
   if(gc == None)
@@ -1328,15 +1423,15 @@ XStandardColormap map;
   else
   {
     BEGIN_XCALL_DEBUG_WRAPPER
-    XPutImage(pDisplay, pxImage, gc, pImage, 0, 0, geom.x, geom.y, geom.width, geom.height);
+    WBXPutImage(pDisplay, pxImage, gc, pImage, 0, 0, geom.x, geom.y, geom.width, geom.height);
 
-    XFreeGC(pDisplay, gc);
+    WBFreeGC(gc);
     END_XCALL_DEBUG_WRAPPER
   }
 
   // I can destroy the image now
   BEGIN_XCALL_DEBUG_WRAPPER
-  XDestroyImage(pImage);
+  WBXDestroyImage(pImage);
   END_XCALL_DEBUG_WRAPPER
 }
 
@@ -1426,7 +1521,9 @@ XColor clr;
           lPixel2 = __internal_grey_the_pixel(&map, lPixel2, iR, iG, iB);
           if(lPixel2 != lPixel) // make sure it's not because if it is, it's a problem
           {
+            BEGIN_XCALL_DEBUG_WRAPPER
             XPutPixel(pImage, nX + 1, nY, lPixel2);
+            END_XCALL_DEBUG_WRAPPER
           }
         }
 
@@ -1435,7 +1532,9 @@ XColor clr;
           lPixel3 = __internal_grey_the_pixel(&map, lPixel3, iR, iG, iB);
           if(lPixel3 != lPixel) // make sure it's not because if it is, it's a problem
           {
+            BEGIN_XCALL_DEBUG_WRAPPER
             XPutPixel(pImage, nX, nY + 1, lPixel3);
+            END_XCALL_DEBUG_WRAPPER
           }
         }
       }
@@ -1447,7 +1546,9 @@ XColor clr;
           lPixel1 = __internal_grey_the_pixel(&map, lPixel1, iR, iG, iB);
           if(lPixel1 != lPixel) // make sure it's not because if it is, it's a problem
           {
+            BEGIN_XCALL_DEBUG_WRAPPER
             XPutPixel(pImage, nX, nY, lPixel1);
+            END_XCALL_DEBUG_WRAPPER
           }
         }
 
@@ -1456,7 +1557,9 @@ XColor clr;
           lPixel4 = __internal_grey_the_pixel(&map, lPixel4, iR, iG, iB);
           if(lPixel4 != lPixel) // make sure it's not because if it is, it's a problem
           {
+            BEGIN_XCALL_DEBUG_WRAPPER
             XPutPixel(pImage, nX + 1, nY + 1, lPixel4);
+            END_XCALL_DEBUG_WRAPPER
           }
         }
       }
@@ -1465,6 +1568,552 @@ XColor clr;
   }
 
 }
+
+
+#if defined(X11WORKBENCH_TOOLKIT_HAVE_XSHM_EXTENSION) || defined(__DOXYGEN__)
+int WBXShmQueryExtension(Display *pDisplay)
+{
+  return XShmQueryExtension(pDisplay) ? 1 : 0;
+}
+#endif // defined(X11WORKBENCH_TOOLKIT_HAVE_XSHM_EXTENSION) || defined(__DOXYGEN__)
+
+int WBXPutImage(Display *pDisplay, Drawable dw, WBGC gc, XImage *pImage,
+                int src_x, int src_y, int dest_x, int dest_y,
+                unsigned int width, unsigned int height)
+{
+int iRval;
+
+  // for now, just do this
+  BEGIN_XCALL_DEBUG_WRAPPER
+  iRval = XPutImage(pDisplay, dw, gc->gc, pImage, src_x, src_y, dest_x, dest_y, width, height); // for now just do this
+  END_XCALL_DEBUG_WRAPPER
+
+  // TODO: I'll need to determine whether or not my image is using shared memory
+  //       and also make sure that it's attached to the display [as it should be]
+  //       If both of these is NOT the case, then I use XPutImage() to avoid issues
+
+//Bool XShmPutImage(
+//            Display *display;
+//            Drawable d;
+//            GC gc;
+//            XImage *image;
+//            int src_x, src_y, dest_x, dest_y;
+//            unsigned int width, height;
+//            bool send_event);
+
+  return iRval;
+}
+
+XImage *WBXGetImage(Display *pDisplay, Drawable dw,
+                    int x, int y, unsigned int width, unsigned int height,
+                    unsigned long plane_mask, int format)
+{
+XImage *pImage;
+
+  // TODO:  if the drawable has an image locally cached, use it.  This handles the situation
+  //        where a remote connection has poor performance grabbing an image from the server,
+  //        but sending an image TO the server is reasonably fast by comparison.
+
+
+#if defined(X11WORKBENCH_TOOLKIT_HAVE_XSHM_EXTENSION) || defined(__DOXYGEN__)
+  if(!WBXShmQueryExtension(pDisplay))
+  {
+#endif // defined(X11WORKBENCH_TOOLKIT_HAVE_XSHM_EXTENSION) || defined(__DOXYGEN__)
+
+    BEGIN_XCALL_DEBUG_WRAPPER
+    pImage = XGetImage(pDisplay, dw, x, y, width, height, plane_mask, format);
+    END_XCALL_DEBUG_WRAPPER
+
+#if defined(X11WORKBENCH_TOOLKIT_HAVE_XSHM_EXTENSION) || defined(__DOXYGEN__)
+  }
+  else
+  {
+//    WB_ERROR_PRINT("TEMPORARY:  %s line %d - 'XShm' not (yet) being invoked\n", __FUNCTION__, __LINE__);
+
+    BEGIN_XCALL_DEBUG_WRAPPER
+    pImage = XGetImage(pDisplay, dw, x, y, width, height, plane_mask, format); // for now just do this
+    END_XCALL_DEBUG_WRAPPER
+
+    if(!pImage)
+    {
+      WB_ERROR_PRINT("ERROR - %s - Unable to get XImage:  dw=%08xH x=%d y=%d width=%d height=%d plane_mask=%08lxH format=%d\n",
+                     __FUNCTION__, (int)dw, x, y, width, height, (unsigned long)plane_mask, format);
+    }
+
+#if 0
+    XShmSegmentInfo shminfo;
+    int screen = DefaultScreen(pDisplay);
+    Visual *pVisual = DefaultVisual(pDisplay, screen);
+    int depth = DefaultDepth(pDisplay, screen);
+
+    if(format == XYBitmap)
+    {
+      depth = 1;
+    }
+
+    bzero(&shminfo, sizeof(shminfo));
+
+    pImage = XShmCreateImage(pDisplay, pVisual, depth, format, NULL, &shminfo, width, height);
+
+    if(pImage)
+    {
+      shminfo.readOnly = False;
+      pImage->data = WBAllocShm(pDisplay, image->bytes_per_line * image->height, &shminfo, IPC_PRIVATE, PIC_CREAT | 0777);
+
+      if(!pImage->data)
+      {
+        WBXDestroyImage(pImage);
+        pImage = NULL;
+      }
+
+//      shminfo.shmaddr; // shmat(shminfo.shmid, 0, 0);
+//      shminfo.readOnly = False;
+
+//      if(!XShmAttach(d, &shminfo))
+//      {
+//        // this would be an error
+//      }
+
+      if(!XShmGetImage(pDisplay, dw, pImage, x, y, plane_mask))
+      {
+        // is FALSE the error, or is it a TRUE value that's an error?  determine which...
+
+        WBXDestroyImage(pImage);
+        pImage = NULL;
+      }
+
+      XSync(pDisplay, 0); // must do this to make sure it completes before I return
+    }
+#endif // 0
+  }
+#endif // defined(X11WORKBENCH_TOOLKIT_HAVE_XSHM_EXTENSION) || defined(__DOXYGEN__)
+  return pImage;
+}
+
+int WBXDestroyImage(XImage *pImage)
+{
+int iRval;
+
+  // TODO:  determine whether the image is using shared memory.  If so, detach
+  //        it from the display (if it's attached), and free the shared memory
+  //        FIRST, and set the data pointer to NULL.  Then, destroy the image
+  //        with XDestroyImage() as if nothing else was different.
+
+  BEGIN_XCALL_DEBUG_WRAPPER
+  iRval = XDestroyImage(pImage); // for now, just do this
+  END_XCALL_DEBUG_WRAPPER
+
+  return iRval;
+}
+
+XImage * WBXCopyImage(Display *pDisplay, XImage *pImage)
+{
+XImage *pRval;
+
+  if(!pImage)
+  {
+    return NULL;
+  }
+
+  if(!pDisplay)
+  {
+    pDisplay = WBGetDefaultDisplay();
+  }
+
+  BEGIN_XCALL_DEBUG_WRAPPER
+  pRval = XCreateImage(pDisplay, DefaultVisual(pDisplay, DefaultScreen(pDisplay)),
+                       pImage->depth, pImage->format, pImage->xoffset,
+                       pImage->data, pImage->width, pImage->height,
+                       pImage->bitmap_pad, pImage->bytes_per_line);
+  END_XCALL_DEBUG_WRAPPER
+
+
+  return pRval;
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////
+// X11 'equivalence' functions for XImage
+//
+// Some of this code may have been adapted from the Xorg and/or earlier versions
+// of the X11 server implementation, and derivatives of it.  The copyright statement
+// and license for the X11 server code is included here, for reference:
+//
+      /*
+
+      Copyright 1988, 1998  The Open Group
+
+      Permission to use, copy, modify, distribute, and sell this software and its
+      documentation for any purpose is hereby granted without fee, provided that
+      the above copyright notice appear in all copies and that both that
+      copyright notice and this permission notice appear in supporting
+      documentation.
+
+      The above copyright notice and this permission notice shall be included
+      in all copies or substantial portions of the Software.
+
+      THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+      OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+      MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+      IN NO EVENT SHALL THE OPEN GROUP BE LIABLE FOR ANY CLAIM, DAMAGES OR
+      OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+      ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+      OTHER DEALINGS IN THE SOFTWARE.
+
+      Except as contained in this notice, the name of The Open Group shall
+      not be used in advertising or otherwise to promote the sale, use or
+      other dealings in this Software without prior written authorization
+      from The Open Group.
+
+      Copyright 1989 by Digital Equipment Corporation, Maynard, Massachusetts.
+
+                              All Rights Reserved
+
+      Permission to use, copy, modify, and distribute this software and its
+      documentation for any purpose and without fee is hereby granted,
+      provided that the above copyright notice appear in all copies and that
+      both that copyright notice and this permission notice appear in
+      supporting documentation, and that the name of Digital not be
+      used in advertising or publicity pertaining to distribution of the
+      software without specific, written prior permission.
+
+      DIGITAL DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING
+      ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT SHALL
+      DIGITAL BE LIABLE FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR
+      ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+      WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+      ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
+      SOFTWARE.
+      */
+//
+// Please do not remove the above copyright and licensing information from
+// any derived work.  Thank you.
+//
+// Although this code can not be considered 'derived', I most definitely
+// examined the licensed code when writing it.  As such I believe it is only
+// fair to at least comply with the intent of the license for Xorg and
+// related X11 libraries and X11 servers.
+//
+//////////////////////////////////////////////////////////////////////////////////////
+
+
+
+Region WBXImageToRegion(const XImage *pImage)
+{
+Region rgnRval;
+
+  if(!pImage)
+  {
+    rgnRval = None;
+  }
+  else
+  {
+    // Use 'pImage' "not background pixel" x,y points to create a Region.
+    //
+    // see 'miCoalesce' in Xorg server; how horizontal 'bands' are used to combine
+    // rectangles in a Region. I want to do something very much like that here, so
+    // that there are no adjacent rectangles horizontally.
+    // After that I fix it vertically.  Pretty straightforward.  Should be fast.
+
+
+    rgnRval = None; // temporary
+  }
+
+  return rgnRval;
+}
+
+XImage * WBXImageFromRegion(Region rgnSource, int width, int height)
+{
+XImage *pRval;
+
+  if(rgnSource == None)
+  {
+    pRval = NULL;
+  }
+  else
+  {
+    // First create an XImage that matches the bounding rectangle of the region.
+    // Then,
+    // simply figure out what the bounding rect is
+    // see 'miCoalesce' in Xorg serve; how horizontal 'bands' are used to combine
+    // rectangles in a Region. I want to do something very much like that here, so
+    // that there are no adjacent rectangles horizontally.
+    // After that I fix it vertically.  Pretty straightforward.  Should be fast.
+
+
+    pRval = NULL; // temporary
+  }
+
+  return pRval;
+}
+
+int WBXDrawPoint(XImage *pImage, WBGC hGC, int x, int y)
+{
+int iRval;
+int bNoClip;
+
+  if(!pImage || !hGC)
+  {
+    return -1;
+  }
+
+  iRval = 0;
+  bNoClip = hGC->clip_rgn == None || XEmptyRegion(hGC->clip_rgn);
+
+  if(bNoClip ||
+     XPointInRegion(hGC->clip_rgn, x, y)) // TODO:  clip origin???
+  {
+    BEGIN_XCALL_DEBUG_WRAPPER
+    iRval = XPutPixel(pImage, x, y, hGC->values.foreground);
+    END_XCALL_DEBUG_WRAPPER
+  }
+
+  return iRval;
+}
+
+//  typedef struct _WBGC_
+//  {
+//    Display *display;   // the Display associated with the WBGC (NULL implies 'Default Display')
+//    Drawable dw;        // the Drawable for which this WBGC was created (None implies default Window)
+//    GC gc;              // the associated 'GC'
+//    XGCValues values;   // cached XGCValues for the GC
+//    WB_FONT pFont; // cached XFontStruct for the GC, for 'font' member
+//    Region clip_rgn;    // clipping region (or None to use clip_image)
+//    XImage *clip_image; // cached XImage for the GC, for 'clip mask'
+//    XImage *tile_image; // cached XImage for the GC, for 'tile'
+//    XImage *stip_image; // cached XImage for the GC, for 'stipple'
+//  } * WBGC;
+
+
+int WBXDrawPoints(XImage *pImage, WBGC hGC,
+                  XPoint *points, int npoints, int mode)
+{
+int i1, i2, iX, iY, iRval;
+int bNoClip;
+
+
+  if(!pImage || !hGC || npoints < 0 ||
+     (mode != CoordModeOrigin && mode != CoordModePrevious))
+  {
+    return -1;
+  }
+
+  bNoClip = hGC->clip_rgn == None || XEmptyRegion(hGC->clip_rgn);
+
+  for(i1=0, iRval = 0; i1 < npoints; i1++)
+  {
+    if(!i1 || mode == CoordModeOrigin)
+    {
+      iX = points[i1].x;
+      iY = points[i1].y;
+    }
+    else
+    {
+      iX += points[i1].x;
+      iY += points[i1].y;
+    }
+
+    if(!bNoClip) // we have a clip region
+    {
+      // don't poke the point if it's not inside the clip region
+      if(!XPointInRegion(hGC->clip_rgn, iX, iY)) // TODO:  clip origin???
+      {
+        continue; // skip this point
+      }
+    }
+
+    BEGIN_XCALL_DEBUG_WRAPPER
+    i2 = XPutPixel(pImage, iX, iY, hGC->values.foreground);
+    END_XCALL_DEBUG_WRAPPER
+
+    if(i2)
+    {
+      iRval = i2;
+    }
+  }
+
+  return iRval;
+}
+
+int WBXDrawLine(XImage *pImage, WBGC hGC,
+                int x1, int y1, int x2, int y2)
+{
+//  return -1; // for now
+XPoint pt[2];
+
+  pt[0].x = x1;
+  pt[0].y = y1;
+  pt[1].x = x2;
+  pt[1].y = y2;
+
+  return WBXDrawLines(pImage, hGC, &(pt[0]), 2, CoordModeOrigin); // probably the best way
+}
+
+
+// for reference, from x11-servers/xorg-server/work/xorg-server-1.18.4/mi/miwideline.c
+//void
+//miPolylines(DrawablePtr drawable,
+//            GCPtr gc,
+//            int mode,
+//            int n,
+//            DDXPointPtr points)
+//{
+//    if (gc->lineWidth == 0) {
+//        if (gc->lineStyle == LineSolid)
+//            miZeroLine(drawable, gc, mode, n, points);
+//        else
+//            miZeroDashLine(drawable, gc, mode, n, points);
+//    } else {
+//        if (gc->lineStyle == LineSolid)
+//            miWideLine(drawable, gc, mode, n, points);
+//        else
+//            miWideDash(drawable, gc, mode, n, points);
+//    }
+
+int WBXDrawLines(XImage *pImage, WBGC hGC,
+                 XPoint *points, int npoints, int mode)
+{
+
+  // by definition, a line width of zero is "minimal line" which is for me the same as 1
+  // and would be independent of scaling and other factors (so always 1 pixel)
+  // a pixel width greater than 1 should be the width of the line such that horizontal or
+  // vertical would be "that many" pixels and I assume diagonal is the same 'appearance'
+  // width, meaning you gotta do some simple trig or another algorithm that looks similar
+
+
+
+
+  return -1; // for now
+}
+
+int WBXDrawRectangle(XImage *pImage, WBGC hGC,
+                     int x, int y, unsigned int width, unsigned int height)
+{
+XPoint ptRect[5];
+
+  ptRect[0].x = x;
+  ptRect[0].y = y;
+  ptRect[1].x = x + width - 1;
+  ptRect[1].y = y;
+  ptRect[2].x = ptRect[1].x;
+  ptRect[2].y = y + height - 1;
+  ptRect[3].x = x;
+  ptRect[3].y = ptRect[2].y;
+  ptRect[4].x = x;
+  ptRect[4].y = y; // close up the polygon
+
+  return WBXDrawLines(pImage, hGC, &(ptRect[0]),
+                      sizeof(ptRect) / sizeof(ptRect[0]),
+                      CoordModeOrigin); // probably the best way
+}
+
+int WBXFillRectangle(XImage *pImage, WBGC hGC,
+                     int x, int y, unsigned int width, unsigned int height)
+{
+int iRval;
+
+XPoint ptRect[5];
+
+  ptRect[0].x = x;
+  ptRect[0].y = y;
+  ptRect[1].x = x + width - 1;
+  ptRect[1].y = y;
+  ptRect[2].x = ptRect[1].x;
+  ptRect[2].y = y + height - 1;
+  ptRect[3].x = x;
+  ptRect[3].y = ptRect[2].y;
+  ptRect[4].x = x;
+  ptRect[4].y = y; // close up the polygon
+
+  iRval = WBXFillPolygon(pImage, hGC, &(ptRect[0]),
+                         sizeof(ptRect) / sizeof(ptRect[0]),
+                         Convex, CoordModeOrigin); // use 'convex' shape for rectangle
+
+  if(!iRval) // fill worked, now draw the outline
+  {
+    // TODO:  if foreground color is same as fill color, no need to do this next part
+
+    iRval = WBXDrawLines(pImage, hGC, &(ptRect[0]),
+                         sizeof(ptRect) / sizeof(ptRect[0]),
+                         CoordModeOrigin); // probably the best way
+  }
+
+  return -1; // for now
+}
+
+int WBXDrawArc(XImage *pImage, WBGC hGC,
+               int x, int y, unsigned int width, unsigned int height,
+               int angle1, int angle2)
+{
+XPoint ptPoly[4096]; // 4k points for my arc polygon
+XPoint *pPoly = &(ptPoly[0]); // if I need more points, malloc them.
+int iRval, nLines = 0;
+
+
+  // TODO: use integer trig WB_isin(X) and WB_icos(X) to determine the x and y offsets
+  //       from the center, and draw a set of lines from point to point.  so simple!
+  //
+  // NOTE:  'WB_icos(X) uses 'pi == 512' for angular granularity. so a circle is
+  //        literally 1024 "angular units" i.e. 0x400
+
+  iRval = 0;
+
+  if(nLines > 0)
+  {
+    iRval = WBXDrawLines(pImage, hGC, pPoly, nLines,
+                         CoordModeOrigin); // probably the best way
+  }
+
+  return iRval;
+}
+
+int WBXFillArc(XImage *pImage, WBGC hGC,
+               int x, int y, unsigned int width, unsigned int height,
+               int angle1, int angle2)
+{
+  return -1; // for now
+}
+
+int WBXFillPolygon(XImage *pImage, WBGC hGC,
+                   XPoint *points, int npoints, int shape, int mode)
+{
+  // shape can be Convex, Nonconvex, or Complex
+  // mode can be CoordModeOrigin or CoordModePrevious
+
+
+  return -1; // for now
+}
+
+int WBXDrawString(XImage *pImage, WB_FONT pFont, WBGC hGC,
+                  int x, int y, const char *string, int length)
+{
+Display *pDisplay = WBGetDefaultDisplay(); // in case I need one
+
+
+
+// TODO:  if 'pFont' is NULL, use the font assigned to WBGC
+
+#ifdef X11WORKBENCH_TOOLKIT_HAVE_XFT
+  if(pFont->pxftFont)
+  {
+#warning TODO: IMPLEMENT THIS PART for Xft FONTS
+  }
+  else
+#endif // X11WORKBENCH_TOOLKIT_HAVE_XFT
+  {
+    // Legacy mode
+    //
+    // Step 1:  draw the text in black on white using a monochrome pixmap, left/bottom justified
+    // Step 2:  transfer the pixmap to a 1-plane XY Image
+    // Step 3:  Using 'hGC', do a bitwise copy onto the XImage such that the background is transparent
+
+
+  }
+
+  return -1; // for now
+}
+
+
 
 
 
