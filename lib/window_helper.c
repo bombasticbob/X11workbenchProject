@@ -92,8 +92,8 @@
 
 
 #define MIN_EVENT_LOOP_SLEEP_PERIOD 100    /* 0.1 millisec */
-#define MAX_EVENT_LOOP_SLEEP_PERIOD 5000 /* 5 msec */
-//#define MAX_EVENT_LOOP_SLEEP_PERIOD 100000 /* 0.1 sec */
+#define MAX_EVENT_LOOP_SLEEP_PERIOD 50000 /* 50 msecs - better for Linux within a VM - worst was 3.6% during idle */
+//#define MAX_EVENT_LOOP_SLEEP_PERIOD 100000 /* 0.1 sec - way too long, actually */
 
 const char *sz_xcall_func = NULL;
 int i_xcall_line = 0;
@@ -1996,7 +1996,7 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
     if(event.xany.window == wID ||
        event.type == Expose ||                                              // always handle expose events
        event.type == GraphicsExpose ||
-       event.type == NoExpose ||
+//       event.type == NoExpose ||
        event.type == DestroyNotify ||                                       // always allow destroy notifications
        event.type == SelectionRequest ||
        event.type == SelectionClear ||
@@ -3755,7 +3755,7 @@ int __InternalCheckGetEvent(Display *pDisplay, XEvent *pEvent, Window wIDModal)
 {
 int iRval = 0, iQueued;
 int iFirstTime = 1;
-static unsigned long long ullLastTime = 0;
+//static unsigned long long ullLastTime = 0;
 
   do
   {
@@ -3806,6 +3806,9 @@ static unsigned long long ullLastTime = 0;
       if(pDisplay == pDefaultDisplay) // for default display, grab the timestamp
       {
         Time tmEvent = 0;
+
+        // for certain events I want to get the time of the event
+        // and so I'll record that here
 
         switch(pEvent->type) // for the ones that have timestamps, I check for them
         {
@@ -3862,6 +3865,11 @@ static unsigned long long ullLastTime = 0;
         iRval = 0;
         continue; // added - this might have been a bug...?
       }
+      else if(pEvent->type == NoExpose) // pretend I never got this
+      {
+        iRval = 0;
+        continue;  // act like it wasn't even there - try again
+      }
 
       // TODO:  other events that might be part of the above list of events to grab first
 
@@ -3914,10 +3922,9 @@ static unsigned long long ullLastTime = 0;
           pEntry->geomAbsolute.height = pEvent->xconfigure.height;
           pEntry->geomAbsolute.border = pEvent->xconfigure.border_width;
 
-          if(!pEntry->rgnClip) // first time through, create clip region that encompasses all of it
+          // first time through, create clip region that's empty, and record the window's width/height info
+          if(!pEntry->rgnClip)
           {
-            XRectangle xrct;
-
             // NOTE:  I must do it THIS way because the window isn't mapped yet.
 
             pEntry->width = pEvent->xconfigure.width;
@@ -3925,16 +3932,18 @@ static unsigned long long ullLastTime = 0;
             pEntry->border = pEvent->xconfigure.border_width;
 
             pEntry->rgnClip = XCreateRegion();
+          }
 
-            if(pEntry->rgnClip)
-            {
-              xrct.x = 0;//(short)pEntry->x;
-              xrct.y = 0;//(short)pEntry->y;
-              xrct.width = (unsigned short)pEntry->width;
-              xrct.height = (unsigned short)pEntry->height;
+          if(pEntry->rgnClip)
+          {
+            XRectangle xrct;
 
-              XUnionRectWithRegion(&xrct, pEntry->rgnClip, pEntry->rgnClip);
-            }
+            xrct.x = 0;//(short)pEntry->x;
+            xrct.y = 0;//(short)pEntry->y;
+            xrct.width = (unsigned short)pEntry->width;
+            xrct.height = (unsigned short)pEntry->height;
+
+            XUnionRectWithRegion(&xrct, pEntry->rgnClip, pEntry->rgnClip); // clip region includes this, now
           }
         }
         else if(WB_IS_WINDOW_MAPPED(*pEntry)) // get values from parent window(s) and adjust absolute coords
@@ -5695,7 +5704,9 @@ void WBCreateWindowDefaultGC(Window wID, unsigned long clrFG, unsigned long clrB
 //    gcv.font = pEntry->pFontStruct->fid;
 //  }
 
+#ifndef NO_DEBUG
 #warning does the default GC _REALLY_ need to have a default X11 (legacy) font ID assigned in the XGCValues struct???
+#endif // NODEBUG
   pEntry->hGC = WBCreateGC(pEntry->pDisplay, wID, (/*GCFont |*/ GCForeground | GCBackground), &gcv);
 
 // TEMPORARY - for debugging a specific problem
@@ -7475,20 +7486,33 @@ Region WBGetInvalidRegion(Window wID)
 
   if(pEntry && pEntry->rgnClip)
   {
-    Region rgnRval = XCreateRegion();
+    int iRet;
 
-    if(rgnRval == None)
+    BEGIN_XCALL_DEBUG_WRAPPER
+    iRet = XEmptyRegion(pEntry->rgnClip);
+    END_XCALL_DEBUG_WRAPPER
+
+    if(iRet)
     {
-      WB_ERROR_PRINT("ERROR:  %s - no region created\n", __FUNCTION__);
+      return None;
     }
     else
     {
-      BEGIN_XCALL_DEBUG_WRAPPER
-      XUnionRegion(pEntry->rgnClip, rgnRval, rgnRval);
-      END_XCALL_DEBUG_WRAPPER
-    }
+      Region rgnRval = XCreateRegion();
 
-    return rgnRval;
+      if(rgnRval == None)
+      {
+        WB_ERROR_PRINT("ERROR:  %s - no region created\n", __FUNCTION__);
+      }
+      else
+      {
+        BEGIN_XCALL_DEBUG_WRAPPER
+        XUnionRegion(pEntry->rgnClip, rgnRval, rgnRval);
+        END_XCALL_DEBUG_WRAPPER
+      }
+
+      return rgnRval;
+    }
   }
 
   return None;
@@ -7527,10 +7551,10 @@ Region WBCopyRegion(Region rgnSource)
 {
 Region rgnRval;
 
-  if((CARD32)rgnSource & 0xe0000000) // see man page for XGetGCValues and the implication of invalid XIDs
+  if((CARD32)(intptr_t)rgnSource & 0xe0000000) // see man page for XGetGCValues and the implication of invalid XIDs
   {
     WB_ERROR_PRINT("ERROR:  %s - invalid source region %d (%08xH), no region created\n",
-                   __FUNCTION__, (int)rgnSource, (int)rgnSource);
+                   __FUNCTION__, (int)(intptr_t)rgnSource, (int)(intptr_t)rgnSource);
 
     return NULL;
   }
@@ -7623,11 +7647,13 @@ Region rgnRval;
 
 WBGC WBBeginPaint(Window wID, XExposeEvent *pEvent, WB_GEOM *pgBounds)
 {
+_WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 WB_GEOM geomTemp;
 WBGC gcRval;
+int iRet;
 
 
-  if(!pEvent || pEvent->type != Expose)
+  if(!pEvent || pEvent->type != Expose || !pEntry)
   {
     return None;
   }
@@ -7637,14 +7663,26 @@ WBGC gcRval;
   geomTemp.width  = pEvent->width;
   geomTemp.height = pEvent->height;
 
-  gcRval = WBBeginPaintGeom(wID, &geomTemp);
+  BEGIN_XCALL_DEBUG_WRAPPER
+  iRet = XEmptyRegion(pEntry->rgnClip);
+  END_XCALL_DEBUG_WRAPPER
 
-  if(gcRval != None && pgBounds)
+  if(iRet)
   {
-    pgBounds->x      = geomTemp.x;
-    pgBounds->y      = geomTemp.y;
-    pgBounds->width  = geomTemp.width;
-    pgBounds->height = geomTemp.height;
+    geomTemp.x = geomTemp.y = geomTemp.width = geomTemp.height = 0;
+    gcRval = None; // nothing to paint
+  }
+  else
+  {
+    gcRval = WBBeginPaintGeom(wID, &geomTemp);
+
+    if(gcRval != None && pgBounds)
+    {
+      pgBounds->x      = geomTemp.x;
+      pgBounds->y      = geomTemp.y;
+      pgBounds->width  = geomTemp.width;
+      pgBounds->height = geomTemp.height;
+    }
   }
 
   return gcRval;
@@ -7671,12 +7709,11 @@ WBGC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // WBGC will get the 'inval
   {
     if(!pEntry->rgnClip)
     {
-      WB_ERROR_PRINT("ERROR:  %s - no clip region!\n", __FUNCTION__);
+      WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Expose,
+                     "%s.%d - no clip region!\n", __FUNCTION__, __LINE__);
     }
     else
     {
-//      WBDebugDumpRegion(pEntry->rgnClip, 1);
-
       WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Expose,
                      "%s - (WARNING) empty clip region - bounds = %d,%d,%d,%d\n",
                      __FUNCTION__, pgBounds->x, pgBounds->y, pgBounds->width, pgBounds->height);
@@ -7691,9 +7728,10 @@ WBGC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // WBGC will get the 'inval
       pEntry->rgnClip = XCreateRegion(); // create an empty region
       END_XCALL_DEBUG_WRAPPER
     }
+
+    return NULL; // don't return a WBGC - no need to paint
   }
 
-//  WB_WARN_PRINT("TEMPORARY:  %s - calling WBCopyGC()\n", __FUNCTION__);
   gcRval = WBCopyGC(pEntry->hGC);
 
   if(!gcRval)
@@ -7725,55 +7763,56 @@ WBGC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // WBGC will get the 'inval
 
     if(rgnPaint)
     {
-      if(!pEntry->rgnClip)
+//      if(!pEntry->rgnClip)
+//      {
+//        xrct.x      = pgBounds->x;
+//        xrct.y      = pgBounds->y;
+//        xrct.width  = pgBounds->width;
+//        xrct.height = pgBounds->height;
+//
+//        WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Expose,
+//                       "%s.%d - no clip region!\n", __FUNCTION__, __LINE__);
+//
+//        BEGIN_XCALL_DEBUG_WRAPPER
+//        XUnionRectWithRegion(&xrct, rgnPaint, rgnPaint);  // the paint rectangle as a region
+//        END_XCALL_DEBUG_WRAPPER
+//      }
+//      else
+//      {
+      Region rgnTemp = XCreateRegion();
+      if(!rgnTemp)
       {
+        BEGIN_XCALL_DEBUG_WRAPPER
+        XDestroyRegion(rgnPaint);
+        END_XCALL_DEBUG_WRAPPER
+
+        rgnPaint = None;
+
+        WBFreeGC(gcRval);
+        gcRval = NULL;
+
+        WB_ERROR_PRINT("ERROR:  %s - could not create clip region\n", __FUNCTION__);
+      }
+      else
+      {
+        // combine specified region with clipping region.  result is new paint region
         xrct.x      = pgBounds->x;
         xrct.y      = pgBounds->y;
         xrct.width  = pgBounds->width;
         xrct.height = pgBounds->height;
 
-//        WB_ERROR_PRINT("TEMPORARY:  %s - no clip region\n", __FUNCTION__);
-
         BEGIN_XCALL_DEBUG_WRAPPER
-        XUnionRectWithRegion(&xrct, rgnPaint, rgnPaint);  // the paint rectangle as a region
+        XUnionRectWithRegion(&xrct, rgnTemp, rgnTemp);  // the paint rectangle as a region
+        XUnionRegion(pEntry->rgnClip, rgnPaint, rgnPaint);  // a copy of the invalid region
+        XIntersectRegion(rgnTemp, rgnPaint, rgnPaint);      // INTERSECT with xrct (usually from the Expose event)
+
+        // so now the paint region includes the intersect of the xrct passed as 'pgBounds' with the invalid region
+        // (if called by WBBeginPaint, 'pgBounds' will be the rectangular area from the Expose event)
+
+        XDestroyRegion(rgnTemp);
         END_XCALL_DEBUG_WRAPPER
       }
-      else
-      {
-        Region rgnTemp = XCreateRegion();
-        if(!rgnTemp)
-        {
-          BEGIN_XCALL_DEBUG_WRAPPER
-          XDestroyRegion(rgnPaint);
-          END_XCALL_DEBUG_WRAPPER
-
-          rgnPaint = None;
-
-          WBFreeGC(gcRval);
-          gcRval = NULL;
-
-          WB_ERROR_PRINT("ERROR:  %s - could not create clip region\n", __FUNCTION__);
-        }
-        else
-        {
-          // combine specified region with clipping region.  result is new paint region
-          xrct.x      = pgBounds->x;
-          xrct.y      = pgBounds->y;
-          xrct.width  = pgBounds->width;
-          xrct.height = pgBounds->height;
-
-          BEGIN_XCALL_DEBUG_WRAPPER
-          XUnionRectWithRegion(&xrct, rgnTemp, rgnTemp);  // the paint rectangle as a region
-          XUnionRegion(pEntry->rgnClip, rgnPaint, rgnPaint);  // a copy of the invalid region
-          XIntersectRegion(rgnTemp, rgnPaint, rgnPaint);      // INTERSECT with xrct (usually from the Expose event)
-
-          // so now the paint region includes the intersect of the xrct passed as 'pgBounds' with the invalid region
-          // (if called by WBBeginPaint, 'pgBounds' will be the rectangular area from the Expose event)
-
-          XDestroyRegion(rgnTemp);
-          END_XCALL_DEBUG_WRAPPER
-        }
-      }
+//      }
     }
 
     if(rgnPaint) // using this as a flag, of sorts - could also use 'gcRval'

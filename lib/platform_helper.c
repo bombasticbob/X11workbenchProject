@@ -222,7 +222,7 @@ char **argv_orig = argv;
 
 static const char * const aszCmdLineOptions[]=
 {
-  "debug","subsys","display","minimize","maximize","geometry","no-antialias","no-imagecache",
+  "help","help-all","debug","subsys","display","minimize","maximize","geometry","no-antialias","no-imagecache",
   NULL // marks end of list
 };
 
@@ -232,12 +232,15 @@ static const char * const aszDebugSubSys[]=
   "dialog","dialogctrl","frame","keyboard",
   "mouse","font","settings","selection",
   "pixmap","expose","editwindow","scrollbar",
+  "drawtext",
   NULL
 };
 
 enum
 {
-    option_debug=0,
+    option_help=0,
+    option_help_all,
+    option_debug,
     option_subsys,
     option_display,
     option_minimize,
@@ -332,6 +335,17 @@ enum
 
           switch(i1)
           {
+            case option_help:
+              WBToolkitUsage();
+              return -1; // for now; later do all of help?
+
+            case option_help_all:
+              WBToolkitUsage();
+              fputs("\n\n'Help All' not yet implemented\n\n",
+                    stderr);
+
+              return -1; // for now; later do all of help?
+
             case option_debug:
               i2 = atoi(szVal);
 
@@ -583,6 +597,7 @@ void WBToolkitUsage(void)
 {
   fputs("X11 WorkBench Toolkit options (these should precede other options)\n"
         "    X11 STARTUP OPTIONS\n"
+        "--help           Show the toolkit options\n"
         "--display xx     X11 display to use (default is DISPLAY env variable)\n"
         "--minimize       show minimized window on startup\n"
         "--maximize       show maximized window on startup\n"

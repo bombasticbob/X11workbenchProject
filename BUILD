@@ -32,13 +32,13 @@ determine an appropriate workaround, please contact the author.
   website:
     http://www.mrp3.com/
 
-For Debian Linux and derivatives (like Ubuntu, Mint):
+For Debian Linux and derivatives (like Ubuntu, Mint, Devuan):
   Install a standard X11 distribution, along with the following packages
       build-essential
       xorg-dev
-      autoconf
       automake
-      autotools-dev
+      autoconf (dependency of automake)
+      autotools-dev (dependency of automake)
 
 For FreeBSD (using the 'ports' system)
   run depends:   x11/libXpm and x11/xorg-clients

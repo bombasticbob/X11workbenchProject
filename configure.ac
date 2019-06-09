@@ -38,6 +38,31 @@ ifdef([XORG_WITH_DOXYGEN],
   AM_CONDITIONAL([HAVE_DOXYGEN], [test x$have_doxygen = xyes])
 ])
 
+# see if I have multiple CPUs (this works on FreeBSD and Linux, not sure about others)
+
+AC_MSG_CHECKING([how many cores the host CPU has])
+
+if test -e conftest.out ; then
+  rm -f conftest.out
+fi
+if test -e /proc/cpuinfo ; then
+  grep -i "^processor" /proc/cpuinfo | wc -l >conftest.out
+else
+  sysctl hw.ncpu | awk '{ print $2; }' >conftest.out
+fi
+
+if test -s conftest.out ; then
+  ac_num_cores=`cat conftest.out`
+  ac_status=0
+  rm conftest.out
+
+  echo $ac_num_cores
+else
+  ac_status=1
+  ac_num_cores=1
+  echo "cannot determine; assuming 1"
+fi
+
 
 # --enable-release (default has debugging enabled)
 # --enable-noopt (default is optimization enabled)
@@ -129,10 +154,10 @@ CXXFLAGS="$CXXFLAGS $X_CFLAGS -I$local_incdir -I$local_xpmdir"
 #################################################################
 
 AC_CHECK_HEADER([unistd.h],[],AC_MSG_ERROR([missing unistd.h]))
-AC_CHECK_HEADER([X11/Xlib.h],[],AC_MSG_ERROR([missing Xlib.h]))
-AC_CHECK_HEADER([X11/Xmd.h],[],AC_MSG_ERROR([missing Xmd.h]))
-AC_CHECK_HEADER([X11/Xutil.h],[],AC_MSG_ERROR([missing Xutil.h]))
-AC_CHECK_HEADER([X11/Xatom.h],[],AC_MSG_ERROR([missing Xatom.h]))
+AC_CHECK_HEADER([X11/Xlib.h],[],AC_MSG_ERROR([missing Xlib.h - you should install 'xorg-dev' or similar]))
+AC_CHECK_HEADER([X11/Xmd.h],[],AC_MSG_ERROR([missing Xmd.h - you need to install the X11 developer packages]))
+AC_CHECK_HEADER([X11/Xutil.h],[],AC_MSG_ERROR([missing Xutil.h - you need to install the X11 developer packages]))
+AC_CHECK_HEADER([X11/Xatom.h],[],AC_MSG_ERROR([missing Xatom.h - you need to install the X11 developer packages]))
 
 #autoscan recommends
 AC_CHECK_HEADERS([fcntl.h])
@@ -261,6 +286,7 @@ AC_CHECK_FUNCS([printf])
 AC_CHECK_FUNCS([alarm])
 AC_CHECK_FUNCS([memset])
 AC_CHECK_FUNCS([nanosleep])
+AC_CHECK_FUNCS([dlopen])
 
 # the 'clock_gettime' function might require '-lrt'
 AC_CHECK_LIB(rt, clock_gettime,
@@ -291,19 +317,22 @@ AC_CHECK_LIB(dl, dlopen,
 ])
 
 
+################################
 # custom function checks go here
+################################
 
 # malloc_usable_size - mostly for debugging purposes, not supported everywhere
-
 AC_CHECK_FUNC(malloc_usable_size, [AC_DEFINE(HAVE_MALLOC_USABLE_SIZE,[1],[whether or not malloc_usable_size is available] ) ])
 
 
 ############################################################################################
 # __builtin_expect - see if compiler supports it
 
+my_save_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -Werror"
 AC_LANG_PUSH([C])
 AC_MSG_CHECKING([if the compiler supports __builtin_expect])
-AC_RUN_IFELSE(
+AC_LINK_IFELSE(
 [AC_LANG_SOURCE([[
   #include <stdio.h>
   #include <stdlib.h>
@@ -325,14 +354,16 @@ AC_RUN_IFELSE(
     AC_MSG_RESULT([no])
   ] )
   AC_LANG_POP([C])
-
+CFLAGS="$my_save_CFLAGS"
 
 ############################################################################################
 # __attribute__((unused)) - see if compiler supports it
 
+my_save_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -Werror"
 AC_LANG_PUSH([C])
 AC_MSG_CHECKING([if the compiler supports __attribute__((unused))])
-AC_RUN_IFELSE(
+AC_LINK_IFELSE(
 [AC_LANG_SOURCE([[
   #include <stdio.h>
   #include <stdlib.h>
@@ -350,7 +381,35 @@ AC_RUN_IFELSE(
     AC_MSG_RESULT([no])
   ] )
   AC_LANG_POP([C])
+CFLAGS="$my_save_CFLAGS"
 
+############################################################################################
+# #pragma GCC diagnostic error "-Wincompatible-pointer-types"
+
+my_save_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -Werror"
+AC_LANG_PUSH([C])
+AC_MSG_CHECKING([if the compiler supports pragma for GCC diagnostic error -Wincompatible-pointer-types])
+AC_LINK_IFELSE(
+[AC_LANG_SOURCE([[
+  #pragma GCC diagnostic error "-Wincompatible-pointer-types"
+  #include <stdio.h>
+  #include <stdlib.h>
+  int main()
+  {
+    return 0;
+  }]] )],
+  [
+    AC_MSG_RESULT([yes])
+    compiler_has_pragma_for_incompatible_pointer_types=1
+    AC_DEFINE([COMPILER_HAS_PRAGMA_FOR_INCOMPATIBLE_POINTER_TYPES],[1],[Compiler supports pragma for GCC diagnostic error -Wincompatible-pointer-types])
+  ],
+  [
+    AC_MSG_RESULT([no])
+    compiler_has_pragma_for_incompatible_pointer_types=0
+  ] )
+  AC_LANG_POP([C])
+CFLAGS="$my_save_CFLAGS"
 
 ############################################################################################
 #    qsort_r - definition for GNU C and BSD differ, other platforms may not have it at all
@@ -358,59 +417,80 @@ AC_RUN_IFELSE(
 
 AC_CHECK_FUNC(qsort_r, [AC_DEFINE(HAVE_QSORT_R,[1],[whether or not qsort_r is available] ) ])
 
+# if it does have qsort_r then make sure it has the BSD-ordered parameters (Linux typically does not)
+# if it doesn't, then I use my already written equivalent version; otherwise use libc's version
 if test "$ac_cv_func_qsort_r" == yes ; then
+  my_save_CFLAGS="$CFLAGS"
+  CFLAGS="$CFLAGS -Werror"
+
+  # if I have support for the pointer mismatch pragma, add this to CFLAGS
+  if test $compiler_has_pragma_for_incompatible_pointer_types -ne 0 ; then
+    CFLAGS="$CFLAGS -DCOMPILER_HAS_PRAGMA_FOR_INCOMPATIBLE_POINTER_TYPES"
+  fi
   AC_LANG_PUSH([C])
   AC_MSG_CHECKING([that qsort_r is the BSD version])
-  AC_RUN_IFELSE(
-  [AC_LANG_SOURCE([[
-    #include <stdio.h>
-    #include <stdlib.h>
-    int unsorted[16]={1,3,5,7,9,11,13,15,2,4,6,8,10,12,14,16};
-    int bsd_sort_compare(void *a, const void *b, const void *c)
-    {
-      const int *p1, *p2;
-      if(a != (void *)unsorted)
-      {
-        exit(2);
-      }
+  AC_LINK_IFELSE(
+  [
+    AC_LANG_SOURCE(
+    [[
+      #ifdef COMPILER_HAS_PRAGMA_FOR_INCOMPATIBLE_POINTER_TYPES
+      #pragma GCC diagnostic error "-Wincompatible-pointer-types"
+      #else
+      #error For now we disallow this, to protect QSORT_R calls, and only use the internal version
+      #endif // COMPILER_HAS_PRAGMA_FOR_INCOMPATIBLE_POINTER_TYPES
 
-      p1 = (const int *)b;
-      p2 = (const int *)c;
-      if(*p1 > *p2)
+      #include <stdio.h>
+      #include <stdlib.h>
+      int unsorted[16]={1,3,5,7,9,11,13,15,2,4,6,8,10,12,14,16};
+      int bsd_sort_compare(void *a, const void *b, const void *c)
       {
-        return 1;
-      }
-      else if(*p2 > *p1)
-      {
-        return -1;
-      }
-
-      return 0;
-    }
-    int main()
-    {
-      int i1;
-      qsort_r(unsorted, 16, sizeof(unsorted[0]), (void *)unsorted, bsd_sort_compare);
-
-      for(i1=1; i1 < 16; i1++)
-      {
-        if(unsorted[i1 - 1] + 1 != unsorted[i1])
+        const int *p1, *p2;
+        if(a != (void *)unsorted)
         {
-          exit(3);
+          exit(2);
         }
-      }
 
-      return 0;
-    }]] )],
-    [
-      AC_MSG_RESULT([yes])
-      AC_DEFINE([QSORT_R_BSD],[1],[BSD version of qsort_r])
-    ],
-    [
-      AC_MSG_RESULT([no])
-      AC_DEFINE([QSORT_R_GNUC],[1],[GNUC version of qsort_r])
-    ] )
-    AC_LANG_POP([C])
+        p1 = (const int *)b;
+        p2 = (const int *)c;
+        if(*p1 > *p2)
+        {
+          return 1;
+        }
+        else if(*p2 > *p1)
+        {
+          return -1;
+        }
+
+        return 0;
+      }
+      int main()
+      {
+        int i1;
+        qsort_r(unsorted, 16, sizeof(unsorted[0]), (void *)unsorted, bsd_sort_compare);
+
+        for(i1=1; i1 < 16; i1++)
+        {
+          if(unsorted[i1 - 1] + 1 != unsorted[i1])
+          {
+            exit(3);
+          }
+        }
+
+        return 0;
+      }
+    ]] )
+  ],
+  [
+    AC_MSG_RESULT([yes])
+    AC_DEFINE([QSORT_R_BSD],[1],[BSD version of qsort_r])
+  ],
+  [
+    AC_MSG_RESULT([no])
+    AC_DEFINE([QSORT_R_GNUC],[1],[GNUC version of qsort_r])
+  ] )
+  AC_LANG_POP([C])
+
+  CFLAGS="$my_save_CFLAGS"
 else
   AC_MSG_WARN([qsort_r not compatible; using internal qsort_r implementation])
 fi
@@ -424,7 +504,7 @@ fi
 
 AC_LANG_PUSH([C])
   AC_MSG_CHECKING([that the 'long long' data type is supported])
-  AC_RUN_IFELSE(
+  AC_LINK_IFELSE(
   [AC_LANG_SOURCE([[
     #include <stdio.h>
     #include <stdlib.h>
@@ -454,6 +534,7 @@ AC_CANONICAL_HOST
 
 
 # optional things for Interix vs the rest of the world
+# Interix is deprecated and I should get rid of this
 case $host in
   i*86-pc-interix*)
     MAN_PAGES="X11workbench.interix"
@@ -494,12 +575,17 @@ case $host in
     ;;
 esac
 
+
+
+#################################################################
+# ADDITIONAL GLOBAL DEFINES (things to export)
+
+# CONDITIONALS
+
 AM_CONDITIONAL(IS_CYGWIN, test x$is_cygwin = xtrue)
 AM_CONDITIONAL(NOT_CYGWIN, test x$is_cygwin = xfalse)
 
-########################
 ## LIBRARY LINKAGE STUFF
-########################
 
 # XPM library (program will use its own implementation when libXpm is not available)
 # note that this conditional defines the linkage, not the library include symbols
@@ -516,13 +602,45 @@ AM_CONDITIONAL(NEED_LRT, test x$test_need_lrt = xtrue)
 AM_CONDITIONAL(NEED_LDL, test x$test_need_ldl = xtrue)
 
 
+# Additional global defines go here
+
+NUM_CORES="$ac_num_cores"
+
 GLOBAL_XPATH=`echo "$ac_x_libraries" | sed 's/\/lib//g'`
 GLOBAL_XPATH="$GLOBAL_XPATH"
+#################################################################
+
+
+
+#############################
+# MULTI-CORE BUILDS via '-j'
+#############################
+
+# Whenever the host (build) system has more than one core, this
+# will automatically invoke '-j' to use one job per available core.
+# experimentation shows that specifying the '-j' argument on
+# the make command line overrides this...
+
+if test $NUM_CORES -gt 1 ; then
+  AM_MAKEFLAGS="-j \$(NUM_CORES) $AM_MAKEFLAGS"
+fi
+
+
+
+
+
+#################################################################
+# Makefile variable SUBSTITUTIONS (so they go into Makefile)
+
+# After all of that, I need the variable substitutions.  They go here.
+# This is for stuff I did not actually create a var already for, that
+# needs to be defined in Makefile
 
 # additional substitutions for man pages and X11 libraries
 
 AC_SUBST([MAN_PAGES])
 AC_SUBST([GLOBAL_XPATH])
+AC_SUBST([NUM_CORES])
 AC_SUBST([IS_CYGWIN])
 AC_SUBST([NOT_CYGWIN])
 AC_SUBST([HAVE_XPM_LIB])
@@ -533,6 +651,10 @@ AC_SUBST([CFLAGS])
 AC_SUBST([CPPFLAGS])
 AC_SUBST([CXXFLAGS])
 AC_SUBST([LIBS])
+AC_SUBST([AM_MAKEFLAGS])
+
+
+########################################################################
 
 
 # the end

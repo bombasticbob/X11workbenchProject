@@ -499,7 +499,7 @@ XImage *pImage;
 #endif // X11WORKBENCH_TOOLKIT_HAVE_XFT
     if(gc->pFont && gc->pFont->fsFont)
     {
-      WB_ERROR_PRINT("TEMPORARY:  %s.%d calling WB_DRAW_STRING \"%-.*s\"\n", __FUNCTION__, __LINE__, length, pTemp);
+      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d calling WB_DRAW_STRING \"%-.*s\"\n", __FUNCTION__, __LINE__, length, pTemp);
 
       BEGIN_XCALL_DEBUG_WRAPPER
       WB_DRAW_STRING(display, d, gc->pFont->fsFont, gc->gc, x, y, pTemp, length);
@@ -522,7 +522,7 @@ XImage *pImage;
         }
       }
 
-      WB_ERROR_PRINT("TEMPORARY:  %s.%d calling XDrawString \"%-.*s\"\n", __FUNCTION__, __LINE__, length, pTemp);
+      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d calling XDrawString \"%-.*s\"\n", __FUNCTION__, __LINE__, length, pTemp);
 
       BEGIN_XCALL_DEBUG_WRAPPER
       iRval = XDrawString(display, d, gc->gc, x, y, pTemp, length);
@@ -735,7 +735,7 @@ XGCValues valtemp;
     // NOTE:  GCClipMask and GCDashList can't be requested but can be changed with this call
     //        when using the XChangeGC call...
 
-#warning if I'm NOT making a copy and assign anyway, will the ref count be messed up???
+#warning if I am NOT making a copy and assign anyway, will the ref count be messed up???
 
     if(hGC->values.clip_mask != None)
     {

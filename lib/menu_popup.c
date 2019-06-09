@@ -514,11 +514,11 @@ int iRval;
 
   iRval = WBWindowDispatch(pSelf->wOwner, (XEvent *)&evt); // 'send event'
 
-//  if(iRval < 1)
-//  {
-//    WB_ERROR_PRINT("TEMPORARY:  %s - \"%s\" returning %d\n", __FUNCTION__,
-//                   (const char *)(pItem->data + pItem->iMenuItemText), iRval);
-//  }
+  if(iRval < 1)
+  {
+    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s - \"%s\" returning %d\n", __FUNCTION__,
+                   (const char *)(pItem->data + pItem->iMenuItemText), iRval);
+  }
 
   WBDestroyPointerHashPtr(pMenu); // destroying hash based on pointer value [not hash value]
   WBDestroyPointerHashPtr(pItem); // clean them up as I'm done with them now
@@ -1194,8 +1194,9 @@ static int MBMenuPopupEvent(Window wID, XEvent *pEvent)
 
           // hover far left or far far right
 
-          WB_WARN_PRINT("TEMPORARY:  %d %d %d\n",
-                        iX, pSelf->iX, pSelf->iX + pSelf->iWidth);
+          WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d %d %d %d\n",
+                         __FUNCTION__, __LINE__, iX, pSelf->iX, pSelf->iX + pSelf->iWidth);
+
           if(iX < pSelf->iX - WB_MOUSE_FAR || iX > pSelf->iX + pSelf->iWidth + 2 * WB_MOUSE_FAR)
           {
             WBEndModal(wID, -1); // canceled menu

@@ -813,12 +813,14 @@ int iRval = 0;
 
     if(gc == None)
     {
-      WB_ERROR_PRINT("%s - Cannot get graphics context for paint\n", __FUNCTION__);
-      return 0; // not handled
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Expose,
+                     "%s.%d - WBBeginPaint returns 'None'\n",
+                    __FUNCTION__, __LINE__);
+
+      return 1; // handled (this is because a None gc means I didn't have anything to update)
     }
 
     WBClearWindow(wID, gc);  // does the erase background intelligently
-
 
 #ifdef DISPLAY_HELLO_WORLD
     {

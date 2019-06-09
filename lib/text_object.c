@@ -306,7 +306,7 @@ int cbLen;
   {
     nLines = WBStringLineCount(pBuf, cbBufSize);
 
-//    WBDebugPrint("TEMPORARY:  WBAllocTextBuffer %d lines\n", nLines);
+    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d allocate for %d lines\n", __FUNCTION__, __LINE__, nLines);
   }
 
   if(nLines < DEFAULT_TEXT_BUFFER_LINES)
@@ -500,8 +500,8 @@ unsigned int nNewMax = 0, nNewMinMax = UINT_MAX;
 
   if(pBuf->nEntries <= 1) // zero or one lines?
   {
-//    WB_ERROR_PRINT("TEMPORARY:  %s %d - (single line) nLine=%ld, nNewLen = %d\n",
-//                   __FUNCTION__, __LINE__, nLine, nNewLen);
+    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d - (single line) nLine=%ld, nNewLen = %d\n",
+                   __FUNCTION__, __LINE__, nLine, nNewLen);
 
     WBTextBufferRefreshCache(pBuf); // always do it THIS way
 
@@ -513,8 +513,8 @@ unsigned int nNewMax = 0, nNewMinMax = UINT_MAX;
     return; // sanity check failed (do nothing)
   }
 
-//  WB_ERROR_PRINT("TEMPORARY:  %s %d - nLine=%ld, nNewLen = %d\n",
-//                 __FUNCTION__, __LINE__, nLine, nNewLen);
+  WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d - nLine=%ld, nNewLen = %d\n",
+                 __FUNCTION__, __LINE__, nLine, nNewLen);
 
   // update the line info in my cache.  If this line appears, remove it (always).
   // If I'm deleting the line, subtract one from every line higher than this one.
@@ -567,7 +567,8 @@ unsigned int nNewMax = 0, nNewMinMax = UINT_MAX;
   // if the cache is NOW empty, re-evaluate it.
   if(!pBuf->aLineCacheLen[0]) // empty
   {
-//    WB_ERROR_PRINT("TEMPORARY:  %s exit (d) after WBTextBufferRefreshCache()\n", __FUNCTION__);
+    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s exit (d) after WBTextBufferRefreshCache()\n", __FUNCTION__);
+
     WBTextBufferRefreshCache(pBuf);
     return;
   }
@@ -590,13 +591,14 @@ unsigned int nNewMax = 0, nNewMinMax = UINT_MAX;
   {
     if(!nNewMax) // in case my cache has dwindled to nothing
     {
-//      WB_ERROR_PRINT("TEMPORARY:  %s exit (c) after WBTextBufferRefreshCache()\n", __FUNCTION__);
+      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s exit (c) after WBTextBufferRefreshCache()\n", __FUNCTION__);
+
       WBTextBufferRefreshCache(pBuf); // time to re-evaluate
     }
-//    else
-//    {
-//      WB_ERROR_PRINT("TEMPORARY:  %s exit (c)\n", __FUNCTION__);
-//    }
+    else
+    {
+      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s exit (c)\n", __FUNCTION__);
+    }
 
     return; // I'm done for delete.  The rest is for updates
   }
@@ -606,7 +608,7 @@ unsigned int nNewMax = 0, nNewMinMax = UINT_MAX;
 
   if(!nNewLen) // don't bother, it has a zero length
   {
-//    WB_ERROR_PRINT("TEMPORARY:  %s exit (f)\n", __FUNCTION__);
+    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s exit (f)\n", __FUNCTION__);
 
     return;  // I'm done - no need to re-insert this line into the cache (yet)
   }
@@ -637,7 +639,7 @@ unsigned int nNewMax = 0, nNewMinMax = UINT_MAX;
   }
   else
   {
-//    WB_ERROR_PRINT("TEMPORARY:  %s exit (a)\n", __FUNCTION__);
+    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s exit (a)\n", __FUNCTION__);
 
     return;  // I'm done - no need to re-insert this line into the cache (yet)
     // NOTE:  re-inserting the line into the cache would require re-doing the
@@ -662,7 +664,7 @@ unsigned int nNewMax = 0, nNewMinMax = UINT_MAX;
 
   // everything should be ok now, unless I b0rked something
 
-//  WB_ERROR_PRINT("TEMPORARY:  %s exit (b)\n", __FUNCTION__);
+  WB_DEBUG_PRINT(DebugLevel_Verbose, "%s exit (b)\n", __FUNCTION__);
 }
 
 void WBTextBufferRefreshCache(TEXT_BUFFER *pBuf)
@@ -675,7 +677,7 @@ char *p1;
     return;
   }
 
-//  WB_ERROR_PRINT("TEMPORARY:  %s\n", __FUNCTION__);
+  WB_DEBUG_PRINT(DebugLevel_Verbose, "%s\n", __FUNCTION__);
 
   // zero out the cache arrays
   memset(pBuf->aLineCache, 0, sizeof(pBuf->aLineCache));
@@ -793,7 +795,7 @@ char *p1;
     }
   }
 
-//  WB_ERROR_PRINT("TEMPORARY:  %s exit point\n", __FUNCTION__);
+  WB_DEBUG_PRINT(DebugLevel_Verbose, "%s exit point\n", __FUNCTION__);
 }
 
 // *********************************
@@ -1217,7 +1219,7 @@ TEXT_BUFFER *pTB;
 int iIsBoxMode, iIsLineMode;
 
 
-  WBDebugPrint("TEMPORARY:  __internal_get_selected_text(%d,%d,%d,%d)\n", iRow, iCol, iEndRow, iEndCol);
+  WB_DEBUG_PRINT(DebugLevel_Verbose, "calling %s(%d,%d,%d,%d)\n", __FUNCTION__, iRow, iCol, iEndRow, iEndCol);
 
   if(WBIsValidTextObject(pThis))
   {
@@ -1515,21 +1517,21 @@ WB_RECT rctInvalid;
 
     WBInvalidateRect(pThis->wIDOwner, &rctInvalid, bPaintFlag);
 
-//    WB_ERROR_PRINT("TEMPORARY:  %s - invalidate %d,%d,%d,%d for %u (%08xH)\n",
-//                   __FUNCTION__,
-//                   rctInvalid.left, rctInvalid.top, rctInvalid.right, rctInvalid.bottom,
-//                   (int)pThis->wIDOwner, (int)pThis->wIDOwner);
+    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d - invalidate %d,%d,%d,%d for %u (%08xH)\n",
+                   __FUNCTION__, __LINE__,
+                   rctInvalid.left, rctInvalid.top, rctInvalid.right, rctInvalid.bottom,
+                   (int)pThis->wIDOwner, (int)pThis->wIDOwner);
 
   }
 //  else
 //  {
 //    if(!WBIsValidTextObject(pThis))
 //    {
-//      WB_ERROR_PRINT("TEMPORARY:  %s - invalid text object\n", __FUNCTION__);
+//      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d - invalid text object\n", __FUNCTION__, __LINE__);
 //    }
 //    else
 //    {
-//      WB_ERROR_PRINT("TEMPORARY:  %s - owner window ID is 'None'\n", __FUNCTION__);
+//      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d - owner window ID is 'None'\n", __FUNCTION__, __LINE__);
 //    }
 //  }
 }
@@ -1636,8 +1638,9 @@ TEXT_BUFFER *pBuf;
                        + iFontHeight * (iEndRow - pThis->rctView.top);
       }
 
-//      WB_ERROR_PRINT("TEMPORARY:  %s - merged rect %d,%d,%d,%d\n", __FUNCTION__,
-//                     pRect->left, pRect->top, pRect->right, pRect->bottom);
+      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d - merged rect %d,%d,%d,%d\n",
+                     __FUNCTION__, __LINE__,
+                     pRect->left, pRect->top, pRect->right, pRect->bottom);
     }
   }
 }
@@ -2438,7 +2441,7 @@ WB_RECT rctSel;
       pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
     }
 
-    WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
 
     __internal_invalidate_rect(pThis, NULL, 1); // TODO:  optimize this
   }
@@ -2522,7 +2525,7 @@ int iSelAll;
       pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
     }
 
-     WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+     WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
     __internal_invalidate_rect(pThis, NULL, 1); // TODO:  optimize this
 
     // NOTE:  no need to call WBTextBufferRefreshCache(), the 'del_select' and 'ins_chars' would've done it
@@ -2594,7 +2597,7 @@ WB_RECT rctInvalid;
     if(nChar < 0 && pThis->iCol == 0 && // backspace prior to beginning of line
        (pThis->iRow <= 0 || pThis->iLineFeed == LineFeed_NONE)) // single line and backspace past begin of column
     {
-      WB_ERROR_PRINT("TEMPORARY:  %s - backspace while I'm at start of file\n", __FUNCTION__);
+      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s - backspace while I'm at start of file\n", __FUNCTION__);
       return; // exit
     }
 
@@ -2602,7 +2605,7 @@ WB_RECT rctInvalid;
        (pThis->iRow >= pBuf->nEntries ||
         pThis->iLineFeed == LineFeed_NONE))              // single line and backspace past begin of column
     {
-      WB_ERROR_PRINT("TEMPORARY:  %s - delete while I'm past end of file\n", __FUNCTION__);
+      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s - delete while I'm past end of file\n", __FUNCTION__);
 
       return; // exit
     }
@@ -2706,7 +2709,7 @@ WB_RECT rctInvalid;
       {
         if(*pL2)
         {
-          WB_ERROR_PRINT("TEMPORARY:  %s - joining \"%s\" at %d with \"%s\"\n", __FUNCTION__,
+          WB_DEBUG_PRINT(DebugLevel_Verbose, "%s - joining \"%s\" at %d with \"%s\"\n", __FUNCTION__,
                          pL, pThis->iCol, pL2);
 
           pL = WBJoinMBLine(pL, pThis->iCol, pL2);
@@ -2747,7 +2750,7 @@ WB_RECT rctInvalid;
                           pThis->iRow + 1, 0, NULL, NULL, 0);
 
 
-      WB_ERROR_PRINT("TEMPORARY:  %s %d - fix the optimization for __internal_merge_rect\n", __FUNCTION__, __LINE__);
+      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s %d - fix the optimization for __internal_merge_rect\n", __FUNCTION__, __LINE__);
 //      __internal_merge_rect(pThis, &rctInvalid, pThis->iRow, 0, -1, -1); // invalidate entire row and those that follow
 
       // bug workaround, mark everything 'invalid'
@@ -2801,7 +2804,7 @@ WB_RECT rctInvalid;
               if(pL2a && (pL3a - pL2a) == 1 &&
                  ((unsigned char)*pL2a == (unsigned char)HARD_TAB_CHAR || *pL2a == '\t'))
               {
-                WB_ERROR_PRINT("TEMPORARY:  %s %d - hard tab (%02xH) at row %d column %d\n",
+                WB_DEBUG_PRINT(DebugLevel_Verbose, "%s %d - hard tab (%02xH) at row %d column %d\n",
                                __FUNCTION__, __LINE__, (unsigned char)*pL2a,
                                pThis->iRow, pThis->iCol - i2 + i2a);
               }
@@ -2857,7 +2860,7 @@ WB_RECT rctInvalid;
               if(pL3a && (pL2a - pL3a) == 1 &&
                  ((unsigned char)*pL3a == (unsigned char)HARD_TAB_CHAR || *pL3a == '\t'))
               {
-                WB_ERROR_PRINT("TEMPORARY:  %s %d - hard tab (%02xH) at row %d column %d\n",
+                WB_DEBUG_PRINT(DebugLevel_Verbose, "%s %d - hard tab (%02xH) at row %d column %d\n",
                                __FUNCTION__, __LINE__, (unsigned char)*pL3a,
                                pThis->iRow, pThis->iCol - i2 + i2a);
               }
@@ -2925,7 +2928,7 @@ WB_RECT rctInvalid;
           pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
         }
 
-        WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+        WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
         __internal_invalidate_rect(pThis, NULL, 1); // scrolling, so invalidate everything
       }
       else
@@ -2935,7 +2938,7 @@ WB_RECT rctInvalid;
           pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
         }
 
-        WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+        WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
         // for now, always do this
         __internal_invalidate_rect(pThis, NULL, 1); // scrolling, so invalidate everything
 //        __internal_invalidate_rect(pThis, &rctInvalid, 1); // invalidate bounding rectangle
@@ -2949,7 +2952,7 @@ WB_RECT rctInvalid;
       }
 
       // for now, always do this
-      WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
 
       __internal_invalidate_rect(pThis, NULL, 1); // scrolling, so invalidate everything
 
@@ -3397,7 +3400,7 @@ WB_RECT rctInvalid;
               {
                 pThis->pText = pBuf; // re-assign in case there's a new ptr
 
-                WB_ERROR_PRINT("TEMPORARY:  %s - split line, %d, %d, %d\n", __FUNCTION__,
+                WB_DEBUG_PRINT(DebugLevel_Verbose, "%s - split line, %d, %d, %d\n", __FUNCTION__,
                                pThis->iRow, pThis->iCol, (int)pBuf->nEntries);
 
                 for(i1=pBuf->nEntries; i1 > (pThis->iRow + 1); i1--)
@@ -3414,7 +3417,7 @@ WB_RECT rctInvalid;
                 pBuf->aLines[pThis->iRow + 1] = WBCopyString(pTemp); // make a copy of previous at "that point"
                 *pTemp = 0; // terminate line at "that point" (TODO: trim right?)
 
-                WB_ERROR_PRINT("TEMPORARY:  %s - split line into \"%s\", \"%s\"\n", __FUNCTION__,
+                WB_DEBUG_PRINT(DebugLevel_Verbose, "%s - split line into \"%s\", \"%s\"\n", __FUNCTION__,
                                pBuf->aLines[pThis->iRow],
                                pBuf->aLines[pThis->iRow + 1]);
 
@@ -3433,7 +3436,7 @@ WB_RECT rctInvalid;
         pThis->pColorContextCallback(pThis, -1, -1); // to refresh it
       }
 
-      WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
 
       __internal_invalidate_rect(pThis, NULL, 1); // so invalidate everything (for NOW)
     }
@@ -3466,7 +3469,7 @@ WB_RECT rctInvalid;
           pThis->rctView.right += iAutoScrollWidth;
         }
 
-        WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+        WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
         __internal_invalidate_rect(pThis, NULL, 1); // scrolling, so invalidate everything
       }
       else
@@ -3742,7 +3745,7 @@ WB_RECT rctSel;
 
     // for now mouse-click invalidates the entire rectangle.  Later I fix this.
 
-    WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
 
     __internal_invalidate_rect(pThis, NULL, 1);
   }
@@ -4632,7 +4635,7 @@ TEXT_BUFFER *pBuf;
           pThis->rctView.right = pThis->iCol + 1;
         }
 
-        WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+        WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
 
         __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
       }
@@ -4728,7 +4731,7 @@ TEXT_BUFFER *pBuf;
           pThis->rctView.right = pThis->iCol + 1;
         }
 
-        WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+        WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
 
         __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
       }
@@ -4795,7 +4798,7 @@ static void __internal_cursor_top(struct _text_object_ *pThis)
     pThis->rctView.top = 0;
     pThis->rctView.bottom = iPageHeight;
 
-    WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
 
     __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
   }
@@ -4864,7 +4867,7 @@ TEXT_BUFFER *pBuf;
       pThis->rctView.bottom = pBuf->nEntries + 1;
     }
 
-    WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
 
     __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
   }
@@ -4928,7 +4931,7 @@ TEXT_BUFFER *pBuf;
       }
     }
 
-    WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
 
     __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
   }
@@ -5044,7 +5047,7 @@ TEXT_BUFFER *pBuf;
       }
     }
 
-    WB_ERROR_PRINT("TEMPORARY:  %s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
+    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - need to optimize invalidate rect\n", __FUNCTION__, __LINE__);
 
     __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
   }
@@ -5477,7 +5480,7 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
   iPX = pThis->rctWinView.right - pThis->rctWinView.left + 2 * MIN_BORDER_SPACING;
   iPY = pThis->rctWinView.bottom - pThis->rctWinView.top + 2 * MIN_BORDER_SPACING;
 
-//    WB_ERROR_PRINT("TEMPORARY:  %s window %u (%08xH) pixmap dimensions %d,%d\n"
+//    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s window %u (%08xH) pixmap dimensions %d,%d\n"
 //                   "            row/col %d,%d\n",
 //                   __FUNCTION__, (int)wID, (int)wID, iPX, iPY,
 //                   pThis->iRow, pThis->iCol);
@@ -5524,14 +5527,14 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
     WBSetForeground(gc, clrFG);
   }
 
-//  WB_ERROR_PRINT("TEMPORARY:  %s line %d - iXDelta is %d, iYDelta is %d\n", __FUNCTION__, __LINE__, iXDelta, iYDelta);
+//  WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - iXDelta is %d, iYDelta is %d\n", __FUNCTION__, __LINE__, iXDelta, iYDelta);
 
   // At this point, if pBuf is NULL or the # of entries zero, the background is *STILL* erased
   // and the cursor has to be drawn.
 
 //  if(!pBuf || pBuf->nEntries <= 0)
 //  {
-////      WB_ERROR_PRINT("TEMPORARY:  %s - no text\n", __FUNCTION__);
+////      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s - no text\n", __FUNCTION__);
 //    goto almost_the_end; // I use the goto so I can put cleanup code there - it's safer
 //  }
 
@@ -5860,7 +5863,7 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
               rctCursor.right = pThis->iCursorX + iFontWidth - iXDelta;
               rctCursor.bottom = rctCursor.top;
 
-//                WB_ERROR_PRINT("TEMPORARY:  %s - iX=%d, iY=%d A=%d,D=%d dX=%d, dY=%d  cursor %d,%d  %d,%d,%d,%d\n", __FUNCTION__,
+//                WB_DEBUG_PRINT(DebugLevel_Verbose, "%s - iX=%d, iY=%d A=%d,D=%d dX=%d, dY=%d  cursor %d,%d  %d,%d,%d,%d\n", __FUNCTION__,
 //                               iX, iY, iAsc, iDesc, iXDelta, iYDelta,
 //                               pThis->iCursorX, pThis->iCursorY,
 //                               rctCursor.left, rctCursor.top, rctCursor.right, rctCursor.bottom);
@@ -5886,11 +5889,11 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
                          rctCursor.left, rctCursor.top, rctCursor.right, rctCursor.bottom);
             }
 
-//              WB_ERROR_PRINT("TEMPORARY:  %s - cursor x,y = %d,%d\n", __FUNCTION__, pThis->iCursorX, pThis->iCursorY);
+//              WB_DEBUG_PRINT(DebugLevel_Verbose, "%s - cursor x,y = %d,%d\n", __FUNCTION__, pThis->iCursorX, pThis->iCursorY);
           }
 //            else
 //            {
-//              WB_ERROR_PRINT("TEMPORARY:  %s - pThis->iRow=%d,iCol=%d,iCurRow=%d,i1=%d\n",
+//              WB_DEBUG_PRINT(DebugLevel_Verbose, "%s - pThis->iRow=%d,iCol=%d,iCurRow=%d,i1=%d\n",
 //                             __FUNCTION__, pThis->iRow, pThis->iCol, iCurRow, i1);
 //            }
 
@@ -5950,7 +5953,7 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
         }
 //          else  (this happens when lines are blank)
 //          {
-//            WB_ERROR_PRINT("TEMPORARY:  %s - NOT drawing \"%s\"\n          p1=%p  p2=%p  delta=%d\n",
+//            WB_DEBUG_PRINT(DebugLevel_Verbose, "%s - NOT drawing \"%s\"\n          p1=%p  p2=%p  delta=%d\n",
 //                           __FUNCTION__, pL, p1, p2, (int)(p2 - p1));
 //          }
       }
@@ -6050,12 +6053,12 @@ static void __internal_set_save_point(struct _text_object_ *pThis)
 {
   // TODO:  implement
 
-  WB_ERROR_PRINT("TEMPORARY:  %s - not yet implemented\n", __FUNCTION__);
+  WB_DEBUG_PRINT(DebugLevel_Verbose, "%s - not yet implemented\n", __FUNCTION__);
 }
 
 static int __internal_get_modified(struct _text_object_ *pThis)
 {
-  WB_ERROR_PRINT("TEMPORARY:  %s - not yet implemented - returning 'modified'\n", __FUNCTION__);
+  WB_DEBUG_PRINT(DebugLevel_Verbose, "%s - not yet implemented - returning 'modified'\n", __FUNCTION__);
 
   return 1; // for now, ALWAYS modified
 }
@@ -6168,7 +6171,7 @@ int iRval;
   {
     int iLen = ((const char *)p1 - pChar);
 
-    WBDebugPrint("TEMPORARY:  %s - return=%d  char=%02xH", __FUNCTION__, iRval, (unsigned char)*pChar);
+    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d - return=%d  char=%02xH", __FUNCTION__, __LINE__, iRval, (unsigned char)*pChar);
     while(iLen > 1)
     {
       iLen--;

@@ -118,7 +118,7 @@ SUBDIRS = lib
 lib/libX11workbenchToolkit.a: toolkit_lib
 
 toolkit_lib:
-	$(MAKE) -C lib libX11workbenchToolkit.a
+	$(MAKE) -j $(NUM_CORES) -C lib libX11workbenchToolkit.a
 
 
 # pseudo target for building documentation

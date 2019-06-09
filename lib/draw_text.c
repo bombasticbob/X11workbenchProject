@@ -184,7 +184,8 @@ use_the_stack_buffer:
   {
     if(pFont->fsFont)
     {
-      WB_ERROR_PRINT("TEMPORARY:  %s.%d using WB_DRAW_STRING for \"%-.*s\"\n", __FUNCTION__, __LINE__, nLength, pString);
+      WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
+                     "%s.%d using WB_DRAW_STRING for \"%-.*s\"\n", __FUNCTION__, __LINE__, nLength, pString);
 
       BEGIN_XCALL_DEBUG_WRAPPER
       WB_DRAW_STRING(pDisplay, drawable, pFont->fsFont, gc->gc, x, y, pS, nLength); // for now, just do this
@@ -202,7 +203,8 @@ use_the_stack_buffer:
     {
       XGCValues gcv, gcv2;
 
-      WB_ERROR_PRINT("TEMPORARY:  %s.%d using XDrawString for \"%-.*s\"\n", __FUNCTION__, __LINE__, nLength, pString);
+      WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
+                     "%s.%d using XDrawString for \"%-.*s\"\n", __FUNCTION__, __LINE__, nLength, pString);
 
       if(pFont->pFontStruct) // legacy font?  switch gc to use this
       {
@@ -901,21 +903,25 @@ do_the_tab:
 
   // Now I know the current (unmodified) text extents.  Let's see what they SHOULD be
 
-//  WB_ERROR_PRINT("TEMPORARY:  %s - iHPos=%d, iMaxLen=%d, iLines=%d, iFontHeight=%d, *=%d\n", __FUNCTION__,
-//                 iHPos, iMaxLen, iLines, iFontHeight, (iLines * iFontHeight));
+  WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
+                 "%s.%d - iHPos=%d, iMaxLen=%d, iLines=%d, iFontHeight=%d, *=%d\n", __FUNCTION__, __LINE__,
+                 iHPos, iMaxLen, iLines, iFontHeight, (iLines * iFontHeight));
 
   rctBounds.left = rctSource.left;
   rctBounds.top  = rctSource.top;
   rctBounds.right = /*rctBounds.left +*/ iMaxLen;
   rctBounds.bottom = rctBounds.top + (iLines * iFontHeight);
 
-//  WB_ERROR_PRINT("TEMPORARY:  %s - rctSource %d,%d,%d,%d  rctBounds: %d,%d,%d,%d\n", __FUNCTION__,
-//                 rctSource.left, rctSource.top, rctSource.right, rctSource.bottom,
-//                 rctBounds.left, rctBounds.top, rctBounds.right, rctBounds.bottom);
+  WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
+                 "%s.%d - rctSource %d,%d,%d,%d  rctBounds: %d,%d,%d,%d\n", __FUNCTION__, __LINE__,
+                 rctSource.left, rctSource.top, rctSource.right, rctSource.bottom,
+                 rctBounds.left, rctBounds.top, rctBounds.right, rctBounds.bottom);
 
   if(iLines > 1)
   {
-//    WB_ERROR_PRINT("TEMPORARY:  %d lines - font height %d, line spacing %d\n", iLines, iFontHeight, iLineSpacing);
+    WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
+                   "%s.%d - %d lines - font height %d, line spacing %d\n",
+                   __FUNCTION__, __LINE__, iLines, iFontHeight, iLineSpacing);
     rctBounds.bottom += (iLines - 1) * iLineSpacing; // inter-line spacing
   }
 
@@ -923,7 +929,7 @@ do_the_tab:
 
   if(rctBounds.top < rctSource.top || rctBounds.bottom > rctSource.bottom)
   {
-    WB_ERROR_PRINT("WARNING:  %s - source rectangle too small, alignment flags may not work\n", __FUNCTION__);
+    WB_ERROR_PRINT("WARNING:  %s.%d - source rectangle too small, alignment flags may not work\n", __FUNCTION__, __LINE__);
     WB_ERROR_PRINT("          %d,%d,%d,%d bounds  vs  source %d,%d,%d,%d\n",
                    rctBounds.left, rctBounds.top, rctBounds.right, rctBounds.bottom,
                    rctSource.left, rctSource.top, rctSource.right, rctSource.bottom);
@@ -974,8 +980,9 @@ it_fits:
         {
           case DTAlignment_HJUSTIFY: // treat like 'center' for now
           case DTAlignment_HCENTER:
-//            WB_ERROR_PRINT("TEMPORARY:  %s - here I am, %d, %d, %d, %d\n", __FUNCTION__,
-//                           rctSource.left, rctSource.right, rctBounds.left, rctBounds.right);
+            WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
+                           "%s.%d - here I am, %d, %d, %d, %d\n", __FUNCTION__, __LINE__,
+                           rctSource.left, rctSource.right, rctBounds.left, rctBounds.right);
 
             i1 = rctSource.right - rctBounds.right;
             i1 -= (i1 >> 1); // so that it's balanced properly, do it THIS way
@@ -1376,7 +1383,8 @@ Region rgnClip;
 
   WBDefaultStandardColormap(pDisplay, &map);
 
-//  WB_ERROR_PRINT("TEMPORARY:  %s - geom %d,%d,%d,%d\n", __FUNCTION__, iX, iY, iWidth, iHeight);
+  WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
+                 "%s.%d - geom %d,%d,%d,%d\n", __FUNCTION__, __LINE__, iX, iY, iWidth, iHeight);
 
   // use XGetGeometry to obtain the characteristics of the pixmap or window.  iX and iY SHOULD be zero...
   BEGIN_XCALL_DEBUG_WRAPPER
@@ -1388,8 +1396,8 @@ Region rgnClip;
 
   if(iX >= iWidth0 + iX0 || iY >= iHeight0 + iY0)
   {
-    WB_ERROR_PRINT("ERROR: %s - drawable smaller than requested geom:  %d,%d,%d,%d  %d,%d,%d,%d\n",
-                 __FUNCTION__, iX0, iY0, iWidth0, iHeight0,
+    WB_ERROR_PRINT("ERROR: %s.%d - drawable smaller than requested geom:  %d,%d,%d,%d  %d,%d,%d,%d\n",
+                 __FUNCTION__, __LINE__, iX0, iY0, iWidth0, iHeight0,
                  iX, iY, iWidth, iHeight);
     return;
   }
@@ -1563,7 +1571,8 @@ XCharStruct xMaxBounds;
 //  iFontWidth = WBFontSetAvgCharWidth(pDisplay, pFont); // was DTGetTextWidth(pFont, " ", 1);  // width of a single space
 //  iFontHeight = pFont->ascent + pFont->descent;
 
-  WB_ERROR_PRINT("TEMPORARY:  %s.%d call to DTGetWordsFromText\n", __FUNCTION__, __LINE__);
+  WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
+                 "%s.%d call to DTGetWordsFromText\n", __FUNCTION__, __LINE__);
   pWords = DTGetWordsFromText(pDisplay, pFont, szText, iAlignment);
 
   if(!pWords)
@@ -1575,11 +1584,13 @@ XCharStruct xMaxBounds;
   }
 
   memcpy(&rcDest, prcBounds, sizeof(rcDest));
-//// TEMPORARY
-//  WB_ERROR_PRINT("%s - TEMPORARY:  bounds rectangle is INITIALLY %d,%d,%d,%d\n",
-//                 __FUNCTION__, rcDest.left, rcDest.top, rcDest.right, rcDest.bottom);
 
-  WB_ERROR_PRINT("TEMPORARY:  %s.%d call to InternalCalcIdealBounds\n", __FUNCTION__, __LINE__);
+  WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
+                 "%s.%d bounds rectangle is INITIALLY %d,%d,%d,%d\n",
+                 __FUNCTION__, __LINE__, rcDest.left, rcDest.top, rcDest.right, rcDest.bottom);
+
+  WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
+                 "%s.%d call to InternalCalcIdealBounds\n", __FUNCTION__, __LINE__);
   if(InternalCalcIdealBounds(pDisplay, pFont, pWords, iTabWidth, iTabOrigin, prcBounds, &rcDest,
                              iAlignment | DTAlignment_PRINTING, 0, -1)
     < 0)
@@ -1599,13 +1610,14 @@ XCharStruct xMaxBounds;
 
 //  InternalDebugDumpWords(pWords);
 
-//// TEMPORARY
-//  WB_ERROR_PRINT("%s - TEMPORARY:  bounds rectangle is NOW %d,%d,%d,%d\n",
-//                 __FUNCTION__, rcDest.left, rcDest.top, rcDest.right, rcDest.bottom);
+  WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
+                 "%s.%d bounds rectangle is NOW %d,%d,%d,%d\n",
+                 __FUNCTION__, __LINE__, rcDest.left, rcDest.top, rcDest.right, rcDest.bottom);
 
   // this function assumes I do not erase the background.  TODO:  flag for that?
 
-  WB_ERROR_PRINT("TEMPORARY:  %s.%d loop to display 'words'\n", __FUNCTION__, __LINE__);
+  WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
+                 "%s.%d loop to display 'words'\n", __FUNCTION__, __LINE__);
   for(i1=0; i1 < pWords->nCount; i1++)
   {
     pW = &(pWords->aWords[i1]);
@@ -1617,22 +1629,24 @@ XCharStruct xMaxBounds;
       {
         // normal string drawing - no underscores to deal with
 
-//// TEMPORARY
-//        WB_ERROR_PRINT("%s - TEMPORARY (a), DTDrawString at %d,%d  %d chars of %s\n",
-//                       __FUNCTION__, rcDest.left + pW->iX, rcDest.top + pW->iY, pW->nLength, pW->pText);
+      WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
+                     "%s.%d DTDrawString at %d,%d  %d chars of %s\n",
+                     __FUNCTION__, __LINE__, rcDest.left + pW->iX, rcDest.top + pW->iY, pW->nLength, pW->pText);
 
         // draw the entire string. 'pW->iY' is the BASE of the font
         DTDrawString(pDisplay, dw, pFont, gc, rcDest.left + pW->iX, rcDest.top + pW->iY,
                      pW->pText, pW->nLength);
 
-        WB_ERROR_PRINT("TEMPORARY:  %s.%d normal display of \"%-.*s\"\n", __FUNCTION__, __LINE__, pW->nLength, pW->pText);
+        WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
+                       "%s.%d normal display of \"%-.*s\"\n", __FUNCTION__, __LINE__, pW->nLength, pW->pText);
       }
       else
       {
         iH = rcDest.left + pW->iX;
         iH2 = -1; // horizontal position of NEXT underscore to display (corresponds to character index 'i3')
 
-        WB_ERROR_PRINT("TEMPORARY:  %s.%d loop to handle underscores\n", __FUNCTION__, __LINE__);
+        WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
+                       "%s.%d loop to handle underscores\n", __FUNCTION__, __LINE__);
         for(i2=0, i3=0; i2 < pW->nLength; )
         {
           if(pW->pText[i2] == '_')
@@ -1647,9 +1661,9 @@ XCharStruct xMaxBounds;
               continue; // i'm going to print this as-is
             }
 
-//// TEMPORARY
-//            WB_ERROR_PRINT("%s - TEMPORARY (b), DTDrawString at %d,%d  %d chars of %s\n",
-//                           __FUNCTION__, iH, rcDest.top + pW->iY, pW->nLength - i3, (char *)(pW->pText) + i3);
+            WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
+                           "%s.%d DTDrawString at %d,%d  %d chars of %s\n",
+                           __FUNCTION__, __LINE__, iH, rcDest.top + pW->iY, pW->nLength - i3, (char *)(pW->pText) + i3);
 
             // print i3 through i2 - 1.  'pW->iY' is the BASE of the font
             DTDrawString(pDisplay, dw, pFont, gc, iH, rcDest.top + pW->iY,
@@ -1711,7 +1725,8 @@ XCharStruct xMaxBounds;
   if(WBFontEnableAntiAlias() &&
      (iAlignment & DTAlignment_ANTIALIAS))
   {
-    WB_ERROR_PRINT("TEMPORARY:  %s.%d call to __internalDoAntiAlias\n", __FUNCTION__, __LINE__);
+    WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
+                   "%s.%d call to __internalDoAntiAlias\n", __FUNCTION__, __LINE__);
     __internalDoAntiAlias(pDisplay, dw, gc,
                           rcDest.left, rcDest.top,
                           rcDest.right - rcDest.left,

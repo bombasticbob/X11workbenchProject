@@ -96,6 +96,7 @@ enum DebugLevel
   DebugLevel_Chatty = 5,    //!< chatty, implies details about flow decisions
   DebugLevel_Verbose = 6,   //!< verbose, implies details regarding information used for decision making
   DebugLevel_Excessive = 7, //!< excessive, implies more information that you probably want
+  DebugLevel_MAXIMUM = 7,   //!< maximum value for masked level
   DebugLevel_MASK = 7,      //!< mask for allowed 'level' values (none through Excessive)
 
   // next are subsystem masks for additional debugging.
@@ -120,6 +121,7 @@ enum DebugLevel
   DebugSubSystem_Expose      = 0x00020000,  //!< expose/paint handling               "expose"
   DebugSubSystem_EditWindow  = 0x00040000,  //!< edit window callbacks               "editwindow"
   DebugSubSystem_ScrollBar   = 0x00080000,  //!< edit window callbacks               "scrollbar"
+  DebugSubSystem_DrawText    = 0x00100000,  //!< Draw Text features                  "drawtext"
 
   DebugSubSystem_MASK = ~7L  //!< mask for allowed 'subsystem' bits
 };

@@ -80,8 +80,10 @@
 
 
 #ifndef WIN32
-// the 'incompatible pointer types' is now an error
+#ifdef COMPILER_HAS_PRAGMA_FOR_INCOMPATIBLE_POINTER_TYPES
+// the 'incompatible pointer types' is now an error (not all gcc supports this)
 #pragma GCC diagnostic error "-Wincompatible-pointer-types"
+#endif // COMPILER_HAS_PRAGMA_FOR_INCOMPATIBLE_POINTER_TYPES
 #endif // !WIN32
 
 
