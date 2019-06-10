@@ -1892,19 +1892,22 @@ int i1, i2, iX, iY, iRval;
 int bNoClip;
 
 
-  if(!pImage || !hGC || npoints < 0 ||
+  if(!pImage || !hGC || !points || npoints <= 0 ||
      (mode != CoordModeOrigin && mode != CoordModePrevious))
   {
     return -1;
   }
 
+  iX = points[0].x; // warning avoidance, put this here, mostly for CoordModePrevious
+  iY = points[0].y;
+
   bNoClip = hGC->clip_rgn == None || XEmptyRegion(hGC->clip_rgn);
 
   for(i1=0, iRval = 0; i1 < npoints; i1++)
   {
-    if(!i1 || mode == CoordModeOrigin)
+    if(mode == CoordModeOrigin)
     {
-      iX = points[i1].x;
+      iX = points[i1].x; // ok this does it again for the first point but so what
       iY = points[i1].y;
     }
     else
@@ -1973,6 +1976,13 @@ XPoint pt[2];
 int WBXDrawLines(XImage *pImage, WBGC hGC,
                  XPoint *points, int npoints, int mode)
 {
+
+  if(!pImage || !hGC || !points || npoints <= 0 ||
+     (mode != CoordModeOrigin && mode != CoordModePrevious))
+  {
+    return -1;
+  }
+
 
   // by definition, a line width of zero is "minimal line" which is for me the same as 1
   // and would be independent of scaling and other factors (so always 1 pixel)
@@ -2077,6 +2087,13 @@ int WBXFillArc(XImage *pImage, WBGC hGC,
 int WBXFillPolygon(XImage *pImage, WBGC hGC,
                    XPoint *points, int npoints, int shape, int mode)
 {
+  if(!pImage || !hGC || !points || npoints <= 0 ||
+     (shape != Convex && shape != Nonconvex && shape != Complex) ||
+     (mode != CoordModeOrigin && mode != CoordModePrevious))
+  {
+    return -1;
+  }
+
   // shape can be Convex, Nonconvex, or Complex
   // mode can be CoordModeOrigin or CoordModePrevious
 

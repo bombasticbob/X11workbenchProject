@@ -7181,7 +7181,7 @@ void WBUpdateWindow(Window wID)
 
         if(xrct.width != 0 && xrct.height != 0)
         {
-          WB_ERROR_PRINT("ERROR:  %s - clipping region is 'empty', bounds = %d, %d, %d, %d\n", __FUNCTION__,
+          WB_ERROR_PRINT("ERROR:  %s - clipping region is 'empty', but bounds = %d, %d, %d, %d\n", __FUNCTION__,
                          xrct.x, xrct.y, xrct.width, xrct.height);
 
 //          WBDebugDumpRegion(pEntry->rgnClip, 1);
@@ -7203,7 +7203,9 @@ void WBUpdateWindow(Window wID)
       evt.width = xrct.width;
       evt.height = xrct.height;
 
-//      WB_ERROR_PRINT("TEMPORARY:  %s - %d,%d,%d,%d\n", __FUNCTION__, evt.x, evt.y, evt.width, evt.height);
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Expose,
+                     "%s.%d creating/handling Expose event, %d,%d,%d,%d\n",
+                     __FUNCTION__, __LINE__, evt.x, evt.y, evt.width, evt.height);
 
       WBProcessExposeEvent(&evt); // better than posting it (this consolidates every Expose event for that window)
                                   // NOTE:  it also calls WBInvalidateGeom() internally but NOT 'WBUpdateWindow()'
@@ -7249,7 +7251,9 @@ void WBUpdateWindowImmediately(Window wID)
     evt.width = xrct.width;
     evt.height = xrct.height;
 
-//      WB_ERROR_PRINT("TEMPORARY:  %s:%d - %d,%d,%d,%d\n", __FUNCTION__, __LINE__, evt.x, evt.y, evt.width, evt.height);
+    WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Expose,
+                   "%s.%d creating/handling Expose event, %d,%d,%d,%d\n",
+                   __FUNCTION__, __LINE__, evt.x, evt.y, evt.width, evt.height);
 
     WBInternalProcessExposeEvent(&evt); // better than posting it (this consolidates every Expose event for that window)
                                         // NOTE:  it also calls WBInvalidateGeom() internally but NOT 'WBUpdateWindow()'
@@ -7285,11 +7289,17 @@ void WBInvalidateGeom(Window wID, const WB_GEOM *pGeom, int bPaintNow)
       WBGetWindowGeom(wID, &geom);
       geom.x = geom.y = geom.border; // always use coordinates relative to window origin (0,0)
       pGeom = &geom;
+
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Expose,
+                     "%s.%d - NULL pGeom, %d,%d,%d,%d\n", __FUNCTION__, __LINE__,
+                     pGeom->x, pGeom->y, pGeom->width, pGeom->height);
     }
-//    else
-//    {
-//      WB_ERROR_PRINT("TEMPORARY:  %s - %d,%d,%d,%d\n", __FUNCTION__, pGeom->x, pGeom->y, pGeom->width, pGeom->height);
-//    }
+    else
+    {
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Expose,
+                     "%s.%d - %d,%d,%d,%d\n", __FUNCTION__, __LINE__,
+                     pGeom->x, pGeom->y, pGeom->width, pGeom->height);
+    }
 
     // NOTE:  XRectangle doesn't encompass the full range of x,y,width,height - limited to 16-bit values
 
@@ -7307,21 +7317,23 @@ void WBInvalidateGeom(Window wID, const WB_GEOM *pGeom, int bPaintNow)
     {
       XUnionRectWithRegion(&xrct, pEntry->rgnClip, pEntry->rgnClip);
 
-//#ifndef NO_DEBUG
-//      XClipBox(pEntry->rgnClip, &xrct2);
-//
-//      if(memcmp(&xrct, &xrct2, sizeof(xrct)))
-//      {
-//        WB_ERROR_PRINT("TEMPORARY:  %s - 'union' of %d,%d,%d,%d - result is %d, %d, %d, %d\n", __FUNCTION__,
-//                       xrct.x, xrct.y, xrct.width, xrct.height,
-//                       xrct2.x, xrct2.y, xrct2.width, xrct2.height);
-//      }
-//
-////      if(pGeom != &geom)
-////      {
-////        WBDebugDumpRegion(pEntry->rgnClip, 1);
-////      }
-//#endif // NO_DEBUG
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Expose,
+                     "%s.%d - resulting invalid rect: %d,%d,%d,%d\n", __FUNCTION__, __LINE__,
+                     xrct.x, xrct.y, xrct.width, xrct.height);
+
+      if(WBCheckDebugLevel(DebugLevel_Medium | DebugSubSystem_Expose))
+      {
+        XRectangle xrct;
+
+        BEGIN_XCALL_DEBUG_WRAPPER
+        XClipBox(pEntry->rgnClip, &xrct);
+        END_XCALL_DEBUG_WRAPPER
+
+        WB_ERROR_PRINT("%s.%d - Bounding rectangle of new invalid region: %d, %d, %d, %d\n",
+                       __FUNCTION__, __LINE__, xrct.x, xrct.y, xrct.width, xrct.height);
+
+//        WBDebugDumpRegion(pEntry->rgnClip, 1);
+      }
 
       if(bPaintNow)
       {
@@ -7337,6 +7349,12 @@ void WBInvalidateRegion(Window wID, Region rgn, int bPaintFlag)
 //  WB_GEOM geom;
 
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
+
+  if(rgn == None)
+  {
+    WBInvalidateGeom(wID, NULL, bPaintFlag);
+    return;
+  }
 
   BEGIN_XCALL_DEBUG_WRAPPER
   XFlush(WBGetWindowDisplay(wID));
@@ -7359,6 +7377,25 @@ void WBInvalidateRegion(Window wID, Region rgn, int bPaintFlag)
       {
         WBUpdateWindow(wID);
       }
+
+      if(WBCheckDebugLevel(DebugLevel_Medium | DebugSubSystem_Expose))
+      {
+        XRectangle xrct;
+
+        BEGIN_XCALL_DEBUG_WRAPPER
+        XClipBox(pEntry->rgnClip, &xrct);
+        END_XCALL_DEBUG_WRAPPER
+
+        // use WB_ERROR_PRINT since it avoids the test for debug level
+        WB_ERROR_PRINT("%s.%d - Bounding rectangle of new invalid region: %d, %d, %d, %d\n",
+                       __FUNCTION__, __LINE__, xrct.x, xrct.y, xrct.width, xrct.height);
+
+//        WBDebugDumpRegion(pEntry->rgnClip, 1);
+      }
+    }
+    else
+    {
+      WB_ERROR_PRINT("%s.%d - unable to create clipping region\n", __FUNCTION__, __LINE__);
     }
   }
 }
@@ -7422,17 +7459,14 @@ void WBValidateGeom(Window wID, const WB_GEOM *pGeom)
     if(XEmptyRegion(pEntry->rgnClip)) // if it's empty, destroy it
     {
       // now I leave the empty region alone
-//      XDestroyRegion(pEntry->rgnClip);
-//      pEntry->rgnClip = 0;
     }
+
     END_XCALL_DEBUG_WRAPPER
   }
 }
 
 void WBValidateRegion(Window wID, Region rgn)
 {
-//  WB_GEOM geom;
-//  Region rgnTemp;
   _WINDOW_ENTRY_ *pEntry;
 
   pEntry = WBGetWindowEntry(wID);
@@ -7469,8 +7503,6 @@ void WBValidateRegion(Window wID, Region rgn)
     if(XEmptyRegion(pEntry->rgnClip))
     {
       // now I leave the empty region alone
-//      XDestroyRegion(pEntry->rgnClip);
-//      pEntry->rgnClip = XCreateRegion(); // put an empty one there
     }
     END_XCALL_DEBUG_WRAPPER
   }
@@ -7655,6 +7687,8 @@ int iRet;
 
   if(!pEvent || pEvent->type != Expose || !pEntry)
   {
+    WB_DEBUG_PRINT(DebugLevel_WARN | DebugSubSystem_Expose,
+                   "%s.%d - returning None (bad parameter)\n", __FUNCTION__, __LINE__);
     return None;
   }
 
@@ -7670,13 +7704,16 @@ int iRet;
   if(iRet)
   {
     geomTemp.x = geomTemp.y = geomTemp.width = geomTemp.height = 0;
-    gcRval = None; // nothing to paint
+    gcRval = NULL; // nothing to paint
+
+    WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Expose,
+                   "%s.%d - returning NULL (nothing to paint)\n", __FUNCTION__, __LINE__);
   }
   else
   {
     gcRval = WBBeginPaintGeom(wID, &geomTemp);
 
-    if(gcRval != None && pgBounds)
+    if(gcRval && pgBounds)
     {
       pgBounds->x      = geomTemp.x;
       pgBounds->y      = geomTemp.y;
@@ -7694,29 +7731,36 @@ WBGC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // WBGC will get the 'inval
   WBGC gcRval;
   Region rgnPaint;
   XRectangle xrct;
+  int iRet;
 
 
   if(!pEntry || !pgBounds)
   {
+    WB_ERROR_PRINT("%s.%d - invalid parameters\n", __FUNCTION__, __LINE__);
+
     return NULL;
   }
 
   BEGIN_XCALL_DEBUG_WRAPPER
   XSync(WBGetWindowDisplay(wID), 0);
+  if(pEntry->rgnClip)
+  {
+    iRet = XEmptyRegion(pEntry->rgnClip);
+  }
   END_XCALL_DEBUG_WRAPPER
 
-  if(!pEntry->rgnClip || XEmptyRegion(pEntry->rgnClip)) // clipping region is empty?
+  if(!pEntry->rgnClip || iRet) // clipping region is empty?
   {
     if(!pEntry->rgnClip)
     {
       WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Expose,
-                     "%s.%d - no clip region!\n", __FUNCTION__, __LINE__);
+                     "%s.%d - no clip region  (returning NULL)\n", __FUNCTION__, __LINE__);
     }
-    else
+    else // if(pBounds)
     {
       WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Expose,
-                     "%s - (WARNING) empty clip region - bounds = %d,%d,%d,%d\n",
-                     __FUNCTION__, pgBounds->x, pgBounds->y, pgBounds->width, pgBounds->height);
+                     "%s.%d - empty clip region - bounds = %d,%d,%d,%d  (returning NULL)\n",
+                     __FUNCTION__, __LINE__, pgBounds->x, pgBounds->y, pgBounds->width, pgBounds->height);
     }
 
     // NOTE:  If I'm in the middle of painting, *AND* the region is empty, then additional 'Expose'
@@ -7736,8 +7780,10 @@ WBGC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // WBGC will get the 'inval
 
   if(!gcRval)
   {
-    WB_WARN_PRINT("%s - * BUG * at line %d - unable to copy GC for window %d (%08xH)\n",
-                  __FUNCTION__, __LINE__, (int)wID, (int)wID);
+    WB_ERROR_PRINT("%s - * BUG * at line %d - unable to copy GC for window %d (%08xH)\n",
+                   __FUNCTION__, __LINE__, (int)wID, (int)wID);
+
+    // it's checked again, but I need to flow through to the next part
   }
 
   // using pEntry->rgnClip create a paint region
@@ -7763,23 +7809,8 @@ WBGC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // WBGC will get the 'inval
 
     if(rgnPaint)
     {
-//      if(!pEntry->rgnClip)
-//      {
-//        xrct.x      = pgBounds->x;
-//        xrct.y      = pgBounds->y;
-//        xrct.width  = pgBounds->width;
-//        xrct.height = pgBounds->height;
-//
-//        WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Expose,
-//                       "%s.%d - no clip region!\n", __FUNCTION__, __LINE__);
-//
-//        BEGIN_XCALL_DEBUG_WRAPPER
-//        XUnionRectWithRegion(&xrct, rgnPaint, rgnPaint);  // the paint rectangle as a region
-//        END_XCALL_DEBUG_WRAPPER
-//      }
-//      else
-//      {
       Region rgnTemp = XCreateRegion();
+
       if(!rgnTemp)
       {
         BEGIN_XCALL_DEBUG_WRAPPER
@@ -7812,7 +7843,6 @@ WBGC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // WBGC will get the 'inval
         XDestroyRegion(rgnTemp);
         END_XCALL_DEBUG_WRAPPER
       }
-//      }
     }
 
     if(rgnPaint) // using this as a flag, of sorts - could also use 'gcRval'
@@ -7824,20 +7854,37 @@ WBGC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // WBGC will get the 'inval
       // TDDO:  clip children
 
 
-      pEntry->rgnPaint = rgnPaint;
-      if(gcRval != NULL)
-      {
-        // assign the clipping region to the GC
+      BEGIN_XCALL_DEBUG_WRAPPER
+      iRet = XEmptyRegion(rgnPaint);
+      END_XCALL_DEBUG_WRAPPER
 
-//        BEGIN_XCALL_DEBUG_WRAPPER
-        WBSetClipOrigin(gcRval, 0, 0);
-        WBSetRegion(gcRval, rgnPaint);
-//        END_XCALL_DEBUG_WRAPPER
+      if(iRet) // it's empty - return NULL
+      {
+        BEGIN_XCALL_DEBUG_WRAPPER
+        XDestroyRegion(rgnPaint);
+        END_XCALL_DEBUG_WRAPPER
+
+        WBFreeGC(gcRval);
+
+        WB_DEBUG_PRINT(DebugLevel_WARN | DebugSubSystem_Expose,
+                       "%s.%d - empty paint region - returning NULL gcRval for window %d (%08xH)\n",
+                       __FUNCTION__, __LINE__, (int)wID, (int)wID);
+
+        return NULL;
       }
+
+      pEntry->rgnPaint = rgnPaint;
+
+      // gcRval is always NOT-NULL here
+
+      // assign the clipping region to the GC
+
+      WBSetClipOrigin(gcRval, 0, 0);
+      WBSetRegion(gcRval, rgnPaint);
     }
   }
 
-  if(gcRval != NULL && pgBounds)
+  if(gcRval != NULL /*&& pgBounds*/) // pgBounds is ALWAYS 'NOT NULL'
   {
     // get the 'bounds' from the expose event
     // and intersect them.  This should prevent me from re-painting several times
@@ -7851,12 +7898,19 @@ WBGC WBBeginPaintGeom(Window wID, WB_GEOM *pgBounds) // WBGC will get the 'inval
     pgBounds->width = xrct.width;
     pgBounds->height = xrct.height;
     pgBounds->border = 0;
+
+
+    WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Expose,
+                   "%s.%d - bounds=%d,%d,%d,%d\n",
+                   __FUNCTION__, __LINE__,
+                   xrct.x, xrct.y, xrct.width, xrct.height);
   }
 
   if(gcRval == NULL)
   {
-    WB_WARN_PRINT("%s - WARNING:  NULL gcRval for window %d (%08xH)\n",
-                  __FUNCTION__, (int)wID, (int)wID);
+    WB_DEBUG_PRINT(DebugLevel_WARN | DebugSubSystem_Expose,
+                   "%s.%d - returning NULL gcRval for window %d (%08xH)\n",
+                   __FUNCTION__, __LINE__, (int)wID, (int)wID);
   }
 
   return gcRval;

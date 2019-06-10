@@ -52,6 +52,8 @@
 #ifndef _DEBUG_HELPER_H_INCLUDED_
 #define _DEBUG_HELPER_H_INCLUDED_
 
+#include "platform_helper.h" // always make sure, I need some definitions from here
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -77,9 +79,12 @@ typedef struct _WBGC_ * WBGC;
   * Debug Level enumeration and subsystem idetification enumeration
   *
   * Bits 0 to 3 identify the level (0 = none, 7 = excessive)\n
-  * The remaining bits identify the subsystem filters (no bits set for ALL)
+  * The remaining 28 bits (lower DWORD) identify the subsystem filters (no bits set for ALL)
   *
-  * \sa WBParseStandardArguments() in platform_helper.c, 'aszDebugSubSys[]' array
+  * End-users may use any of the bits in the upper DWORD as the debug level is an 'unsigned long long' (64-bit) value.
+  * However, enumerations only work for 32-bit integers with 32-bit compilers, so there are no definitions for those bits here.
+  *
+  * \sa WBParseStandardArguments() in platform_helper.c, 'aszDebugSubSys[]' array, WBGetDebugLevel(), WBCheckDebugLevel()
   *
 **/
 enum DebugLevel
@@ -99,8 +104,8 @@ enum DebugLevel
   DebugLevel_MAXIMUM = 7,   //!< maximum value for masked level
   DebugLevel_MASK = 7,      //!< mask for allowed 'level' values (none through Excessive)
 
-  // next are subsystem masks for additional debugging.
-  // Also, see 'aszDebugSubSys' in WBParseStandardArguments(), platform_helper.c
+  // next are subsystem masks for additional debugging for the toolkit.
+  // Also, see 'aszDebugSubSys' in WBParseStandardArguments(), platform_helper.c (it must match)
   DebugSubSystem_ALL         = 0,           //!< 'ALL' is the default unless masked bits are non-zero
   DebugSubSystem_RESTRICT    = 0x80000000,  //!< only show specific subsystems (prevents zero masked value)
   DebugSubSystem_BITSHIFT    = 3,           //!< bit # for 'lowest' subsystem bit
@@ -122,9 +127,26 @@ enum DebugLevel
   DebugSubSystem_EditWindow  = 0x00040000,  //!< edit window callbacks               "editwindow"
   DebugSubSystem_ScrollBar   = 0x00080000,  //!< edit window callbacks               "scrollbar"
   DebugSubSystem_DrawText    = 0x00100000,  //!< Draw Text features                  "drawtext"
+  DebugSubSystem_Clipboard   = 0x00200000,  //!< Draw Text features                  "drawtext"
+
+  // remaining subsystem bits are reserved - please do not use them
+  DebugSubSystem_RESERVED1   = 0x00400000,  //!< reserved
+  DebugSubSystem_RESERVED2   = 0x00800000,  //!< reserved
+  DebugSubSystem_RESERVED3   = 0x01000000,  //!< reserved
+  DebugSubSystem_RESERVED4   = 0x02000000,  //!< reserved
+  DebugSubSystem_RESERVED5   = 0x04000000,  //!< reserved
+  DebugSubSystem_RESERVED6   = 0x08000000,  //!< reserved
+  DebugSubSystem_RESERVED7   = 0x10000000,  //!< reserved
+  DebugSubSystem_RESERVED8   = 0x20000000,  //!< reserved
+  DebugSubSystem_RESERVED9   = 0x40000000,  //!< reserved
+  DebugSubSystem_MAX         = 0x40000000,  //!< reserved
 
   DebugSubSystem_MASK = ~7L  //!< mask for allowed 'subsystem' bits
+
+  // user bits are the high 32-bits of a long-long value for the debug level.  They can be
+  // used for any purpose without any restriction.
 };
+
 
 
 
@@ -157,14 +179,14 @@ void WBSetDebugLevel(unsigned int iLevel);
 **/
 
 #if defined(__GNUC__) || defined(_MSVC_VER)
-static __inline__ unsigned int WBGetDebugLevel(void)
+static __inline__ WB_UINT64 WBGetDebugLevel(void)
 {
-extern unsigned int iWBDebugLevel;
+extern WB_UINT64 iWBDebugLevel;
 
   return iWBDebugLevel;
 }
 #else // !defined(__GNUC__) && !defined(_MSVC_VER)
-unsigned int WBGetDebugLevel(void);
+WB_UINT64 WBGetDebugLevel(void);
 #endif // defined(__GNUC__) || defined(_MSVC_VER)
 
 /** \ingroup debug
@@ -272,9 +294,9 @@ void WBDebugDumpEvent(XEvent *pEvent);
   * Header File:  debug_helper.h
 **/
 #if defined(__GNUC__) || defined(_MSVC_VER)
-static __inline__ int WBCheckDebugLevel(unsigned int dwLevel)
+static __inline__ int WBCheckDebugLevel(WB_UINT64 dwLevel)
 {
-extern unsigned int iWBDebugLevel;
+extern WB_UINT64 iWBDebugLevel;
 
   if(WB_LIKELY((iWBDebugLevel & DebugLevel_MASK) < (dwLevel & DebugLevel_MASK)))
   {
@@ -301,7 +323,7 @@ extern unsigned int iWBDebugLevel;
   return 0;
 }
 #else // !defined(__GNUC__) && !defined(_MSVC_VER)
-int WBGetDebugLevel(void);
+int WBCheckDebugLevel(WB_UINT64 dwLevel);
 #endif // defined(__GNUC__) || defined(_MSVC_VER)
 
 

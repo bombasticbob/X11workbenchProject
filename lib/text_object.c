@@ -1466,13 +1466,16 @@ WB_RECT rctCursor;
   }
 }
 
-static void __internal_invalidate_rect(const struct _text_object_ *pThis, WB_RECT *pRect, int bPaintFlag)
+static void __internal_invalidate_rect(struct _text_object_ *pThis, WB_RECT *pRect, int bPaintFlag)
 {
 WB_RECT rctInvalid;
 
   if(WBIsValidTextObject(pThis) && pThis->wIDOwner != None)
   {
-    // TODO:  determine if scroll area changed.  if not, don't do this next part
+    if(pThis->rctView.right <= pThis->rctView.left || pThis->rctView.bottom <= pThis->rctView.top ||
+       pThis->rctWinView.right <= pThis->rctWinView.left || pThis->rctWinView.bottom <= pThis->rctWinView.top ||
+       memcmp(&pThis->rctView, &pThis->rctViewOld, sizeof(pThis->rctView)) ||
+       memcmp(&pThis->rctWinView, &pThis->rctWinViewOld, sizeof(pThis->rctWinView)))
     {
       XClientMessageEvent evt;
 
@@ -1483,7 +1486,14 @@ WB_RECT rctInvalid;
       evt.message_type = aRECALC_LAYOUT;
       evt.format = 32;
 
-      WBPostPriorityEvent(pThis->wIDOwner, (XEvent *)&evt); // asynch (for now)
+      WBPostPriorityEvent(pThis->wIDOwner, (XEvent *)&evt); // async (for now)
+
+      memcpy(&pThis->rctViewOld, &pThis->rctView, sizeof(pThis->rctViewOld));
+      memcpy(&pThis->rctWinViewOld, &pThis->rctWinView, sizeof(pThis->rctWinViewOld));
+
+      WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_EditWindow | DebugSubSystem_Expose,
+                     "%s,%d - force recalc layout, window %u (%08xH)\n",
+                     __FUNCTION__, __LINE__, (int)pThis->wIDOwner, (int)pThis->wIDOwner);
     }
 
     if(!pRect)
@@ -1724,6 +1734,9 @@ static void __internal_init(struct _text_object_ *pThis)
   pThis->iCol = 0;
   pThis->iPos = 0; // reserved
   bzero(&pThis->rctView, sizeof(pThis->rctView));
+  bzero(&pThis->rctWinView, sizeof(pThis->rctWinView));
+  bzero(&pThis->rctViewOld, sizeof(pThis->rctViewOld));
+  bzero(&pThis->rctWinViewOld, sizeof(pThis->rctWinViewOld));
   pThis->pText = NULL;
   pThis->pUndo = NULL;
   pThis->pRedo = NULL;
@@ -5295,7 +5308,6 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
   {
     nEntries = pBuf->nEntries;
   }
-
 
 
   // ------------------------------------------

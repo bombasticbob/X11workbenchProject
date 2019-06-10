@@ -928,6 +928,9 @@ extern const TEXT_OBJECT_VTABLE WBDefaultTextObjectVTable;
     WB_RECT rctView;           // viewport, in characters
     WB_RECT rctWinView;        // viewport, in window coordinates, or 'empty' if unknown
 
+    // these are maintained internally - do not use
+    WB_RECT rctViewOld;        // previous viewport [for invalidating window efficiently]
+    WB_RECT rctWinViewOld;     // previous viewport, in window coordinates [for invalidating window efficiently]
 
     // the data
 
@@ -986,6 +989,9 @@ typedef struct _text_object_
   WB_RECT rctView;           ///< viewport, in characters (rctView.top is the top visible line, always)
   WB_RECT rctWinView;        ///< viewport, in window coordinates, or 'empty' if unknown
 
+  // these are maintained internally - do not use
+  WB_RECT rctViewOld;        ///< previous viewport [for invalidating window efficiently]
+  WB_RECT rctWinViewOld;     ///< previous viewport, in window coordinates [for invalidating window efficiently]
 
   // the data
 

@@ -62,12 +62,20 @@
 #include <stdarg.h> /* stdarg to make sure I have va_list and other important stuff */
 #include <stdint.h> /* for standard integer types like uint32_t */
 
-// X11 header files (TODO:  use 'ifdef' blocks around this as needed for non-X platforms)
+#ifndef WIN32
+// X11 header files
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xmd.h>  // for 'CARD32' and other things
 #include <X11/Xatom.h> // for 'XA_CARDINAL' and other things
+
+#else // WIN32
+
+#include <windows.h> // for WIN32 applications
+
+#endif // WIN32
+
 
 
 #if defined(__GNUC__) || defined(__DOXYGEN__)

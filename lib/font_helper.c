@@ -302,7 +302,8 @@ WB_FONT pFont = (WB_FONT)pFont0;
 
   if(pFont->iAvgCharWidth >= 0)
   {
-    WB_DEBUG_PRINT(DebugLevel_Heavy, "%s returns (cached) font avg char width %d\n", __FUNCTION__, pFont->iAvgCharWidth);
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Font,
+                   "%s returns (cached) font avg char width %d\n", __FUNCTION__, pFont->iAvgCharWidth);
     return pFont->iAvgCharWidth;
   }
 
@@ -327,7 +328,8 @@ WB_FONT pFont = (WB_FONT)pFont0;
     pFont->iAvgCharWidth = iRval;
   }
 
-  WB_DEBUG_PRINT(DebugLevel_Heavy, "%s returns font avg char width %d\n", __FUNCTION__, iRval);
+  WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Font,
+                 "%s returns font avg char width %d\n", __FUNCTION__, iRval);
 
   return iRval;
 }
@@ -351,7 +353,8 @@ WB_FONT pFont = (WB_FONT)pFont0;
 
   if(pFont->iDescent >= 0)
   {
-    WB_DEBUG_PRINT(DebugLevel_Heavy, "%s returns (cached) font descent %d\n", __FUNCTION__, pFont->iDescent);
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Font,
+                   "%s returns (cached) font descent %d\n", __FUNCTION__, pFont->iDescent);
     return pFont->iDescent;
   }
 
@@ -377,7 +380,8 @@ WB_FONT pFont = (WB_FONT)pFont0;
     pFont->iDescent = iRval; // cached for next time
   }
 
-  WB_DEBUG_PRINT(DebugLevel_Heavy, "%s returns font descent %d\n", __FUNCTION__, iRval);
+  WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Font,
+                 "%s returns font descent %d\n", __FUNCTION__, iRval);
 
   return iRval;
 }
@@ -401,7 +405,8 @@ WB_FONT pFont = (WB_FONT)pFont0;
 
   if(pFont->iAscent >= 0)
   {
-    WB_DEBUG_PRINT(DebugLevel_Heavy, "%s returns (cached) font ascent %d\n", __FUNCTION__, pFont->iAscent);
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Font,
+                   "%s returns (cached) font ascent %d\n", __FUNCTION__, pFont->iAscent);
     return pFont->iAscent;
   }
 
@@ -426,7 +431,8 @@ WB_FONT pFont = (WB_FONT)pFont0;
     pFont->iAscent = iRval; // cached for next time
   }
 
-  WB_DEBUG_PRINT(DebugLevel_Heavy, "%s returns font ascent %d\n", __FUNCTION__, iRval);
+  WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Font,
+                 "%s returns font ascent %d\n", __FUNCTION__, iRval);
 
   return iRval;
 }
@@ -450,7 +456,8 @@ WB_FONT pFont = (WB_FONT)pFont0;
 
   if(pFont->iHeight >= 0)
   {
-    WB_DEBUG_PRINT(DebugLevel_Heavy, "%s returns (cached) font height %d\n", __FUNCTION__, pFont->iHeight);
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Font,
+                   "%s returns (cached) font height %d\n", __FUNCTION__, pFont->iHeight);
     return pFont->iHeight;
   }
 
@@ -470,7 +477,8 @@ WB_FONT pFont = (WB_FONT)pFont0;
     pFont->iHeight = iRval; // cached for next time
   }
 
-  WB_DEBUG_PRINT(DebugLevel_Heavy, "%s returns font height %d\n", __FUNCTION__, iRval);
+  WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Font,
+                 "%s returns font height %d\n", __FUNCTION__, iRval);
 
   return iRval;
 }
@@ -500,7 +508,8 @@ WB_FONT pFont = (WB_FONT)pFont0;
      pFont->max_bounds.ascent != 0 ||
      pFont->max_bounds.descent != 0)
   {
-    WB_DEBUG_PRINT(DebugLevel_Heavy, "%s returns (cached) font extent %d %d %d %d %d\n",
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Font,
+                   "%s returns (cached) font extent %d %d %d %d %d\n",
                    __FUNCTION__,
                    pFont->max_bounds.lbearing, pFont->max_bounds.rbearing,
                    pFont->max_bounds.width, pFont->max_bounds.ascent, pFont->max_bounds.descent);
@@ -535,7 +544,8 @@ WB_FONT pFont = (WB_FONT)pFont0;
     memcpy(&(pFont->max_bounds), &rVal, sizeof(pFont->max_bounds));
   }
 
-  WB_DEBUG_PRINT(DebugLevel_Heavy, "%s returns font extent %d %d %d %d %d\n",
+  WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Font,
+                 "%s returns font extent %d %d %d %d %d\n",
                  __FUNCTION__, rVal.lbearing, rVal.rbearing, rVal.width, rVal.ascent, rVal.descent);
 
   return rVal;
@@ -665,7 +675,8 @@ int iLen, iRval = 0;
     iRval = XTextWidth(pFont->pFontStruct, szText, iLen);
   }
 
-  WB_DEBUG_PRINT(DebugLevel_Heavy, "%s returns text width %d for \"%-.*s\"\n", __FUNCTION__, iRval, iLen, szText);
+  WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Font,
+                 "%s returns text width %d for \"%-.*s\"\n", __FUNCTION__, iRval, iLen, szText);
 
   return iRval;
 }

@@ -328,8 +328,8 @@ int nListItems;
   pScrollInfo->iVBarHeight = iBarHeight;
 
   WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
-                 "%s - iVScrollWidth=%d, iHScrollHeight=%d  iBarHeight=%d  geomClient=%d,%d,%d,%d border=%d\n",
-                 __FUNCTION__, iVScrollWidth, iHScrollHeight, iBarHeight,
+                 "%s.%d - iVScrollWidth=%d, iHScrollHeight=%d  iBarHeight=%d  geomClient=%d,%d,%d,%d border=%d\n",
+                 __FUNCTION__, __LINE__, iVScrollWidth, iHScrollHeight, iBarHeight,
                  pgeomClient->x, pgeomClient->y, pgeomClient->width, pgeomClient->height, pgeomClient->border);
 
   if(pScrollInfo->iVPos < pScrollInfo->iVMin || pScrollInfo->iVPos > pScrollInfo->iVMax)
@@ -452,7 +452,7 @@ int nListItems;
   pScrollInfo->geomVKnob.y = (pScrollInfo->iVKnob = iKnobPos)
                            + pScrollInfo->geomVUp.y + pScrollInfo->geomVUp.height;
 
-  // fixed values go here
+  // 'fixed' (as in static) values go here
   pScrollInfo->geomVBar.border = 1;
   pScrollInfo->geomVUp.border = 0;
   pScrollInfo->geomVDown.border = 0;
@@ -480,8 +480,8 @@ int nListItems;
 
 
   WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
-                 "%s - iVScrollWidth=%d, iHScrollHeight=%d  iBarWidth=%d  geomClient=%d,%d,%d,%d border=%d\n",
-                 __FUNCTION__, iVScrollWidth, iHScrollHeight, iBarWidth,
+                 "%s.%d - iVScrollWidth=%d, iHScrollHeight=%d  iBarWidth=%d  geomClient=%d,%d,%d,%d border=%d\n",
+                 __FUNCTION__, __LINE__, iVScrollWidth, iHScrollHeight, iBarWidth,
                  pgeomClient->x, pgeomClient->y, pgeomClient->width, pgeomClient->height, pgeomClient->border);
 
 
@@ -603,7 +603,7 @@ int nListItems;
   pScrollInfo->geomHKnob.x = (pScrollInfo->iHKnob = iKnobPos)
                            + pScrollInfo->geomHLeft.x + pScrollInfo->geomHLeft.width;
 
-  // fixed values go here
+  // 'fixed' (as in static) values go here
   pScrollInfo->geomVBar.border = 1;
   pScrollInfo->geomVUp.border = 0;
   pScrollInfo->geomVDown.border = 0;
@@ -650,7 +650,7 @@ int iBarHeight, iBarWidth;
   }
 
   WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
-                 "%s line %d -  %d %d %d %d %d\n", __FUNCTION__, __LINE__,
+                 "%s.%d -  %d %d %d %d %d\n", __FUNCTION__, __LINE__,
                  iBarHeight, iVScrollWidth, iHScrollHeight, nListItems, nPos);
 
   pScrollInfo->iVMin = 0;
@@ -672,7 +672,7 @@ int iBarHeight, iBarWidth;
   pScrollInfo->iHBarWidth = iBarWidth;
 
   WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
-                 "%s line %d -  iHScrollHeight=%d, iBarWidth=%d\n", __FUNCTION__, __LINE__,
+                 "%s.%d -  iHScrollHeight=%d, iBarWidth=%d\n", __FUNCTION__, __LINE__,
                  iHScrollHeight, iBarWidth);
 
 }
@@ -709,7 +709,7 @@ int /*iKnobSize, iKnobPos,*/ iBarHeight, iBarWidth;
   }
 
   WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
-                 "%s line %d -  %d %d %d %d %d\n", __FUNCTION__, __LINE__,
+                 "%s.%d -  %d %d %d %d %d\n", __FUNCTION__, __LINE__,
                  iBarWidth, iVScrollWidth, iHScrollHeight, nListItems, nPos);
 
   pScrollInfo->iHMin = 0;
@@ -732,7 +732,7 @@ int /*iKnobSize, iKnobPos,*/ iBarHeight, iBarWidth;
   pScrollInfo->iVBarHeight = iBarHeight;
 
   WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
-                 "%s line %d -  iHScrollHeight=%d, iBarWidth=%d\n", __FUNCTION__, __LINE__,
+                 "%s.%d -  iHScrollHeight=%d, iBarWidth=%d\n", __FUNCTION__, __LINE__,
                  iVScrollWidth, iBarHeight);
 }
 
@@ -762,7 +762,9 @@ int WBCalcVScrollDragPos(WB_SCROLLINFO *pScrollInfo, int iY)
       int nPos = (WB_INT64)iKnobPos * (WB_INT64)(nListItems - 1)
                / (WB_INT64)iBarScrollArea;
 
-      WB_ERROR_PRINT("TEMPORARY:  iY=%d; nLI=%d  KS=%d  KP=%d  BSA=%d  nP=%d\n",
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
+                     "%s.%d  iY=%d; nLI=%d  KS=%d  KP=%d  BSA=%d  nP=%d\n",
+                     __FUNCTION__, __LINE__,
                      iY, nListItems, iKnobSize, iKnobPos, iBarScrollArea, nPos);
 
       if(nPos < pScrollInfo->iVMin)
@@ -807,16 +809,17 @@ XCharStruct xBounds;
   geom.y = pgeomClient->y;
   geom.width = pgeomClient->width;
   geom.height = pgeomClient->height;
+  geom.border = pgeomClient->border;
 
   xBounds = WBFontMaxBounds(pFont);
 
   iVScrollWidth = WBTextWidth(pFont, "X", 1) * 2 + 4; // standard width of vertical scrollbar
   iHScrollHeight = xBounds.ascent + xBounds.descent + 4;
 
-  WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_ScrollBar,
-                 "INFO:  %s - iVScrollWidth=%d, iHScrollHeight=%d  geom=%d,%d,%d,%d\n",
-                 __FUNCTION__, iVScrollWidth, iHScrollHeight,
-                 geom.x, geom.y, geom.width, geom.height);
+  WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
+                 "%s.%d - iVScrollWidth=%d, iHScrollHeight=%d  geom=%d,%d,%d,%d (%d)\n",
+                 __FUNCTION__, __LINE__, iVScrollWidth, iHScrollHeight,
+                 geom.x, geom.y, geom.width, geom.height, geom.border);
 
   // calculate the rectangles for the scroll bars
 
@@ -844,7 +847,7 @@ XCharStruct xBounds;
     memcpy(pgeomUsable, &geom, sizeof(*pgeomUsable));
   }
 
-  WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_ScrollBar,
+  WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
                  "    SCROLL INFO:  iVBarHeight = %-6d    iHBarWidth  = %d\n"
                  "                  iVKnob      = %-6d    iHKnob      = %d\n"
                  "                  iVKnobSize  = %-6d    iHKnobSize  = %d\n"
@@ -878,6 +881,7 @@ WB_GEOM geom;
     geom.y = pScrollInfo->geomVBar.y;
     geom.width = pScrollInfo->geomVBar.width;
     geom.height = pScrollInfo->geomVBar.height;
+    geom.border = pScrollInfo->geomVBar.border;
   }
   else
   {
@@ -885,6 +889,7 @@ WB_GEOM geom;
     geom.y = pScrollInfo->geomVUp.y + pScrollInfo->geomVUp.height;
     geom.width = pScrollInfo->geomVBar.width;
     geom.height = pScrollInfo->geomVDown.y - geom.y;
+    geom.border = pScrollInfo->geomVBar.border; // just use this one
   }
 
   WBInvalidateGeom(wID, &geom, bUpdate); // invalidate scroll area before notifying
@@ -909,6 +914,7 @@ WB_GEOM geom;
     geom.y = pScrollInfo->geomHBar.y;
     geom.width = pScrollInfo->geomHBar.width;
     geom.height = pScrollInfo->geomHBar.height;
+    geom.border = pScrollInfo->geomHBar.border;
   }
   else
   {
@@ -916,6 +922,7 @@ WB_GEOM geom;
     geom.y = pScrollInfo->geomHBar.y;
     geom.width = pScrollInfo->geomHRight.x - geom.x;
     geom.height = pScrollInfo->geomHBar.height;
+    geom.border = pScrollInfo->geomHBar.border; // just use this one
   }
 
   WBInvalidateGeom(wID, &geom, bUpdate); // invalidate scroll area before notifying
@@ -1290,7 +1297,7 @@ void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable w
      pScrollInfo->iHPos > pScrollInfo->iHMax ||
      pScrollInfo->iHMax < pScrollInfo->iHMin)
   {
-    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_ScrollBar,
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
                    "%s - grey out iHPos=%d  iHMin=%d  iHMax=%d\n", __FUNCTION__,
                    pScrollInfo->iHPos, pScrollInfo->iHMin, pScrollInfo->iHMax);
 
@@ -1298,31 +1305,34 @@ void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable w
   }
 
   WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
-                 "%s - paint 'left' button %d %d %d %d\n", __FUNCTION__,
+                 "%s - paint 'left' button %d %d %d %d (%d)\n", __FUNCTION__,
                  pScrollInfo->geomHLeft.x,
                  pScrollInfo->geomHLeft.y,
                  pScrollInfo->geomHLeft.width,
-                 pScrollInfo->geomHLeft.height);
+                 pScrollInfo->geomHLeft.height,
+                 pScrollInfo->geomHLeft.border);
 
   WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomHLeft),
                      clrScrollBD2.pixel, clrScrollBD3.pixel);
 
   WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
-                 "%s - paint 'right' button %d %d %d %d\n", __FUNCTION__,
+                 "%s - paint 'right' button %d %d %d %d (%d)\n", __FUNCTION__,
                  pScrollInfo->geomHRight.x,
                  pScrollInfo->geomHRight.y,
                  pScrollInfo->geomHRight.width,
-                 pScrollInfo->geomHRight.height);
+                 pScrollInfo->geomHRight.height,
+                 pScrollInfo->geomHRight.border);
 
   WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomHRight),
                      clrScrollBD2.pixel, clrScrollBD3.pixel);
 
   WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
-                 "%s - paint horizontal 'knob' %d %d %d %d\n", __FUNCTION__,
+                 "%s - paint horizontal 'knob' %d %d %d %d (%d)\n", __FUNCTION__,
                  pScrollInfo->geomHKnob.x,
                  pScrollInfo->geomHKnob.y,
                  pScrollInfo->geomHKnob.width,
-                 pScrollInfo->geomHKnob.height);
+                 pScrollInfo->geomHKnob.height,
+                 pScrollInfo->geomHKnob.border);
 
   WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomHKnob),
                      clrScrollBD2.pixel, clrScrollBD3.pixel);
@@ -1355,7 +1365,7 @@ void WBPaintVScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable w
      pScrollInfo->iVPos > pScrollInfo->iVMax ||
      pScrollInfo->iVMax < pScrollInfo->iVMin)
   {
-    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_ScrollBar,
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
                    "%s - grey out iVPos=%d  iVMin=%d  iVMax=%d\n", __FUNCTION__,
                    pScrollInfo->iVPos, pScrollInfo->iVMin, pScrollInfo->iVMax);
 
@@ -1363,31 +1373,34 @@ void WBPaintVScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable w
   }
 
   WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
-                 "%s - paint 'up' button %d %d %d %d\n", __FUNCTION__,
+                 "%s - paint 'up' button %d %d %d %d (%d)\n", __FUNCTION__,
                  pScrollInfo->geomVUp.x,
                  pScrollInfo->geomVUp.y,
                  pScrollInfo->geomVUp.width,
-                 pScrollInfo->geomVUp.height);
+                 pScrollInfo->geomVUp.height,
+                 pScrollInfo->geomVUp.border);
 
   WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomVUp),
                      clrScrollBD2.pixel, clrScrollBD3.pixel);
 
   WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
-                 "%s - paint 'down' button %d %d %d %d\n", __FUNCTION__,
+                 "%s - paint 'down' button %d %d %d %d (%d)\n", __FUNCTION__,
                  pScrollInfo->geomVDown.x,
                  pScrollInfo->geomVDown.y,
                  pScrollInfo->geomVDown.width,
-                 pScrollInfo->geomVDown.height);
+                 pScrollInfo->geomVDown.height,
+                 pScrollInfo->geomVDown.border);
 
   WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomVDown),
                      clrScrollBD2.pixel, clrScrollBD3.pixel);
 
   WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_ScrollBar | DebugSubSystem_Expose,
-                 "%s - paint vertical 'knob' %d %d %d %d\n", __FUNCTION__,
+                 "%s - paint vertical 'knob' %d %d %d %d (%d)\n", __FUNCTION__,
                  pScrollInfo->geomVKnob.x,
                  pScrollInfo->geomVKnob.y,
                  pScrollInfo->geomVKnob.width,
-                 pScrollInfo->geomVKnob.height);
+                 pScrollInfo->geomVKnob.height,
+                 pScrollInfo->geomVKnob.border);
 
   WBDraw3DBorderRect(pDisplay, wID, gc, &(pScrollInfo->geomVKnob),
                      clrScrollBD2.pixel, clrScrollBD3.pixel);

@@ -106,7 +106,7 @@ static void __add_to_temp_file_list(const char *szFile);
 int bQuitFlag = FALSE;             // defined here, used globally
 
 // within this file debug level is writable.  outside of this file, it's (technically) read-only
-unsigned int iWBDebugLevel = 0; // default is no debug except errors, all subsystems
+WB_UINT64 iWBDebugLevel = 0; // default is no debug except errors, all subsystems
 
 // application name (from argv[0])
 static char szAppName[PATH_MAX * 2]="";
@@ -226,15 +226,22 @@ static const char * const aszCmdLineOptions[]=
   NULL // marks end of list
 };
 
+static const uint8_t const abCmdLineOptions[]= // NON-ZERO means that it expects a parameter
+{
+  0, 0, 1, 1, 1, 0, 0, 1, 0, 0,
+  0
+};
+
 static const char * const aszDebugSubSys[]=
 {
   "init","application","window","menu","event",
   "dialog","dialogctrl","frame","keyboard",
   "mouse","font","settings","selection",
   "pixmap","expose","editwindow","scrollbar",
-  "drawtext",
+  "drawtext","clipboard",
   NULL
 };
+
 
 enum
 {
@@ -288,9 +295,9 @@ enum
     int argc0 = argc;  // value at start of loop iteration
     int iFlag = 0;
 
-    if(argv[1][0] != '-' || !argv[1][1])
+    if(argv[1][0] != '-' || !argv[1][1] || // end of arguments is a '-' by itself or something not starting with '-'
+       (argv[1][1] == '-' && !argv[1][2])) // '--' by itself has the same effect
     {
-      // end of arguments is a '-' by itself or something not starting with '-'
       break;
     }
 
@@ -301,11 +308,13 @@ enum
         argv++; // keep looking but don't touch anything yet
         argc--;
 
-//        WB_ERROR_PRINT("TEMPORARY:  skipping argument '%s'\n", argv[0]);
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Init,
+                       "%s.%d  skipping over argument '%s'\n", __FUNCTION__, __LINE__, argv[0]);
         continue;
       }
 
-//      WB_ERROR_PRINT("TEMPORARY:  unrecognized argument '%s'\n", argv[1]);
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Init,
+                     "%s.%d unrecognized argument '%s'\n", __FUNCTION__, __LINE__, argv[1]);
     }
     else
     {
@@ -316,17 +325,21 @@ enum
       {
         const char *szOpt = aszCmdLineOptions[i1];
         int iLen = strlen(szOpt);
-        const char *szArg = argv[1] + 2;
-        const char *szVal = szArg + iLen;
+        const char *szArg = argv[1] + 2;   // points past the '--'
+        const char *szVal = szArg + iLen;  // end of the option string ('=' or '\0')
 
         if(!strncmp(szOpt, szArg, iLen) &&
            (*szVal == '=' || !*szVal))
         {
           if(!*szVal)
           {
-            if(argc > 2)
+            // I've come for an argument.  But not everything has an argument.  Some things
+            // do, some things don't. So if I don't expect an argument, don't check for one
+            // Otherwise, I need to increment argv and decrement argc and point to the arg
+
+            if(abCmdLineOptions[i1] && argc > 2)
             {
-              // skip over arg for loop
+              // skip over arg for the loop iteration
               argv++;
               argc--;
               szVal = argv[1];
@@ -337,28 +350,28 @@ enum
           {
             case option_help:
               WBToolkitUsage();
-              return -1; // for now; later do all of help?
+
+help_exit: // go here if I displayed help and don't want a 'usage()'
+              if(argvNew)
+              {
+                WBFree(argvNew);
+              }
+
+              return 1; // advise NOT to display 'usage()' but to definitely exit the application
 
             case option_help_all:
               WBToolkitUsage();
-              fputs("\n\n'Help All' not yet implemented\n\n",
-                    stderr);
+              WBDebugPrint("\n\n'Help All' not yet implemented\n\n");
+              goto help_exit;
 
-              return -1; // for now; later do all of help?
-
-            case option_debug:
+            case option_debug: // this takes immediate effect
               i2 = atoi(szVal);
 
-              if(*szVal < '0' || *szVal > '9' || i2 < 0 || i2 > DebugLevel_Excessive)
+              // max debugt level is 7, minimum is zero
+              if(*szVal < '0' || *szVal > '7' || i2 < 0 || i2 > DebugLevel_MAXIMUM)
               {
-                WBDebugPrint("Invalid debug level %s\n", szVal);
-
-                if(argvNew)
-                {
-                  WBFree(argvNew);
-                }
-
-                return -1;
+                WBDebugPrint("Invalid debug level %s - must be between 0 and %d\n", szVal, DebugLevel_MAXIMUM);
+                goto argument_error_exit;
               }
 
               iDebugLevelSeen = 1;
@@ -388,7 +401,7 @@ enum
                              "Specify 'restrict' in addition to one or more subsystems in order\n"
                              "to ONLY display debug output for the specified subsystem(s)\n\n");
 
-                return 1; // advise NOT to display 'usage()' but to definitely exit the application
+                goto help_exit;
               }
               else if(!strcmp("restrict", szVal))
               {
@@ -419,12 +432,7 @@ enum
                   {
                     WBDebugPrint("unrecognized subsystem %s\n", szVal);
 
-                    if(argvNew)
-                    {
-                      WBFree(argvNew);
-                    }
-
-                    return -1;
+                    goto argument_error_exit;
                   }
                 }
               }
@@ -462,8 +470,10 @@ enum
               break;
 
             default:
-              WBDebugPrint("Unrecognized option: --%s\n", szArg);
+              WB_ERROR_PRINT("%s.%d - Internal error - unrecognized option: --%s\n",
+                             __FUNCTION__, __LINE__, szArg);
 
+argument_error_exit: // for argument errors go here - it displays usage()
               if(argvNew)
               {
                 WBFree(argvNew);
@@ -478,25 +488,32 @@ enum
       }
     }
 
+//loop_end:
     // at this point the argument may not have been recognized and so I must
     // copy it into the destination if it wasn't... as PRIOR to this there
     // should already be one or more unrecognized arguments
 
     if(!argvNew) // need to allocate copy
     {
-//      WB_ERROR_PRINT("TEMPORARY:  allocating argvNew at '%s'\n", argv[1]);
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Init,
+                     "%s.%d allocating argvNew at '%s'\n", __FUNCTION__, __LINE__, argv[1]);
 
       argvNew = WBAlloc(sizeof(*argvNew) * (argc + 2));
+
       if(!argvNew)
       {
         return -1;  // not enough memory
       }
 
-      i2 = argc_orig;  // the original 'argc' value
       argcNew = 0;
+
+      // copy original arguments, excluding this one
+      i2 = argc_orig;  // the original 'argc' value
+
       while(i2 >= argc0) // I want to do this once on the first pass, etc.
       {
-//        WB_ERROR_PRINT("TEMPORARY:  copying argv at '%s'\n", argv_orig[argcNew]);
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Init,
+                       "%s.%d copying argv at '%s'\n", __FUNCTION__, __LINE__, argv_orig[argcNew]);
 
         argvNew[argcNew] = argv_orig[argcNew];
         argcNew++;
@@ -504,11 +521,12 @@ enum
       }
     }
 
-    if(!iFlag)
+    if(!iFlag) // iFlag means 'do not copy it'
     {
       argvNew[argcNew++] = argv[1];
 
-//      WB_ERROR_PRINT("TEMPORARY:  (2) copying argv at '%s'\n", argv[1]);
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Init,
+                     "%s.%d.  (2) copying argv at '%s'\n", __FUNCTION__, __LINE__, argv[1]);
     }
 
     argv++;
@@ -521,9 +539,21 @@ enum
 
     while(argc > 1)
     {
-//      WB_ERROR_PRINT("TEMPORARY:  (3) copying argv at '%s'\n", argv[1]);
+      if(argv[1][0] == '-' && argv[1][1] == '-' && !argv[1][2]) // look for a '--'
+      {
+        // skip this one
 
-      argvNew[argcNew++] = argv[1];
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Init,
+                       "%s.%d (3) skipping argv at '%s'\n", __FUNCTION__, __LINE__, argv[1]);
+      }
+      else
+      {
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Init,
+                       "%s.%d (3) copying argv at '%s'\n", __FUNCTION__, __LINE__, argv[1]);
+
+        argvNew[argcNew++] = argv[1];
+      }
+
       argv++;
       argc--;
     }
@@ -539,6 +569,7 @@ enum
 
   if((iWBDebugLevel & DebugSubSystem_MASK) != 0)
   {
+//    WBDebugPrint("TEMPORARY:  iWBDebugLevel = %d (%08xH)\n", iWBDebugLevel, iWBDebugLevel);
     i2 = 0;
     for(i1=0; aszDebugSubSys[i1]; i1++)
     {
@@ -558,7 +589,7 @@ enum
 
     for(; (i1 + DebugSubSystem_BITSHIFT) < 32; i1++)
     {
-      if((1L << (i1 + DebugSubSystem_BITSHIFT)) == DebugSubSystem_RESTRICT)
+      if((iWBDebugLevel & (1L << (i1 + DebugSubSystem_BITSHIFT))) == DebugSubSystem_RESTRICT)
       {
         if(!i2)
         {
@@ -588,6 +619,18 @@ enum
     {
       WBDebugPrint("\n");
     }
+  }
+
+  if(WBCheckDebugLevel(DebugLevel_Medium | DebugSubSystem_Init))
+  {
+    WBDebugPrint("Command line arguments passed to application:\n");
+
+    for(i1=0; i1 < *pargc; i1++)
+    {
+      WBDebugPrint("  %4d    %s\n", i1, (*pargv)[i1]);
+    }
+
+    WBDebugPrint("\n");
   }
 
   return 0;
