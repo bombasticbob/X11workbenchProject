@@ -5194,8 +5194,21 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
 
     geomV.x = geomV.y = 0; // ALWAYS (make sure) - it's client coords now
 
+    if(geomV.height <= MIN_BORDER_SPACING * 4)   // absolute minimum height
+    {
+      return; // can't do window that's way too small
+    }
+
     geomV.y += MIN_BORDER_SPACING;           // need a minimum top/bottom border as well
     geomV.height -= MIN_BORDER_SPACING * 2;
+  }
+
+//  WB_ERROR_PRINT("TEMPORARY:  %s.%d  window geometry:  %d, %d, %d, %d\n",
+//                  __FUNCTION__, __LINE__, geomV.x, geomV.y, geomV.width, geomV.height);
+
+  if(geomV.width <= MIN_BORDER_SPACING * 4)  // absolute minimum width
+  {
+    return; // can't do window that's way too small
   }
 
   // in all cases, make room on right/left edges for the cursor
@@ -5204,12 +5217,6 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
   geomV.width -= MIN_BORDER_SPACING * 2;
 
   // TODO:  make use of geomV's "border" parameter??
-
-  if(geomV.width <= MIN_BORDER_SPACING * 2 ||  // absolute minimum width
-     geomV.height <= MIN_BORDER_SPACING * 2)   // absolute minimum height
-  {
-    return; // can't do window that's way too small
-  }
 
   if(pPaintGeom)
   {
@@ -5249,6 +5256,8 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
   {
     iAsc  = WBFontAscent(pFont);
     iDesc  = WBFontDescent(pFont);
+
+//    WB_ERROR_PRINT("TEMPORARY:  %s.%d  font ascent=%d, descent=%d\n", __FUNCTION__, __LINE__, iAsc, iDesc);
   }
   else
   {
@@ -5262,6 +5271,8 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
 
   // NOW get the font width for a space (TODO:  average char width instead?)
   iFontWidth = WBTextWidth(pFont, " ", 1); // WB_TEXT_ESCAPEMENT(fSet, " ", 1);
+
+#warning support proportional pitch fonts by assigning a font width < 0 ???  For now only fixed-pitch are supported by this object
 
   // get FG/BG color information
   clrFG = WBGetGCFGColor(gc);
@@ -5303,6 +5314,8 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
   pThis->iDesc = iDesc;
   pThis->iFontWidth = iFontWidth;
 
+#warning support proportional pitch fonts by assigning a font width < 0 ???  For now only fixed-pitch are supported by this object
+
   // keep track of the total viewport in window coordinates.
   // this will be used later for mouse translation
 
@@ -5335,10 +5348,14 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
 
   if(pThis->iLineFeed == LineFeed_NONE) // SINGLE LINE
   {
+//    WB_ERROR_PRINT("TEMPORARY:  %s.%d single line text object expose\n", __FUNCTION__, __LINE__);
+
     // AUTO-ASSIGN the viewport whenever right <= left (i.e. viewport is 'NULL' or 'empty')
     // or whenever the viewport is not properly assigned (window re-size re-paint)
 
     iFontHeight = iAsc + iDesc; // does not include interline spacing (that comes later for multi-line only)
+
+//    WB_ERROR_PRINT("TEMPORARY:  %s.%d  font height=%d\n", __FUNCTION__, __LINE__, iFontHeight);
 
     if(pThis->rctView.top || pThis->rctView.bottom ||
        pThis->rctView.right != pThis->rctView.left + geomV.width / iFontWidth) // not PROPERLY assigned
@@ -5377,6 +5394,8 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
   }
   else                                  // MULTI-LINE
   {
+//    WB_ERROR_PRINT("TEMPORARY:  %s.%d multi-line text object expose\n", __FUNCTION__, __LINE__);
+
     // adjust font height to include line spacing (I'll use this to position the lines)
 
     iFontHeight = WBTextObjectCalculateLineHeight(pThis->iAsc, pThis->iDesc);
@@ -5466,11 +5485,15 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
     {
       memcpy(&rctSel, &(pThis->rctView), sizeof(rctSel)); // use entire viewport for hightlight rect
       // TODO:  single-line, only select to end of string?
+
+//      WB_ERROR_PRINT("TEMPORARY:  %s.%d select rect is 'select all' - font height %d\n", __FUNCTION__, __LINE__, iFontHeight);
     }
     else
     {
       memcpy(&rctSel, &(pThis->rctSel), sizeof(rctSel));
       NORMALIZE_SEL_RECT(rctSel);
+
+//      WB_ERROR_PRINT("TEMPORARY:  %s.%d select rectangle not empty - font height %d\n", __FUNCTION__, __LINE__, iFontHeight);
     }
 
     pThis->rctHighLight.left = pThis->rctWinView.left
@@ -5481,7 +5504,8 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
 
     if(pThis->iLineFeed == LineFeed_NONE)
     {
-      pThis->rctHighLight.top += (geomV.height - iAsc - iDesc) / 2; // since single-line text is centered
+      if(geomV.height >= iAsc + iDesc)
+        pThis->rctHighLight.top += (geomV.height - (iAsc + iDesc)) / 2; // since single-line text is centered
     }
 
     pThis->rctHighLight.right = pThis->rctHighLight.left
@@ -5493,11 +5517,29 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
     // NOTE:  this is independent of the selection method.  In the special case
     //        that a single line or an entire line is selected, I may have
     //        to handle this differently
+
+//    WB_ERROR_PRINT("TEMPORARY:  %s.%d select rect: %d, %d, %d, %d  of  %d, %d, %d, %d\n",
+//                   __FUNCTION__, __LINE__,
+//                   rctSel.left, rctSel.top, rctSel.right, rctSel.bottom,
+//                   pThis->rctView.left, pThis->rctView.top, pThis->rctView.right, pThis->rctView.bottom);
+//
+//    WB_ERROR_PRINT("TEMPORARY:  %s.%d highlight rect: %d, %d, %d, %d  of  %d, %d, %d, %d\n",
+//                   __FUNCTION__, __LINE__,
+//                   pThis->rctHighLight.left, pThis->rctHighLight.top, pThis->rctHighLight.right, pThis->rctHighLight.bottom,
+//                   pThis->rctWinView.left, pThis->rctWinView.top, pThis->rctWinView.right, pThis->rctWinView.bottom);
+
+
+
+//    WB_ERROR_PRINT("TEMPORARY:  %s.%d   geomV.height = %d   FG/BG colors  %08lxH %08lxH    %08lxH %08lxH\n",
+//                   __FUNCTION__, __LINE__, geomV.height,
+//                   (unsigned long)clrFG, (unsigned long)clrBG, (unsigned long)clrHFG, (unsigned long)clrHBG);
   }
   else
   {
     bzero(&rctSel, sizeof(rctSel)); // zero out selection rectangle
     bzero(&(pThis->rctHighLight), sizeof(pThis->rctHighLight));
+
+//    WB_ERROR_PRINT("TEMPORARY:  %s.%d select rectangle *EMPTY*\n", __FUNCTION__, __LINE__);
   }
 
 

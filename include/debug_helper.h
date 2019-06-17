@@ -52,14 +52,18 @@
 #ifndef _DEBUG_HELPER_H_INCLUDED_
 #define _DEBUG_HELPER_H_INCLUDED_
 
+#ifndef __DOXYGEN__ /* exclude these so I don't mess up the docs */
 #include "platform_helper.h" // always make sure, I need some definitions from here
+#endif // __DOXYGEN__ /* exclude these so I don't mess up the docs */
 
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
 
+#ifndef __DOXYGEN__ /* exclude these so I don't mess up the docs */
 // forward definitions
 typedef struct _WBGC_ * WBGC;
+#endif // __DOXYGEN__ /* exclude these so I don't mess up the docs */
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////

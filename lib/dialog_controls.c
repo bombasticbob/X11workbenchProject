@@ -4243,6 +4243,7 @@ static int EditDoPointerEvent(XClientMessageEvent *pEvent, Display *pDisplay,
 WBEditControl *pPrivate = (WBEditControl *)pSelf;
 int iACS;
 int iX, iY;
+WB_RECT rct;
 
 
   if(pEvent->type != ClientMessage ||
@@ -4272,43 +4273,58 @@ int iX, iY;
   switch(pEvent->data.l[0])
   {
     case WB_POINTER_CLICK:
-//      WB_ERROR_PRINT("TEMPORARY - %s - WB_POINTER_CLICK\n", __FUNCTION__);
+      WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DialogCtrl | DebugSubSystem_Mouse,
+                     "%s.%d - WB_POINTER_CLICK\n", __FUNCTION__, __LINE__);
+
       pPrivate->xTextObject.vtable->mouse_click(&(pPrivate->xTextObject), iX, iY, pEvent->data.l[1], iACS);
       break;
 
     case WB_POINTER_DBLCLICK:
-      WB_ERROR_PRINT("TEMPORARY - %s - WB_POINTER_DBLCLICK\n", __FUNCTION__);
+      WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DialogCtrl | DebugSubSystem_Mouse,
+                     "%s.%d - WB_POINTER_DBLCLICK\n", __FUNCTION__, __LINE__);
+
+      // TODO:  select all??
+      WB_ERROR_PRINT("TEMPORARY:  selecting all\n");
+      rct.left = rct.top = rct.right = rct.bottom = -1; // "select all"
+      pPrivate->xTextObject.vtable->set_select(&(pPrivate->xTextObject), &rct);
+      WBInvalidateGeom(wID, NULL, 1);
+
       break;
 
     case WB_POINTER_DRAG:
-//      WB_ERROR_PRINT("TEMPORARY - %s - WB_POINTER_DRAG\n", __FUNCTION__);
+      WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DialogCtrl | DebugSubSystem_Mouse,
+                     "%s.%d - WB_POINTER_DRAG\n", __FUNCTION__, __LINE__);
       pPrivate->xTextObject.vtable->begin_mouse_drag(&(pPrivate->xTextObject));
       return wID; // do this to support pointer drag
 
     case WB_POINTER_DROP:
-//      WB_ERROR_PRINT("TEMPORARY - %s - WB_POINTER_DROP\n", __FUNCTION__);
+      WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DialogCtrl | DebugSubSystem_Mouse,
+                     "%s.%d - WB_POINTER_DROP\n", __FUNCTION__, __LINE__);
       pPrivate->xTextObject.vtable->end_mouse_drag(&(pPrivate->xTextObject));
       break;
 
     case WB_POINTER_MOVE:
-//      WB_ERROR_PRINT("TEMPORARY - %s - WB_POINTER_MOVE\n", __FUNCTION__);
+      WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DialogCtrl | DebugSubSystem_Mouse,
+                     "%s.%d - WB_POINTER_MOVE\n", __FUNCTION__, __LINE__);
       pPrivate->xTextObject.vtable->mouse_click(&(pPrivate->xTextObject), iX, iY, 0, 0); // mouse motion only
       break;
 
     case WB_POINTER_CANCEL:
-      WB_ERROR_PRINT("TEMPORARY - %s - WB_POINTER_CANCEL\n", __FUNCTION__);
+      WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DialogCtrl | DebugSubSystem_Mouse,
+                     "%s.%d - WB_POINTER_CANCEL\n", __FUNCTION__, __LINE__);
       break;
     case WB_POINTER_SCROLLUP:
-      WB_ERROR_PRINT("TEMPORARY - %s - WB_POINTER_SCROLLUP\n", __FUNCTION__);
+      WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DialogCtrl | DebugSubSystem_Mouse,
+                     "%s.%d - WB_POINTER_SCROLLUP\n", __FUNCTION__, __LINE__);
       break;
     case WB_POINTER_SCROLLDOWN:
-      WB_ERROR_PRINT("TEMPORARY - %s - WB_POINTER_SCROLLDOWN\n", __FUNCTION__);
+      WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DialogCtrl | DebugSubSystem_Mouse,
+                     "%s.%d - WB_POINTER_SCROLLDOWN\n", __FUNCTION__, __LINE__);
       break;
 
-
     default:
-
-      WB_ERROR_PRINT("TEMPORARY - %s - unhandled mousie message\n", __FUNCTION__);
+      WB_DEBUG_PRINT(DebugLevel_WARN | DebugSubSystem_DialogCtrl | DebugSubSystem_Mouse,
+                     "%s.%d - unhandled mousie message\n", __FUNCTION__, __LINE__);
       break;
   }
 

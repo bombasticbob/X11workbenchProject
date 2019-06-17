@@ -91,9 +91,11 @@
 
 #include <string.h>   // for memset, mostly
 
+#ifndef __DOXYGEN__ /* exclude these so I don't mess up the docs */
 #include "platform_helper.h"
 #include "debug_helper.h"
 #include "font_helper.h"
+#endif // __DOXYGEN__
 
 #ifdef __cplusplus
 extern "C" {
@@ -246,6 +248,10 @@ typedef int (* WBAppEvent)(XEvent *pEvent);
 
   * \endcode
   *
+  *
+  * It is generally safe to query the 'values' member in order to get
+  * cached information about the WBGC.  You should not change them, however.
+  *
   * The XOrg documentation defines the XGCValues structure as follows:
   *
   * \code
@@ -281,7 +287,7 @@ typedef int (* WBAppEvent)(XEvent *pEvent);
   * Additional information regarding the drawing of lines
   *
   * The XOrg 'manual page' documentation for XGCValues also includes the
-  * following information:
+  * following information (slightly edited):
   *
   * \code
 
@@ -327,7 +333,7 @@ typedef int (* WBAppEvent)(XEvent *pEvent);
     and join-style.  It is recommended that this property be true for thin
     lines, but this is not required.  A line-width of zero may differ from
     a line-width of one in which pixels are drawn.  This permits the use of
-    many manufacturers' line drawing hardware, which may run many times
+    line drawing hardware from many manufacturers, which may run many times
     faster than the more precisely specified wide lines.
 
     In general, drawing a thin line will be faster than drawing a wide line
