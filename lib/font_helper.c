@@ -74,6 +74,14 @@
 // globals
 
 static int bDisableAntiAlias = 0;
+static int bEnableTrueTypeFonts = 0;
+
+// libXft aka Freetype -
+#ifdef X11WORKBENCH_TOOLKIT_HAVE_XFT
+FT_Library __ftlib = NULL; /* located in font_helper.c */
+static int bInitFtLibOnce = 0;
+#endif // X11WORKBENCH_TOOLKIT_HAVE_XFT
+
 
 void __internal_disable_antialias(void)
 {
@@ -88,23 +96,72 @@ void __internal_enable_antialias(void)
 void __internal_font_helper_init(void)
 {
 #ifdef X11WORKBENCH_TOOLKIT_HAVE_XFT
-static int bInitFtLibOnce = 0;
+
+  // see https://www.freedesktop.org/wiki/Software/Xft/
+  // and https://cgit.freedesktop.org/xorg/lib/libXft/
+  // this software requires libXft2 and is not compatible
+  // with any earlier version...
+
+#if XFT_VERSION < 20000
+#warning - You need libXft version 2 or greater - true type fonts disabled
+  bInitFtLibOnce = 0;
+  bEnableTrueTypeFonts = 0;
+#else
 
   if(!bInitFtLibOnce)
   {
     // this must only be called once...
+    if(XftInit(0) == FcTrue && XftInitFtLibrary() == FcTrue )
+    {
+      bInitFtLibOnce = 1;
 
-    XftInitFtLibrary();
-    bInitFtLibOnce = 1;
+      if(XftDefaultHasRender(WBGetDefaultDisplay()))
+      {
+        bEnableTrueTypeFonts = 1;
+      }
+      else
+      {
+        WB_ERROR_PRINT("Unable to render true type fonts, disabled\n");
+      }
+
+//      __ftlib = _XftFTlibrary; // the libXft cached value (this does not actually work)
+      if(FT_Init_FreeType(&__ftlib))
+      {
+        __ftlib = NULL;
+        WB_WARN_PRINT("Unable to get own copy of FreeType library, disabled\n");
+      }
+    }
+    else
+    {
+      WB_ERROR_PRINT("Unable to initialize libXft - truetype fonts not enabled\n");
+    }
   }
+#endif // XFT_VERSION < 20000
 #endif // X11WORKBENCH_TOOLKIT_HAVE_XFT
 
   // TODO:  other global initialization things for font_helper
 }
 
+void __internal_font_helper_exit(void)
+{
+#ifdef X11WORKBENCH_TOOLKIT_HAVE_XFT
+  if(bInitFtLibOnce)
+  {
+    // TODO:  any uninitialization goes here.  for now there is none.
+
+    bInitFtLibOnce = 0;
+  }
+#endif // X11WORKBENCH_TOOLKIT_HAVE_XFT
+}
+
 int WBFontEnableAntiAlias(void)
 {
   return !bDisableAntiAlias; // for now, just do this
+}
+
+void WBFontSetEnableAntiAlias(int bEnable)
+{
+  bDisableAntiAlias = bEnable ? 1 : 0;
 }
 
 

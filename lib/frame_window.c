@@ -1215,7 +1215,7 @@ check_curtab:
 
   // if my tab focus has changed, notify all child windows
 
-  if(!iMax)
+  if(!iMax) // no contained windows, bail out now
   {
     pFrameWindow->nLastTab = -1; // always assign to '-1' if there are no tabs
 
@@ -1286,6 +1286,14 @@ const FRAME_WINDOW *pFrameWindow;
   if(!pFrameWindow)
   {
     WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
+
+    return NULL;
+  }
+
+  if(pFrameWindow->nChildFrames <= 0)
+  {
+    WB_WARN_PRINT("WARNING:  %s.%d called with no child frames, returning NULL\n",
+                  __FUNCTION__, __LINE__);
 
     return NULL;
   }

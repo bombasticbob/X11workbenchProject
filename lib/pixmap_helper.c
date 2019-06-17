@@ -1983,7 +1983,6 @@ int WBXDrawLines(XImage *pImage, WBGC hGC,
     return -1;
   }
 
-
   // by definition, a line width of zero is "minimal line" which is for me the same as 1
   // and would be independent of scaling and other factors (so always 1 pixel)
   // a pixel width greater than 1 should be the width of the line such that horizontal or
@@ -1991,6 +1990,7 @@ int WBXDrawLines(XImage *pImage, WBGC hGC,
   // width, meaning you gotta do some simple trig or another algorithm that looks similar
 
 
+  // TODO: implement this
 
 
   return -1; // for now
@@ -2066,6 +2066,11 @@ int iRval, nLines = 0;
   // NOTE:  'WB_icos(X) uses 'pi == 512' for angular granularity. so a circle is
   //        literally 1024 "angular units" i.e. 0x400
 
+
+  // TODO:  implement this
+
+
+  // render the poly lines using WBXDrawLines
   iRval = 0;
 
   if(nLines > 0)
@@ -2081,7 +2086,7 @@ int WBXFillArc(XImage *pImage, WBGC hGC,
                int x, int y, unsigned int width, unsigned int height,
                int angle1, int angle2)
 {
-  return -1; // for now
+  return -1; // for now (use WBXFillPolygon to do it, similar to what WBXDrawArc does)
 }
 
 int WBXFillPolygon(XImage *pImage, WBGC hGC,
@@ -2097,6 +2102,18 @@ int WBXFillPolygon(XImage *pImage, WBGC hGC,
   // shape can be Convex, Nonconvex, or Complex
   // mode can be CoordModeOrigin or CoordModePrevious
 
+  // basic fill algorithm for arbitrary complex polygon:
+  //
+  // 1.  get a bounding retangle for it
+  // 2.  start at one corner, go across or down (either works)
+  // 3.  when you reach a boundary for one of the edges, flip the 'fill' bit
+  //  3a. this could be done with a mono bitmap except when lines overlap
+  //  3b. so instead this should be done mathematically, except it's slower
+  // 4.  In cases where lines overlap any of the bits, ignore them
+  //
+  // a convex polygon makes this quite a bit easier, COULD use a mono bitmap
+  // to enclose the polygon and a simpler fill method to test the mono bitmap.
+
 
   return -1; // for now
 }
@@ -2104,7 +2121,7 @@ int WBXFillPolygon(XImage *pImage, WBGC hGC,
 int WBXDrawString(XImage *pImage, WB_FONT pFont, WBGC hGC,
                   int x, int y, const char *string, int length)
 {
-Display *pDisplay = WBGetDefaultDisplay(); // in case I need one
+//Display *pDisplay = WBGetDefaultDisplay(); // in case I need one
 
 
 
@@ -2113,7 +2130,7 @@ Display *pDisplay = WBGetDefaultDisplay(); // in case I need one
 #ifdef X11WORKBENCH_TOOLKIT_HAVE_XFT
   if(pFont->pxftFont)
   {
-#warning TODO: IMPLEMENT THIS PART for Xft FONTS
+#warning TODO: IMPLEMENT THIS PART for Xft FONTS - this may require legacy font stuff too
   }
   else
 #endif // X11WORKBENCH_TOOLKIT_HAVE_XFT
@@ -2123,6 +2140,7 @@ Display *pDisplay = WBGetDefaultDisplay(); // in case I need one
     // Step 1:  draw the text in black on white using a monochrome pixmap, left/bottom justified
     // Step 2:  transfer the pixmap to a 1-plane XY Image
     // Step 3:  Using 'hGC', do a bitwise copy onto the XImage such that the background is transparent
+    //          with the 'hGC's foreground color and any anti-alising I might want to add...
 
 
   }

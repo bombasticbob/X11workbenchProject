@@ -226,7 +226,7 @@ static const char * const aszCmdLineOptions[]=
   NULL // marks end of list
 };
 
-static const uint8_t const abCmdLineOptions[]= // NON-ZERO means that it expects a parameter
+static const uint8_t abCmdLineOptions[]= // NON-ZERO means that it expects a parameter
 {
   0, 0, 1, 1, 1, 0, 0, 1, 0, 0,
   0

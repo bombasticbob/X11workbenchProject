@@ -390,6 +390,7 @@ enum WBDialogEntryFlags
   * \brief create a dialog window using a text resource
   *
   * \returns Pointer to WBDialogWindow structure that identifies the dialog (frame) window
+  * \param WIDOwner A Window that owns the dialog box; Use 'None' to make it a stand-alone window
   * \param szTitle Pointer to a null-byte terminated string containing the title
   * \param szDialogResource Pointer to a null-byte terminated string containing the dialog resource
   * \param iX Screen X coordinate of upper left corner of dialog window (-1 for default)
@@ -424,7 +425,8 @@ enum WBDialogEntryFlags
   *
   * Header File:  dialog_window.h
 **/
-WBDialogWindow *DLGCreateDialogWindow(const char *szTitle, const char *szDialogResource,
+WBDialogWindow *DLGCreateDialogWindow(Window wIDOwner, const char *szTitle,
+                                      const char *szDialogResource,
                                       int iX, int iY, int iWidth, int iHeight,
                                       WBWinEvent pUserCallback, int iFlags,
                                       void *pUserData);

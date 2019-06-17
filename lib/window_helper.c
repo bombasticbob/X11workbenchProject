@@ -995,6 +995,12 @@ static WB_GEOM geomStartup
 static char szStartupDisplayName[512]=":0.0";  // NOTE:  new values must be UTF-8
 static char szDefaultDisplayName[512]= "";  // copy the "default" display name from WBInit() here
 
+// libXft aka Freetype -
+#ifdef X11WORKBENCH_TOOLKIT_HAVE_XFT
+extern FT_Library __ftlib; /* located in font_helper.c */
+#endif // X11WORKBENCH_TOOLKIT_HAVE_XFT
+
+
 
 // helpers called by WBParseStandardArguments()
 
@@ -1046,9 +1052,6 @@ Display *pRval;
 
 
   WBPlatformOnInit(); // initialize a few important 'platform helper' things
-
-  __internal_font_helper_init(); // initialize font helper
-
 
   bQuitFlag = FALSE; // in case I re-init an app.  note the variable is in 'platform_helper.c'
 
@@ -1129,6 +1132,13 @@ Display *pRval;
   // to mis-behave or a window to insert an unnecessary keystroke.  Giving
   // the window manager a chance to NOT be involved in a race condition should
   // prevent this from happening, or at least minimize the chances.
+
+  // now that I've initialized the display I can initialize things
+  // that depend up on it, beginning with the font stuff
+
+  __internal_font_helper_init(); // initialize font helper
+
+  // TODO:  other things
 
   return pRval;
 }
@@ -1670,9 +1680,10 @@ int i1;
   wWBFakeWindow = None;
   pDefaultDisplay = NULL;
 
-  PXM_OnExit();       // pixmap_helper
-  CHOnExit();         // config_helper
-  WBPlatformOnExit(); // platform_helper
+  __internal_font_helper_exit(); // font helper
+  PXM_OnExit();                  // pixmap_helper
+  CHOnExit();                    // config_helper
+  WBPlatformOnExit();            // platform_helper
 
   if(pOldDisplayIOErrorHandler)
   {
@@ -9560,5 +9571,80 @@ const WB_ERROR_INFO * WBGetLastError(void)
 {
   return &xErrorInfo;
 }
+
+
+
+// certain C compilers might not handle inlines well.  So I define function bodies for them here
+
+#if !defined(__DOXYGEN__) && !defined(__GNUC__) && !defined(_MSVC_VER)
+
+Display * WBGetDefaultDisplay(void)
+{
+  return pDefaultDisplay;
+}
+
+void WBInvalidateRect(Window wID, const WB_RECT *pRCT, int bPaintFlag)
+{
+  WB_GEOM geom;
+
+  if(!pRCT)
+  {
+    WBInvalidateGeom(wID, NULL, bPaintFlag);
+    return;
+  }
+
+  geom.x      = pRCT->left;
+  geom.y      = pRCT->top;
+  geom.width  = pRCT->right - pRCT->left;
+  geom.height = pRCT->bottom - pRCT->top;
+  geom.border = 0;
+
+  WBInvalidateGeom(wID, &geom, bPaintFlag);
+}
+
+void WBValidateRect(Window wID, WB_RECT *pRCT)
+{
+  WB_GEOM geom;
+
+  if(!pRCT)
+  {
+    WBValidateGeom(wID, NULL);
+    return;
+  }
+
+  geom.x      = pRCT->left;
+  geom.y      = pRCT->top;
+  geom.width  = pRCT->right - pRCT->left;
+  geom.height = pRCT->bottom - pRCT->top;
+  geom.border = 0;
+
+  WBValidateGeom(wID, &geom);
+}
+
+void WBSupressErrorOutput(void)
+{
+extern int bIgnoreXErrors;
+
+  // TODO:  serialize this with a mutex or other sync object?
+  bIgnoreXErrors++;
+}
+
+void WBAllowErrorOutput(void)
+{
+extern int bIgnoreXErrors;
+
+  // TODO:  serialize this with a mutex or other sync object?
+  if(bIgnoreXErrors > 0)
+  {
+    bIgnoreXErrors--;
+  }
+  else
+  {
+    bIgnoreXErrors = 0;
+  }
+}
+
+#endif // !defined(__DOXYGEN__) && !defined(__GNUC__) && !defined(_MSVC_VER)
+
 
 

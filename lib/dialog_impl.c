@@ -414,34 +414,14 @@ int iRval, iX, iY;
   }
 
 
-//  WB_ERROR_PRINT("TEMPORARY:  %s - calling DLGCreateDialogWindow\n", __FUNCTION__);
-
-  pDlg = DLGCreateDialogWindow(szTitle,pRes, iX, iY,
-                               MESSAGE_BOX_WIDTH,
-                               MESSAGE_BOX_HEIGHT, // TODO:  derive from ???
+  pDlg = DLGCreateDialogWindow(wIDOwner, szTitle, pRes,
+                               iX, iY, MESSAGE_BOX_WIDTH, MESSAGE_BOX_HEIGHT, // TODO:  derive from ???
                                MessageBoxCallback,
                                WBDialogWindow_VISIBLE, &mbox);
 
-  if(pDlg) // TODO:  manage this stuff as part of 'DLGCreateDialogWindow' instead
+  if(pDlg)
   {
     wIDDlg = pDlg->wID;
-
-    if(wIDOwner != None)
-    {
-      Atom a1;
-      unsigned int ai1[3];
-
-      DLGAssignOwner(pDlg, wIDOwner);
-
-      a1 = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE", False);
-      ai1[0] = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE_SKIP_TASKBAR", False);
-      ai1[1] = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE_SKIP_PAGER", False);
-
-      XChangeProperty(WBGetWindowDisplay(wIDDlg), wIDDlg, a1, XA_ATOM, 32, PropModeReplace, (unsigned char *)ai1, 2);
-
-      a1 = XInternAtom(WBGetWindowDisplay(wIDDlg), "WM_TRANSIENT_FOR", False);
-      XChangeProperty(WBGetWindowDisplay(wIDDlg), wIDDlg, a1, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&wIDOwner, 1);
-    }
 
     WBSetWindowIcon(wIDDlg, GetMessageBoxIconPixmapID(iType & MessageBox_ICON_MASK));
 
@@ -555,6 +535,9 @@ struct _INPUT_BOX_ *pUserData = (struct _INPUT_BOX_ *)(pDlg ? pDlg->pUserData : 
   return 0;
 }
 
+#define INPUT_BOX_WIDTH 400
+#define INPUT_BOX_HEIGHT 120
+
 char *DLGInputBox(Window wIDOwner, const char *szTitle, const char *szPrompt, const char *szDefault,
                   int iWidth, int iMaxChar)
 {
@@ -568,8 +551,9 @@ static const char szInputDialogRes[]=
   "END_DIALOG\n";
 WBDialogWindow *pDlg;
 struct _INPUT_BOX_ sRval;
-int iRval;
+int iX, iY, iRval;
 Window wIDDlg;
+WB_GEOM geomParent;
 
 
   sRval.szTitle = szTitle;
@@ -583,30 +567,36 @@ Window wIDDlg;
     sRval.szRval = NULL;
   }
 
-  pDlg = DLGCreateDialogWindow(szTitle,szInputDialogRes,
-                               100,100,300,60,InputBoxCallback,
+  bzero(&geomParent, sizeof(geomParent));
+
+  if(wIDOwner != None)
+  {
+    WBGetWindowGeom0(wIDOwner, &geomParent); // parent geometry in absolute coordinates
+
+    iX = geomParent.x + geomParent.border + MESSAGE_BOX_OFFSET;
+    iY = geomParent.y + geomParent.border + MESSAGE_BOX_OFFSET;
+  }
+  else
+  {
+    // center in screen with slight random offset (so that every window won't always appear in exactly the same place)
+    iY = (DisplayHeight(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()))
+          - INPUT_BOX_HEIGHT + MESSAGE_BOX_OFFSET - (int)(WBGetTimeIndex() % (2 * MESSAGE_BOX_OFFSET)))
+       / 2;
+
+    iX = (DisplayWidth(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()))
+          - INPUT_BOX_WIDTH + MESSAGE_BOX_OFFSET - (int)((~WBGetTimeIndex()) % (2 * MESSAGE_BOX_OFFSET)))
+       / 2;
+  }
+
+
+  pDlg = DLGCreateDialogWindow(wIDOwner, szTitle,szInputDialogRes,
+                               iX,iY,INPUT_BOX_WIDTH,INPUT_BOX_HEIGHT,
+                               InputBoxCallback,
                                WBDialogWindow_VISIBLE,&sRval);
 
-  if(pDlg) // TODO:  manage this stuff as part of 'DLGCreateDialogWindow' instead
+  if(pDlg)
   {
     wIDDlg = pDlg->wID;
-
-    if(wIDOwner != None)
-    {
-      Atom a1;
-      unsigned int ai1[3];
-
-      DLGAssignOwner(pDlg, wIDOwner);
-
-      a1 = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE", False);
-      ai1[0] = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE_SKIP_TASKBAR", False);
-      ai1[1] = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE_SKIP_PAGER", False);
-
-      XChangeProperty(WBGetWindowDisplay(wIDDlg), wIDDlg, a1, XA_ATOM, 32, PropModeReplace, (unsigned char *)ai1, 2);
-
-      a1 = XInternAtom(WBGetWindowDisplay(wIDDlg), "WM_TRANSIENT_FOR", False);
-      XChangeProperty(WBGetWindowDisplay(wIDDlg), wIDDlg, a1, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&wIDOwner, 1);
-    }
 
     iRval = WBShowModal(pDlg->wID, 0);
 
@@ -961,6 +951,9 @@ char *p1, *p2;
   return 0;
 }
 
+#define FILE_DIALOG_WIDTH 520
+#define FILE_DIALOG_HEIGHT 500
+
 char *DLGFileDialog(int iType, Window wIDOwner, const char *szDefPath, const char *szDefName,
                     const char *szExtAndDescList)
 {
@@ -974,39 +967,46 @@ static const char szFileDialogRes[]=
   "END_DIALOG\n";
 WBDialogWindow *pDlg;
 struct _FILE_DIALOG_ data;
-int iRval;
+int iX, iY, iRval;
 Window wIDDlg;
+WB_GEOM geomParent;
 
+
+  bzero(&geomParent, sizeof(geomParent));
+
+  if(wIDOwner != None)
+  {
+    WBGetWindowGeom0(wIDOwner, &geomParent); // parent geometry in absolute coordinates
+
+    iX = geomParent.x + geomParent.border + MESSAGE_BOX_OFFSET;
+    iY = geomParent.y + geomParent.border + MESSAGE_BOX_OFFSET;
+  }
+  else
+  {
+    // center in screen with slight random offset (so that every window won't always appear in exactly the same place)
+    iY = (DisplayHeight(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()))
+          - FILE_DIALOG_HEIGHT + MESSAGE_BOX_OFFSET - (int)(WBGetTimeIndex() % (2 * MESSAGE_BOX_OFFSET)))
+       / 2;
+
+    iX = (DisplayWidth(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()))
+          - FILE_DIALOG_WIDTH + MESSAGE_BOX_OFFSET - (int)((~WBGetTimeIndex()) % (2 * MESSAGE_BOX_OFFSET)))
+       / 2;
+  }
 
   data.szDefPath = szDefPath;
   data.szDefName = szDefName;
   data.szExtAndDescList = szExtAndDescList;
   data.szPathName = NULL;
 
-  pDlg = DLGCreateDialogWindow("File Select",szFileDialogRes,
-                               100,100,300,100,FileDialogCallback,
+
+  pDlg = DLGCreateDialogWindow(wIDOwner, "File Select",szFileDialogRes,
+                               iX, iY,FILE_DIALOG_WIDTH,FILE_DIALOG_HEIGHT,
+                               FileDialogCallback,
                                WBDialogWindow_VISIBLE,&data);
 
-  if(pDlg) // TODO:  manage this stuff as part of 'DLGCreateDialogWindow' instead
+  if(pDlg)
   {
     wIDDlg = pDlg->wID;
-
-    if(wIDOwner != None)
-    {
-      Atom a1;
-      unsigned int ai1[3];
-
-      DLGAssignOwner(pDlg, wIDOwner);
-
-      a1 = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE", False);
-      ai1[0] = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE_SKIP_TASKBAR", False);
-      ai1[1] = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE_SKIP_PAGER", False);
-
-      XChangeProperty(WBGetWindowDisplay(wIDDlg), wIDDlg, a1, XA_ATOM, 32, PropModeReplace, (unsigned char *)ai1, 2);
-
-      a1 = XInternAtom(WBGetWindowDisplay(wIDDlg), "WM_TRANSIENT_FOR", False);
-      XChangeProperty(WBGetWindowDisplay(wIDDlg), wIDDlg, a1, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&wIDOwner, 1);
-    }
 
     iRval = WBShowModal(pDlg->wID, 0);
 
@@ -1695,7 +1695,7 @@ fix_rgb_and_colors:
         break;
 
       case SAT_BOX:
-        pUserData->iSaturation = WBDialogControlGetCaptionInt(WBGetDialogEntryControlStruct(pDlg, CHROMA_BOX)) & 0xff;
+        pUserData->iSaturation = WBDialogControlGetCaptionInt(WBGetDialogEntryControlStruct(pDlg, SAT_BOX)) & 0xff;
         if(pUserData->iSaturation != pUserData->iOldS) // value changed?
         {
           WB_ERROR_PRINT("TEMPORARY:  %s - Sat Box Changed from %d to %d\n", __FUNCTION__, pUserData->iOldS, pUserData->iSaturation);
@@ -1802,6 +1802,9 @@ fix_hsv_and_colors:
   return 0;
 }
 
+#define COLOR_DIALOG_WIDTH 560
+#define COLOR_DIALOG_HEIGHT 364
+
 int DLGColorDialog(Window wIDOwner, XStandardColormap *pColorMap, XColor *pColor)
 {
 static const char szColorDialogRes[]=
@@ -1839,8 +1842,9 @@ static const char szColorDialogRes[]=
 WBDialogWindow *pDlg;
 Display *pDisplay;
 struct _COLOR_DIALOG_ data;
-int iRval = IDCANCEL; // default return is 'cancel'
+int iX, iY, iRval = IDCANCEL; // default return is 'cancel'
 Window wIDDlg;
+WB_GEOM geomParent;
 
 
   if(!pColor)
@@ -1868,6 +1872,27 @@ Window wIDDlg;
     WBDefaultStandardColormap(pDisplay, &(data.stdColorMap));
   }
 
+  bzero(&geomParent, sizeof(geomParent));
+
+  if(wIDOwner != None)
+  {
+    WBGetWindowGeom0(wIDOwner, &geomParent); // parent geometry in absolute coordinates
+
+    iX = geomParent.x + geomParent.border + MESSAGE_BOX_OFFSET;
+    iY = geomParent.y + geomParent.border + MESSAGE_BOX_OFFSET;
+  }
+  else
+  {
+    // center in screen with slight random offset (so that every window won't always appear in exactly the same place)
+    iY = (DisplayHeight(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()))
+          - MESSAGE_BOX_HEIGHT + MESSAGE_BOX_OFFSET - (int)(WBGetTimeIndex() % (2 * MESSAGE_BOX_OFFSET)))
+       / 2;
+
+    iX = (DisplayWidth(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()))
+          - MESSAGE_BOX_WIDTH + MESSAGE_BOX_OFFSET - (int)((~WBGetTimeIndex()) % (2 * MESSAGE_BOX_OFFSET)))
+       / 2;
+  }
+
   data.pColor = pColor; // pixel value will become initial color
   data.pimgLumaSat = NULL;
   data.pimgChroma = NULL;
@@ -1878,30 +1903,13 @@ Window wIDDlg;
 
   // now that all of THAT is done, do the dialog box
 
-  pDlg = DLGCreateDialogWindow("Color Chooser",szColorDialogRes,
+  pDlg = DLGCreateDialogWindow(wIDOwner, "Color Chooser",szColorDialogRes,
                                100,100,300,100,ColorDialogCallback,
                                WBDialogWindow_VISIBLE,&data);
 
-  if(pDlg) // TODO:  manage this stuff as part of 'DLGCreateDialogWindow' instead
+  if(pDlg)
   {
     wIDDlg = pDlg->wID;
-
-    if(wIDOwner != None)
-    {
-      Atom a1;
-      unsigned int ai1[3];
-
-      DLGAssignOwner(pDlg, wIDOwner);
-
-      a1 = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE", False);
-      ai1[0] = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE_SKIP_TASKBAR", False);
-      ai1[1] = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE_SKIP_PAGER", False);
-
-      XChangeProperty(WBGetWindowDisplay(wIDDlg), wIDDlg, a1, XA_ATOM, 32, PropModeReplace, (unsigned char *)ai1, 2);
-
-      a1 = XInternAtom(WBGetWindowDisplay(wIDDlg), "WM_TRANSIENT_FOR", False);
-      XChangeProperty(WBGetWindowDisplay(wIDDlg), wIDDlg, a1, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&wIDOwner, 1);
-    }
 
     iRval = WBShowModal(pDlg->wID, 0);
 

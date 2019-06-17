@@ -939,7 +939,7 @@ WBChildFrame * FWGetContainedWindowByIndex(const WBFrameWindow *pFrameWindow, in
   *
   * \param pFW The WBFrameWindow structure pointer
 **/
-#define FWGetFocusWindow(pFW) FWGetContainedWindowByIndex(pFW, -1)
+#define FWGetFocusWindow(pFW) (FWGetNumContWindows(pFW) > 0 ? FWGetContainedWindowByIndex(pFW, -1) : NULL)
 
 /** \ingroup frame_window
   * \brief Adds a 'contained' window and returns the tab order index

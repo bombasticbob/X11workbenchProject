@@ -221,16 +221,19 @@ typedef struct WBFontInfo
   char data[8];
 } WB_FONT_INFO;
 
+
 #ifndef NO_DEBUG
 /** \ingroup debug
   * \brief debug function to dump font struct members
 **/
 static void WBDumpFontStruct(const XFontStruct *pFont);
 
+
 /** \ingroup debug
   * \brief debug function to dump matching font names
 **/
 static void WBDumpMatchingFontNames(Display *pDisplay, const char *szFontName);
+
 
 /** \ingroup debug
   * \brief debug function to dump font set members
@@ -246,11 +249,21 @@ void __internal_font_helper_init(void);
 
 
 /** \ingroup font
+  * \brief un-initialization for font helper - call once at end of program (WBExit() does this for you)
+**/
+void __internal_font_helper_exit(void);
+
+
+/** \ingroup font
   * \brief returns non-zero value if certain fonts should be anti-aliased when rendered
   *
-  * \return A non-zero value if certain fonts should be anti-aliased; zero if they should not be.
-  *         This only applies to legacy (X11) fonts, and not to Xft 'freetype' fonts.
+  * \return A non-zero value if certain fonts should be anti-aliased; zero if they should not be.  This generally applies to legacy (X11) fonts only.
   *
+  * Anti-aliasing can carry with it a performance degradation due to the somewhat slow process of getting rendering
+  * information from the X server.  if the Render extension is present, and libXft is also present, then the Xft library
+  * uses the Render extension to do the anti-aliasing.  Otherwise, it's done "the hard way" which can be slow.
+  *
+  * \sa WBFontSetEnableAntiAlias()
 **/
 int WBFontEnableAntiAlias(void);
 
@@ -258,11 +271,15 @@ int WBFontEnableAntiAlias(void);
 /** \ingroup font
   * \brief returns non-zero value if certain fonts should be anti-aliased when rendered
   *
-  * \return A non-zero value if certain fonts should be anti-aliased; zero if they should not be.
-  *         This only applies to legacy (X11) fonts, and not to Xft 'freetype' fonts.
+  * \param bEnable A non-zero value if certain fonts should be anti-aliased; zero if they should not be.  This generally applies to legacy (X11) fonts only.
   *
+  * Anti-aliasing can carry with it a performance degradation due to the somewhat slow process of getting rendering
+  * information from the X server.  if the Render extension is present, and libXft is also present, then the Xft library
+  * uses the Render extension to do the anti-aliasing.  Otherwise, it's done "the hard way" which can be slow.
+  *
+  * \sa WBFontEnableAntiAlias()
 **/
-int WBFontEnableAntiAlias(void);
+void WBFontSetEnableAntiAlias(int bEnable);
 
 /** \ingroup font
   * \brief make a copy of an existing font (best when assigning to a window)

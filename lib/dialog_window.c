@@ -248,7 +248,7 @@ static void InternalCheckColors(void)
   }
 }
 
-WBDialogWindow *DLGCreateDialogWindow(const char *szTitle, const char *szDialogResource,
+WBDialogWindow *DLGCreateDialogWindow(Window wIDOwner, const char *szTitle, const char *szDialogResource,
                                       int iX, int iY, int iWidth, int iHeight,
                                       WBWinEvent pUserCallback, int iFlags, void *pUserData)
 {
@@ -511,10 +511,33 @@ WBDialogWindow *DLGCreateDialogWindow(const char *szTitle, const char *szDialogR
     }
   }
 
+  if(wIDOwner != None) // dialog box is 'owned', so I need to modify some stuff
+  {
+    Atom a1;
+    unsigned int ai1[3];
+
+    // make sure that things like Alt+Tab picks the owner window, and not the dialog box, when I Alt+Tab things
+
+    DLGAssignOwner((WBDialogWindow *)pNew, wIDOwner);
+
+    BEGIN_XCALL_DEBUG_WRAPPER
+    a1 = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE", False);
+    ai1[0] = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE_SKIP_TASKBAR", False);
+    ai1[1] = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE_SKIP_PAGER", False);
+
+    XChangeProperty(WBGetWindowDisplay(pNew->wbDLG.wID), pNew->wbDLG.wID,
+                    a1, XA_ATOM, 32, PropModeReplace, (unsigned char *)ai1, 2);
+
+    a1 = XInternAtom(WBGetWindowDisplay(pNew->wbDLG.wID), "WM_TRANSIENT_FOR", False);
+    XChangeProperty(WBGetWindowDisplay(pNew->wbDLG.wID), pNew->wbDLG.wID,
+                    a1, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&wIDOwner, 1);
+    END_XCALL_DEBUG_WRAPPER
+  }
+
   if(iFlags & WBDialogWindow_DOMODAL)
   {
     WBShowModal(pNew->wbDLG.wID, 0);  // ignore return value
-    WBGetParentWindow(pNew->wbDLG.wID);  // this syncs everything up
+    WBGetParentWindow(pNew->wbDLG.wID);  // this syncs everything up following 'modality'
   }
 
   return (WBDialogWindow *)pNew;

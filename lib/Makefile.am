@@ -71,7 +71,7 @@ else
 
 libX11workbenchToolkit_a_CFLAGS = \
    $(CFLAGS) $(AM_CFLAGS) $(AM_CPPFLAGS) $(EXTRA_WARN_FLAGS) -Wimplicit-int \
-   -Wimplicit-function-declaration -Wformat -Wmissing-braces \
+   -Wimplicit-function-declaration -Wmissing-braces \
    -Wnonnull -Wparentheses -Wreturn-type \
    -Wsequence-point -Wswitch -Wtrigraphs \
    -Wuninitialized -Wunknown-pragmas -Wunused-label \
@@ -85,7 +85,7 @@ libX11workbenchToolkit_debug_a_SOURCES = $(libX11workbenchToolkit_a_SOURCES)
 
 libX11workbenchToolkit_debug_a_CFLAGS = \
    $(CFLAGS) $(AM_CFLAGS) $(EXTRA_WARN_FLAGS) -Wimplicit-int \
-   -Wimplicit-function-declaration -Wformat -Wmissing-braces \
+   -Wimplicit-function-declaration -Wmissing-braces \
    -Wnonnull -Wparentheses -Wreturn-type \
    -Wsequence-point -Wswitch -Wtrigraphs \
    -Wuninitialized -Wunknown-pragmas -Wunused-label \
@@ -120,6 +120,15 @@ DISTCLEANFILES = ../include/X11workbenchToolkit_install_config.h
 	@echo "#define _X11WORKBENCH_TOOLKIT_CONFIG_H_DEFINED_" >>$@
 	@echo "" >>$@
 	@echo "// X11workbench-specific option defines" >>$@
+	@echo "" >>$@
+	@grep COMPILER_HAS_ATTRIBUTE_FOR_PRINTF ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep COMPILER_HAS_PRAGMA_FOR_INCOMPATIBLE_POINTER_TYPES ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep COMPILER_SUPPORTS_BUILTIN_EXPECT ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
+	@grep COMPILER_SUPPORTS_UNUSED_ATTRIBUTE ../include/X11workbenchToolkit_config.h >>$@
+	@echo "" >>$@
 	@grep QSORT_R_BSD ../include/X11workbenchToolkit_config.h >>$@
 	@echo "" >>$@
 	@grep QSORT_R_GNUC ../include/X11workbenchToolkit_config.h >>$@

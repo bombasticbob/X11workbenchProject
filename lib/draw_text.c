@@ -185,7 +185,9 @@ use_the_stack_buffer:
     if(pFont->fsFont)
     {
       WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
-                     "%s.%d using WB_DRAW_STRING for \"%-.*s\"\n", __FUNCTION__, __LINE__, nLength, pString);
+                     "%s.%d using WB_DRAW_STRING for \"%-.*s\" color=#%08lxH bkgnd=#%08lxH\n",
+                     __FUNCTION__, __LINE__, nLength, pString,
+                     WBGetForeground(gc), WBGetBackground(gc));
 
       BEGIN_XCALL_DEBUG_WRAPPER
       WB_DRAW_STRING(pDisplay, drawable, pFont->fsFont, gc->gc, x, y, pS, nLength); // for now, just do this
@@ -204,7 +206,9 @@ use_the_stack_buffer:
       XGCValues gcv, gcv2;
 
       WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
-                     "%s.%d using XDrawString for \"%-.*s\"\n", __FUNCTION__, __LINE__, nLength, pString);
+                     "%s.%d using XDrawString for \"%-.*s\" color=#%08lxH bkgnd=#%08lxH\n",
+                     __FUNCTION__, __LINE__, nLength, pString,
+                     WBGetForeground(gc), WBGetBackground(gc));
 
       if(pFont->pFontStruct) // legacy font?  switch gc to use this
       {
@@ -938,13 +942,13 @@ do_the_tab:
   }
   else
   {
-    WB_DEBUG_PRINT(DebugLevel_Heavy,
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_DrawText,
                    "INFO:  %s - source rectangle seems to fit\n", __FUNCTION__);
-    WB_DEBUG_PRINT(DebugLevel_Heavy,
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_DrawText,
                    "          %d,%d,%d,%d bounds  vs  source %d,%d,%d,%d\n",
                    rctBounds.left, rctBounds.top, rctBounds.right, rctBounds.bottom,
                    rctSource.left, rctSource.top, rctSource.right, rctSource.bottom);
-    WB_DEBUG_PRINT(DebugLevel_Heavy,
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_DrawText,
                    "          Lines: %d  Font ascent=%d, descent=%d, height=%d, line spacing %d\n",
                    iLines, iFontAscent, iFontDescent, iFontHeight, iLineSpacing);
   }
@@ -955,9 +959,11 @@ do_the_tab:
      rctBounds.bottom <= rctSource.bottom)
   {
 it_fits:
-    WB_DEBUG_PRINT(DebugLevel_Heavy,
-                   "%s - 'it fits' bounds rectangle is %d,%d,%d,%d\n",
-                   __FUNCTION__, rctBounds.left, rctBounds.top, rctBounds.right, rctBounds.bottom);
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_DrawText,
+                   "%s.%d - 'it fits' bounds rectangle is %d,%d,%d,%d  iAlighment=%d (%08xH)\n",
+                   __FUNCTION__, __LINE__,
+                   rctBounds.left, rctBounds.top, rctBounds.right, rctBounds.bottom,
+                   iAlignment, iAlignment);
 
     // it looks like it can fit properly without any additional effort.
     // based on the alignment flags, I will return now with the results.
@@ -966,9 +972,6 @@ it_fits:
 
     if(prcDest) // caller wants the actual rectangle
     {
-//      WB_ERROR_PRINT("%s - TEMPORARY:  'it fits' bounds rectangle is %d,%d,%d,%d  iAlignment=%d (%08xH)\n",
-//                     __FUNCTION__, rctBounds.left, rctBounds.top, rctBounds.right, rctBounds.bottom, iAlignment, iAlignment);
-
       if(iAlignment & DTAlignment_NO_SHRINK)
       {
         rctBounds.right = rctSource.right;

@@ -1554,7 +1554,7 @@ static int ChildFrameDoScrollEvent(XClientMessageEvent *pEvent, Display *pDispla
       case WB_SCROLL_PAGEBACK:  //  page up or page left
         if(pUI->pgleft)
         {
-          pUI->pgright(pC, 0);
+          pUI->pgleft(pC, 0);
         }
 
         break;

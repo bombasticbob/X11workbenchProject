@@ -1124,7 +1124,7 @@ static int MenuBarDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu, Display *pD
   WB_FONT pOldFont;
   XPoint xpt[3];
   WBGC gc; // = WBGetWindowDefaultGC(wID);
-  XGCValues xgc;
+//  XGCValues xgc;
   WB_GEOM geomPaint;
   char tbuf[128];
 

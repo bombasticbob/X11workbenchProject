@@ -98,7 +98,7 @@ endif
 else
 
   AM_CFLAGS += $(EXTRA_WARN_FLAGS) -Wimplicit-int \
-   -Wimplicit-function-declaration -Wformat -Wmissing-braces \
+   -Wimplicit-function-declaration -Wmissing-braces \
    -Wnonnull -Wparentheses -Wreturn-type \
    -Wsequence-point -Wswitch -Wtrigraphs \
    -Wuninitialized -Wunknown-pragmas -Wunused-label \

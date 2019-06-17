@@ -499,7 +499,10 @@ XImage *pImage;
 #endif // X11WORKBENCH_TOOLKIT_HAVE_XFT
     if(gc->pFont && gc->pFont->fsFont)
     {
-      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d calling WB_DRAW_STRING \"%-.*s\"\n", __FUNCTION__, __LINE__, length, pTemp);
+      WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
+                     "%s.%d using WB_DRAW_STRING for \"%-.*s\" color=#%08lxH bkgnd=#%08lxH\n",
+                     __FUNCTION__, __LINE__, length, pTemp,
+                     WBGetForeground(gc), WBGetBackground(gc));
 
       BEGIN_XCALL_DEBUG_WRAPPER
       WB_DRAW_STRING(display, d, gc->pFont->fsFont, gc->gc, x, y, pTemp, length);
@@ -522,7 +525,10 @@ XImage *pImage;
         }
       }
 
-      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d calling XDrawString \"%-.*s\"\n", __FUNCTION__, __LINE__, length, pTemp);
+      WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
+                     "%s.%d using XDrawString for \"%-.*s\" color=#%08lxH bkgnd=#%08lxH\n",
+                     __FUNCTION__, __LINE__, length, pTemp,
+                     WBGetForeground(gc), WBGetBackground(gc));
 
       BEGIN_XCALL_DEBUG_WRAPPER
       iRval = XDrawString(display, d, gc->gc, x, y, pTemp, length);

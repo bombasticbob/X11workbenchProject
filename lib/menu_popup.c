@@ -593,7 +593,7 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
   WB_FONT pOldFont;
   XPoint xpt[3];
   WBGC gc; // = WBGetWindowDefaultGC(wID);
-  XGCValues xgc;
+//  XGCValues xgc;
   WB_GEOM geomPaint;
   char tbuf[128];
 
@@ -1187,6 +1187,7 @@ static int MBMenuPopupEvent(Window wID, XEvent *pEvent)
         else if(!(pEvent->xmotion.state & (Button1Mask | Button2Mask | Button3Mask)))
         {
           // "hover select" - hover far left or far far right, close popup
+          //                    TODO: open adjacent menu popup
           //                  vertical hover over, select (immediate)
           //                  hover over far right, open popup (as needed)
           //                  hover below, scroll (as needed)
@@ -1194,12 +1195,16 @@ static int MBMenuPopupEvent(Window wID, XEvent *pEvent)
 
           // hover far left or far far right
 
-          WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d %d %d %d\n",
-                         __FUNCTION__, __LINE__, iX, pSelf->iX, pSelf->iX + pSelf->iWidth);
-
           if(iX < pSelf->iX - WB_MOUSE_FAR || iX > pSelf->iX + pSelf->iWidth + 2 * WB_MOUSE_FAR)
           {
+            WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_Menu | DebugSubSystem_Mouse,
+                           "%s.%d  hover outside of popup menu  iX=%d   menu: left=%d right=%d\n",
+                           __FUNCTION__, __LINE__, iX, pSelf->iX, pSelf->iX + pSelf->iWidth);
+
             WBEndModal(wID, -1); // canceled menu
+
+            // TODO: look for a top-level menu that has a 'fit' for the X value and activate it
+#warning need to implement hover select adjacent top level menu
 
             WBSetInputFocus(pSelf->wOwner);
             return 1;  // no further processing on this one
@@ -1242,8 +1247,8 @@ static int MBMenuPopupEvent(Window wID, XEvent *pEvent)
         else
         {
           WB_DEBUG_PRINT(DebugLevel_WARN | DebugSubSystem_Menu | DebugSubSystem_Mouse,
-                         "%s - Mouse is out of range - %d, %d, %d, %d, %d, %d\n",
-                         __FUNCTION__, iX, iY, pSelf->iX, pSelf->iY, pSelf->iWidth, pSelf->iHeight);
+                         "%s.%d - Mouse is out of range - %d, %d, %d, %d, %d, %d\n",
+                         __FUNCTION__, __LINE__, iX, iY, pSelf->iX, pSelf->iY, pSelf->iWidth, pSelf->iHeight);
         }
       }
       else // if(pEvent->type == ButtonRelease)

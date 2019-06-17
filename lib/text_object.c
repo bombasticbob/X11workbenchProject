@@ -4394,6 +4394,10 @@ TEXT_BUFFER *pBuf;
     int iOldCol = pThis->iCol;
     int iPageWidth = pThis->rctView.right - pThis->rctView.left;
 
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_ScrollBar,
+                   "%s %d - page left by %d, iCol=%d\n",
+                   __FUNCTION__, __LINE__, iPageWidth, pThis->iCol);
+
     pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     __internal_invalidate_cursor(pThis, 0); // invalidate current cursor rectangle
@@ -4486,6 +4490,10 @@ TEXT_BUFFER *pBuf;
   {
     int iOldCol = pThis->iCol;
     int iPageWidth = pThis->rctView.right - pThis->rctView.left;
+
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_ScrollBar,
+                   "%s %d - page right by %d, iCol=%d\n",
+                   __FUNCTION__, __LINE__, iPageWidth, pThis->iCol);
 
     pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
@@ -4896,7 +4904,11 @@ TEXT_BUFFER *pBuf;
   }
   else
   {
-    int iOldRow WB_UNUSED = pThis->iRow; // TODO:  do I still need this assignment?  For now, mark 'unused' and leave for reference
+//    int iOldRow WB_UNUSED = pThis->iRow; // TODO:  do I still need this assignment?  For now, mark 'unused' and leave for reference
+
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_ScrollBar,
+                   "%s %d - scroll vertical by %d, iCol=%d\n",
+                   __FUNCTION__, __LINE__, nRows, pThis->iCol);
 
     pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
@@ -4960,7 +4972,11 @@ TEXT_BUFFER *pBuf;
   }
   else
   {
-    int iOldRow WB_UNUSED = pThis->iRow; // TODO:  do I still need this assignment?  For now, mark 'unused' and leave for reference
+//    int iOldCol WB_UNUSED = pThis->iCol; // TODO:  do I still need this assignment?  For now, mark 'unused' and leave for reference
+
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_ScrollBar,
+                   "%s %d - scroll horizontal by %d, iCol=%d\n",
+                   __FUNCTION__, __LINE__, nCols, pThis->iCol);
 
     pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 

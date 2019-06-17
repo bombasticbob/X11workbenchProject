@@ -135,13 +135,13 @@ AM_CONDITIONAL(FATAL_WARN, test x$fatalwarn = xtrue)
 local_incdir="\$(top_srcdir)/include"
 local_xpmdir="\$(top_srcdir)/xpm"
 
+
 if test x$noopt = xtrue ; then
-  CFLAGS="$CFLAGS -O0 -Wformat $_X_CFLAGS -I$local_incdir -I$local_xpmdir"
+  CFLAGS="$CFLAGS -O0 $_X_CFLAGS -I$local_incdir -I$local_xpmdir"
 else
-  CFLAGS="$CFLAGS -Wformat $X_CFLAGS -I$local_incdir -I$local_xpmdir"
+  CFLAGS="$CFLAGS $X_CFLAGS -I$local_incdir -I$local_xpmdir"
 fi
 
-#CFLAGS="$CFLAGS -Wformat $X_CFLAGS"
 CPPFLAGS="$CPPFLAGS $X_CFLAGS -I$local_incdir -I$local_xpmdir"
 CXXFLAGS="$CXXFLAGS $X_CFLAGS -I$local_incdir -I$local_xpmdir"
 
@@ -219,27 +219,75 @@ fi
 
 test_have_xft=false
 ifdef([AC_CHECK_FT2],
-[
-  if test x$libXft = xtrue ; then
-    AC_CHECK_FT2([7.0.1],,[libXft=false; AC_MSG_WARN([freetype missing or incompatible version; will not link with libXft])])
-  fi
+# this is complex so I have indented all of the [] sections to make them visible, even if it's a little ugly
+  [
+    if test x$libXft = xtrue ; then
+      AC_CHECK_FT2([7.0.1],,[libXft=false; AC_MSG_WARN([freetype missing or incompatible version; will not link with libXft])])
+    fi
 
-  if test x$libXft = xtrue ; then
-    my_save_CFLAGS="$CFLAGS"
-    my_save_CPPFLAGS="$CPPFLAGS"
-    CFLAGS="$CFLAGS $FT2_CFLAGS"
-    CPPFLAGS="$CPPFLAGS $FT2_CFLAGS"
-    AC_CHECK_HEADER([X11/Xft/Xft.h],test_have_xft=true,
-    [
-      AC_MSG_WARN([***************************************************************************])
-      AC_MSG_WARN([missing Xft.h - will not be building the toolkit with libXft])
-      AC_MSG_WARN([                you should consider installing the developer libXft package])
-      AC_MSG_WARN([***************************************************************************])
-    ])
-    CFLAGS="$my_save_CFLAGS"
-    CPPFLAGS="$my_save_CPPFLAGS"
-  fi
-],[AC_MSG_WARN([Freetype M4 macros not installed - do you need the developer package?])])
+      if test x$libXft = xtrue ; then
+      my_save_CFLAGS="$CFLAGS"
+      my_save_CPPFLAGS="$CPPFLAGS"
+      my_save_LDFLAGS="$LDFLAGS"
+      CFLAGS="$CFLAGS $FT2_CFLAGS"
+      CPPFLAGS="$CPPFLAGS $FT2_CFLAGS"
+      LDFLAGS="$LDFLAGS -L$ac_x_libraries $FT2_LIBS -lXft"
+      AC_CHECK_HEADER(
+        [X11/Xft/Xft.h],
+# if the header exists I need to check the version defined in it with a compile
+# and I might as well do a test-link while I'm at it
+        [
+          AC_LANG_PUSH([C])
+          AC_MSG_CHECKING([if libXft can link ok and is at least version 2.0])
+          AC_LINK_IFELSE(
+            [
+              AC_LANG_SOURCE([[
+              #include <stdio.h>
+              #include <stdlib.h>
+              #include <X11/Xft/Xft.h> /* required header for Xft definitions */
+
+              #if XFT_VERSION < 20000
+              #error XFT is too old
+              #endif
+
+              int main()
+              {
+                // note that I don't fail this by running it; if X11 is being
+                // accessed remotely I need to rely on these at run time
+                // but as an example I leave it just like this
+                if(XftInit(0) != FcTrue || XftInitFtLibrary() != FcTrue )
+                {
+                  exit(3);
+                }
+
+                return 0;
+              }]] )
+            ],
+            [
+              AC_MSG_RESULT([yes!!!  w00t!!!])
+              test_have_xft=true
+            ],
+            [
+              AC_MSG_RESULT([no])
+            ] )
+          AC_LANG_POP([C])
+        ],
+        [
+          AC_MSG_WARN([***************************************************************************])
+          AC_MSG_WARN([missing Xft.h - will not be building the toolkit with libXft])
+          AC_MSG_WARN([                you should consider installing the developer libXft package])
+          AC_MSG_WARN([***************************************************************************])
+        ])
+
+      LDFLAGS="$my_save_LDFLAGS"
+      CFLAGS="$my_save_CFLAGS"
+      CPPFLAGS="$my_save_CPPFLAGS"
+    fi
+  ],
+  [
+    AC_MSG_WARN([Freetype M4 macros not installed - do you need the developer package?])
+  ])
+
 
 test_have_xext=false
 if test x$libXext = xtrue ; then
@@ -384,8 +432,128 @@ AC_LINK_IFELSE(
 CFLAGS="$my_save_CFLAGS"
 
 ############################################################################################
-# #pragma GCC diagnostic error "-Wincompatible-pointer-types"
+# #attribute( printf
+my_save_CFLAGS="$CFLAGS"
+CFLAGS="$CFLAGS -Werror"
+compiler_has_attribute_for_printf=no
+AC_LANG_PUSH([C])
+AC_MSG_CHECKING([if the compiler supports __attribute__((format(printf,n,m))) for functions and -Wformat])
+AC_LINK_IFELSE(
+[AC_LANG_SOURCE([[
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <stdarg.h> /* stdarg to make sure I have va_list and other important stuff */
 
+  void WBDebugPrint(const char *fmt, ...) __attribute__ ((format(printf, 1, 2)));
+
+  void WBDebugPrint(const char *fmt, ...)
+  {
+  va_list va;
+
+    va_start(va, fmt);
+
+    vfprintf(stderr, fmt, va);
+    fflush(stderr); // dump NOW before (possibly) crashing
+
+    // TODO:  log file?
+
+    va_end(va);
+  }
+
+  int main()
+  {
+    WBDebugPrint("Hello, world %s\n", "testing");
+    return 0;
+  }]] )],
+  [
+    CFLAGS="$CFLAGS -Wformat"
+    AC_LINK_IFELSE(
+      [AC_LANG_SOURCE([[
+        #include <stdio.h>
+        #include <stdlib.h>
+        #include <stdarg.h> /* stdarg to make sure I have va_list and other important stuff */
+
+        void WBDebugPrint(const char *fmt, ...) __attribute__ ((format(printf, 1, 2)));
+
+        void WBDebugPrint(const char *fmt, ...)
+        {
+        va_list va;
+
+          va_start(va, fmt);
+
+          vfprintf(stderr, fmt, va);
+          fflush(stderr); // dump NOW before (possibly) crashing
+
+          // TODO:  log file?
+
+          va_end(va);
+        }
+
+        int main()
+        {
+          WBDebugPrint("Hello, world %s\n", "testing");
+          return 0;
+        }]] )],
+      [
+        AC_LINK_IFELSE(
+          [AC_LANG_SOURCE([[
+            #include <stdio.h>
+            #include <stdlib.h>
+            #include <stdarg.h> /* stdarg to make sure I have va_list and other important stuff */
+
+            void WBDebugPrint(const char *fmt, ...) __attribute__ ((format(printf, 1, 2)));
+
+            void WBDebugPrint(const char *fmt, ...)
+            {
+            va_list va;
+
+              va_start(va, fmt);
+
+              vfprintf(stderr, fmt, va);
+              fflush(stderr); // dump NOW before (possibly) crashing
+
+              // TODO:  log file?
+
+              va_end(va);
+            }
+
+            int main()
+            {
+              WBDebugPrint("Hello, world %d\n", "testing"); // warning fails this
+              return 0;
+            }]] )],
+          [
+            # failing the test is 'success' this time through
+            # and succeeding is a failure (since the warning doesn't work)
+            AC_MSG_RESULT([no (does not properly support -Wformat)])
+            compiler_has_attribute_for_printf=no
+          ],
+          [
+            AC_MSG_RESULT([yes])
+            compiler_has_attribute_for_printf=yes
+            AC_DEFINE([COMPILER_HAS_ATTRIBUTE_FOR_PRINTF],[1],[Compiler supports attributes for 'printf'-like calls])
+          ] )
+      ],
+      [
+        AC_MSG_RESULT([no (does not support -Wformat)])
+        compiler_has_attribute_for_printf=no
+      ] )
+  ],
+  [
+    AC_MSG_RESULT([no])
+    compiler_has_attribute_for_printf=no
+  ] )
+  AC_LANG_POP([C])
+
+  CFLAGS="$my_save_CFLAGS"
+
+# this conditional will cause Makefile.am to enable -Wformat where appropriate
+AM_CONDITIONAL(PRINTF_ATTRIBUTE, test x$compiler_has_attribute_for_printf=xyes)
+
+
+
+############################################################################################
+# #pragma GCC diagnostic error "-Wincompatible-pointer-types"
 my_save_CFLAGS="$CFLAGS"
 CFLAGS="$CFLAGS -Werror"
 AC_LANG_PUSH([C])
@@ -401,15 +569,16 @@ AC_LINK_IFELSE(
   }]] )],
   [
     AC_MSG_RESULT([yes])
-    compiler_has_pragma_for_incompatible_pointer_types=1
+    compiler_has_pragma_for_incompatible_pointer_types=yes
     AC_DEFINE([COMPILER_HAS_PRAGMA_FOR_INCOMPATIBLE_POINTER_TYPES],[1],[Compiler supports pragma for GCC diagnostic error -Wincompatible-pointer-types])
   ],
   [
     AC_MSG_RESULT([no])
-    compiler_has_pragma_for_incompatible_pointer_types=0
+    compiler_has_pragma_for_incompatible_pointer_types=no
   ] )
   AC_LANG_POP([C])
 CFLAGS="$my_save_CFLAGS"
+
 
 ############################################################################################
 #    qsort_r - definition for GNU C and BSD differ, other platforms may not have it at all
@@ -627,6 +796,14 @@ fi
 
 
 
+# LAST MINUTE CFLAGS TWEEKS
+
+if test x$compiler_has_attribute_for_printf==xyes ; then
+  CFLAGS="-Wformat $CFLAGS"
+  CPPFLAGS="-Wformat $CPPFLAGS"
+  CXXFLAGS="-Wformat $CXXFLAGS"
+fi
+
 
 
 #################################################################
@@ -646,6 +823,7 @@ AC_SUBST([NOT_CYGWIN])
 AC_SUBST([HAVE_XPM_LIB])
 AC_SUBST([HAVE_XFT_LIB])
 AC_SUBST([HAVE_XEXT_LIB])
+
 
 AC_SUBST([CFLAGS])
 AC_SUBST([CPPFLAGS])

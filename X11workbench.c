@@ -1940,16 +1940,28 @@ static int bCtrlCFlag = 0; // when I hit ctrl+c multiple times, kill the app any
 
       if(iSig == SIGKILL || iSig == SIGSEGV)  // special handling, must terminate process
       {
-        WB_ERROR_PRINT("caught signal %d, terminating now\n", iSig);
+        signal(iSig, SIG_DFL); // disable recursive signaling
 
-        exit(0);
+        if(iSig == SIGKILL)  // special handling, must terminate process
+        {
+          WB_ERROR_PRINT("caught signal %d (SIGKILL), terminating now\n", iSig);
+          exit(0); // 'KILL' signal is not considered an error
+        }
+        else
+        {
+          WB_ERROR_PRINT("caught signal %d (SIGSEGV), terminating now\n", iSig);
+
+          _exit(1); // calling this version to avoid possible problems with signal handling
+                    // it's considered to be 'signal handler safe' though it doesn't flush buffers
+                    // nor delete temp files the way 'exit()' would...
+        }
       }
 
       if(iSig == SIGBUS)  // might happen
       {
         WB_DEBUG_PRINT(DebugLevel_ERROR | DebugSubSystem_Application,
                        "SIGBUS received (this is usually caused by use of a data pointer instead of a function pointer)\n");
-        exit(1);
+        _exit(1);
       }
 
       return;

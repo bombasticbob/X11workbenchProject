@@ -132,10 +132,12 @@ XFontStruct *pRval;
     }
   }
 #ifndef NO_DEBUG /* assign this to disable debugging - most likely a -D in Makefile */
-  else if((WBGetDebugLevel() & DebugLevel_MASK) >= FONT_DUMP_DEBUG_LEVEL ||
-          (WBGetDebugLevel() & DebugSubSystem_Font))
+  else
   {
-    WBDumpFontStruct(pOldFont);
+    WB_IF_DEBUG_LEVEL(FONT_DUMP_DEBUG_LEVEL | DebugSubSystem_Font)
+    {
+      WBDumpFontStruct(pOldFont);
+    }
   }
 #endif // NO_DEBUG
 
@@ -922,7 +924,12 @@ int iRval = 0;
     return 0;
   }
 
-//  WBDumpFontStruct(pFont);
+#ifndef NO_DEBUG /* assign this to disable debugging - most likely a -D in Makefile */
+  WB_IF_DEBUG_LEVEL(FONT_DUMP_DEBUG_LEVEL | DebugSubSystem_Font)
+  {
+    WBDumpFontStruct(pFont);
+  }
+#endif // NO_DEBUG
 
   // calculate from 'AVERAGE_WIDTH' (in pixels) using font height and point info
 
@@ -1340,8 +1347,7 @@ XFontStruct *pRval;
 
 
 #ifndef NO_DEBUG /* assign this to disable debugging - most likely a -D in Makefile */
-  if((WBGetDebugLevel() & DebugLevel_MASK) >= FONT_DUMP_DEBUG_LEVEL ||
-     (WBGetDebugLevel() & DebugSubSystem_Font))
+  WB_IF_DEBUG_LEVEL(FONT_DUMP_DEBUG_LEVEL | DebugSubSystem_Font)
   {
     WBDumpFontStruct(pRval);
   }
@@ -1508,8 +1514,6 @@ char tbuf[512];
 
 
 #ifndef NO_DEBUG /* assign this to disable debugging - most likely a -D in Makefile */
-//  if((WBGetDebugLevel() & DebugLevel_MASK) >= FONT_DUMP_DEBUG_LEVEL ||
-//     (WBGetDebugLevel() & DebugSubSystem_Font))
   WB_IF_DEBUG_LEVEL(FONT_DUMP_DEBUG_LEVEL | DebugSubSystem_Font)
   {
     WBDumpFontSet(pDisplay, fsRval);
@@ -1738,12 +1742,15 @@ static const char szISO[]="-ISO8859-";
   {
     WB_ERROR_PRINT("%s - no result, returning NULL\n", __FUNCTION__);
   }
-//#ifndef NO_DEBUG
-//  else
-//  {
-//    WBDumpFontSet(pDisplay, rVal);
-//  }
-//#endif // NO_DEBUG
+#ifndef NO_DEBUG /* assign this to disable debugging - most likely a -D in Makefile */
+  else
+  {
+    WB_IF_DEBUG_LEVEL(FONT_DUMP_DEBUG_LEVEL | DebugSubSystem_Font)
+    {
+      WBDumpFontSet(pDisplay, rVal);
+    }
+  }
+#endif // NO_DEBUG
 
   return rVal;
 }
@@ -1845,7 +1852,10 @@ char *p1, *pLocale;
 #ifndef NO_DEBUG
   else
   {
-    WBDumpFontSet(pDisplay, rVal);
+    WB_IF_DEBUG_LEVEL(FONT_DUMP_DEBUG_LEVEL | DebugSubSystem_Font)
+    {
+      WBDumpFontSet(pDisplay, rVal);
+    }
   }
 #endif // NO_DEBUG
 

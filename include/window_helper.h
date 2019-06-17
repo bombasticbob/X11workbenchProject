@@ -685,10 +685,15 @@ int GetStartupMinMax(void);
   *
   * Header File:  window_helper.h
 **/
+#if defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
 static __inline__ Colormap WBDefaultColormap(Display *pDisplay)
 {
   return DefaultColormap(pDisplay, DefaultScreen(pDisplay));
 }
+#else // defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
+#define WBDefaultColormap(X) DefaultColormap(pDisplay, DefaultScreen(pDisplay))
+#endif // defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
+
 
 /** \ingroup startup
   * \brief initializes the XSetWIndowAttributes structure with minimal attributes
@@ -751,11 +756,15 @@ void WBInitSizeHints(XSizeHints *pSH, Display *pDisplay, int iMinHeight, int iMi
   *
   * Header File:  window_helper.h
 **/
+#if defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
 static __inline__ Display * WBGetDefaultDisplay(void)
 {
   extern Display *pDefaultDisplay;
   return pDefaultDisplay;
 }
+#else // defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
+Display *WBGetDefaultDisplay();
+#endif // defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
 
 /** \ingroup defaults
   * \brief Returns a pointer to the default font WB_FONT for the default display.  This is a shared resource; do NOT free it nor alter it!
@@ -2716,6 +2725,7 @@ void WBClearWindow(Window wID, WBGC gc);
   *
   * Header File:  window_helper.h
 **/
+#if defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
 static __inline__ void WBInvalidateRect(Window wID, const WB_RECT *pRCT, int bPaintFlag)
 {
   WB_GEOM geom;
@@ -2734,6 +2744,9 @@ static __inline__ void WBInvalidateRect(Window wID, const WB_RECT *pRCT, int bPa
 
   WBInvalidateGeom(wID, &geom, bPaintFlag);
 }
+#else // defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
+void WBInvalidateRect(Window wID, const WB_RECT *pRCT, int bPaintFlag);
+#endif // defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
 
 /** \ingroup expose
   * \brief 'Paint' helper, validates a WB_RECT for asynchronous Expose event generation
@@ -2748,6 +2761,7 @@ static __inline__ void WBInvalidateRect(Window wID, const WB_RECT *pRCT, int bPa
   *
   * Header File:  window_helper.h
 **/
+#if defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
 static __inline__ void WBValidateRect(Window wID, WB_RECT *pRCT)
 {
   WB_GEOM geom;
@@ -2766,7 +2780,9 @@ static __inline__ void WBValidateRect(Window wID, WB_RECT *pRCT)
 
   WBValidateGeom(wID, &geom);
 }
-
+#else // defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
+void WBValidateRect(Window wID, WB_RECT *pRCT);
+#endif // defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2787,6 +2803,12 @@ static __inline__ void WBValidateRect(Window wID, WB_RECT *pRCT)
   * \param values A pointer to an XGCValues structure describing values to be assigned (may be NULL)
   * \return A copy of the new WBGC
   *
+  * Most of the cached GC values are stored in the 'values' member of the WBGC structure.  It is
+  * safe to read this structure directly, though you should never assign anything to it without
+  * using one of the API functions.
+  *
+  * \sa WBGC
+  *
   * Header File:  window_helper.h
 **/
 WBGC WBCreateGC(Display *pDisplay, Drawable dw, unsigned long valuemask,
@@ -2800,6 +2822,12 @@ WBGC WBCreateGC(Display *pDisplay, Drawable dw, unsigned long valuemask,
   * \param values A pointer to an XGCValues structure describing values to be assigned (may be NULL)
   * \return An integer indicating success or fail
   *
+  * Most of the cached GC values are stored in the 'values' member of the WBGC structure.  It is
+  * safe to read this structure directly, though you should never assign anything to it without
+  * using one of the API functions (such as this one).
+  *
+  * \sa WBGC
+  *
   * Header File:  window_helper.h
 **/
 int WBChangeGC(WBGC hGC, unsigned long valuemask,
@@ -2812,6 +2840,14 @@ int WBChangeGC(WBGC hGC, unsigned long valuemask,
   * \param valuemask A bitwise mask of values to assign to the new WBGC from 'values'
   * \param values A pointer to an XGCValues structure describing values to be assigned (may be NULL)
   * \returns A Status indicating success or fail
+  *
+  * Most of the cached GC values are stored in the 'values' member of the WBGC structure.  It is
+  * safe to read this structure directly, though you should never assign anything to it without
+  * using one of the API functions.
+  * This function will conveniently make a copy of that internal structure and write it to the pointer
+  * specified by 'values'.
+  *
+  * \sa WBGC, WBFreeGC()
   *
   * Header File:  window_helper.h
 **/
@@ -2895,10 +2931,19 @@ WBGC WBCopyDrawableGC(Display *pDisplay, Drawable dw, WBGC hGCOrig);
 void WBFreeGC(WBGC hGC);
 
 /** \ingroup graphics
-  * \brief Free resources for a WBGC, wrapper for XFreeGC()
+  * \brief Free resources for a WBGC, wrapper for XGContextFromGC()
   *
   * \param hGC The WBGC which is to be freed
   * \returns a GContext indicating the saved graphics context associated with the WBGC
+  *
+  * NOTE:  this only preserves those things that XGContextFromGC will preserve; some things
+  *        are only cached by the WBGC internally
+  *
+  * Most of the cached GC values are stored in the 'values' member of the WBGC structure.  It is
+  * safe to read this structure directly, though you should never assign anything to it without
+  * using one of the API functions.
+  *
+  * \sa WBGC
   *
   * Header File:  window_helper.h
 **/
@@ -2923,6 +2968,12 @@ int WBSetRegion(WBGC hGC, Region rgnClip);
   * \param clip_y_origin The 'y' clipping origin
   * \returns an integer indicating success or fail
   *
+  * Most of the cached GC values are stored in the 'values' member of the WBGC structure.  It is
+  * safe to read this structure directly, though you should never assign anything to it without
+  * using one of the API functions.
+  *
+  * \sa WBGC
+  *
   * Header File:  window_helper.h
 **/
 int WBSetClipOrigin(WBGC hGC, int clip_x_origin, int clip_y_origin);
@@ -2945,27 +2996,73 @@ int WBSetClipMask(WBGC hGC, Pixmap pixmap);
   * \param function The 'function' for the GC - for more information, see XSetFunction()
   * \returns an integer indicating success or fail
   *
+  * Most of the cached GC values are stored in the 'values' member of the WBGC structure.  It is
+  * safe to read this structure directly, though you should never assign anything to it without
+  * using one of the API functions.
+  *
+  * \sa WBGC
+  *
   * Header File:  window_helper.h
 **/
 int WBSetFunction(WBGC hGC, int function);
 
 /** \ingroup graphics
+  * \brief Get the (cached) foreground color for a WBGC
+  *
+  * \param hGC The WBGC to query the color of
+  * \returns the foreground color associated with the WBGC
+  *
+  * Header File:  window_helper.h
+**/
+#if defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
+static __inline__ unsigned long WBGetForeground(WBGC hGC) { return hGC->values.foreground; }
+#else // defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
+#define WBGetForeground(X) ((X)->values.foreground)
+#endif // defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
+
+/** \ingroup graphics
   * \brief Assign foreground color, a wrapper for XSetForeground()
   *
-  * \param hGC The WBGC to assign a clipping Region to
+  * \param hGC The WBGC to set the foreground color of
   * \param foreground The foreground color
   * \returns an integer indicating success or fail
+  *
+  * Most of the cached GC values are stored in the 'values' member of the WBGC structure.  It is
+  * safe to read this structure directly, though you should never assign anything to it without
+  * using one of the API functions.
+  *
+  * \sa WBGC
   *
   * Header File:  window_helper.h
 **/
 int WBSetForeground(WBGC hGC, unsigned long foreground);
 
 /** \ingroup graphics
-  * \brief Assign background color, a wrapper for XSetForeground()
+  * \brief Get the (cached) background color for a WBGC
   *
-  * \param hGC The WBGC to assign a clipping Region to
+  * \param hGC The WBGC to query the color of
+  * \returns the backgound color associated with the WBGC
+  *
+  * Header File:  window_helper.h
+**/
+#if defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
+static __inline__ unsigned long WBGetBackground(WBGC hGC) { return hGC->values.background; }
+#else // defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
+#define WBGetBackground(X) ((X)->values.background)
+#endif // defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
+
+/** \ingroup graphics
+  * \brief Assign background color, a wrapper for XSetBackground()
+  *
+  * \param hGC The WBGC to set the background color of
   * \param background The background color
   * \returns an integer indicating success or fail
+  *
+  * Most of the cached GC values are stored in the 'values' member of the WBGC structure.  It is
+  * safe to read this structure directly, though you should never assign anything to it without
+  * using one of the API functions.
+  *
+  * \sa WBGC
   *
   * Header File:  window_helper.h
 **/
@@ -2977,6 +3074,8 @@ int WBSetBackground(WBGC hGC, unsigned long background);
   * \param hGC The WBGC to assign a clipping Region to
   * \param pFont The WB_FONTC to assign to the WBGC (makes a copy of it)
   * \returns an integer indicating success or fail
+  *
+  * \sa WBQueryGCFont(), WBGetGCFont()
   *
   * Header File:  window_helper.h
 **/
@@ -2993,6 +3092,8 @@ int WBSetFont(WBGC hGC, WB_FONTC pFont);
   * This means that the WBGC will 'take ownership' of the WB_FONT immediately after making this
   * call. The caller must ensure that it is safe for the WBGC object to own such a WB_FONT.
   *
+  * \sa WBQueryGCFont(), WBGetGCFont()
+  *
   * Header File:  window_helper.h
 **/
 int WBSetFontNoCopy(WBGC hGC, WB_FONT pFont);
@@ -3007,6 +3108,12 @@ int WBSetFontNoCopy(WBGC hGC, WB_FONT pFont);
   * \param join_style The join style - see XSetLineAttributes()
   * \returns an integer indicating success or fail
   *
+  * Most of the cached GC values are stored in the 'values' member of the WBGC structure.  It is
+  * safe to read this structure directly, though you should never assign anything to it without
+  * using one of the API functions.
+  *
+  * \sa WBGC
+  *
   * Header File:  window_helper.h
 **/
 int WBSetLineAttributes(WBGC hGC, unsigned int line_width,
@@ -3020,6 +3127,12 @@ int WBSetLineAttributes(WBGC hGC, unsigned int line_width,
   * \param dash_list An array of 'char' values containing the dash info
   * \param n The number of entries in 'dash_list'
   * \returns an integer indicating success or fail
+  *
+  * Most of the cached GC values are stored in the 'values' member of the WBGC structure.  It is
+  * safe to read this structure directly, though you should never assign anything to it without
+  * using one of the API functions.
+  *
+  * \sa WBGC
   *
   * Header File:  window_helper.h
 **/
@@ -3478,6 +3591,7 @@ typedef struct __WB_ERROR_INFO__
   *
   * Header File:  window_helper.h
 **/
+#if defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
 static __inline__ void WBSupressErrorOutput(void)
 {
 extern int bIgnoreXErrors;
@@ -3485,6 +3599,9 @@ extern int bIgnoreXErrors;
   // TODO:  serialize this with a mutex or other sync object?
   bIgnoreXErrors++;
 }
+#else // defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
+void WBSupressErrorOutput(void);
+#endif // defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
 
 /** \ingroup error
   * \brief Restore X11 XErrorEvent output to stderr
@@ -3495,6 +3612,7 @@ extern int bIgnoreXErrors;
   *
   * Header File:  window_helper.h
 **/
+#if defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
 static __inline__ void WBAllowErrorOutput(void)
 {
 extern int bIgnoreXErrors;
@@ -3509,6 +3627,9 @@ extern int bIgnoreXErrors;
     bIgnoreXErrors = 0;
   }
 }
+#else // defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
+void WBAllowErrorOutput(void);
+#endif // defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
 
 
 /** \ingroup error

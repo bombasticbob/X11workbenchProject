@@ -1118,7 +1118,7 @@ static const char szPropertiesDlgBox[]=
 
   propdlg.pEditWindow = pE; // custom data sent to dialog box
 
-  pDlg = DLGCreateDialogWindow("Document Properties", szPropertiesDlgBox, iX, iY,
+  pDlg = DLGCreateDialogWindow(pC->wID, "Document Properties", szPropertiesDlgBox, iX, iY,
                                300, 200, // the values also specified in the resource
                                PropertyDialogCallback,
                                WBDialogWindow_VISIBLE, &propdlg);
@@ -1128,24 +1128,7 @@ static const char szPropertiesDlgBox[]=
   {
     wIDDlg = pDlg->wID;
 
-    if(pC->wID != None) // owned dialog box needs certain properties set
-    {
-      Atom a1;
-      unsigned int ai1[3];
-
-      DLGAssignOwner(pDlg, pC->wID);
-
-      a1 = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE", False);
-      ai1[0] = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE_SKIP_TASKBAR", False);
-      ai1[1] = XInternAtom(WBGetDefaultDisplay(), "_NET_WM_STATE_SKIP_PAGER", False);
-
-      XChangeProperty(WBGetWindowDisplay(wIDDlg), wIDDlg, a1, XA_ATOM, 32, PropModeReplace, (unsigned char *)ai1, 2);
-
-      a1 = XInternAtom(WBGetWindowDisplay(wIDDlg), "WM_TRANSIENT_FOR", False);
-      XChangeProperty(WBGetWindowDisplay(wIDDlg), wIDDlg, a1, XA_WINDOW, 32, PropModeReplace, (unsigned char *)&(pC->wID), 1);
-    }
-
-//    WBSetWindowIcon(wIDDlg, );
+//    WBSetWindowIcon(wIDDlg, ???);
 //    WB_ERROR_PRINT("TEMPORARY:  %s - calling WBShowModal\n", __FUNCTION__);
 
     if(WBShowModal(wIDDlg, 0) == IDOK)
@@ -2005,6 +1988,9 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+  WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_ScrollBar,
+                 "%s %d - iMode=%d, iValue=%d\n", __FUNCTION__, __LINE__, iMode, iValue);
+
   // TODO:  check scroll mode for scroll lock?
 
   if(iMode == 0) // absolute
@@ -2060,6 +2046,9 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+  WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_ScrollBar,
+                 "%s %d - iMode=%d, iValue=%d\n", __FUNCTION__, __LINE__, iMode, iValue);
+
   // TODO:  check scroll mode for scroll lock?
 
   if(iMode == 0) // absolute
@@ -2071,7 +2060,7 @@ WBEditWindow *pE = (WBEditWindow *)pC;
 
       pE->xTextObject.vtable->get_view(&(pE->xTextObject), &rctView);
 
-      if(iValue == rctView.top) // not moving
+      if(iValue == rctView.left) // not moving
       {
         return;
       }
