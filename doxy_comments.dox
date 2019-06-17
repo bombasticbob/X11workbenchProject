@@ -1192,6 +1192,13 @@
   * functions, but not event nor class-specific functionality.
 **/
 
+/** \ingroup wcore
+  * \defgroup wcore_internal Internal-only Window 'Core' features
+  *
+  * These functions and definitions comprise internal-only 'CORE WINDOW HANDLING'
+  * features.  You should not make use of these.
+**/
+
 /** \ingroup core
   * \defgroup events Event Handling
   *

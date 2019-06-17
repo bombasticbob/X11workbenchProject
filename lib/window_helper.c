@@ -694,13 +694,11 @@ Atom aNULL=None;             // Atom for 'NULL'
 
 
 
-/** \ingroup wcore
-  * \internal
+/** \ingroup wcore_internal
   * \struct __internal_window_entry__
   * \copydoc _WINDOW_ENTRY_
 **/
-/** \ingroup wcore
-  * \internal
+/** \ingroup wcore_internal
   * \typedef _WINDOW_ENTRY_
   * \brief Core (internal) structure for window management, one per window
   *
@@ -861,12 +859,13 @@ XStandardColormap cmapDefault; // a copy of teh XStandardColormap for the Colorm
 #define EVENT_ARRAY_SIZE 0x2000 /* this many events maximum */
 #define EVENT_ARRAY_MASK 0x1fff /* 'and' this for modular math */
 
-/** \ingroup wcore
+/** \ingroup wcore_internal
   * \struct __EVENT_ENTRY__
   * \copydoc EVENT_ENTRY
 **/
-/** \ingroup wcore
+/** \ingroup wcore_internal
   * \typedef EVENT_ENTRY
+
   * \brief Core (internal) structure for storing and dispatching events
   *
 **/
@@ -899,10 +898,10 @@ static int (* pAppEventCallback)(XEvent *pEvent) = NULL;
 #define TIMER_ARRAY_SIZE  512
 
 /** \struct __TIMER_ENTRY__
-  * \ingroup wcore
+  * \ingroup wcore_internal
   * \copydoc TIMER_ENTRY
 **/
-/** \ingroup wcore
+/** \ingroup wcore_internal
   * \typedef TIMER_ENTRY
   * \brief Core (internal) structure for managing timers
 **/
@@ -922,10 +921,10 @@ static TIMER_ENTRY *pTimerEntryActive = NULL, *pTimerEntryFree = NULL;
   // pointers for two linked lists.  entries must be in either 'active' or 'free' list.
 
 /** \struct __DELAYED_EVENT_ENTRY__
-  * \ingroup wcore
+  * \ingroup wcore_internal
   * \copydoc DELAYED_EVENT_ENTRY
 **/
-/** \ingroup wcore
+/** \ingroup wcore_internal
   * \typedef DELAYED_EVENT_ENTRY
   * \brief Core (internal) structure for managing delayed events
 **/
