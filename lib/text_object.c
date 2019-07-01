@@ -5270,9 +5270,7 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
 
 
   // NOW get the font width for a space (TODO:  average char width instead?)
-  iFontWidth = WBTextWidth(pFont, " ", 1); // WB_TEXT_ESCAPEMENT(fSet, " ", 1);
-
-#warning support proportional pitch fonts by assigning a font width < 0 ???  For now only fixed-pitch are supported by this object
+  iFontWidth = WBFontAvgCharWidth(pFont); // WBTextWidth(pFont, " ", 1); // WB_TEXT_ESCAPEMENT(fSet, " ", 1);
 
   // get FG/BG color information
   clrFG = WBGetGCFGColor(gc);
@@ -5312,6 +5310,8 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
   // cache the font metrics
   pThis->iAsc = iAsc;
   pThis->iDesc = iDesc;
+
+  pThis->iMaxFontWidth = WBFontMaxCharWidth(pFont);
   pThis->iFontWidth = iFontWidth;
 
 #warning support proportional pitch fonts by assigning a font width < 0 ???  For now only fixed-pitch are supported by this object

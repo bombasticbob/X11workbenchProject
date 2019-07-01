@@ -391,6 +391,55 @@ WB_FONT pFont = (WB_FONT)pFont0;
   return iRval;
 }
 
+int WBFontMaxCharWidth(WB_FONTC pFont0)
+{
+int iRval = 0;
+Display *pDisplay;
+WB_FONT pFont = (WB_FONT)pFont0;
+
+
+  if(!pFont || !pFont->pDisplay)
+  {
+    WB_WARN_PRINT("%s returns zero (bad param, %p, %p)\n",
+                  __FUNCTION__, pFont, (void *)(pFont ? pFont->pDisplay : NULL));
+
+    return 0;
+  }
+
+  pDisplay = pFont->pDisplay;
+
+  if(pFont->iMaxCharWidth >= 0)
+  {
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Font,
+                   "%s returns (cached) font max char width %d\n", __FUNCTION__, pFont->iMaxCharWidth);
+    return pFont->iMaxCharWidth;
+  }
+
+#ifdef X11WORKBENCH_TOOLKIT_HAVE_XFT
+  if(pFont->pxftFont)
+  {
+    WB_ERROR_PRINT("ERROR:  %s font has 'pfxftFont' non-NULL\n", __FUNCTION__);
+#warning TODO: IMPLEMENT THIS PART for Xft FONTS
+  }
+  else
+#endif // X11WORKBENCH_TOOLKIT_HAVE_XFT
+  {
+    XCharStruct xc = WBFontMaxBounds(pFont);
+
+    iRval = xc.width;
+
+    if(iRval > 0) // values > 0 assume it's right
+    {
+      pFont->iAvgCharWidth = iRval;
+    }
+  }
+
+  WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Font,
+                 "%s returns font max char width %d\n", __FUNCTION__, iRval);
+
+  return iRval;
+}
+
 int WBFontDescent(WB_FONTC pFont0)
 {
 int iRval = 0;

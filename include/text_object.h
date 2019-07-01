@@ -921,7 +921,8 @@ extern const TEXT_OBJECT_VTABLE WBDefaultTextObjectVTable;
 
     int iAsc;                  // font height ascension (cached)
     int iDesc;                 // font height descension (cached)
-    int iFontWidth;            // width of font in pixels (fixed pitch) - cached by 'expose' handler
+    int iFontWidth;            // average width of font in pixels (mostly for fixed pitch) - cached by 'expose' handler
+    int iMaxFontWidth;         // maximum width of font in pixels (mostly for proportional pitch) - cached by 'expose' handler
 
     // viewport
 
@@ -982,7 +983,8 @@ typedef struct _text_object_
 
   int iAsc;                  ///< font height ascension
   int iDesc;                 ///< font height descension
-  int iFontWidth;            ///< width of font in pixels (fixed pitch) - assigned by 'expose' handler
+  int iFontWidth;            ///< average width of font in pixels (mostly for fixed pitch) - cached by 'expose' handler
+  int iMaxFontWidth;         ///< maximum width of font in pixels (mostly for proportional pitch) - cached by 'expose' handler
 
   // viewport
 

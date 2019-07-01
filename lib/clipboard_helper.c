@@ -140,17 +140,40 @@ static void * ClipboardThreadProc(void *);
 
 
 // WBInitClipboardSystem
-// return NON-ZERO if clipboard system is initialized properly
+// return ZERO if clipboard system is initialized properly
 int WBInitClipboardSystem(Display *pDisplay, const char *szDisplayName)
 {
-char *pDisplayName;
-//unsigned long long ullTick;
+int iRval;
+#ifndef NO_DEBUG
+unsigned long long ullTick;
+#endif // NO_DEBUG
 
+#ifndef NO_DEBUG
+  ullTick = WBGetTimeIndex();
+#endif // NO_DEBUG
+
+  iRval = __StartInitClipboardSystem(pDisplay, szDisplayName);
+
+  if(!iRval) // so far so good
+  {
+    iRval = __FinishInitClipboardSystem(pDisplay, szDisplayName);
+  }
+
+#ifndef NO_DEBUG
+  ullTick = WBGetTimeIndex() - ullTick;
+  WBDebugPrint("TEMPORARY:  %s took %llu ticks)\n", __FUNCTION__, ullTick);
+#endif // NO_DEBUG
+
+  return iRval;
+}
+
+static char *pGlobalDisplayNameForClipboardInit = NULL;
+
+int __StartInitClipboardSystem(Display *pDisplay, const char *szDisplayName)
+{
   // for debugging purposes, keep track of how long it takes
 
   // TODO:  check 'hClipboardThread' and/or 'bClipboardQuitFlag'
-
-//  ullTick = WBGetTimeIndex();
 
   if(!szDisplayName ||
      (pDisplay && pDisplay != WBGetDefaultDisplay())) // for now, this param is reserved
@@ -162,9 +185,9 @@ char *pDisplayName;
     }
   }
 
-  pDisplayName = WBCopyString(szDisplayName);
+  pGlobalDisplayNameForClipboardInit = WBCopyString(szDisplayName);
 
-  if(!pDisplayName)
+  if(!pGlobalDisplayNameForClipboardInit)
   {
     WB_ERROR_PRINT("ERROR:  in %s - NULL display name\n",__FUNCTION__);
 
@@ -192,7 +215,7 @@ char *pDisplayName;
   pCBTHead = NULL;
   pCBDHead = NULL; // make sure in both cases
 
-  hClipboardThread = WBThreadCreate(ClipboardThreadProc, pDisplayName);
+  hClipboardThread = WBThreadCreate(ClipboardThreadProc, pGlobalDisplayNameForClipboardInit);
 
   if(hClipboardThread == (WB_THREAD)INVALID_HANDLE_VALUE)
   {
@@ -200,47 +223,52 @@ char *pDisplayName;
 
     return 3;
   }
-  else
+
+  return 0;
+}
+
+
+int __FinishInitClipboardSystem(Display *pDisplay, const char *szDisplayName)
+{
+int iDelayPeriod = MIN_EVENT_LOOP_SLEEP_PERIOD;
+
+  while(WBThreadRunning(hClipboardThread) &&
+        bClipboardQuitFlag > 0)
   {
-    int iDelayPeriod = MIN_EVENT_LOOP_SLEEP_PERIOD;
+    WBDelay(iDelayPeriod); // wait for my thread to initialize
 
-    while(WBThreadRunning(hClipboardThread) &&
-          bClipboardQuitFlag > 0)
+    if(iDelayPeriod < MAX_EVENT_LOOP_SLEEP_PERIOD)
     {
-      WBDelay(iDelayPeriod); // wait for my thread to initialize
-
-      if(iDelayPeriod < MAX_EVENT_LOOP_SLEEP_PERIOD)
-      {
-        iDelayPeriod += (iDelayPeriod >> 1);
-      }
-      else
-      {
-        iDelayPeriod = MAX_EVENT_LOOP_SLEEP_PERIOD;
-      }
+      iDelayPeriod += (iDelayPeriod >> 1);
     }
-
-    WBFree(pDisplayName);  // ok to free it now
-
-    if(bClipboardQuitFlag || !WBThreadRunning(hClipboardThread))
+    else
     {
-      WBThreadWait(hClipboardThread); // wait for thread to exit (should be already)
-
-      hClipboardThread = (WB_THREAD)NULL; // make sure
-
-      WBMutexFree(&xClipboardMutex);
-
-      return 4; // error
+      iDelayPeriod = MAX_EVENT_LOOP_SLEEP_PERIOD;
     }
+  }
+
+  if(pGlobalDisplayNameForClipboardInit)
+  {
+    WBFree(pGlobalDisplayNameForClipboardInit);  // ok to free it now
+    pGlobalDisplayNameForClipboardInit = NULL;
+  }
+
+  if(bClipboardQuitFlag || !WBThreadRunning(hClipboardThread))
+  {
+    WBThreadWait(hClipboardThread); // wait for thread to exit (should be already)
+
+    hClipboardThread = (WB_THREAD)NULL; // make sure
+
+    WBMutexFree(&xClipboardMutex);
+
+    return 4; // error
   }
 
   WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Init, "INFO:  %s - Clipboard Thread started\n",__FUNCTION__);
 
-
-//  ullTick = WBGetTimeIndex() - ullTick;
-//  WBDebugPrint("TEMPORARY:  CLIPBOARD STARTUP took %llu ticks\n", ullTick);
-
   return 0; // everything's ok
 }
+
 
 void WBExitClipboardSystem(Display *pDisplay)
 {
@@ -540,11 +568,10 @@ Atom aUTF8_STRING;
 
   pDisplayName = NULL; // no longer valid (TODO:  cache it for multiple display instances?)
 
-  WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Init, "INFO:  %s - Clipboard Thread initialization complete\n",__FUNCTION__);
-
   ullTick = WBGetTimeIndex() - ullTick;
 
-  WBDebugPrint("TEMPORARY:  CLIPBOARD THREAD STARTUP took %llu ticks\n", ullTick);
+  WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Init, "INFO:  %s - Clipboard Thread initialization complete\n",__FUNCTION__);
+  WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Init, "CLIPBOARD THREAD STARTUP took %llu ticks\n", ullTick);
 
   // -------------------------------------------------------
   // main handler loop - this executes the clipboard thread

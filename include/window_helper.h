@@ -606,6 +606,23 @@ int WBInitDisplay(Display *pDisplay);
 int WBInitClipboardSystem(Display *pDisplay, const char *szDisplayName);
 
 /** \ingroup startup
+  * \internal
+  * \brief initializes clipboard sub-system
+  *
+  * first half of 'WBInitClipboardSystem()
+**/
+int __StartInitClipboardSystem(Display *pDisplay, const char *szDisplayName);
+
+/** \ingroup startup
+  * \internal
+  * \brief initializes clipboard sub-system
+  *
+  * final half of 'WBInitClipboardSystem()
+**/
+int __FinishInitClipboardSystem(Display *pDisplay, const char *szDisplayName);
+
+
+/** \ingroup startup
   * \brief deletes any remaining global objects, frees the Display pointer, and terminates event processing
   *
   * This function deletes any remaining global objects, frees the Display pointer, and terminates event

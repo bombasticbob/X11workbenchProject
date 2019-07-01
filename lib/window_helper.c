@@ -1112,7 +1112,7 @@ Display *pRval;
 
   pOldDisplayIOErrorHandler = XSetIOErrorHandler(WBXIOErrorHandler);
 
-  if(WBInitDisplay(pRval)) // open and initialize display and basic windowing stuff
+  if(WBInitDisplay(pRval)) // open and initialize display and basic windowing stuff (including clipboard)
   {
     WBExit(); // in case there are resources to free, plus it does XCloseDisplay(pRval);
 
@@ -1124,6 +1124,7 @@ Display *pRval;
 //  XFlush(pRval);
   XSync(pRval, 0); // make sure that the display is "in sync"
 
+#if 0 // see if I still need this by removing it
   WBDelay(100000); // wait 0.1 seconds for everything to stabilize (shorter times not good enough)
   // sometimes the window manager will get caught in a race condition and
   // forward along keystrokes that belong to the OLD application, such
@@ -1131,6 +1132,7 @@ Display *pRval;
   // to mis-behave or a window to insert an unnecessary keystroke.  Giving
   // the window manager a chance to NOT be involved in a race condition should
   // prevent this from happening, or at least minimize the chances.
+#endif // 0
 
   // now that I've initialized the display I can initialize things
   // that depend up on it, beginning with the font stuff
@@ -1158,10 +1160,30 @@ static int WBXIOErrorHandler(Display *pDisp)
 
 int WBInitDisplay(Display *pDisplay)
 {
+unsigned long long ullTick;
+
+  ullTick = WBGetTimeIndex();
+
   pDefaultDisplay = pDisplay;
 
   // create a 'fake' window that will keep me from losing connection when I terminate the app
   wWBFakeWindow = XCreateSimpleWindow(pDisplay, DefaultRootWindow(pDisplay), -1, -1, 1, 1, 0, 0, 0);
+
+  // assign a global X11 error handler that will continue execution after printing an appropriate
+  // debug message (as needed), in lieu of basically KILLING THE APPLICATION due to some trivial B.S. "error"
+
+//  BEGIN_XCALL_DEBUG_WRAPPER
+  XSetErrorHandler(WBXErrorHandler);
+//  END_XCALL_DEBUG_WRAPPER
+
+  // begin clipboard initialization with a background thread
+
+  if(__StartInitClipboardSystem(pDisplay, szDefaultDisplayName)) // initialize clipboard system
+  {
+    WB_ERROR_PRINT("%s - unable to initialize clipboard system\n", __FUNCTION__);
+
+    return 2;
+  }
 
   /*
    * Load the font to use.  See Sections 10.2 & 6.5.1 of the X11 docs
@@ -1187,6 +1209,10 @@ int WBInitDisplay(Display *pDisplay)
   }
 
 //  fontsetDefault = WBFontSetFromFont(pDisplay, pDefaultFont);
+
+  //------
+  // ATOMS
+  //------
 
   // NOTE:  the documentation for 'XInternAtom' does _NOT_ include a provision to
   //        free up unused atoms.  There's no obvious way to get rid of the ones that
@@ -1308,24 +1334,41 @@ int WBInitDisplay(Display *pDisplay)
   }
 
 
-  // NOW, assign a global X11 error handler that will continue execution after printing an appropriate
-  // debug message (as needed), in lieu of basically KILLING THE APPLICATION due to some trivial B.S. "error"
+  // FINALLY, initialize settings and finish the clipboard system
 
-//  BEGIN_XCALL_DEBUG_WRAPPER
-  XSetErrorHandler(WBXErrorHandler);
-//  END_XCALL_DEBUG_WRAPPER
-
-
-  // FINALLY, initialize settings and the clipboard system
-
-  if(WBInitClipboardSystem(pDisplay, szDefaultDisplayName)) // initialize clipboard system
+  if(__FinishInitClipboardSystem(pDisplay, szDefaultDisplayName)) // initialize clipboard system
   {
     WB_ERROR_PRINT("%s - unable to initialize clipboard system\n", __FUNCTION__);
 
     return 2;
   }
 
-  CHSettingsRefresh(pDisplay); // must init clipboard system *FIRST* before I call this
+  CHSettingsRefresh(pDisplay); // must init first part of the clipboard system *FIRST* before I call this
+
+  // now there's a minimum time delay that I need so that any characters
+  // that have been posted to a console window are processed by that console
+  // window and not by me.  If I grab the focus too early, it could interpret the
+  // return for the previous command as an input to the program.
+  //
+  // This needs to be longer for a debug build than for a release one, due to debug output
+  // on stderr (mostly).  At least that's how it seems to me.
+  //
+  // So, I need to delay for about 0.25 seconds at a minimum for debug builds, and 0.1 seconds
+  // for a release build.
+
+#ifdef NO_DEBUG
+#define MIN_STARTUP_DELAY 100000LL
+#else
+#define MIN_STARTUP_DELAY 250000LL
+#endif // NO_DEBUG
+
+  ullTick = WBGetTimeIndex() - ullTick;
+  if(ullTick < MIN_STARTUP_DELAY)
+  {
+    // TODO:  eat all keyboard and mouse input events...
+
+    usleep(MIN_STARTUP_DELAY - ullTick);
+  }
 
   return 0;  // success
 }
@@ -5716,7 +5759,7 @@ void WBCreateWindowDefaultGC(Window wID, unsigned long clrFG, unsigned long clrB
 
 #ifndef NO_DEBUG
 #warning does the default GC _REALLY_ need to have a default X11 (legacy) font ID assigned in the XGCValues struct???
-#endif // NODEBUG
+#endif // NO_DEBUG
   pEntry->hGC = WBCreateGC(pEntry->pDisplay, wID, (/*GCFont |*/ GCForeground | GCBackground), &gcv);
 
 // TEMPORARY - for debugging a specific problem

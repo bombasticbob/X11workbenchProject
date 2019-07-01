@@ -257,7 +257,7 @@ void __internal_font_helper_exit(void);
 /** \ingroup font
   * \brief returns non-zero value if certain fonts should be anti-aliased when rendered
   *
-  * \return A non-zero value if certain fonts should be anti-aliased; zero if they should not be.  This generally applies to legacy (X11) fonts only.
+  * \return A non-zero value if certain fonts should be anti-aliased; zero if they should not be.  This generally applies to legacy (X11) fonts only.  See WBFontSetEnableAntiAlias() which basically controls the internal flag that this function queries.
   *
   * Anti-aliasing can carry with it a performance degradation due to the somewhat slow process of getting rendering
   * information from the X server.  if the Render extension is present, and libXft is also present, then the Xft library
@@ -282,11 +282,10 @@ int WBFontEnableAntiAlias(void);
 void WBFontSetEnableAntiAlias(int bEnable);
 
 /** \ingroup font
-  * \brief make a copy of an existing font (best when assigning to a window)
+  * \brief free a WB_FONT that was created using one of the WBFont APIs
   *
   * \param pDisplay A pointer to the display
-  * \param pFont The original font to be copied
-  * \returns A copy of the original font as a WB_FONT.
+  * \param pFont The WB_FONT to be freed
   *
   * use this function to free up resources associated with an existing WB_FONT, invalidating the pointer.
   *
@@ -299,7 +298,7 @@ void WBFreeFont(Display *pDisplay, WB_FONT pFont);
   * \brief make a copy of an existing font (best when assigning to a window)
   *
   * \param pDisplay A pointer to the display
-  * \param pFont The original font to be copied
+  * \param pFont The original WB_FONTC to be copied
   * \returns A copy of the original font as a WB_FONT object (pointer).
   *
   * use this function to make a copy of an existing WB_FONT.
@@ -315,7 +314,7 @@ WB_FONT WBCopyFont(Display *pDisplay, WB_FONTC pFont);
   * \brief load and modify a font according to the specified size and flags
   *
   * \param pDisplay A pointer to the display
-  * \param pOriginal The original font on which to base the new font
+  * \param pOriginal The original WB_FONTC on which to base the new font
   * \param iFontSize The font size (see \ref WBLoadFont() for more details)\n
   * For a non-zero value, the font size is based on the WBFontFlag_SIZE_xxx flag specified in 'iFlags'
   * An 'iFontSize' value of ZERO copies the font size from the original font specified in 'pOriginal'.
@@ -364,13 +363,25 @@ WB_FONT WBLoadFont(Display *pDisplay, const char *szFontName,
 /** \ingroup font
   * \brief Get the average character width for a font
   *
-  * \param pFont A pointer to a WB_FONT
+  * \param pFont A pointer to a WB_FONTC
   * \returns The average width of a character for this font
   *
   * Use this function to query a WB_FONT about its average character width.
   *
 **/
 int WBFontAvgCharWidth(WB_FONTC pFont);
+
+
+/** \ingroup font
+  * \brief Get the maximum character width for a font
+  *
+  * \param pFont A pointer to a WB_FONTC
+  * \returns The maximum width of a character for this font
+  *
+  * Use this function to query a WB_FONT about its maximum character width.
+  *
+**/
+int WBFontMaxCharWidth(WB_FONTC pFont);
 
 
 /** \ingroup font
