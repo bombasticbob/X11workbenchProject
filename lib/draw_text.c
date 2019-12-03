@@ -106,12 +106,15 @@ static void __internalDoAntiAlias(Display *pDisplay, Drawable dw, WBGC gc, int i
 // *******************
 
 // abstracting the 'draw text' process
+// NOTE:  this is like WBDrawString but you specify a font without assigning it to the WBGC
+
 void DTDrawString(Display *pDisplay, Drawable drawable, WB_FONTC pFont,
                   WBGC gc, int x, int y, const char *pString, int nLength)
 {
 char tbuf[1024];
 char *pS;
 WB_EXTENT ext;
+XImage *pImage;
 
 //#if defined(X_HAVE_UTF8_STRING)
 //#define DO_DRAW_STRING Xutf8DrawString
@@ -119,6 +122,9 @@ WB_EXTENT ext;
 //#define DO_DRAW_STRING XmbDrawString
 //#endif // UTF8 vs multi-byte
 
+
+  // NOTE:  invokes WB_DRAW_STRING macro, which (for X11) is either Xutf8DrawString() or XmbDrawString()
+  //        depending on your system's configuration (more likely the first one)
 
   if(!pDisplay || !pString || drawable == None || !pFont || !gc || nLength <= 0)
   {
@@ -134,10 +140,22 @@ WB_EXTENT ext;
     return; // don't allow this.  just don't.
   }
 
+// TODO:  do I allow this??
 //  if(nLength < 0) // negative length - use strlen
 //  {
 //    nLength = strlen(pString);
 //  }
+
+  pImage = WBGetWindowImage(pDisplay, drawable);
+
+  if(pImage) // cached image - use WBXDrawString to do the work
+  {
+    WBXDrawString(pImage, pFont, gc, x, y, pString, nLength);
+    // NOTE:  does not update immediately, but after you 'end paint'
+
+    return;
+  }
+
 
   // do THIS part because 'pString' is 'const char *' and X*DrawString wants 'char *'
   // and so 'pS' becomes a copy of the string, in writeable memory.
@@ -167,12 +185,12 @@ use_the_stack_buffer:
     memcpy(pS, pString, nLength);
   }
 
+
   // TODO:  An alternate method of anti-aliasing
   //        make a font that is twice as big, render it on large-enough pixmap, and then
   //        shrink it down onto the display surface with a raster operation that combines
   //        pixels and (effectively) gives it an anti-aliasing effect.
 
-  // TODO:  need to make this so I can draw it onto an XImage
 
 #ifdef X11WORKBENCH_TOOLKIT_HAVE_XFT
   if(pFont && pFont->pxftFont)
@@ -247,34 +265,12 @@ use_the_stack_buffer:
     }
   }
 
+  // free up buffer if I allocated it
   if(pS && pS != &(tbuf[0]) && pS != (char *)pString)
   {
     WBFree(pS);
   }
 }
-
-int DTGetTextWidth(WB_FONTC pFont, const char *szUTF8, int nLength)
-{
-int iRval;
-
-  if(nLength <= 0)
-  {
-    return 0;
-  }
-
-  iRval = WBTextWidth(pFont, szUTF8, nLength); // WB_TEXT_ESCAPEMENT(fSet, szUTF8, nLength);
-
-  // TODO:  any debug output
-
-  return iRval;
-}
-
-void DTGetTextExtent(WB_FONTC pFont, const char *szUTF8, int nLength, WB_EXTENT *pExtent)
-{
-  WBTextExtent(pFont, szUTF8, nLength, pExtent);
-}
-
-
 
 // determine ideal font size from desired text and geometry
 
@@ -509,7 +505,7 @@ DT_WORDS * DTGetWordsFromText(Display *pDisplay, WB_FONTC pFont, const char *szT
         }
 
         // use white space string for width
-        pRval->aWords[pRval->nCount].iWidth = DTGetTextWidth(pFont, p2, pRval->aWords[pRval->nCount].nLength);
+        pRval->aWords[pRval->nCount].iWidth = WBTextWidth(pFont, p2, pRval->aWords[pRval->nCount].nLength);
         pRval->aWords[pRval->nCount].iHeight = WBFontHeight(pFont); // total height of font
 
         pRval->nCount++;
@@ -553,7 +549,7 @@ DT_WORDS * DTGetWordsFromText(Display *pDisplay, WB_FONTC pFont, const char *szT
       {
         if(!(iAlignment & DTAlignment_UNDERSCORE) || !iUnderscoreFlag)
         {
-          pRval->aWords[pRval->nCount].iWidth = DTGetTextWidth(pFont, p2, p1 - p2);
+          pRval->aWords[pRval->nCount].iWidth = WBTextWidth(pFont, p2, p1 - p2);
         }
         else
         {
@@ -562,8 +558,8 @@ DT_WORDS * DTGetWordsFromText(Display *pDisplay, WB_FONTC pFont, const char *szT
 
           // TODO:  the hard way?
 
-          pRval->aWords[pRval->nCount].iWidth = DTGetTextWidth(pFont, p2, p1 - p2)
-                                              - iUnderscoreFlag * DTGetTextWidth(pFont, "_", 1);
+          pRval->aWords[pRval->nCount].iWidth = WBTextWidth(pFont, p2, p1 - p2)
+                                              - iUnderscoreFlag * WBTextWidth(pFont, "_", 1);
         }
       }
       else
@@ -742,7 +738,7 @@ DT_WORD *pW, *pW2;
 
   if(!iFontWidth)
   {
-    iFontWidth = DTGetTextWidth(pFont, " ", 1);  // width of a single space
+    iFontWidth = WBTextWidth(pFont, " ", 1);  // width of a single space
   }
 
   iFontAscent = WBFontAscent(pFont);
@@ -1571,7 +1567,7 @@ XCharStruct xMaxBounds;
   // get a few things straight 'round here
 
 // NOTE:  iFontWidth and iFontHeight not being used; commented out because of linux gcc warnings
-//  iFontWidth = WBFontSetAvgCharWidth(pDisplay, pFont); // was DTGetTextWidth(pFont, " ", 1);  // width of a single space
+//  iFontWidth = WBFontSetAvgCharWidth(pDisplay, pFont); // was WBTextWidth(pFont, " ", 1);  // width of a single space
 //  iFontHeight = pFont->ascent + pFont->descent;
 
   WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DrawText,
@@ -1677,7 +1673,7 @@ XCharStruct xMaxBounds;
             {
               xpt[0].x=iH2;
               xpt[0].y=rcDest.top + pW->iY + iFontDescent + 1;// + pFont->max_bounds.ascent;
-              xpt[1].x=iH + DTGetTextWidth(pFont, (char *)(pW->pText) + i3, 1); // width of character
+              xpt[1].x=iH + WBTextWidth(pFont, (char *)(pW->pText) + i3, 1); // width of character
               xpt[1].y=xpt[0].y;
 
               //BEGIN_XCALL_DEBUG_WRAPPER
@@ -1686,7 +1682,7 @@ XCharStruct xMaxBounds;
             }
 
             // advance the pointer
-            iH += DTGetTextWidth(pFont, (char *)(pW->pText) + i3, i2 - i3);
+            iH += WBTextWidth(pFont, (char *)(pW->pText) + i3, i2 - i3);
 
             iH2 = iH; // next underscore's position
 
@@ -1710,7 +1706,7 @@ XCharStruct xMaxBounds;
           {
             xpt[0].x=iH;
             xpt[0].y=rcDest.top + pW->iY + xMaxBounds.descent + 1;// + pFont->max_bounds.ascent;
-            xpt[1].x=iH + DTGetTextWidth(pFont, (char *)(pW->pText) + i3, 1); // width of character
+            xpt[1].x=iH + WBTextWidth(pFont, (char *)(pW->pText) + i3, 1); // width of character
             xpt[1].y=xpt[0].y;
 
             //BEGIN_XCALL_DEBUG_WRAPPER

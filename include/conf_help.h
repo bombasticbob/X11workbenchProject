@@ -557,6 +557,195 @@ int CHGetCursorBlink(Display *pDisplay);
 int CHGetCursorBlinkTime(Display *pDisplay);
 
 
+////////////////////////////////////
+//             _                  //
+//    ___ ___ | | ___  _ __ ___   //
+//   / __/ _ \| |/ _ \| '__/ __|  //
+//  | (_| (_) | | (_) | |  \__ \  //
+//   \___\___/|_|\___/|_|  |___/  //
+//                                //
+////////////////////////////////////
+
+/** \ingroup desktop_settings
+  * \brief returns border color
+  *
+  * \param pDisplay The Display pointer (NULL for default)
+  * \returns const pointer to the border color as a string
+  *
+  * Returns const pointer to the border color as a string, default "#000000" or "#000000000000"
+  *
+  * Header File:  conf_help.h
+**/
+const char *CHGetBorderColor(Display *pDisplay);
+
+/** \ingroup desktop_settings
+  * \brief returns background color for static elements
+  *
+  * \param pDisplay The Display pointer (NULL for default)
+  * \returns const pointer to the 'static' background color as a string
+  *
+  * Returns const pointer to the background color as a string, default "#edeceb" or "#ededececebeb"
+  * Static background is for menus, toolbars, labels, and so forth
+  *
+  * Header File:  conf_help.h
+**/
+const char *CHGetStaticBackgroundColor(Display *pDisplay);
+
+/** \ingroup desktop_settings
+  * \brief returns background color for 'tool tips'
+  *
+  * \param pDisplay The Display pointer (NULL for default)
+  * \returns const pointer to the 'tool tip' background color as a string
+  *
+  * Returns const pointer to the background color as a string, default "#f8f880" or "#f8f8f8f88080"
+  *
+  * Header File:  conf_help.h
+**/
+const char *CHGetToolTipBackgroundColor(Display *pDisplay);
+
+/** \ingroup desktop_settings
+  * \brief returns background color for dialog frame elements
+  *
+  * \param pDisplay The Display pointer (NULL for default)
+  * \returns const pointer to the 'dialog' background color as a string
+  *
+  * Returns const pointer to the background color as a string, default "#edeceb" or "#ededececebeb" [consider e0e0e0]
+  * Dialog background is for dialog frames and most dialog box controls
+  *
+  * Header File:  conf_help.h
+**/
+const char *CHGetDialogBackgroundColor(Display *pDisplay);
+
+/** \ingroup desktop_settings
+  * \brief returns background color for active elements
+  *
+  * \param pDisplay The Display pointer (NULL for default)
+  * \returns const pointer to the 'active' background color as a string
+  *
+  * Returns const pointer to the background color as a string, default "#0000c0" or "#00000000c0c0"
+  * Active background is for windows and items that currently have the focus
+  *
+  * Header File:  conf_help.h
+**/
+const char *CHGetActiveBackgroundColor(Display *pDisplay);
+
+/** \ingroup desktop_settings
+  * \brief returns background color for disabled (greyed) elements
+  *
+  * \param pDisplay The Display pointer (NULL for default)
+  * \returns const pointer to the 'disabled' background color as a string
+  *
+  * Returns const pointer to the background color as a string, default "#0000c0" or "#00000000c0c0"
+  * Disabled background is for windows and items that are disabled (greyed)
+  *
+  * Header File:  conf_help.h
+**/
+const char *CHGetDisabledBackgroundColor(Display *pDisplay);
+
+/** \ingroup desktop_settings
+  * \brief returns background color for non-static elements
+  *
+  * \param pDisplay The Display pointer (NULL for default)
+  * \returns const pointer to the 'edit' background color as a string
+  *
+  * Returns const pointer to the background color as a string, default "#ffffff" or "#ffffffffffff"
+  * 'Regular' background color is for windows and controls that display selectable and/or editable content
+  *
+  * Header File:  conf_help.h
+**/
+const char *CHGetBackgroundColor(Display *pDisplay);
+
+/** \ingroup desktop_settings
+  * \brief returns text color for dialog frame elements
+  *
+  * \param pDisplay The Display pointer (NULL for default)
+  * \returns const pointer to the 'dialog' text color as a string
+  *
+  * Returns const pointer to the text color as a string, default "#000000" or "#000000000000"
+  * Dialog text color is for dialog frames, labels, and other static elements in a dialog box/frame
+  *
+  * Header File:  conf_help.h
+**/
+const char *CHGetDialogTextColor(Display *pDisplay);
+
+/** \ingroup desktop_settings
+  * \brief returns 'active' text color
+  *
+  * \param pDisplay The Display pointer (NULL for default)
+  * \returns const pointer to the 'active' text color as a string
+  *
+  * Returns const pointer to the text color as a string, default "#ffffff" or "#ffffffffffff"
+  * Active text color is the text color in an element that has the input focus.
+  *
+  * Header File:  conf_help.h
+**/
+const char *CHGetActiveTextColor(Display *pDisplay);
+
+/** \ingroup desktop_settings
+  * \brief returns 'disabled' (greyed) text color
+  *
+  * \param pDisplay The Display pointer (NULL for default)
+  * \returns const pointer to the 'disabled' text color as a string
+  *
+  * Returns const pointer to the text color as a string, default "#808080" or "#808080808080"
+  * Disabled text color is the text color in an element that has been disabled (greyed)
+  *
+  * Header File:  conf_help.h
+**/
+const char *CHGetDisabledTextColor(Display *pDisplay);
+
+/** \ingroup desktop_settings
+  * \brief returns text color for 'tool tips'
+  *
+  * \param pDisplay The Display pointer (NULL for default)
+  * \returns const pointer to the 'tool tip' text color as a string
+  *
+  * Returns const pointer to the text color as a string, default "#000000" or "#000000000000"
+  *
+  * Header File:  conf_help.h
+**/
+const char *CHGetToolTipTextColor(Display *pDisplay);
+
+/** \ingroup desktop_settings
+  * \brief returns text color
+  *
+  * \param pDisplay The Display pointer (NULL for default)
+  * \returns const pointer to the text color as a string
+  *
+  * Returns const pointer to the text color as a string, default "#000000" or "#000000000000"
+  * This is the default text/foreground color for everything that doesn't have a special color definition.
+  *
+  * Header File:  conf_help.h
+**/
+const char *CHGetTextColor(Display *pDisplay);
+
+/** \ingroup desktop_settings
+  * \brief returns highlight foreground color
+  *
+  * \param pDisplay The Display pointer (NULL for default)
+  * \returns const pointer to the highlight foreground color as a string
+  *
+  * Returns const pointer to the highlight foreground color as a string, default "#f0f0f0" or "#f0f0f0f0f0f0"
+  * Highlight colors include selected text, or selected items from a list.
+  *
+  * Header File:  conf_help.h
+**/
+const char *CHGetHighlightForegroundColor(Display *pDisplay);
+
+/** \ingroup desktop_settings
+  * \brief returns highlight background color
+  *
+  * \param pDisplay The Display pointer (NULL for default)
+  * \returns const pointer to the highlight background color as a string
+  *
+  * Returns const pointer to the highlight background color as a string, default "#0000a0" or "#00000000a0a0" [consider a0a0a0]
+  * Highlight colors include selected text, or selected items from a list.
+  *
+  * Header File:  conf_help.h
+**/
+const char *CHGetHighlightBackgroundColor(Display *pDisplay);
+
+
 
 // XML help
 

@@ -78,12 +78,11 @@ static XColor clrScrollFG,  ///< foreground scroll bar color
 **/
 static int iInitScrollColorFlag = 0;
 
-/** \brief macro to load a color, mostly for readability
+
+/** \hideinitializer
+  * \brief macro to get a color name or use default if it does not exist in settings
 **/
-#define LOAD_COLOR0(X,Y) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) > 0) {  }
-/** \brief macro to load a color with a fallback, mostly for readability
-**/
-#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
+#define COPY_COLOR_NAME(X,Y,Z) {const char *pX = X(WBGetDefaultDisplay()); if(pX) strncpy(Y,pX,sizeof(Y)); else strncpy(Y,Z,sizeof(Y));}
 
 /** \brief internal utility to check and initialize scroll bar standard colors
 **/
@@ -96,34 +95,41 @@ static void CheckInitScrollColors(void)
   {
     static const char *szBorder2="#FFFFFF", *szBorder2W="#C8C6C0", *szBorder3="#9C9A94"; // for 3D borders
     char szFG[16], szBG[16], szBD[16], szHFG[16], szHBG[16], szAFG[16], szABG[16]; // must be at least 14 characters
-    static const char szFGName[]="Scrollbar.foreground";
-    static const char szBGName[]="Scrollbar.background";
-    static const char szHFGName[]="Scrollbar.highlightForeground";
-    static const char szHBGName[]="Scrollbar.highlightBackground";
-    static const char szAFGName[]="Scrollbar.activeForeground";
-    static const char szABGName[]="Scrollbar.activeBackground";
-    static const char szBDName[]="Scrollbar.border";
+//    static const char szFGName[]="Scrollbar.foreground";
+//    static const char szBGName[]="Scrollbar.background";
+//    static const char szHFGName[]="Scrollbar.highlightForeground";
+//    static const char szHBGName[]="Scrollbar.highlightBackground";
+//    static const char szAFGName[]="Scrollbar.activeForeground";
+//    static const char szABGName[]="Scrollbar.activeBackground";
+//    static const char szBDName[]="Scrollbar.border";
 
     Colormap colormap = DefaultColormap(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
 
 
-    LOAD_COLOR0(szFGName,szFG) else LOAD_COLOR0("*Dialog.foreground",szFG) else LOAD_COLOR0("*Form.foreground", szFG)
-     else LOAD_COLOR0("*WmDialogShell.foreground",szFG) else LOAD_COLOR0("*WmForm.foreground", szFG)
-     else LOAD_COLOR("*foreground", szFG, "#000000");
+    COPY_COLOR_NAME(CHGetTextColor,szFG,"#000000");
+//    LOAD_COLOR0(szFGName,szFG) else LOAD_COLOR0("*Dialog.foreground",szFG) else LOAD_COLOR0("*Form.foreground", szFG)
+//     else LOAD_COLOR0("*WmDialogShell.foreground",szFG) else LOAD_COLOR0("*WmForm.foreground", szFG)
+//     else LOAD_COLOR("*foreground", szFG, "#000000");
 
-    LOAD_COLOR0(szBGName,szBG) else LOAD_COLOR0("*Dialog.background",szBG) else LOAD_COLOR0("*Form.background", szBG)
-     else LOAD_COLOR0("*WmDialogShell.background",szBG)
-     else LOAD_COLOR("*WmForm.background", szBG, "#dcdad5"); // default for gnome is dcdad5
+    COPY_COLOR_NAME(CHGetDialogBackgroundColor,szBG,"#dcdad5");
+//    LOAD_COLOR0(szBGName,szBG) else LOAD_COLOR0("*Dialog.background",szBG) else LOAD_COLOR0("*Form.background", szBG)
+//     else LOAD_COLOR0("*WmDialogShell.background",szBG)
+//     else LOAD_COLOR("*WmForm.background", szBG, "#dcdad5"); // default for gnome is dcdad5
 
-    LOAD_COLOR(szHFGName,szHFG,szFG);
-    LOAD_COLOR(szHBGName,szHBG,szBG);
-    LOAD_COLOR(szAFGName,szAFG,szFG);
-    LOAD_COLOR(szABGName,szABG,szBG);
+    COPY_COLOR_NAME(CHGetHighlightForegroundColor,szHFG,"#ffffff");
+    COPY_COLOR_NAME(CHGetHighlightBackgroundColor,szHBG,"#0040ff");
+    COPY_COLOR_NAME(CHGetActiveTextColor,szAFG,"#000000");
+    COPY_COLOR_NAME(CHGetActiveBackgroundColor,szABG,"#dcdad5");
+//    LOAD_COLOR(szHFGName,szHFG,szFG);
+//    LOAD_COLOR(szHBGName,szHBG,szBG);
+//    LOAD_COLOR(szAFGName,szAFG,szFG);
+//    LOAD_COLOR(szABGName,szABG,szBG);
 
-    LOAD_COLOR0(szBDName,szBD) else LOAD_COLOR0("*Dialog.border",szBD) else LOAD_COLOR0("*Form.border", szBD)
-     else LOAD_COLOR0("*WmDialogShell.border",szBD) else LOAD_COLOR0("*WmForm.border", szBD)
-     else LOAD_COLOR0("*borderColor", szBD)
-     else LOAD_COLOR("*border", szBD, "black"); // default for gnome
+    COPY_COLOR_NAME(CHGetBorderColor,szBD,"#000000");
+//     LOAD_COLOR0(szBDName,szBD) else LOAD_COLOR0("*Dialog.border",szBD) else LOAD_COLOR0("*Form.border", szBD)
+//     else LOAD_COLOR0("*WmDialogShell.border",szBD) else LOAD_COLOR0("*WmForm.border", szBD)
+//     else LOAD_COLOR0("*borderColor", szBD)
+//     else LOAD_COLOR("*border", szBD, "black"); // default for gnome
 
     XParseColor(WBGetDefaultDisplay(), colormap, szFG, &clrScrollFG);
     XAllocColor(WBGetDefaultDisplay(), colormap, &clrScrollFG);

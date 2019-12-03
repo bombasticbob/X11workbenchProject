@@ -131,10 +131,10 @@ enum DebugLevel
   DebugSubSystem_EditWindow  = 0x00040000,  //!< edit window callbacks               "editwindow"
   DebugSubSystem_ScrollBar   = 0x00080000,  //!< edit window callbacks               "scrollbar"
   DebugSubSystem_DrawText    = 0x00100000,  //!< Draw Text features                  "drawtext"
-  DebugSubSystem_Clipboard   = 0x00200000,  //!< Draw Text features                  "drawtext"
+  DebugSubSystem_Clipboard   = 0x00200000,  //!< Clipboard features                  "clipboard"
+  DebugSubSystem_TextObject  = 0x00400000,  //!< Text Object handling                "textobject"
 
   // remaining subsystem bits are reserved - please do not use them
-  DebugSubSystem_RESERVED1   = 0x00400000,  //!< reserved
   DebugSubSystem_RESERVED2   = 0x00800000,  //!< reserved
   DebugSubSystem_RESERVED3   = 0x01000000,  //!< reserved
   DebugSubSystem_RESERVED4   = 0x02000000,  //!< reserved

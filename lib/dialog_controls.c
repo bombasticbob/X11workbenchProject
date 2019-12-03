@@ -465,15 +465,93 @@ int i1;
   return NULL;
 }
 
+#define COPY_COLOR_NAME(X,Y,Z) {const char *pX = X(WBGetDefaultDisplay()); if(pX) strncpy(Y,pX,sizeof(Y)); else strncpy(Y,Z,sizeof(Y));}
+static void alloc_control_colors(WBDialogControl *pDialogControl,int bUseStaticColors)
+{
+char szFG[18], szBG[18], szBD[18], szHFG[18], szHBG[18], szAFG[18], szABG[18];
+Colormap colormap = DefaultColormap(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
+int iY, iU, iV, iR, iG, iB;
+
+  COPY_COLOR_NAME(CHGetTextColor,szFG,"#000000");
+
+  if(bUseStaticColors)
+  {
+    COPY_COLOR_NAME(CHGetStaticBackgroundColor,szBG,"#dcdad5");
+    COPY_COLOR_NAME(CHGetActiveTextColor,szAFG,"#000000");
+    COPY_COLOR_NAME(CHGetActiveBackgroundColor,szABG,"#ffffff");
+  }
+  else
+  {
+    COPY_COLOR_NAME(CHGetBackgroundColor,szBG,"#000000");
+    COPY_COLOR_NAME(CHGetTextColor,szAFG,"#000000");
+    COPY_COLOR_NAME(CHGetBackgroundColor,szABG,"#ffffff");
+  }
+
+  COPY_COLOR_NAME(CHGetHighlightForegroundColor,szHFG,"#e0e0e0");
+  COPY_COLOR_NAME(CHGetHighlightBackgroundColor,szHBG,"#0000a0");
+
+  COPY_COLOR_NAME(CHGetBorderColor,szBD,"#000000");
+
+
+  XParseColor(WBGetDefaultDisplay(), colormap, szFG, &(pDialogControl->clrFG));
+  XAllocColor(WBGetDefaultDisplay(), colormap, &(pDialogControl->clrFG));
+  XParseColor(WBGetDefaultDisplay(), colormap, szBG, &(pDialogControl->clrBG));
+  XAllocColor(WBGetDefaultDisplay(), colormap, &(pDialogControl->clrBG));
+  XParseColor(WBGetDefaultDisplay(), colormap, szAFG, &(pDialogControl->clrAFG));
+  XAllocColor(WBGetDefaultDisplay(), colormap, &(pDialogControl->clrAFG));
+  XParseColor(WBGetDefaultDisplay(), colormap, szABG, &(pDialogControl->clrABG));
+  XAllocColor(WBGetDefaultDisplay(), colormap, &(pDialogControl->clrABG));
+  XParseColor(WBGetDefaultDisplay(), colormap, szHFG, &(pDialogControl->clrHFG));
+  XAllocColor(WBGetDefaultDisplay(), colormap, &(pDialogControl->clrHFG));
+  XParseColor(WBGetDefaultDisplay(), colormap, szHBG, &(pDialogControl->clrHBG));
+  XAllocColor(WBGetDefaultDisplay(), colormap, &(pDialogControl->clrHBG));
+  XParseColor(WBGetDefaultDisplay(), colormap, szBD, &(pDialogControl->clrBD));
+
+  // ---------------------------------------------------------------------------------------
+  // 3D border colors - determine a decent set of border colors for clrBD2 and clrBD3 using
+  // the background color.  highlight luminocity will average between black and background
+  // for the shaded color (clrBD3) and between white and background for highlight (clrBD2).
+  // ---------------------------------------------------------------------------------------
+
+  if((pDialogControl->clrBG.flags & (DoRed | DoGreen | DoBlue)) != (DoRed | DoGreen | DoBlue))
+  {
+    PXM_PixelToRGB(PXM_StandardColormapFromColormap(NULL,colormap),
+                   &(pDialogControl->clrBG)); // make sure RGB is correctly assigned
+  }
+
+  RGB255_FROM_XCOLOR(pDialogControl->clrBG, iR, iG, iB);
+
+  PXM_RGBToYUV(iR, iG, iB, &iY, &iU, &iV);
+
+  // the highlight color should be 1/4 of the way between the background color and white, using the same U and V
+
+  PXM_YUVToRGB((3 * iY + 256) / 4, iU, iV, &iR, &iG, &iB);
+
+  RGB255_TO_XCOLOR(iR, iG, iB, pDialogControl->clrBD2); // assign new RGB values to the XColor struct
+  PXM_RGBToPixel(PXM_StandardColormapFromColormap(NULL,colormap),
+                 &(pDialogControl->clrBD2)); // re-assign pixel element from RGB values
+
+  // the shaded color should be 3/4 of the way between black and the background color, using the same U and V
+
+  PXM_YUVToRGB((3 * iY) / 4, iU, iV, &iR, &iG, &iB);
+
+  RGB255_TO_XCOLOR(iR, iG, iB, pDialogControl->clrBD3); // assign new RGB values to the XColor struct
+  PXM_RGBToPixel(PXM_StandardColormapFromColormap(NULL,colormap),
+                &(pDialogControl->clrBD3)); // re-assign pixel element from RGB values
+
+  XAllocColor(WBGetDefaultDisplay(), colormap, &(pDialogControl->clrBD2));
+  XAllocColor(WBGetDefaultDisplay(), colormap, &(pDialogControl->clrBD3));
+}
+
 
 #define LOAD_COLOR0(X,Y) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) > 0) {  }
 #define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
 
-static void alloc_control_colors(WBDialogControl *pDialogControl,
-                                 const char *szFGName, const char *szBGName,
-                                 const char *szHFGName, const char *szHBGName,
-                                 const char *szAFGName, const char *szABGName,
-                                 const char *szBDName, int bUseStaticColors)
+static void old_alloc_control_colors(WBDialogControl *pDialogControl,
+                                     const char *szFGName, const char *szBGName,
+                                     const char *szHFGName, const char *szHBGName,
+                                     const char *szAFGName, const char *szABGName,
+                                     const char *szBDName, int bUseStaticColors)
 {
 //  static const char *szBorder2="#FFFFFF", *szBorder3="#9C9A94"; // for 3D borders
   static const char *szHFGDef="#E0E0E0", *szHBGDef="#0000A0";  // highlight FG/BG
@@ -579,6 +657,10 @@ static void alloc_control_colors(WBDialogControl *pDialogControl,
   XAllocColor(WBGetDefaultDisplay(), colormap, &(pDialogControl->clrBD3));
 }
 
+#undef LOAD_COLOR0
+#undef LOAD_COLOR
+
+
 static Display *dialog_control_get_display(WBDialogControl *pDialogControl)
 {
 Display *pRval = NULL;
@@ -670,10 +752,10 @@ BEGIN_CREATE_CONTROL(FRAME_CONTROL);
 
   // color information for border, foreground, background
 
-  alloc_control_colors(pDialogControl, "*Dialog.foreground", "*Dialog.background",
+  alloc_control_colors(pDialogControl,/* "*Dialog.foreground", "*Dialog.background",
                        "*Dialog.foreground", "*Dialog.background",
                        "*Dialog.foreground", "*Dialog.background",
-                       "*Dialog.border", 1);
+                       "*Dialog.border",*/ 1);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, iBorderWidth,
                                 szClassName, szTitle, static_callback)
@@ -732,10 +814,10 @@ BEGIN_CREATE_CONTROL(TEXT_CONTROL);
 
   // color information for border, foreground, background
 
-  alloc_control_colors(pDialogControl, "*Label.foreground", "*Label.background",
+  alloc_control_colors(pDialogControl,/* "*Label.foreground", "*Label.background",
                        "*Label.highlightColor", "*Label.highlightBackground",
                        "*Labelframe.highlightColor", "*Labelframe.background",  // slightly different
-                       "*Labelframe.foreground", 1);
+                       "*Labelframe.foreground",*/ 1);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, iBorderWidth,
                                 szClassName, szTitle, static_callback)
@@ -792,10 +874,10 @@ BEGIN_CREATE_CONTROL(ICON_CONTROL);
 
   // color information for border, foreground, background
 
-  alloc_control_colors(pDialogControl, "*Dialog.foreground", "*Dialog.background",
+  alloc_control_colors(pDialogControl,/* "*Dialog.foreground", "*Dialog.background",
                        "*Dialog.foreground", "*Dialog.background",
                        "*Dialog.foreground", "*Dialog.background",
-                       "*Dialog.border", 1);
+                       "*Dialog.border",*/ 1);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, iBorderWidth,
                                 szClassName, szTitle, static_callback)
@@ -858,10 +940,10 @@ BEGIN_CREATE_CONTROL(IMAGE_CONTROL);
 
   // color information for border, foreground, background
 
-  alloc_control_colors(pDialogControl, "*Dialog.foreground", "*Dialog.background",
+  alloc_control_colors(pDialogControl,/* "*Dialog.foreground", "*Dialog.background",
                        "*Dialog.foreground", "*Dialog.background",
                        "*Dialog.foreground", "*Dialog.background",
-                       "*Dialog.border", 1);
+                       "*Dialog.border",*/ 1);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, iBorderWidth,
                                 szClassName, szTitle, static_callback)
@@ -930,10 +1012,10 @@ BEGIN_CREATE_CONTROL(EDIT_CONTROL);
 
   // color information for border, foreground, background
 
-  alloc_control_colors(pDialogControl, "*Text.foreground", "*Text.background",
+  alloc_control_colors(pDialogControl,/* "*Text.foreground", "*Text.background",
                        "*Text.selectForeground", "*Text.selectBackground",
                        "*Text.activeForeground", "*Text.activeBackground",
-                       "*Text.border", 0);
+                       "*Text.border",*/ 0);
 
 //  WB_ERROR_PRINT("TEMPORARY:  EDIT colors FG=%lxH BG=%lxH HF=%lx HB=%lx AF=%lx AB=%lx\n",
 //                 pDialogControl->clrFG.pixel,pDialogControl->clrBG.pixel,
@@ -1006,10 +1088,10 @@ WB_FONT pBold;
 
   // color information for border, foreground, background
 
-  alloc_control_colors(pDialogControl, "*Button.foreground", "*Button.background",
+  alloc_control_colors(pDialogControl,/* "*Button.foreground", "*Button.background",
                        "*Button.highlightForeground", "*Button.highlightBackground",
                        "*Button.activeForeground", "*Button.activeBackground",
-                       "*Button.border", 1);
+                       "*Button.border",*/ 1);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
                                 szClassName, szTitle, button_callback)
@@ -1073,10 +1155,10 @@ WB_FONT pBold;
 
   // color information for border, foreground, background
 
-  alloc_control_colors(pDialogControl, "*Button.foreground", "*Button.background",
+  alloc_control_colors(pDialogControl,/* "*Button.foreground", "*Button.background",
                        "*Button.highlightForeground", "*Button.highlightBackground",
                        "*Button.activeForeground", "*Button.activeBackground",
-                       "*Button.border", 1);
+                       "*Button.border",*/ 1);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
                                 szClassName, szTitle, button_callback)
@@ -1139,10 +1221,10 @@ WB_FONT pBold;
 
   // color information for border, foreground, background
 
-  alloc_control_colors(pDialogControl, "*Button.foreground", "*Button.background",
+  alloc_control_colors(pDialogControl,/* "*Button.foreground", "*Button.background",
                        "*Button.highlightForeground", "*Button.highlightBackground",
                        "*Button.activeForeground", "*Button.activeBackground",
-                       "*Button.border", 1);
+                       "*Button.border",*/ 1);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
                                 szClassName, szTitle, button_callback)
@@ -1201,10 +1283,10 @@ BEGIN_CREATE_CONTROL(RADIOBUTTON_CONTROL);
 
   // color information for border, foreground, background
 
-  alloc_control_colors(pDialogControl, "*Radiobutton.foreground", "*Radiobutton.background",
+  alloc_control_colors(pDialogControl,/* "*Radiobutton.foreground", "*Radiobutton.background",
                        "*Radiobutton.highlightForeground", "*Radiobutton.highlightBackground",
                        "*Radiobutton.activeForeground", "*RadioButton.activeBackground",
-                       "*Radiobutton.border", 1);
+                       "*Radiobutton.border",*/ 1);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
                                 szClassName, szTitle, button_callback)
@@ -1251,10 +1333,10 @@ BEGIN_CREATE_CONTROL(FIRSTRADIOBUTTON_CONTROL);
 
   // color information for border, foreground, background
 
-  alloc_control_colors(pDialogControl, "*Radiobutton.foreground", "*Radiobutton.background",
+  alloc_control_colors(pDialogControl,/* "*Radiobutton.foreground", "*Radiobutton.background",
                        "*Radiobutton.highlightForeground", "*Radiobutton.highlightBackground",
                        "*Radiobutton.activeForeground", "*RadioButton.activeBackground",
-                       "*Radiobutton.border", 1);
+                       "*Radiobutton.border",*/ 1);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
                                 szClassName, szTitle, button_callback)
@@ -1302,10 +1384,10 @@ BEGIN_CREATE_CONTROL(CHECKBUTTON_CONTROL);
 
   // color information for border, foreground, background
 
-  alloc_control_colors(pDialogControl, "*Checkbutton.foreground", "*Checkbutton.background",
+  alloc_control_colors(pDialogControl,/* "*Checkbutton.foreground", "*Checkbutton.background",
                        "*Checkbutton.highlightForeground", "*Checkbutton.highlightBackground",
                        "*Checkbutton.activeForeground", "*CheckButton.activeBackground",
-                       "*Checkbutton.border", 1);
+                       "*Checkbutton.border",*/ 1);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
                                 szClassName, szTitle, button_callback)
@@ -1352,10 +1434,10 @@ BEGIN_CREATE_CONTROL(TRISTATEBUTTON_CONTROL);
 
   // color information for border, foreground, background
 
-  alloc_control_colors(pDialogControl, "*Checkbutton.foreground", "*Checkbutton.background",
+  alloc_control_colors(pDialogControl,/* "*Checkbutton.foreground", "*Checkbutton.background",
                        "*Checkbutton.highlightForeground", "*Checkbutton.highlightBackground",
                        "*Checkbutton.activeForeground", "*CheckButton.activeBackground",
-                       "*Checkbutton.border", 1);
+                       "*Checkbutton.border",*/ 1);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
                                 szClassName, szTitle, button_callback)
@@ -1443,10 +1525,10 @@ BEGIN_CREATE_CONTROL(LIST_CONTROL);
 
   // color information for border, foreground, background
 
-  alloc_control_colors(pDialogControl, "*List.foreground", "*List.background",
+  alloc_control_colors(pDialogControl,/* "*List.foreground", "*List.background",
                        "*List.highlightForeground", "*List.highlightBackground",
                        "*List.activeForeground", "*List.activeBackground",
-                       "*List.border", 0);
+                       "*List.border",*/ 0);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
                                 szClassName, szTitle, list_callback)
@@ -1561,10 +1643,10 @@ BEGIN_CREATE_CONTROL(COMBO_CONTROL);
 
   // color information for border, foreground, background
 
-  alloc_control_colors(pDialogControl, "*Combo.foreground", "*Combo.background",
+  alloc_control_colors(pDialogControl,/* "*Combo.foreground", "*Combo.background",
                        "*Combo.highlightForeground", "*Combo.highlightBackground",
                        "*Combo.activeForeground", "*Combo.activeBackground",
-                       "*Combo.border", 0);
+                       "*Combo.border",*/ 0);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
                                 szClassName, szTitle, combo_callback)
@@ -1632,10 +1714,10 @@ BEGIN_CREATE_CONTROL(TREE_CONTROL);
 
   // color information for border, foreground, background
 
-  alloc_control_colors(pDialogControl, "*List.foreground", "*List.background",
+  alloc_control_colors(pDialogControl,/* "*List.foreground", "*List.background",
                        "*List.highlightForeground", "*List.highlightBackground",
                        "*List.activeForeground", "*List.activeBackground",
-                       "*List.border", 0);
+                       "*List.border",*/ 0);
 
   if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width is zero
                                 szClassName, szTitle, tree_callback)
@@ -3809,7 +3891,9 @@ WB_RECT rctTemp;
     {
       if(pPrivate->xTextObject.vtable->has_select(&(pPrivate->xTextObject)))
       {
-        pPrivate->xTextObject.vtable->replace_select(&(pPrivate->xTextObject), pBuf, nChar); // replace
+//        pPrivate->xTextObject.vtable->replace_select(&(pPrivate->xTextObject), pBuf, nChar); // replace
+        pPrivate->xTextObject.vtable->del_select(&(pPrivate->xTextObject));
+        pPrivate->xTextObject.vtable->ins_chars(&(pPrivate->xTextObject), pBuf, nChar); // insert where selection was
       }
       else
       {

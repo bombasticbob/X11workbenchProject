@@ -238,7 +238,7 @@ static const char * const aszDebugSubSys[]=
   "dialog","dialogctrl","frame","keyboard",
   "mouse","font","settings","selection",
   "pixmap","expose","editwindow","scrollbar",
-  "drawtext","clipboard",
+  "drawtext","clipboard","textobject",
   NULL
 };
 

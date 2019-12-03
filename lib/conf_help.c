@@ -499,6 +499,12 @@ int iRval = -1;//, iFormat;
     if(!pXS)
     {
       // color schemes are stored hierarchically - look in Gtk/ColorScheme for now
+      // TODO:  this is apparently deprecated; find how to do this properly.
+      //   https://wiki.gnome.org/Attic/GnomeArt/Tutorials/GtkThemes/SymbolicColors
+      //   (some info here) https://unix.stackexchange.com/questions/365607/overriding-gtk3-theme-colors
+      //   https://developer.gnome.org/gtk3/stable/GtkSettings.html
+      //   (some info here) https://forum.xfce.org/viewtopic.php?id=11947
+
 
       const char *pTemp = TranslateColorRequest(szIdentifier);
 
@@ -1740,6 +1746,24 @@ const CHXSettings * CHGetXSettings(Display *pDisplay)
 const CHXSetting * CHGetXSetting(Display *pDisplay, const char *szSettingName)
 {
 int i1, nSettings;
+// if it's Gtk/ColorScheme and the scheme is empty, return a dummied-up one
+// This spec is a MOVING TARGET, and it's a REAL PAIN to keep up with it.
+// currently has been marked as 'deprecated'
+// TODO:  find out what replaced this
+static char the_colors[]="fg_color:#000000000000\nbg_color:#ededececebeb\ntext_color:#1a1a1a1a1a1a\nbase_color:#ffffffffffff\n"
+                         "selected_fg_color:#ffffffffffff\nselected_bg_color:#2020abab2020\ntooltip_fg_color:#000000000000\n"
+                         "tooltip_bg_color:#f5f5f5f5b5b5";
+static CHXSetting defcolorscheme =
+{
+  "Gtk/ColorScheme",
+  XSettingsTypeString,
+  sizeof(the_colors),
+  0,
+  {
+   .szData = (char *)the_colors // as a char * actually
+  }
+};
+
 
   if(!pXSettings || pXSettings->pDisplay != pDisplay)
   {
@@ -1752,9 +1776,21 @@ int i1, nSettings;
   {
     if(!strcasecmp(szSettingName, pXSettings->aData[i1].szName))
     {
+      if(!strcasecmp(szSettingName, "Gtk/ColorScheme") &&
+         (pXSettings->aData[i1].iLen==0 || !pXSettings->aData[i1].uData.szData ||
+          !*(pXSettings->aData[i1].uData.szData)))
+      {
+        return &defcolorscheme;
+      }
+
       return pXSettings->aData + i1;
     }
   }
+
+  // TODO:  if there is no Gtk/ColorScheme do I want to return this anyway?
+
+  if(!strcasecmp(szSettingName, "Gtk/ColorScheme"))
+    return &defcolorscheme;  // for now, yes
 
   return NULL;
 }
@@ -3233,6 +3269,170 @@ int i1;
 
   return pRval;
 }
+
+
+
+// this was what I was doing in dialog_control.c and other places...
+#define LOAD_COLOR0(X,Y) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) > 0) {  }
+#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
+
+const char *CHGetBorderColor(Display *pDisplay)
+{
+static char szRval[256];
+
+  LOAD_COLOR("border_color", szRval, "#000000");
+
+  return szRval;
+}
+
+const char *CHGetStaticBackgroundColor(Display *pDisplay)
+{
+static char szRval[256];
+
+  LOAD_COLOR0("bg_color",szRval) else
+    LOAD_COLOR0("*Form.background", szRval) else
+    LOAD_COLOR("*WmForm.background", szRval, "#dcdad5"); // default for gnome is dcdad5
+
+  return szRval;
+}
+
+const char *CHGetToolTipBackgroundColor(Display *pDisplay)
+{
+static char szRval[256];
+
+  LOAD_COLOR("tooltip_bg_color",szRval, "#f8f880");
+
+  return szRval;
+}
+
+const char *CHGetDialogBackgroundColor(Display *pDisplay)
+{
+static char szRval[256];
+
+  LOAD_COLOR0("bg_color",szRval) else
+    LOAD_COLOR0("*Dialog.background",szRval) else
+    LOAD_COLOR0("*Form.background", szRval) else
+    LOAD_COLOR0("*WmDialogShell.background",szRval) else
+    LOAD_COLOR0("*WmForm.background", szRval) else
+    LOAD_COLOR0("*Window.background",szRval) else
+    LOAD_COLOR("*background", szRval, "#dcdad5"); // default for gnome is dcdad5
+
+  return szRval;
+}
+
+const char *CHGetActiveBackgroundColor(Display *pDisplay)
+{
+static char szRval[256];
+
+  // for now, same as normal (non-static) background color
+
+  LOAD_COLOR0("base_color",szRval) else // 'base_color' is the normal background color for non-static windows
+    LOAD_COLOR0("*Window.background",szRval) else
+    LOAD_COLOR("*background", szRval, "#edeceb");
+
+  return szRval;
+}
+
+const char *CHGetDisabledBackgroundColor(Display *pDisplay)
+{
+  return CHGetStaticBackgroundColor(pDisplay); // for now
+}
+
+const char *CHGetBackgroundColor(Display *pDisplay)
+{
+static char szRval[256];
+
+  LOAD_COLOR0("base_color",szRval) else // 'base_color' is the normal background color for non-static windows
+    LOAD_COLOR0("*Window.background",szRval) else
+    LOAD_COLOR("*background", szRval, "#ffffff");
+
+  return szRval;
+}
+
+const char *CHGetDialogTextColor(Display *pDisplay)
+{
+static char szRval[256];
+
+  LOAD_COLOR0("fg_color",szRval) else
+    LOAD_COLOR0("*Dialog.foreground",szRval) else
+    LOAD_COLOR0("*Form.foreground", szRval) else
+    LOAD_COLOR0("*WmDialogShell.foreground",szRval) else
+    LOAD_COLOR0("*WmForm.foreground", szRval) else
+    LOAD_COLOR("*foreground", szRval, "#000000");
+
+  return szRval;
+}
+
+const char *CHGetActiveTextColor(Display *pDisplay)
+{
+static char szRval[256];
+
+  // for now, same as normal (non-static) foreground/text color
+
+  LOAD_COLOR0("fg_color",szRval) else
+    LOAD_COLOR("*foreground", szRval, "#000000");
+
+  return szRval;
+}
+
+const char *CHGetDisabledTextColor(Display *pDisplay)
+{
+//static char szRval[256];
+//
+//  LOAD_COLOR0("fg_color",szRval) else
+//    LOAD_COLOR("*foreground", szRval, "#000000");
+//
+//  return szRval;
+
+  return "#808080"; // for now
+}
+
+const char *CHGetToolTipTextColor(Display *pDisplay)
+{
+static char szRval[256];
+
+  LOAD_COLOR("tooltip_fg_color",szRval, "#202020");
+
+  return szRval;
+}
+
+const char *CHGetTextColor(Display *pDisplay)
+{
+static char szRval[256];
+
+  LOAD_COLOR0("fg_color",szRval) else
+    LOAD_COLOR("*foreground", szRval, "#000000");
+
+  return szRval;
+}
+
+const char *CHGetHighlightForegroundColor(Display *pDisplay)
+{
+static char szRval[256];
+
+  LOAD_COLOR0("selected_fg_color",szRval) else
+    LOAD_COLOR0("*selectForeground",szRval) else
+    LOAD_COLOR0("*highlightColor",szRval) else
+    LOAD_COLOR("*highlightForeground", szRval, "#ffffff");
+
+//  "*Text.selectForeground", "*Text.selectBackground",
+//  "*Label.highlightColor", "*Label.highlightBackground",
+//  "*Button.highlightForeground", "*Button.highlightBackground",
+
+  return szRval;
+}
+
+const char *CHGetHighlightBackgroundColor(Display *pDisplay)
+{
+static char szRval[256];
+
+  LOAD_COLOR0("selected_bg_color",szRval) else
+    LOAD_COLOR0("*selectForeground",szRval) else
+    LOAD_COLOR("*highlightBackground", szRval, "#20ab20");
+
+  return szRval;
+}
+
 
 
 

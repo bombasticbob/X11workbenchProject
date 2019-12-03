@@ -218,7 +218,7 @@ typedef struct __DT_WORDS__
 
 
 /** \ingroup draw_text
-  * \brief Draw text in a platform-independent manner for UTF-8 or multi-byte text
+  * \brief Draw text in a platform-independent manner for UTF-8 or multi-byte text, equivalent to WBDrawString() using the specified WB_FONTC
   *
   * \param pDisplay A pointer to the display to use for rendering the text
   * \param drawable The 'Drawable' object upon which to render the text
@@ -230,48 +230,16 @@ typedef struct __DT_WORDS__
   * \param nLength The BYTE LENGTH of the UTF-8 or mult-byte string (not character length)
   *
   * Use this function to 'Draw Text' in a platform-independent manner, using the
-  * specified font set, upon the specified 'Drawable'.  This function is the equivalent
-  * of the X11 library's XmbDrawString() and Xutf8DrawString().
+  * specified WB_FONTC, upon the specified 'Drawable'.  This function is the equivalent
+  * of the X11 library's XmbDrawString() and Xutf8DrawString().  It implements similar
+  * to the WBDrawString() function.
   *
-  * As an extra added bonus, this function will apply anti-aliasing features, as appropriate
+  * As an extra added bonus, this function may apply anti-aliasing features, as appropriate
   *
   * Header File:  draw_text.h
 **/
 void DTDrawString(Display *pDisplay, Drawable drawable, WB_FONTC pFont,
                   WBGC gc, int x, int y, const char *pString, int nLength);
-
-
-/** \ingroup draw_text
-  * \brief XTextWidth equivalent for MBCS and UTF-8 strings
-  *
-  * \param pFont The WB_FONTC for which to query metrics
-  * \param szUTF8 A const pointer to a UTF-8 string
-  * \param nLength The BYTE LENGTH of the UTF-8 string (not character length)
-  * \returns the text width, in pixels
-  *
-  * This function is similar to WBTextWidth() except that it allows you to pass
-  * a font set of 'None', which will then use the default font set.  It calls
-  * the WBTextWidth() function internally.
-  *
-  * Header File:  draw_text.h
-**/
-int DTGetTextWidth(WB_FONTC pFont, const char *szUTF8, int nLength);
-
-/** \ingroup draw_text
-  * \brief XTextExtent equivalent for MBCS and UTF-8 strings
-  *
-  * \param pFont The WB_FONTC for which to query metrics
-  * \param szUTF8 A const pointer to a UTF-8 string
-  * \param nLength The BYTE LENGTH of the UTF-8 string (not character length)
-  * \param pExtent A pointer to a WB_EXTENT structure that receives the text extent
-  *
-  * This function is similar to WBTextExtent() except that it allows you to pass
-  * a font set of 'None', which will then use the default font set.  It calls
-  * the WBTextExtent() function internally.
-  *
-  * Header File:  draw_text.h
-**/
-void DTGetTextExtent(WB_FONTC pFont, const char *szUTF8, int nLength, WB_EXTENT *pExtent);
 
 
 ///** \ingroup draw_text

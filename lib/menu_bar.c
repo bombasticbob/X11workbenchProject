@@ -172,7 +172,7 @@ Atom aMENU_DISPLAY_POPUP = 0;
 #define DEBUG_VALIDATE(X) if(!(X)) { WB_WARN_PRINT("%s:%d - %s\n", __FUNCTION__, __LINE__, "WARNING - " #X " failed!\n"); }
 #endif // NO_DEBUG
 
-#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
+//#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
 
 int MBInitGlobal(void)
 {
@@ -236,7 +236,17 @@ int MBInitGlobal(void)
 //    static const char*szMenuBorder2="#FFFFFF", *szMenuBorder3="#9C9A94";
     int iY, iU, iV, iR, iG, iB;
 
+#define COPY_COLOR_NAME(X,Y,Z) {const char *pX = X(WBGetDefaultDisplay()); if(pX) strncpy(Y,pX,sizeof(Y)); else strncpy(Y,Z,sizeof(Y));}
+
     colormap = DefaultColormap(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
+    COPY_COLOR_NAME(CHGetTextColor, szMenuFG, "#000000");
+    COPY_COLOR_NAME(CHGetStaticBackgroundColor, szMenuBG, "#DCDAD5");
+    COPY_COLOR_NAME(CHGetHighlightForegroundColor, szMenuActiveFG, "#ffffff");
+    COPY_COLOR_NAME(CHGetHighlightBackgroundColor, szMenuActiveBG, "#4B6983");
+    COPY_COLOR_NAME(CHGetDisabledTextColor, szMenuDisabledFG, "#808080");
+    COPY_COLOR_NAME(CHGetDisabledTextColor, szMenuActiveDisabledFG, "#808080");
+
+#if 0
     LOAD_COLOR("*Menu.foreground",szMenuFG,"#000000");
     LOAD_COLOR("*Menu.background",szMenuBG,"#DCDAD5");
     LOAD_COLOR("*Menu.activeForeground",szMenuActiveFG,"#FFFFFF");
@@ -244,6 +254,7 @@ int MBInitGlobal(void)
     LOAD_COLOR("*Menu.disabledForeground",szMenuDisabledFG,"#808080");  // TODO:  verify these Menu.xxx strings for DISABLED
     LOAD_COLOR("*Menu.disabledForeground",szMenuActiveDisabledFG,"#808080");
     LOAD_COLOR("*borderColor",szMenuBorder1,"#000000");
+#endif // 0
 
     // NOTE:  'DEBUG_VALIDATE' (defined above) simply validates the return and prints a message if it failed.
     //        in a release build, the code is still executed, but no error checks are performed on the return value

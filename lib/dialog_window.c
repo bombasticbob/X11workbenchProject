@@ -211,8 +211,9 @@ void WBDialogWindowExit()
 
 }
 
-#define LOAD_COLOR0(X,Y) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) > 0) {  }
-#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
+//#define LOAD_COLOR0(X,Y) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) > 0) {  }
+//#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
+#define COPY_COLOR_NAME(X,Y,Z) {const char *pX = X(WBGetDefaultDisplay()); if(pX) strncpy(Y,pX,sizeof(Y)); else strncpy(Y,Z,sizeof(Y));}
 
 static void InternalCheckColors(void)
 {
@@ -226,6 +227,11 @@ static void InternalCheckColors(void)
     char szFG[16], szBG[16], szBD[16];
     colormap = DefaultColormap(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
 
+    COPY_COLOR_NAME(CHGetTextColor,szFG,"#000000");
+    COPY_COLOR_NAME(CHGetDialogBackgroundColor,szBG,"#dcdad5");
+    COPY_COLOR_NAME(CHGetBorderColor,szBD,"#000000");
+
+#if 0
     LOAD_COLOR0("*Dialog.foreground",szFG) else LOAD_COLOR0("*Form.foreground", szFG)
      else LOAD_COLOR0("*WmDialogShell.foreground",szFG) else LOAD_COLOR0("*WmForm.foreground", szFG)
      else LOAD_COLOR("*foreground", szFG, "#000000");
@@ -236,6 +242,7 @@ static void InternalCheckColors(void)
      else LOAD_COLOR0("*WmDialogShell.border",szBD) else LOAD_COLOR0("*WmForm.border", szBD)
      else LOAD_COLOR0("*borderColor", szBD)
      else LOAD_COLOR("*border", szBD, "black"); // default for gnome
+#endif // 0
 
     XParseColor(WBGetDefaultDisplay(), colormap, szFG, &clrFG);
     XAllocColor(WBGetDefaultDisplay(), colormap, &clrFG);

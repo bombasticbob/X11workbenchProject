@@ -98,7 +98,7 @@ struct __internal_undo_redo_buffer
 
 #define SEL_RECT_ALL(X) ((X)->rctSel.left < 0)
 #define SEL_RECT_EMPTY(X) (!SEL_RECT_ALL(X) && ((X)->rctSel.left == (X)->rctSel.right && (X)->rctSel.bottom == (X)->rctSel.top))
-#define NORMALIZE_SEL_RECT(X) {if((X).top > (X).bottom || ((X).top == (X).bottom && (X).left > (X).right)) \
+#define NORMALIZE_SEL_RECT(X) {if(( (X).top > (X).bottom ) || ( (X).top == (X).bottom && (X).left > (X).right) ) \
                                { int i1 = (X).left; (X).left = (X).right; (X).right = i1; \
                                  i1 = (X).top; (X).top = (X).bottom; (X).bottom = i1; }}
 
@@ -306,7 +306,7 @@ int cbLen;
   {
     nLines = WBStringLineCount(pBuf, cbBufSize);
 
-    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d allocate for %d lines\n", __FUNCTION__, __LINE__, nLines);
+    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d allocate for %d lines\n", __FUNCTION__, __LINE__, nLines);
   }
 
   if(nLines < DEFAULT_TEXT_BUFFER_LINES)
@@ -500,7 +500,7 @@ unsigned int nNewMax = 0, nNewMinMax = UINT_MAX;
 
   if(pBuf->nEntries <= 1) // zero or one lines?
   {
-    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d - (single line) nLine=%ld, nNewLen = %d\n",
+    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - (single line) nLine=%ld, nNewLen = %d\n",
                    __FUNCTION__, __LINE__, nLine, nNewLen);
 
     WBTextBufferRefreshCache(pBuf); // always do it THIS way
@@ -513,7 +513,7 @@ unsigned int nNewMax = 0, nNewMinMax = UINT_MAX;
     return; // sanity check failed (do nothing)
   }
 
-  WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d - nLine=%ld, nNewLen = %d\n",
+  WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - nLine=%ld, nNewLen = %d\n",
                  __FUNCTION__, __LINE__, nLine, nNewLen);
 
   // update the line info in my cache.  If this line appears, remove it (always).
@@ -828,6 +828,12 @@ void WBTextObjectDestructor(TEXT_OBJECT *pObj)
 {
   if(WBIsValidTextObject(pObj))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pObj iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pObj->iRow, pObj->iCol,
+                   pObj->rctSel.left, pObj->rctSel.top, pObj->rctSel.right, pObj->rctSel.bottom);
+
     pObj->vtable->destroy(pObj);
 
     WBFree(pObj);
@@ -916,6 +922,12 @@ struct __internal_undo_redo_buffer *pUndo, *pTU, *pTU2;
   {
     return;
   }
+
+  WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                 "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                 __FUNCTION__, __LINE__,
+                 pThis->iRow, pThis->iCol,
+                 pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
 
   pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
@@ -1044,6 +1056,12 @@ int cbLen;
     return;
   }
 
+  WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                 "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                 __FUNCTION__, __LINE__,
+                 pThis->iRow, pThis->iCol,
+                 pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
   // convert an 'undo' into a 'redo' and add it to the 'redo' chain
   // essentially 'just a copy'
 
@@ -1081,6 +1099,12 @@ int iOldSel;
   {
     return;
   }
+
+  WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                 "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                 __FUNCTION__, __LINE__,
+                 pThis->iRow, pThis->iCol,
+                 pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
 
   // first, make sure the selection mode is correct
 
@@ -1137,6 +1161,12 @@ int iOldSel, cbLen;
   {
     return;
   }
+
+  WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                 "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                 __FUNCTION__, __LINE__,
+                 pThis->iRow, pThis->iCol,
+                 pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
 
   cbLen = pRedo->nOld + pRedo->nNew + sizeof(*pRedo);
 
@@ -1219,10 +1249,16 @@ TEXT_BUFFER *pTB;
 int iIsBoxMode, iIsLineMode;
 
 
-  WB_DEBUG_PRINT(DebugLevel_Verbose, "calling %s(%d,%d,%d,%d)\n", __FUNCTION__, iRow, iCol, iEndRow, iEndCol);
-
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
+    WB_DEBUG_PRINT(DebugLevel_Verbose, "calling %s(%d,%d,%d,%d)\n", __FUNCTION__, iRow, iCol, iEndRow, iEndCol);
+
     if(!pThis->pText)
     {
       return WBCopyString(""); // return a blank string
@@ -1449,6 +1485,12 @@ WB_RECT rctCursor;
 
   if(WBIsValidTextObject(pThis) && pThis->wIDOwner != None)
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     rctCursor.left = pThis->iCursorX - 1;
     rctCursor.top = pThis->iCursorY - 1;
     rctCursor.bottom = rctCursor.top + pThis->iCursorHeight + 2;
@@ -1472,6 +1514,12 @@ WB_RECT rctInvalid;
 
   if(WBIsValidTextObject(pThis) && pThis->wIDOwner != None)
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     if(pThis->rctView.right <= pThis->rctView.left || pThis->rctView.bottom <= pThis->rctView.top ||
        pThis->rctWinView.right <= pThis->rctWinView.left || pThis->rctWinView.bottom <= pThis->rctWinView.top ||
        memcmp(&pThis->rctView, &pThis->rctViewOld, sizeof(pThis->rctView)) ||
@@ -1527,7 +1575,7 @@ WB_RECT rctInvalid;
 
     WBInvalidateRect(pThis->wIDOwner, &rctInvalid, bPaintFlag);
 
-    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d - invalidate %d,%d,%d,%d for %u (%08xH)\n",
+    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - invalidate %d,%d,%d,%d for %u (%08xH)\n",
                    __FUNCTION__, __LINE__,
                    rctInvalid.left, rctInvalid.top, rctInvalid.right, rctInvalid.bottom,
                    (int)pThis->wIDOwner, (int)pThis->wIDOwner);
@@ -1537,11 +1585,11 @@ WB_RECT rctInvalid;
 //  {
 //    if(!WBIsValidTextObject(pThis))
 //    {
-//      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d - invalid text object\n", __FUNCTION__, __LINE__);
+//      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - invalid text object\n", __FUNCTION__, __LINE__);
 //    }
 //    else
 //    {
-//      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d - owner window ID is 'None'\n", __FUNCTION__, __LINE__);
+//      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - owner window ID is 'None'\n", __FUNCTION__, __LINE__);
 //    }
 //  }
 }
@@ -1563,6 +1611,12 @@ TEXT_BUFFER *pBuf;
 
     return;
   }
+
+  WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                 "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                 __FUNCTION__, __LINE__,
+                 pThis->iRow, pThis->iCol,
+                 pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
 
   pBuf = (TEXT_BUFFER *)(pThis->pText); // might be NULL, must check before use
 
@@ -1648,7 +1702,7 @@ TEXT_BUFFER *pBuf;
                        + iFontHeight * (iEndRow - pThis->rctView.top);
       }
 
-      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d - merged rect %d,%d,%d,%d\n",
+      WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - merged rect %d,%d,%d,%d\n",
                      __FUNCTION__, __LINE__,
                      pRect->left, pRect->top, pRect->right, pRect->bottom);
     }
@@ -1669,6 +1723,12 @@ WB_RECT rctMerge;
 
     return;
   }
+
+  WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                 "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                 __FUNCTION__, __LINE__,
+                 pThis->iRow, pThis->iCol,
+                 pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
 
   __internal_calc_rect(pThis, &rctMerge, iStartRow, iStartCol, iEndRow, iEndCol);
 
@@ -1699,6 +1759,12 @@ static void __internal_destroy(struct _text_object_ *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     // TODO:  additional validation
 
     if(pThis->pText)
@@ -1747,15 +1813,19 @@ static void __internal_init(struct _text_object_ *pThis)
     char szHFG[16], szHBG[16];
     Colormap colormap = DefaultColormap(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
 
-#define LOAD_COLOR(X,Y,Z) \
-    if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0) \
-    { WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", \
-                    __FUNCTION__, X, Z); strcpy(Y,Z); }
+//#define LOAD_COLOR(X,Y,Z) \
+//    if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0) \
+//    { WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", \
+//                    __FUNCTION__, X, Z); strcpy(Y,Z); }
+//
+//    LOAD_COLOR("selected_bg_color", szHBG, "#0040FF"); // a slightly greenish blue for the 'selected' BG color
+//    LOAD_COLOR("selected_fg_color", szHFG, "white");   // white FG when selected
+//
+//#undef LOAD_COLOR
 
-    LOAD_COLOR("selected_bg_color", szHBG, "#0040FF"); // a slightly greenish blue for the 'selected' BG color
-    LOAD_COLOR("selected_fg_color", szHFG, "white");   // white FG when selected
-
-#undef LOAD_COLOR
+#define COPY_COLOR_NAME(X,Y,Z) {const char *pX = X(WBGetDefaultDisplay()); if(pX) strncpy(Y,pX,sizeof(Y)); else strncpy(Y,Z,sizeof(Y));}
+    COPY_COLOR_NAME(CHGetHighlightForegroundColor,szHFG,"#ffffff");
+    COPY_COLOR_NAME(CHGetHighlightBackgroundColor,szHBG,"#0040FF");
 
     XParseColor(WBGetDefaultDisplay(), colormap, szHFG, &(pThis->clrHFG));
     XAllocColor(WBGetDefaultDisplay(), colormap, &(pThis->clrHFG)); // TODO:  calculate missing pieces myself?
@@ -1775,6 +1845,12 @@ static void __internal_highlight_colors(struct _text_object_ *pThis, XColor clrH
 {
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pThis->clrHFG = clrHFG;
     pThis->clrHBG = clrHBG;
   }
@@ -1791,6 +1867,12 @@ TEXT_BUFFER *pTemp;
 
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     // for now, allocate a NEW text buffer and replace the old one with it
 
     pTemp = WBAllocTextBuffer(szText, cbLen);
@@ -1831,6 +1913,12 @@ TEXT_BUFFER *pBuf;
 
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pBuf = (TEXT_BUFFER *)(pThis->pText);
 
     if(pBuf && pBuf->nEntries > 0) // only if NOT empty
@@ -1854,6 +1942,12 @@ int i1;
 
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pBuf = (TEXT_BUFFER *)(pThis->pText);
 
     if(pBuf)
@@ -1903,6 +1997,12 @@ static void __internal_set_filetype(struct _text_object_ *pThis, int iFileType)
 {
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pThis->iFileType = iFileType;
 
     if(pThis->pColorContextCallback)
@@ -1923,6 +2023,12 @@ static void __internal_set_linefeed(struct _text_object_ *pThis, int iLineFeed)
 {
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pThis->iLineFeed = (enum _LineFeed_)iLineFeed;
   }
 }
@@ -1938,6 +2044,12 @@ static void __internal_set_insmode(struct _text_object_ *pThis, int iInsMode)
 {
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pThis->iInsMode = iInsMode;
 
     pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
@@ -1957,6 +2069,12 @@ static void __internal_set_selmode(struct _text_object_ *pThis, int iSelMode)
 {
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pThis->iSelMode = iSelMode;
   }
 }
@@ -1973,6 +2091,12 @@ static void __internal_set_tab(struct _text_object_ *pThis, int iTab)
 {
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pThis->iTab = iTab;
   }
 }
@@ -1988,6 +2112,12 @@ static void __internal_set_scrollmode(struct _text_object_ *pThis, int iScrollMo
 {
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pThis->iScrollMode = iScrollMode;
   }
 }
@@ -1995,6 +2125,12 @@ static void __internal_get_select(const struct _text_object_ *pThis, WB_RECT *pR
 {
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     if(pRct)
     {
       if(SEL_RECT_ALL(pThis))
@@ -2022,6 +2158,12 @@ static void __internal_set_select(struct _text_object_ *pThis, const WB_RECT *pR
 
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     if(!pRct)
     {
       pThis->rctSel.left = pThis->rctSel.top = pThis->rctSel.right = pThis->rctSel.bottom
@@ -2047,6 +2189,12 @@ WB_RECT rctSel;
 
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     if(pRct)
     {
       if(pRct->left == pRct->right && pRct->top == pRct->bottom)
@@ -2093,6 +2241,12 @@ static void __internal_set_row(struct _text_object_ *pThis, int iRow)
 {
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     if(iRow < 0 || !pThis->pText)
     {
       iRow = 0;
@@ -2120,6 +2274,12 @@ int iAutoScrollWidth = AUTO_HSCROLL_SIZE;
 
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pThis->iCol = iCol; // for now, assign "as-is"
 
     // auto-scroll viewport for single-line only
@@ -2164,6 +2324,12 @@ WB_RECT rctSel;
 
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     __internal_invalidate_cursor(pThis, 0);
     pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
@@ -2171,6 +2337,8 @@ WB_RECT rctSel;
 
     if(!iSelAll && SEL_RECT_EMPTY(pThis))
     {
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject, "%s line %d - empty selection\n", __FUNCTION__, __LINE__);
+
       // no selection, do nothing
       return;
     }
@@ -2179,6 +2347,9 @@ WB_RECT rctSel;
 
     if(!pBuf || (pThis->rctSel.top >= pBuf->nEntries && pThis->rctSel.bottom >= pBuf->nEntries))
     {
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject,
+                     "%s line %d: no selection to delete\n", __FUNCTION__, __LINE__);
+
       return;  // NO buffer, or select area is outside of buffer area
     }
 
@@ -2201,6 +2372,8 @@ WB_RECT rctSel;
 
     if(iSelAll)
     {
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject,
+                     "%s line %d: delete 'select all'\n", __FUNCTION__, __LINE__);
       // delete all
       if(pThis->pText)
       {
@@ -2219,6 +2392,10 @@ WB_RECT rctSel;
             rctSel.top == rctSel.bottom) // single-line selection (all methods behave the same)
     {
       // delete from rctSel.left to rctSel.right (exclusive)
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject,
+                     "%s line %d: delete single line, %d to %d (top=%d, bottom=%d)\n",
+                      __FUNCTION__, __LINE__,
+                      rctSel.left, rctSel.right, rctSel.top, rctSel.bottom);
 
       pL = pBuf->aLines[rctSel.top];
 
@@ -2284,12 +2461,28 @@ WB_RECT rctSel;
     }
     else if(pThis->iSelMode == SelectMode_BOX) // multiline delete BOX mode
     {
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject,
+                     "%s line %d: BOX MODE delete multiline, %d,%d to %d,%d\n",
+                      __FUNCTION__, __LINE__,
+                      rctSel.left, rctSel.top,
+                      rctSel.right, rctSel.right);
     }
     else if(pThis->iSelMode == SelectMode_LINE) // multiline delete LINE mode
     {
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject,
+                     "%s line %d: LINE MODE delete multiline, %d,%d to %d,%d\n",
+                      __FUNCTION__, __LINE__,
+                      rctSel.left, rctSel.top,
+                      rctSel.right, rctSel.right);
     }
     else // default 'char'
     {
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject,
+                     "%s line %d: delete multiline, %d,%d to %d,%d\n",
+                      __FUNCTION__, __LINE__,
+                      rctSel.left, rctSel.top,
+                      rctSel.right, rctSel.right);
+
       if(pBuf->aLines[rctSel.top] && rctSel.left > 0)
       {
         pL = pBuf->aLines[rctSel.top];
@@ -2437,16 +2630,33 @@ WB_RECT rctSel;
 
     // NOTE:  this assumes that the data is consistent
 
-    pThis->rctSel.left = pThis->rctSel.top = pThis->rctSel.right = pThis->rctSel.bottom = 0;
+    pThis->rctSel.left = 0;
+    pThis->rctSel.top = 0;
+    pThis->rctSel.right = 0;
+    pThis->rctSel.bottom = 0;
 
-    if(iSelAll)
+    if(iSelAll) // everything was deleted
     {
-      pThis->iRow = pThis->iCol = 0;
+      pThis->iRow = 0;
+      pThis->iCol = 0;
     }
     else
     {
-      pThis->iRow = rctSel.top;
-      pThis->iCol = rctSel.left;
+      if(rctSel.top >= 0)
+        pThis->iRow = rctSel.top;
+      else
+      {
+        WB_WARN_PRINT("WARNING - %s line %d - rctSel.top == %d\n", __FUNCTION__, __LINE__, rctSel.top);
+        pThis->iRow = 0;
+      }
+
+      if(rctSel.left >= 0)
+        pThis->iCol = rctSel.left;
+      else
+      {
+        WB_WARN_PRINT("WARNING - %s line %d - rctSel.left == %d\n", __FUNCTION__, __LINE__, rctSel.left);
+        pThis->iCol = 0;
+      }
     }
 
     if(pThis->pColorContextCallback)
@@ -2464,9 +2674,16 @@ static void __internal_replace_select(struct _text_object_ *pThis, const char *s
 WB_RECT rctSel;
 int iSelAll;
 
+
   if(WBIsValidTextObject(pThis))
   {
     int iOldIns; //, iOldRow, iOldCol;
+
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
 
     if(pThis->iRow < 0 || pThis->iCol< 0)
     {
@@ -2502,24 +2719,24 @@ int iSelAll;
 
     if(!iSelAll && SEL_RECT_EMPTY(pThis)) // not 'ALL'
     {
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject, "%s line %d - replace an empty select\n", __FUNCTION__, __LINE__);
+
       __internal_ins_chars(pThis, szText, cbLen); // just insert the text (no selection)
 
       // NOTE:  select rectangle remains empty
     }
     else
     {
-      // for now delete the selection, then insert the new characters
+      // for now delete the selection, then insert the new characters, and make new selection match inserted text
       // this will take into consideration the select mode
       __internal_del_select(pThis);               // this also clears the selection
 
-     // new selection starts at rctSel.top, rctSel.left
-
+       // new selection starts at rctSel.top, rctSel.left
       __internal_ins_chars(pThis, szText, cbLen); // just insert the text (no selection)
 
       // new selection ends at iRow, iCol
-
-      rctSel.right = pThis->iRow;
-      rctSel.bottom = pThis->iCol;
+      rctSel.bottom = pThis->iRow;
+      rctSel.right = pThis->iCol;
 
       // assign the new select rectangle to become the text I just added.
       memcpy(&(pThis->rctSel), &rctSel, sizeof(pThis->rctSel));
@@ -2568,6 +2785,12 @@ WB_RECT rctInvalid;
   {
     return; // error
   }
+
+  WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                 "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                 __FUNCTION__, __LINE__,
+                 pThis->iRow, pThis->iCol,
+                 pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
 
   __internal_invalidate_cursor(pThis, 0);
   pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
@@ -3013,6 +3236,12 @@ WB_RECT rctInvalid;
 
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     if(pThis->iRow < 0 || pThis->iCol< 0)
     {
       pThis->iRow = 0;
@@ -3571,6 +3800,12 @@ static void __internal_set_view_origin(struct _text_object_ *pThis, const WB_POI
     int nRows = __internal_get_rows(pThis);
     int nCols = __internal_get_cols(pThis);
 
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     nRows -= (pThis->rctView.bottom - pThis->rctView.top); // note that 'nRows' includes the blank line at the end
     if(nRows < 0)
     {
@@ -3619,6 +3854,12 @@ static void __internal_begin_highlight(struct _text_object_ *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pThis->iDragState = DragState_CURSOR;
   }
 }
@@ -3626,6 +3867,12 @@ static void __internal_end_highlight(struct _text_object_ *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pThis->iDragState = DragState_NONE;
   }
 }
@@ -3640,6 +3887,12 @@ WB_RECT rctSel;
 
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pBuf = (TEXT_BUFFER *)(pThis->pText);
 
     memset(&rctSel, 0, sizeof(rctSel));
@@ -3735,6 +3988,8 @@ WB_RECT rctSel;
 
       if(SEL_RECT_EMPTY(pThis))
       {
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject, "%s line %d - empty selection, starting the drag\n", __FUNCTION__, __LINE__);
+
         pThis->rctSel.top = pThis->iRow; // old row
         pThis->rctSel.left = pThis->iCol; // previous column
       }
@@ -3767,6 +4022,12 @@ static void __internal_begin_mouse_drag(struct _text_object_ *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
 //    WB_ERROR_PRINT("TEMPORARY - %s\n", __FUNCTION__);
     pThis->iDragState = DragState_MOUSE;
   }
@@ -3775,6 +4036,12 @@ static void __internal_end_mouse_drag(struct _text_object_ *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
 //    WB_ERROR_PRINT("TEMPORARY - %s\n", __FUNCTION__);
     pThis->iDragState = DragState_NONE;
   }
@@ -3791,6 +4058,12 @@ TEXT_BUFFER *pBuf;
   else
   {
     int iOldRow = pThis->iRow;
+
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
 
     pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
@@ -3826,6 +4099,8 @@ TEXT_BUFFER *pBuf;
     {
       if(SEL_RECT_EMPTY(pThis))
       {
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject, "%s line %d - empty selection, starting select\n", __FUNCTION__, __LINE__);
+
         pThis->rctSel.left = pThis->iCol;
         pThis->rctSel.top = iOldRow;
       }
@@ -3885,6 +4160,12 @@ TEXT_BUFFER *pBuf;
   {
     int iOldRow = pThis->iRow;
 
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     if(pThis->iLineFeed == LineFeed_NONE) // single line
@@ -3915,6 +4196,8 @@ TEXT_BUFFER *pBuf;
     {
       if(SEL_RECT_EMPTY(pThis))
       {
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject, "%s line %d - empty selection, starting select\n", __FUNCTION__, __LINE__);
+
         pThis->rctSel.left = pThis->iCol;
         pThis->rctSel.top = iOldRow;
       }
@@ -3974,6 +4257,12 @@ TEXT_BUFFER *pBuf;
   {
     int iOldCol = pThis->iCol;
 
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     __internal_invalidate_cursor(pThis, 0); // invalidate current cursor rectangle
@@ -3998,6 +4287,8 @@ TEXT_BUFFER *pBuf;
     {
       if(SEL_RECT_EMPTY(pThis))
       {
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject, "%s line %d - empty selection, starting select\n", __FUNCTION__, __LINE__);
+
         pThis->rctSel.left = iOldCol;
         pThis->rctSel.top = pThis->iRow;
       }
@@ -4065,6 +4356,12 @@ TEXT_BUFFER *pBuf;
   {
     int iOldCol = pThis->iCol;
 
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     __internal_invalidate_cursor(pThis, 0); // invalidate current cursor rectangle
@@ -4119,6 +4416,8 @@ TEXT_BUFFER *pBuf;
     {
       if(SEL_RECT_EMPTY(pThis))
       {
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject, "%s line %d - empty selection, starting select\n", __FUNCTION__, __LINE__);
+
         pThis->rctSel.left = iOldCol;
         pThis->rctSel.top = pThis->iRow;
       }
@@ -4186,6 +4485,12 @@ TEXT_BUFFER *pBuf;
     int iOldRow = pThis->iRow;
     int iPageHeight = pThis->rctView.bottom - pThis->rctView.top;
 
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     if(pThis->iLineFeed == LineFeed_NONE) // single line
@@ -4220,6 +4525,8 @@ TEXT_BUFFER *pBuf;
     {
       if(SEL_RECT_EMPTY(pThis))
       {
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject, "%s line %d - empty selection, starting select\n", __FUNCTION__, __LINE__);
+
         pThis->rctSel.left = pThis->iCol;
         pThis->rctSel.top = iOldRow;
       }
@@ -4289,6 +4596,12 @@ TEXT_BUFFER *pBuf;
     int iOldRow = pThis->iRow;
     int iPageHeight = pThis->rctView.bottom - pThis->rctView.top;
 
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     if(pThis->iLineFeed == LineFeed_NONE) // single line
@@ -4323,6 +4636,8 @@ TEXT_BUFFER *pBuf;
     {
       if(SEL_RECT_EMPTY(pThis))
       {
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject, "%s line %d - empty selection, starting select\n", __FUNCTION__, __LINE__);
+
         pThis->rctSel.left = pThis->iCol;
         pThis->rctSel.top = iOldRow;
       }
@@ -4394,6 +4709,12 @@ TEXT_BUFFER *pBuf;
     int iOldCol = pThis->iCol;
     int iPageWidth = pThis->rctView.right - pThis->rctView.left;
 
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_ScrollBar,
                    "%s %d - page left by %d, iCol=%d\n",
                    __FUNCTION__, __LINE__, iPageWidth, pThis->iCol);
@@ -4422,6 +4743,8 @@ TEXT_BUFFER *pBuf;
     {
       if(SEL_RECT_EMPTY(pThis))
       {
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject, "%s line %d - empty selection, starting select\n", __FUNCTION__, __LINE__);
+
         pThis->rctSel.left = iOldCol;
         pThis->rctSel.top = pThis->iRow;
       }
@@ -4491,6 +4814,12 @@ TEXT_BUFFER *pBuf;
     int iOldCol = pThis->iCol;
     int iPageWidth = pThis->rctView.right - pThis->rctView.left;
 
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_ScrollBar,
                    "%s %d - page right by %d, iCol=%d\n",
                    __FUNCTION__, __LINE__, iPageWidth, pThis->iCol);
@@ -4524,6 +4853,8 @@ TEXT_BUFFER *pBuf;
     {
       if(SEL_RECT_EMPTY(pThis))
       {
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject, "%s line %d - empty selection, starting select\n", __FUNCTION__, __LINE__);
+
         pThis->rctSel.left = iOldCol;
         pThis->rctSel.top = pThis->iRow;
       }
@@ -4586,6 +4917,12 @@ TEXT_BUFFER *pBuf;
   {
     int iOldCol = pThis->iCol;
 
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     __internal_invalidate_cursor(pThis, 0); // invalidate current cursor rectangle
@@ -4622,6 +4959,8 @@ TEXT_BUFFER *pBuf;
     {
       if(SEL_RECT_EMPTY(pThis))
       {
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject, "%s line %d - empty selection, starting select\n", __FUNCTION__, __LINE__);
+
         pThis->rctSel.left = iOldCol;
         pThis->rctSel.top = pThis->iRow;
       }
@@ -4690,6 +5029,12 @@ TEXT_BUFFER *pBuf;
   {
     int iOldCol = pThis->iCol;
 
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     __internal_invalidate_cursor(pThis, 0); // invalidate current cursor rectangle
@@ -4718,6 +5063,8 @@ TEXT_BUFFER *pBuf;
     {
       if(SEL_RECT_EMPTY(pThis))
       {
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject, "%s line %d - empty selection, starting select\n", __FUNCTION__, __LINE__);
+
         pThis->rctSel.left = iOldCol;
         pThis->rctSel.top = pThis->iRow;
       }
@@ -4786,6 +5133,12 @@ static void __internal_cursor_top(struct _text_object_ *pThis)
     int iOldRow = pThis->iRow;
     int iPageHeight = pThis->rctView.bottom - pThis->rctView.top;
 
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     pThis->iRow = 0;
@@ -4797,6 +5150,8 @@ static void __internal_cursor_top(struct _text_object_ *pThis)
     {
       if(SEL_RECT_EMPTY(pThis))
       {
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject, "%s line %d - empty selection, starting select\n", __FUNCTION__, __LINE__);
+
         pThis->rctSel.left = pThis->iCol;
         pThis->rctSel.top = iOldRow;
       }
@@ -4839,6 +5194,12 @@ TEXT_BUFFER *pBuf;
     int iOldRow = pThis->iRow;
     int iPageHeight = pThis->rctView.bottom - pThis->rctView.top;
 
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     pThis->iBlinkState = CURSOR_BLINK_RESET; // this affects the cursor blink, basically resetting it whenever I edit something
 
     pBuf = (TEXT_BUFFER *)(pThis->pText);
@@ -4858,6 +5219,8 @@ TEXT_BUFFER *pBuf;
     {
       if(SEL_RECT_EMPTY(pThis))
       {
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_TextObject, "%s line %d - empty selection, starting select\n", __FUNCTION__, __LINE__);
+
         pThis->rctSel.left = pThis->iCol;
         pThis->rctSel.top = iOldRow;
       }
@@ -4905,6 +5268,12 @@ TEXT_BUFFER *pBuf;
   else
   {
 //    int iOldRow WB_UNUSED = pThis->iRow; // TODO:  do I still need this assignment?  For now, mark 'unused' and leave for reference
+
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
 
     WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_ScrollBar,
                    "%s %d - scroll vertical by %d, iCol=%d\n",
@@ -4973,6 +5342,12 @@ TEXT_BUFFER *pBuf;
   else
   {
 //    int iOldCol WB_UNUSED = pThis->iCol; // TODO:  do I still need this assignment?  For now, mark 'unused' and leave for reference
+
+    WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
 
     WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_ScrollBar,
                    "%s %d - scroll horizontal by %d, iCol=%d\n",
@@ -5181,6 +5556,12 @@ int nEntries, iAutoScrollWidth, iWindowHeightInLines;
     WB_ERROR_PRINT("ERROR:  %s - text object %p not valid\n", __FUNCTION__, pThis);
     return;
   }
+
+  WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_TextObject,
+                 "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                 __FUNCTION__, __LINE__,
+                 pThis->iRow, pThis->iCol,
+                 pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
 
   iXDelta = iYDelta = 0; // make sure, as they're used in a few places
 
@@ -6100,6 +6481,12 @@ static void __internal_cursor_blink(struct _text_object_ *pThis, int bHasFocus)
   {
     int bShow = __internal_cursor_show(pThis->iBlinkState);
 
+    WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_TextObject,
+                   "%s line %d:  pThis iRow=%d iCol=%d rctSel=(%d,%d,%d,%d)\n",
+                   __FUNCTION__, __LINE__,
+                   pThis->iRow, pThis->iCol,
+                   pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
+
     if(!bHasFocus)
     {
       if(pThis->iBlinkState != CURSOR_BLINK_OFF)
@@ -6241,7 +6628,7 @@ int iRval;
   {
     int iLen = ((const char *)p1 - pChar);
 
-    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s.%d - return=%d  char=%02xH", __FUNCTION__, __LINE__, iRval, (unsigned char)*pChar);
+    WB_DEBUG_PRINT(DebugLevel_Verbose, "%s line %d - return=%d  char=%02xH", __FUNCTION__, __LINE__, iRval, (unsigned char)*pChar);
     while(iLen > 1)
     {
       iLen--;

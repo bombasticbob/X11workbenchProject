@@ -178,7 +178,7 @@ int __internal_do_status_tab_cols(FRAME_WINDOW *pFrameWindow, const WB_RECT *prc
 
 static FRAME_WINDOW *pFrames = NULL;  // pointer to linked list of frame windows (WBAlloc'd)
 
-static XColor clrFG, clrBG, clrBD, clrBD2, clrBD3, clrABG;
+static XColor clrFG, clrBG, clrBD, clrBD2, clrBD3, clrHBG;
 static int iInitColorFlag = 0;
 
 
@@ -325,8 +325,9 @@ Display *pDisplay = WBGetDefaultDisplay();
 }
 
 
-#define LOAD_COLOR0(X,Y) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) > 0) {  }
-#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
+//#define LOAD_COLOR0(X,Y) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) > 0) {  }
+//#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
+#define COPY_COLOR_NAME(X,Y,Z) {const char *pX = X(WBGetDefaultDisplay()); if(pX) strncpy(Y,pX,sizeof(Y)); else strncpy(Y,Z,sizeof(Y));}
 
 static void InternalCheckFWColors(void)
 {
@@ -341,15 +342,22 @@ int iY, iU, iV, iR, iG, iB;
   {
 //    static const char szBD2[]="#FFFFFF"; // border colors (TODO:  derive them?)
 //    static const char szBD3[]="#9C9A94";
-    char szFG[16], szBG[16], szBD[16], szABG[16]; // note colors can typically be up to 13 characters + 0 byte
+    char szFG[16], szBG[16], szBD[16], szHBG[16]; // note colors can typically be up to 13 characters + 0 byte
 
     colormap = DefaultColormap(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
+
+    COPY_COLOR_NAME(CHGetTextColor,szFG,"#000000");
+    COPY_COLOR_NAME(CHGetStaticBackgroundColor,szBG,"#dcdad5");
+
+    COPY_COLOR_NAME(CHGetHighlightBackgroundColor,szHBG,"#0040FF");
+
+    COPY_COLOR_NAME(CHGetBorderColor,szBD,"#000000");
 
     // TODO:  add some sanity to this, maybe an API for loading colors?  *MOST* of this is now obsolete
     //        and XSETTINGS uses completely different naming.
 
+#if 0
     // (these color names and standards have changed *WAY* too many times...)
-
     LOAD_COLOR0("*Frame.foreground",szFG) else LOAD_COLOR0("*Form.foreground", szFG)
      else LOAD_COLOR0("*WmFrame.foreground",szFG) else LOAD_COLOR0("*WmForm.foreground", szFG)
      else LOAD_COLOR("*foreground", szFG, "#000000");
@@ -362,6 +370,7 @@ int iY, iU, iV, iR, iG, iB;
      else LOAD_COLOR("*border", szBD, "black"); // default for gnome
 
     LOAD_COLOR("selected_bg_color", szABG, "#0040FF"); // a slightly greenish blue for the 'selected' color
+#endif // 0
 
     XParseColor(WBGetDefaultDisplay(), colormap, szFG, &clrFG);
     XAllocColor(WBGetDefaultDisplay(), colormap, &clrFG);
@@ -369,8 +378,8 @@ int iY, iU, iV, iR, iG, iB;
     XAllocColor(WBGetDefaultDisplay(), colormap, &clrBG);
     XParseColor(WBGetDefaultDisplay(), colormap, szBD, &clrBD);
     XAllocColor(WBGetDefaultDisplay(), colormap, &clrBD);
-    XParseColor(WBGetDefaultDisplay(), colormap, szABG, &clrABG);
-    XAllocColor(WBGetDefaultDisplay(), colormap, &clrABG);
+    XParseColor(WBGetDefaultDisplay(), colormap, szHBG, &clrHBG);
+    XAllocColor(WBGetDefaultDisplay(), colormap, &clrHBG);
 
 
     // ---------------------------------------------------------------------------------------
@@ -2535,7 +2544,7 @@ WBGC gc0;
           WBDraw3DBorderTab(pDisplay, dw, gc, &g2,
                             pFrameWindow->nCloseTab == i1 ? -2 : 0,  // -2 if I'm deleting the tab (no focus)
                             clrFG.pixel, clrBG.pixel,
-                            clrBD2.pixel, clrBD3.pixel, clrABG.pixel,
+                            clrBD2.pixel, clrBD3.pixel, clrHBG.pixel,
                             pFrameWindow->pFont, pFrameWindow->pBoldFont,
                             pC->aImageAtom, pC->szDisplayName);
         }
@@ -2556,7 +2565,7 @@ WBGC gc0;
           WBDraw3DBorderTab(pDisplay, dw, gc, &g2,
                             pFrameWindow->nCloseTab == i1 ? -1 : 1,  // -1 if I'm deleting the tab, positive otherwise
                             clrFG.pixel, clrBG.pixel,
-                            clrBD2.pixel, clrBD3.pixel, clrABG.pixel,
+                            clrBD2.pixel, clrBD3.pixel, clrHBG.pixel,
                             pFrameWindow->pFont, pFrameWindow->pBoldFont,
                             pC->aImageAtom, pC->szDisplayName);
         }

@@ -20,6 +20,11 @@ AC_PROG_CC([cc gcc cl])
 # flags on pixmap_helper.c with automake 1.11,and it must be AFTER AC_PROG_CC
 AM_PROG_CC_C_O
 
+# consider adding this for make -j support.  currently I do my own...
+# AX_AM_JOBSERVER([default_value])
+# see https://www.gnu.org/software/autoconf-archive/ax_am_jobserver.html 
+# this will enable the '--enable-jobserver' configure parameter
+
 AC_PROG_RANLIB
 AC_PATH_X
 AC_PATH_XTRA

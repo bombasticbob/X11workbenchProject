@@ -540,6 +540,7 @@ XImage *pImage;
   else
   {
     iRval = WBXDrawString(pImage, gc->pFont, gc, x, y, string, length);
+    // NOTE:  does not update immediately, but after you 'end paint'
   }
 
 #endif // WIN32

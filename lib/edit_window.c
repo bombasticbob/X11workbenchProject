@@ -150,7 +150,7 @@ static int PropertyDialogCallback(Window wID, XEvent *pEvent);
 
 
 
-static XColor clrFG, clrBG, clrAFG, clrABG;
+static XColor clrFG, clrBG, clrHFG, clrHBG;
 static int iInitColorFlag = 0;
 
 
@@ -212,8 +212,9 @@ Atom aEW_EDIT_CHANGE=None;
 
 
 
-#define LOAD_COLOR0(X,Y) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) > 0) {  }
-#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
+//#define LOAD_COLOR0(X,Y) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) > 0) {  }
+//#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
+#define COPY_COLOR_NAME(X,Y,Z) {const char *pX = X(WBGetDefaultDisplay()); if(pX) strncpy(Y,pX,sizeof(Y)); else strncpy(Y,Z,sizeof(Y));}
 
 static void InternalCheckEWColorsAndAtoms(void)
 {
@@ -234,12 +235,18 @@ static void InternalCheckEWColorsAndAtoms(void)
 
   if(!iInitColorFlag)
   {
-    char szFG[16], szBG[16], szAFG[16], szABG[16]; // note colors can typically be up to 13 characters + 0 byte
+    char szFG[16], szBG[16], szHFG[16], szHBG[16]; // note colors can typically be up to 13 characters + 0 byte
 
     colormap = DefaultColormap(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
 
-    // (these color names and standards have changed *WAY* too many times...)
+    COPY_COLOR_NAME(CHGetTextColor,szFG,"#000000");
+    COPY_COLOR_NAME(CHGetBackgroundColor,szBG,"#ffffff");
 
+    COPY_COLOR_NAME(CHGetHighlightForegroundColor,szHFG,"#ffffff");
+    COPY_COLOR_NAME(CHGetHighlightBackgroundColor,szHBG,"#0040FF");
+
+#if 0
+    // (these color names and standards have changed *WAY* too many times...)
     LOAD_COLOR0("*Text.foreground",szFG) else LOAD_COLOR0("*Edit.foreground", szFG)
      else LOAD_COLOR("*foreground", szFG, "#000000");
     LOAD_COLOR0("*Text.background",szBG) else LOAD_COLOR0("*Edit.background", szBG)
@@ -250,15 +257,16 @@ static void InternalCheckEWColorsAndAtoms(void)
 
     WB_ERROR_PRINT("TEMPORARY:  %s - edit window colors:  FG=%s BG=%s AFG=%s ABG=%s\n", __FUNCTION__,
                    szFG, szBG, szAFG, szABG);
+#endif // 0
 
     XParseColor(WBGetDefaultDisplay(), colormap, szFG, &clrFG);
     XAllocColor(WBGetDefaultDisplay(), colormap, &clrFG);
     XParseColor(WBGetDefaultDisplay(), colormap, szBG, &clrBG);
     XAllocColor(WBGetDefaultDisplay(), colormap, &clrBG);
-    XParseColor(WBGetDefaultDisplay(), colormap, szAFG, &clrAFG);
-    XAllocColor(WBGetDefaultDisplay(), colormap, &clrAFG);
-    XParseColor(WBGetDefaultDisplay(), colormap, szABG, &clrABG);
-    XAllocColor(WBGetDefaultDisplay(), colormap, &clrABG);
+    XParseColor(WBGetDefaultDisplay(), colormap, szHFG, &clrHFG);
+    XAllocColor(WBGetDefaultDisplay(), colormap, &clrHFG);
+    XParseColor(WBGetDefaultDisplay(), colormap, szHBG, &clrHBG);
+    XAllocColor(WBGetDefaultDisplay(), colormap, &clrHBG);
 
     iInitColorFlag = 1;
   }
