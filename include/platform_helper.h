@@ -100,7 +100,7 @@
 #endif // X11WORKBENCH_PROJECT_BUILD
 
 // TESTING THE CONFIGURATION - TODO:  for some, provide alternates?
-// NOTE that for 'WIN32' defined, certain features won't be checked
+// NOTE that for '_MSC_VER' defined, certain features won't be checked
 
 // basic checks - test them all up front, then individual errors if any of these
 //                are not defined in the appropriate header files
@@ -113,8 +113,8 @@
     !defined( HAVE_SELECT ) || !defined( HAVE_SETLOCALE ) || !defined( HAVE_STRCASECMP ) || \
     !defined( HAVE_STRCHR ) || !defined( HAVE_STRNCASECMP ) || !defined( HAVE_STRRCHR ) || \
     !defined( HAVE_STRSTR ) || !defined( HAVE__BOOL ) || \
-    ( !defined(WIN32) && ( !defined( LSTAT_FOLLOWS_SLASHED_SYMLINK ) || !defined( HAVE_VFORK ) || \
-                          !defined( HAVE_WORKING_FORK ) || !defined( HAVE_WORKING_VFORK ) ))
+    ( !defined(_MSC_VER) && ( !defined( LSTAT_FOLLOWS_SLASHED_SYMLINK ) || !defined( HAVE_VFORK ) || \
+                              !defined( HAVE_WORKING_FORK ) || !defined( HAVE_WORKING_VFORK ) ))
 // *************************************************************
 #error
 #error configure script feature check 1 fail
@@ -219,8 +219,8 @@
     !( HAVE_SELECT ) || !( HAVE_SETLOCALE ) || !( HAVE_STRCASECMP ) || \
     !( HAVE_STRCHR ) || !( HAVE_STRNCASECMP ) || !( HAVE_STRRCHR ) || \
     !( HAVE_STRSTR ) || !( HAVE__BOOL ) || \
-    ( !defined(WIN32) && ( !( LSTAT_FOLLOWS_SLASHED_SYMLINK ) || !( HAVE_VFORK ) || \
-                           !( HAVE_WORKING_FORK ) || !( HAVE_WORKING_VFORK ) ))
+    ( !defined(_MSC_VER) && ( !( LSTAT_FOLLOWS_SLASHED_SYMLINK ) || !( HAVE_VFORK ) || \
+                              !( HAVE_WORKING_FORK ) || !( HAVE_WORKING_VFORK ) ))
 #error
 #error configure script feature check 2 fail
 #error critical features missing
@@ -538,7 +538,7 @@ typedef unsigned __int64 WB_UINT64;
 typedef int WB_INT32;
 typedef unsigned int WB_UINT32;
 
-// assume MS Windows Win32 API
+// use terms similar to MS Windows Win32 API
 typedef HMODULE WB_MODULE ;     /* module handle */
 typedef HANDLE WB_THREAD;       /* thread handle - thread IDs are still 'int' types */
 typedef FARPROC WB_PROCADDRESS; // generic proc address returned from GetProcAddress()
@@ -657,6 +657,50 @@ void WBPlatformOnInit(void);
 **/
 void WBPlatformOnExit(void);
 
+/** \ingroup startup
+  * \brief Startup function, equivalent to 'main()' - provided for convenience
+  *
+  * \param argc An integer that indicates the number of elements in 'argv'.  On exit, it is updated based on the arguments that were parsed.
+  * \param argv An array of char *, the list of arguments passed as 'argv' to 'main()', minus toolkit-specific entries
+  * \param envp An array of char *, the list of arguments passed as 'envp', plus anything toolkit-specific
+  * \return A non-zero value indicating the exit/return code (which only uses the low 8 bits)
+  *
+  * Use this function in your application, in lieu of 'main()', to ensure that everything is initialized and cleaned up properly,
+  * and so that command line arguments are correctly handled.  It avoids having to add a call to 'WBParseStandardArguments()' and
+  * other startup functions from within your application's 'main()'.
+  *
+  *
+  * NOTE:  Your application must either have a 'main()' or a 'WBMain'.  Internally, 'main()' is declared 'weak' and simply
+  * calls 'WBMain()' with proper initialization and termination.  If you want to process this yourself, use 'main()' instead.
+  *
+  * Header File:  platform_helper.h
+  *
+  * /sa WBParseStandardArguments() WBPlatformOnInit() WBPlatformOnExit()
+*/
+#if defined(DOXYGEN) || !defined(_MSC_VER)
+int WBMain(int argc, char *argv[], char *envp[]);
+#else // MSVC
+int __declspec(selectany) WBMain(int argc, char *argv[], char *envp[]);
+#endif // _MSC_VER
+
+/** \ingroup startup
+  * \brief Optional startup function, sends 'usage' (help) info to stderr - application-defined function
+  *
+  * Define this function in your application (automatically called by internally defined 'main()' when
+  * 'WBParseStandardArguments()' returns an error) to display a customized 'help' message that documents the
+  * command line options and/or other 'help' information for the application.
+  *
+  * The default (weak) version simply calls WBToolkitUsage()
+  *
+  * Header File:  platform_helper.h
+  *
+  * /sa WBToolkitUsage()
+*/
+#if defined(DOXYGEN) || !defined(_MSC_VER)
+void WBUsage(void);
+#else // _MSC_VER
+void __declspec(selectany) WBUsage(void);
+#endif // _MSC_VER
 
 /** \ingroup startup
   * \brief parses standard C arguments as passed to 'main()'

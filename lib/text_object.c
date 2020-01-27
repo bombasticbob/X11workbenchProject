@@ -80,7 +80,7 @@ struct __internal_undo_redo_buffer
   WB_RECT rctSelOld; // original select rectangle (as applicable)
   WB_RECT rctSelNew; // new select rectangle after the operation
 
-  int iOperation; // select=0, delete=1, insert/paste=2, replace=3
+  int iOperation; // see 'enum _undo_operation_' below
   int iSelMode;   // selection mode
 
   int nOld; // size of 'old' buffer (zero if none)
@@ -89,11 +89,16 @@ struct __internal_undo_redo_buffer
   char aData[2]; // actual data for operation
 };
 
-#define UNDO_SELECT 0
-#define UNDO_DELETE 1
-#define UNDO_INSERT 2
-#define UNDO_REPLACE 3 /* currently not used */
-#define UNDO_INDENT 4
+typedef enum _undo_operation_
+{
+  UNDO_NONE=-1,   /* for initialization purposes only */
+  UNDO_SELECT=0,
+  UNDO_DELETE=1,
+  UNDO_INSERT=2,
+  UNDO_REPLACE=3, /* currently not used */
+  UNDO_INDENT=4,
+  UNDO_LAST=4
+} UNDO_OPERATION;
 
 
 #define SEL_RECT_ALL(X) ((X)->rctSel.left < 0)
@@ -273,7 +278,7 @@ static __inline__ const char * __internal_get_line_ending_text(enum _LineFeed_ i
   "\r\n"
 #else // POSIX
   "\n",
-#endif // OS-dependent line endings
+#endif // WIN32 or POSIX - OS-dependent line endings
   "\n","\r","\r\n","\n\r"
   };
 
@@ -281,6 +286,7 @@ static __inline__ const char * __internal_get_line_ending_text(enum _LineFeed_ i
   {
     return NULL;  // single-line or invalid
   }
+
   return szLineEndings[iIndex];
 }
 

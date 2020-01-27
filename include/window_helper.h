@@ -928,7 +928,7 @@ enum WBScrollEventParam
 //                                                     //
 /////////////////////////////////////////////////////////
 
-/** \ingroup wcore
+/** \ingroup events
   * \brief 'Standard' input mask, bit flag for window creation
   *
   * 'Standard' input mask.  Use this as a parameter to XSelectInput to enable standard events to be sent to the window\n
@@ -936,7 +936,7 @@ enum WBScrollEventParam
 **/
 #define WB_STANDARD_INPUT_MASK (FocusChangeMask | PropertyChangeMask | ExposureMask | StructureNotifyMask | VisibilityChangeMask | SubstructureNotifyMask)
 
-/** \ingroup wcore
+/** \ingroup events
   * \brief 'Keyboard' input mask, bit flag for window creation
   *
   * 'Keyboard' input mask.  Use this as a parameter to XSelectInput to enable keyboard events to be sent to the window\n
@@ -944,7 +944,7 @@ enum WBScrollEventParam
 **/
 #define WB_KEYBOARD_INPUT_MASK (KeyPressMask | KeyReleaseMask)
 
-/** \ingroup wcore
+/** \ingroup events
   * \brief 'Mouse' input mask, bit flag for window creation
   *
   * 'Mouse' input mask.  Use this as a parameter to XSelectInput to enable mouse events to be sent to the window\n
@@ -953,7 +953,38 @@ enum WBScrollEventParam
 #define WB_MOUSE_INPUT_MASK (ButtonPressMask | ButtonReleaseMask | PointerMotionMask | EnterWindowMask | LeaveWindowMask)
 
 
-/** \ingroup wcore
+/** \defgroup wcore_wm Window Manager Window Properties
+  * \ingroup wcore
+**/
+
+/** \defgroup wcore_cursor Pointer/Cursor management
+  * \ingroup wcore
+  *
+  * Window-related API for managing the window's cursor.  The cursor can be changed
+  * depending on the current context, and is a property of the window itself.
+  *
+  * Use these API funtions to manage the cursor for a particular window.
+  *
+  * See Also: \ref WB_DEFAULT_CURSOR, \ref WB_WAIT_CURSOR
+**/
+
+/** \defgroup wcore_geom Points, Rectangles, and Geometries
+  * \ingroup wcore
+  *
+  * The following functions, data types, and macro definitions are related
+  * to window geometries, querying, translating coordinate mapping, and comparing
+  * points, rectangles, and geometries to one another.
+  *
+  * See Also:  \ref WB_RECT, \ref WB_GEOM
+**/
+
+/** \defgroup wcore_gc Graphics Context APIs related to Windows
+  * \ingroup wcore
+  *
+  * See Also: \ref graphics
+**/
+
+/** \ingroup wcore_wm
   * \hideinitializer
   * \brief Window type enumeration.  Reserved for future implementation.
   *
@@ -1006,7 +1037,7 @@ enum WMPropertiesWindowType
   WMPropertiesWindowType_Max = 0x80000000
 };
 
-/** \ingroup wcore
+/** \ingroup wcore_wm
   * \hideinitializer
   * \brief Window WMProtocols support enumeration.
   *
@@ -1098,7 +1129,7 @@ Window WBCreateWindow(Display *pDisplay, Window wIDParent,
 void WBDestroyWindow(Window wID);
 
 /** \ingroup wcore
-  * \brief Destroy a window
+  * \brief Get the main 'Application' window
   *
   * \return The application window's Window ID, or 'None'
   *
@@ -1110,7 +1141,7 @@ void WBDestroyWindow(Window wID);
 Window WBGetApplicationWindow(void);
 
 /** \ingroup wcore
-  * \brief Destroy a window
+  * \brief Assign the main 'Appklication' window
   *
   * \param wID The Window identifier of the 'application' window, or None
   *
@@ -1170,6 +1201,16 @@ void WBRegisterWindowCallback(Window wID, WBWinEvent pCallback);
 void WBUnregisterWindowCallback(Window wID);
 
 /** \ingroup wcore
+  * \brief assign window (and icon) title
+  *
+  * \param wID The Window ID for the window
+  * \param szTitle A const pointer to a character string containing the window title
+  *
+  * Header File:  window_helper.h
+**/
+void WBSetWindowTitle(Window wID, const char *szTitle);
+
+/** \ingroup wcore_wm
   * \brief assign standard WM (Window Manager) properties via XSetWMProperties
   *
   * \param wID The Window ID for the window
@@ -1182,17 +1223,7 @@ void WBUnregisterWindowCallback(Window wID);
 **/
 void WBSetWMProperties(Window wID, const char *szTitle, XSizeHints *pNormalHints,
                        XWMHints *pWMHints, XClassHint *pClassHints);
-/** \ingroup wcore
-  * \brief assign window (and icon) title
-  *
-  * \param wID The Window ID for the window
-  * \param szTitle A const pointer to a character string containing the window title
-  *
-  * Header File:  window_helper.h
-**/
-void WBSetWindowTitle(Window wID, const char *szTitle);
-
-/** \ingroup wcore
+/** \ingroup wcore_wm
   * \brief assign standard WM (Window Manager) 'window type' properties BEFORE mapping it (reserved)
   *
   * \param wID The Window ID for the window
@@ -1205,7 +1236,7 @@ void WBSetWindowTitle(Window wID, const char *szTitle);
 **/
 void WBSetWMPropertiesWindowType(Window wID, enum WMPropertiesWindowType wmProp);
 
-/** \ingroup wcore
+/** \ingroup wcore_wm
   * \brief re-assign standard WM (Window Manager) 'window type' properties and notify the root window (reserved)
   *
   * \param wID The Window ID for the window
@@ -1220,7 +1251,7 @@ void WBSetWMPropertiesWindowType(Window wID, enum WMPropertiesWindowType wmProp)
 void WBChangeWMPropertiesWindowType(Window wID, enum WMPropertiesWindowType wmPropSet, enum WMPropertiesWindowType wmChangeMask);
 
 
-/** \ingroup wcore
+/** \ingroup wcore_wm
   * \brief re-assign standard WM (Window Manager) 'window type' properties and notify the root window (reserved)
   *
   * \param wID The Window ID for the window
@@ -1232,7 +1263,7 @@ void WBChangeWMPropertiesWindowType(Window wID, enum WMPropertiesWindowType wmPr
 **/
 enum WMPropertiesWindowType WBGetWMPropertiesWindowType(Window wID);
 
-/** \ingroup wcore
+/** \ingroup wcore_wm
   * \brief re-assign standard WM (Window Manager) 'window type' properties and notify the root window (reserved)
   *
   * \param wID The Window ID for the window
@@ -1305,7 +1336,7 @@ Display * WBGetWindowDisplay(Window wID);
 /** \ingroup wcore
   * \brief assigns an icon resource (by ID) to a window
   *
-  * \param wID The Window ID from which to return the default cursor
+  * \param wID The Window ID from which to return the default icon
   * \param idIcon The resource ID for the window's icon
   *
   * Header File:  window_helper.h
@@ -1315,24 +1346,24 @@ void WBSetWindowIcon(Window wID, int idIcon);
 /** \ingroup wcore
   * \brief assigns the default WB_FONT object for a window
   *
-  * \param wID The Window ID from which to return the default cursor
+  * \param wID The Window ID from which to return the default font
   * \param pFont The WB_FONTC (or WB_FONT) object for the window.  A copy of this object will be owned by the window.  To use the default font set, you can assign a value of 'NULL'
   *
   * Header File:  window_helper.h
 **/
 void WBSetWindowFont(Window wID, WB_FONTC pFont);
 
-/** \ingroup wcore
+/** \ingroup wcore_cursor
   * \brief Assigns a default cursor (by ID) to a window
   *
-  * \param wID The Window ID from which to return the default cursor
+  * \param wID The Window ID to which to assign the default cursor
   * \param idStandardCursor The default Cursor ID to assign (Typically an XC_ definition from X11/cursorfont.h).  A value of '-1' equates to 'None'
   *
   * Header File:  window_helper.h
 **/
 void WBSetWindowDefaultCursor(Window wID, int idStandardCursor);
 
-/** \ingroup wcore
+/** \ingroup wcore_cursor
   * \brief returns the default cursor ID for a window
   *
   * \param wID The Window ID from which to return the default cursor
@@ -1342,7 +1373,7 @@ void WBSetWindowDefaultCursor(Window wID, int idStandardCursor);
 **/
 int WBGetWindowDefaultCursor(Window wID);
 
-/** \ingroup wcore
+/** \ingroup wcore_gc
   * \brief creates a default WBGC for a window
   *
   * \param wID The Window ID for which to assign the colors
@@ -1353,7 +1384,7 @@ int WBGetWindowDefaultCursor(Window wID);
 **/
 void WBCreateWindowDefaultGC(Window wID, unsigned long clrFG, unsigned long clrBG);
 
-/** \ingroup wcore
+/** \ingroup wcore_gc
   * \brief assigns a default WBGC to a window
   *
   * \param wID The Window ID for which to assign the WBGC
@@ -1363,7 +1394,7 @@ void WBCreateWindowDefaultGC(Window wID, unsigned long clrFG, unsigned long clrB
 **/
 void WBSetWindowDefaultGC(Window wID, WBGC hGC);
 
-/** \ingroup wcore
+/** \ingroup wcore_gc
   * \brief makes a copy of the default WBGC so that it can be modified
   *
   * \param wID The Window ID from which to copy the WBGC
@@ -1373,7 +1404,7 @@ void WBSetWindowDefaultGC(Window wID, WBGC hGC);
 **/
 WBGC WBGetWindowCopyGC(Window wID);
 
-/** \ingroup wcore
+/** \ingroup wcore_gc
   * \brief makes a copy of the specified WBGC for the desired window
   *
   * \param wID The Window ID for which to copy the WBGC
@@ -1398,7 +1429,7 @@ WBGC WBGetWindowCopyGC(Window wID);
 **/
 void WBSetWindowData(Window wID, int iIndex, void *pData);
 
-/** \ingroup wcore
+/** \ingroup wcore_cursor
   * \brief increment 'wait cursor' count, set cursor to WB_WAIT_CURSOR
   *
   * \param wID The Window ID to which the wait cursor needs to be assigned
@@ -1407,7 +1438,7 @@ void WBSetWindowData(Window wID, int iIndex, void *pData);
 **/
 void WBBeginWaitCursor(Window wID);
 
-/** \ingroup wcore
+/** \ingroup wcore_cursor
   * \brief decrement 'wait cursor' count, restore to default when zero
   *
   * \param wID The Window ID to which the cursor needs to be restored
@@ -1416,7 +1447,7 @@ void WBBeginWaitCursor(Window wID);
 **/
 void WBEndWaitCursor(Window wID);
 
-/** \ingroup wcore
+/** \ingroup wcore_cursor
   * \brief immediately set the window cursor
   *
   * \param wID The Window ID to which the cursor needs to be assigned
@@ -1426,7 +1457,7 @@ void WBEndWaitCursor(Window wID);
 **/
 void WBSetWindowCursor(Window wID, int idCursor);
 
-/** \ingroup wcore
+/** \ingroup wcore_cursor
   * \brief restore the default cursor
   *
   * \param wID The Window ID to which the default cursor needs to be restored
@@ -1435,7 +1466,7 @@ void WBSetWindowCursor(Window wID, int idCursor);
 **/
 void WBRestoreDefaultCursor(Window wID);
 
-/** \ingroup wcore
+/** \ingroup wcore_gc
   * \brief Returns the default WBGC currently assigned to the window (not a copy)
   *
   * \param wID The Window ID from which to obtain the default WBGC
@@ -1480,6 +1511,8 @@ WB_FONT WBGetWindowFont(Window wID);
   * \return The current foreground color for the window
   *
   * Header File:  window_helper.h
+  *
+  * \sa \ref WBGetGCFGColor()
 **/
 unsigned long WBGetWindowFGColor(Window wID);
 
@@ -1490,34 +1523,10 @@ unsigned long WBGetWindowFGColor(Window wID);
   * \return The current background color for the window
   *
   * Header File:  window_helper.h
+  *
+  * \sa \ref WBGetGCBGColor()
 **/
 unsigned long WBGetWindowBGColor(Window wID);
-
-/** \ingroup wcore
-  * \brief returns the currently assigned foreground color for a WBGC
-  *
-  * \param gc The WBGC to be queried
-  * \returns The currently assigned foreground color
-  *
-  * If the current foreground color cannot be determined, this function will
-  * return the pre-defined color for BLACK on the specified Display and default screen
-  *
-  * Header File:  window_helper.h
-**/
-unsigned long WBGetGCFGColor(WBGC gc);
-
-/** \ingroup wcore
-  * \brief returns the currently assigned background color for a WBGC
-  *
-  * \param gc The WBGC to be queried
-  * \returns The currently assigned background color
-  *
-  * If the current background color cannot be determined, this function will
-  * return the pre-defined color for WHITE on the specified Display and default screen
-  *
-  * Header File:  window_helper.h
-**/
-unsigned long WBGetGCBGColor(WBGC gc);
 
 /** \ingroup wcore
   * \brief returns a default XStandardColormap structure for the default screen of the specified display
@@ -1588,7 +1597,7 @@ const char *WBGetWindowClassName(Window wID);
 **/
 void *WBGetWindowData(Window wID, int iIndex);
 
-/** \ingroup wcore
+/** \ingroup wcore_geom
   * \brief Returns the RAW geometry of the window as reported by the window manager
   *
   * \param wID The Window ID to obtain the WB_GEOM data for
@@ -1598,7 +1607,7 @@ void *WBGetWindowData(Window wID, int iIndex);
 **/
 void WBGetWindowGeom(Window wID, WB_GEOM *pGeom);
 
-/** \ingroup wcore
+/** \ingroup wcore_geom
   * \brief Returns the geometry of the window relative to the root window
   *
   * \param wID The Window ID to obtain the WB_GEOM data for
@@ -1609,7 +1618,7 @@ void WBGetWindowGeom(Window wID, WB_GEOM *pGeom);
 void WBGetWindowGeom2(Window wID, WB_GEOM *pGeom);
 
 
-/** \ingroup wcore
+/** \ingroup wcore_geom
   * \brief Returns the ABSOLUTE window geometry relative the screen
   *
   * \param wID The Window ID to obtain the WB_GEOM data for
@@ -1628,7 +1637,7 @@ void WBGetWindowGeom2(Window wID, WB_GEOM *pGeom);
 **/
 void WBGetWindowGeom0(Window wID, WB_GEOM *pGeom);  // absolute window geometry (from latest notification)
 
-/** \ingroup wcore
+/** \ingroup wcore_geom
   * \brief Returns the WB_RECT (rectangle) defined by the window's geometry, including the border area
   *
   * \param wID The Window ID to obtain the WB_RECT data for
@@ -1638,7 +1647,7 @@ void WBGetWindowGeom0(Window wID, WB_GEOM *pGeom);  // absolute window geometry 
 **/
 void WBGetWindowRect(Window wID, WB_RECT *pRect);
 
-/** \ingroup wcore
+/** \ingroup wcore_geom
   * \brief Returns the WB_RECT (rectangle) defined by the window's geometry, excluding the border area
   *
   * \param wID The Window ID to obtain the WB_RECT data for
@@ -1709,7 +1718,7 @@ int WBReparentWindow(Window wID, Window wIDParent, int iX, int iY); // keeps int
 **/
 int WBIsChildWindow(Window wIDParent, Window wIDChild);  // non-zero if 'wIDParent' is in a parent relationship with 'wIDChild'
 
-/** \ingroup wcore
+/** \ingroup wcore_geom
   * \brief Returns logical TRUE if the point (X,Y) is within the borders of the rectangle 'R'
   * \param X The X value to check for
   * \param Y The Y value to check for
@@ -1719,7 +1728,7 @@ int WBIsChildWindow(Window wIDParent, Window wIDChild);  // non-zero if 'wIDPare
 **/
 #define WBPointInRect(X,Y,R) ((X) >= (R).left && (X) < (R).right && (Y) >= (R).top && (Y) < (R).bottom)
 
-/** \ingroup wcore
+/** \ingroup wcore_geom
   * \brief Returns logical TRUE if the point (X,Y) is within the borders of the geometry 'G'
   * \param X The X value to check for
   * \param Y The Y value to check for
@@ -1728,7 +1737,7 @@ int WBIsChildWindow(Window wIDParent, Window wIDChild);  // non-zero if 'wIDPare
 **/
 #define WBPointInGeom(X,Y,G) ((X) >= (G).x && (X) < ((G).x + (G).width) && (Y) >= (G).y && (Y) < ((G).y + (G).height))
 
-/** \ingroup wcore
+/** \ingroup wcore_geom
   * \brief Returns logical TRUE if the rectangle R1 overlaps/intersects R2
   * \param R1 A WB_RECT structure bounding the first area to check
   * \param R2 A second WB_RECT structure bounding the second area to check
@@ -1740,7 +1749,7 @@ int WBIsChildWindow(Window wIDParent, Window wIDChild);  // non-zero if 'wIDPare
    (((R1).top >= (R2).top && (R1).top < (R2).bottom) || \
     ((R2).top >= (R1).top && (R2).top < (R1).bottom)))
 
-/** \ingroup wcore
+/** \ingroup wcore_geom
   * \brief Returns logical TRUE if the geometry G1 overlaps/intersects G2
   * \param G1 A WB_GEOM structure bounding the first area to check
   * \param G2 A second WB_GEOM structure bounding the second area to check
@@ -1752,7 +1761,7 @@ int WBIsChildWindow(Window wIDParent, Window wIDChild);  // non-zero if 'wIDPare
    (((G1).y >= (G2).y && (G1).y < (G2).y + (G2).height) || \
     ((G2).y >= (G1).y && (G2).y < (G1).y + (G1).height)))
 
-/** \ingroup wcore
+/** \ingroup wcore_geom
   * \brief Translate X,Y point coordinates relative to a window
   *
   * \param wIDSrc The source Window ID
@@ -1771,7 +1780,7 @@ int WBIsChildWindow(Window wIDParent, Window wIDChild);  // non-zero if 'wIDPare
 **/
 void WBXlatCoordPoint(Window wIDSrc, int iXSrc, int iYSrc, Window wIDDest, int *piXDest, int *piYDest);
 
-/** \ingroup wcore
+/** \ingroup wcore_geom
   * \brief Translate geometry coordinates relative to a window
   *
   * \param wIDSrc The source Window ID
@@ -1788,7 +1797,7 @@ void WBXlatCoordPoint(Window wIDSrc, int iXSrc, int iYSrc, Window wIDDest, int *
 **/
 void WBXlatCoordGeom(Window wIDSrc, const WB_GEOM *pGeomSrc, Window wIDDest, WB_GEOM *pGeomDest);
 
-/** \ingroup wcore
+/** \ingroup wcore_geom
   * \brief Translate rectangle coordinates relative to a window
   *
   * \param wIDSrc The source Window ID
@@ -1805,7 +1814,7 @@ void WBXlatCoordGeom(Window wIDSrc, const WB_GEOM *pGeomSrc, Window wIDDest, WB_
 **/
 void WBXlatCoordRect(Window wIDSrc, const WB_RECT *pRectSrc, Window wIDDest, WB_RECT *pRectDest);
 
-/** \ingroup wcore
+/** \ingroup wcore_geom
   * \brief Returna a non-zero value if X,Y coordinates relative to the reference window are within the query window
   *
   * \param wIDRef The reference Window ID
@@ -2878,6 +2887,36 @@ Status WBGetGCValues(WBGC hGC, unsigned long valuemask,
                      XGCValues *values);
 
 /** \ingroup graphics
+  * \brief returns the currently assigned background color for a WBGC
+  *
+  * \param gc The WBGC to be queried
+  * \returns The currently assigned background color
+  *
+  * If the current background color cannot be determined, this function will
+  * return the pre-defined color for WHITE on the specified Display and default screen
+  *
+  * Header File:  window_helper.h
+  *
+  * \sa \ref WBGetWindowBGColor()
+**/
+unsigned long WBGetGCBGColor(WBGC gc);
+
+/** \ingroup graphics
+  * \brief returns the currently assigned foreground color for a WBGC
+  *
+  * \param gc The WBGC to be queried
+  * \returns The currently assigned foreground color
+  *
+  * If the current foreground color cannot be determined, this function will
+  * return the pre-defined color for BLACK on the specified Display and default screen
+  *
+  * Header File:  window_helper.h
+  *
+  * \sa \ref WBGetWindowFGColor()
+**/
+unsigned long WBGetGCFGColor(WBGC gc);
+
+/** \ingroup graphics
   * \brief return the WB_FONTC object that was assigned to a WBGC
   *
   * \param gc The WBGC to be queried
@@ -2887,7 +2926,13 @@ Status WBGetGCValues(WBGC hGC, unsigned long valuemask,
   * there has been NO font assigned, the system default font information will be
   * returned.  A value of NULL is returned on error, or if no font is assigned.
   *
+  * This function differs from WBGetGCFont() in that it does not create a new copy
+  * of an existing GC.  Therefore, the return value is only valid within the context
+  * of the call to WBQueryGCFont() and should NOT be passed to WBFreeFont().
+  *
   * Header File:  window_helper.h
+  *
+  * \sa \ref WBGetGCFont()
 **/
 WB_FONTC WBQueryGCFont(WBGC gc);
 
@@ -2898,12 +2943,16 @@ WB_FONTC WBQueryGCFont(WBGC gc);
   * \param gc The WBGC to be queried
   * \returns A pointer to a WB_FONT object, or NULL on error.  non-NULL values must be freed via WBFreeFont()
   *
-  * Call this function to determine the font that has been assigned to a WBGC.  If
-  * there has been NO font assigned, the system default font information will be
-  * returned.  The return value is always a new pointer to a WB_FONT, or
-  * NULL on error.  The caller must free non-NULL return values via WBFreeFont().
+  * Call this function to determine the font that has been assigned to a WBGC, and make
+  * a copy of it for subsequent use.  If there has been NO font assigned, the system default
+  * font information will be returned.
+  *
+  * The return value is always a new pointer to a WB_FONT, or NULL on error.  The caller must
+  * free non-NULL return values via WBFreeFont().
   *
   * Header File:  window_helper.h
+  *
+  * \sa \ref WBQueryGCFont()
 **/
 WB_FONT WBGetGCFont(Display *pDisplay, WBGC gc);
 

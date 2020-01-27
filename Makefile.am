@@ -3,9 +3,10 @@ X11workbench_SOURCES = X11workbench.c X11workbench.h refactor.c refactor.h gizza
 X11workbench_SOURCES += gdb_helper.c gdb_helper.h resource_edit.c resource_edit.h
 X11workbench_SOURCES += context_help.c context_help.h
 X11workbench_SOURCES += application_icon.xpm splash.xpm textfiledoc.xpm newdoc.xpm clangdoc.xpm makefiledoc.xpm
-X11workbench_SOURCES += doxy_comments.dox doxy.txt
+X11workbench_SOURCES += doxy_comments.dox doxy.txt doxy_footer.html doxy_header.html doxy_stylesheet.css
 
 X11workbench_DEPENDENCIES = toolkit_lib
+TOOLKIT_DOCDEPENDS = doxy.txt doxy_comments.dox doxy_footer.html doxy_header.html doxy_stylesheet.css
 
 if HAVE_DOXYGEN
   X11workbench_DEPENDENCIES += toolkit_doc
@@ -140,7 +141,7 @@ libX11workbenchToolkit_DOCDEPEND += include/platform_helper.h include/text_objec
 
 toolkit_doc: toolkit_doc.log
 
-toolkit_doc.log: doxy.txt doxy_comments.dox Makefile $(libX11workbenchToolkit_DOCDEPEND)
+toolkit_doc.log: $(TOOLKIT_DOCDEPENDS) Makefile $(libX11workbenchToolkit_DOCDEPEND)
 	@echo Building documentation using doxygen. see toolkit_doc.log for output
 	@doxygen doxy.txt >toolkit_doc.log 2>&1
 

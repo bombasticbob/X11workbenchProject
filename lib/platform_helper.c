@@ -124,6 +124,67 @@ static char szAppName[PATH_MAX * 2]="";
 //                                                                          //
 //////////////////////////////////////////////////////////////////////////////
 
+#if !defined(DOXYGEN) && defined(_MSC_VER)
+//#pragma comment(linker, "/alternatename:_main=___main__")
+//int __main__(int argc, char *argv0[], char *envp0[])
+int __declspec(selectany) main(int argc, char *argv0[], char *envp0[])
+#else // _MSC_VER
+int main(int argc, char *argv0[], char *envp0[]) __attribute__((weak)) __attribute__((section("text_main")))
+#endif // _MSC_VER
+{
+int iRval;
+char **argv = argv0; // re-define as char ** so I can re-allocate it as needed
+char **envp = envp0;
+
+  WBPlatformOnInit();
+
+  if(!WBParseStandardArguments(&argc, &argv, &envp))
+  {
+    iRval = WBMain(argc, argv, envp);
+
+    if(envp && envp != envp0) // was envp re-allocated by the toolkit?
+    {
+      WBFree(envp); // use 'WBFree' to free memory allocated by the toolkit
+    }
+    if(argv && argv != argv0) // was argv re-allocated by the toolkit?
+    {
+      WBFree(argv);
+    }
+  }
+  else
+  {
+    WBUsage();
+    iRval = 1;
+  }
+
+  WBPlatformOnExit();
+  return iRval;
+}
+
+#if !defined(DOXYGEN) && defined(_MSC_VER)
+//#pragma comment(linker, "/alternatename:_WBMain=___WBMain__")
+//int __WBMain__(int argc, char *argv0[], char *envp0[])
+int __declspec(selectany) __WBMain__(int argc, char *argv0[], char *envp0[])
+#else // _MSC_VER
+int WBMain(int argc, char *argv0[], char *envp0[]) __attribute__((weak)) __attribute__((section("text_wbmain")))
+#endif // _MSC_VER
+{
+  fputs("You need to define 'WBMain' in your code\n", stderr);
+  return 1;
+}
+
+#if !defined(DOXYGEN) && defined(_MSC_VER)
+//#pragma comment(linker, "/alternatename:_WBUsage=___WBUsage__")
+//void __WBUsage__(void)
+void __declspec(selectany) WBUsage(void)
+#else // _MSC_VER
+void WBUsage(void) __attribute__((weak)) __attribute__((section("text_wbusage")))
+#endif // _MSC_VER
+{
+  WBToolkitUsage(); // default just does this
+}
+
+
 void WBPlatformOnInit(void)
 {
 char *pEnv;
@@ -1242,12 +1303,12 @@ struct __malloc_header__ *pMH;
     {
       // TODO:  make sure it's not "already free" somehow since re-freeing free memory is *BAD*
 
-      WB_ERROR_PRINT("TODO:  %s unimplemented - NOT freeing memory %p\n", __FUNCTION__, pBuf);
+      WB_ERROR_PRINT("TODO:  %s 'pre-alloc' unimplemented - NOT freeing memory %p\n", __FUNCTION__, pBuf);
     }
   }
   else
   {
-    WB_ERROR_PRINT("ERROR:  %s NOT freeing memory %p\n", __FUNCTION__, pBuf);
+    WB_ERROR_PRINT("ERROR:  %s NOT freeing (invalid) memory %p\n", __FUNCTION__, pBuf);
   }
 }
 
@@ -1311,7 +1372,7 @@ unsigned int nAllocSize, nNewNewSize, nLimit;
         //TODO:  maintain lists of pre-allocated blocks of memory, allocating new memory as needed
         //       (this memory will need to be re-used intelligently so trash mashing can work properly
 
-        WB_ERROR_PRINT("TODO:  %s - this feature is NOT implemented.  Pointer %p NOT re-allocated\n", __FUNCTION__, pBuf);
+        WB_ERROR_PRINT("TODO:  %s - 'pre-alloc' is NOT implemented.  Pointer %p NOT re-allocated\n", __FUNCTION__, pBuf);
         return NULL;
       }
     }
@@ -2750,7 +2811,9 @@ unsigned char buf[32], buf2[32]; // if smaller than 32 bytes, use THIS for temp 
 //
 // This function is generally PREFERABLE to the libXpm version as it's a LOT faster
 // Additionally, it can be made 'MS Windows Compatible' so that XPM resources can be
-// used within WIN32 applications.
+// used within WIN32 applications.  Should support MSVC, gcc, and llvm compilers
+//
+// checking for MSVC:  use '#ifdef _MSC_VER' or similar
 
 #define MAX_XPM_COLOR_CHAR_SIZE 4
 

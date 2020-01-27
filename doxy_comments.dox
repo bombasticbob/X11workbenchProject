@@ -395,7 +395,7 @@
   // ----------
 
   #define MY_BUFFER_SIZE 256
-  int main(int argc, char *argv[])
+  int WBMain(int argc, char *argv[])
   {
     int i1;
     char buffer[MY_BUFFER_SIZE];
@@ -488,67 +488,53 @@
   #include <stdio.h>
   #include <stdlib.h>
 
-  #include "window_helper.h"
+  #include "window_helper.h" // includes platform_helper.h and others as well
   #include "dialog_window.h"
 
-  int main(int argc, char *argv0[], char *envp0[])
+  // NOTE:  this example uses WBMain() - you could use 'main()' but additional function calls
+  //        are needed.  For more information, see platform_helper.c and 'main()'
+
+  int WBMain(int argc, char *argv[], char *envp[])
   {
   int iRval = 1;
-  char **argv = argv0; // re-define as char ** so I can re-allocate it as needed
-  char **envp = envp0;
 
-    if(!WBParseStandardArguments(&argc, &argv, &envp))
+    if(WBInit(NULL))
     {
-      if(WBInit(NULL))
-      {
-        DLGMessageBox(MessageBox_OK | MessageBox_Info, None,
-                      "Hello World",
-                      "Hello World using X11workbench Toolkit");
+      DLGMessageBox(MessageBox_OK | MessageBox_Info, None,
+                    "Hello World",
+                    "Hello World using X11workbench Toolkit");
 
   // if your application creates a modeless dialog window or frame window, you will
   // need a message loop.  For the sample, it is disabled with an '#if 0' block
   #if 0
-        //=====================
-        //   MAIN EVENT LOOP
-        //=====================
+      //=====================
+      //   MAIN EVENT LOOP
+      //=====================
 
-        while (!bQuitFlag)
+      while (!bQuitFlag)
+      {
+        if(!WBCheckGetEvent(pX11Display, &event))
         {
-          if(!WBCheckGetEvent(pX11Display, &event))
-          {
-            // SLEEP if no event while in message loop (function returns without blocking)
-            // otherwise I can do background tasks during this loop iteration.
+          // SLEEP if no event while in message loop (function returns without blocking)
+          // otherwise I can do background tasks during this loop iteration.
+          // NOTE:  sleeping allows the CPU to "not spin" and go into an idle state
+          //        this will result in lower power consumption in most cases
 
-            WBDelay(100); // 100 microseconds (0.1 milliseconds)
+          WBDelay(100); // 100 microseconds (0.1 milliseconds)
+          // for MS Windows you might want to change this to 10 milliseconds due to the way in
+          // which windows handles the 'Sleep()' API.  The actual wait time is likely to be
+          // about that long anyway, and delaying 'zero' spins the CPU.
 
-            continue; // skip the 'WBDispatch' since there was no event
-          }
-
-          WBDispatch(&event);
+          continue; // skip the 'WBDispatch' since there was no event
         }
+
+        WBDispatch(&event);
+      }
   #endif // 0
 
+      WBExit(); // this frees toolkit resources and closes windows, etc.
 
-        WBExit(); // this frees toolkit resources and closes windows, etc.
-
-        // The application itself continues to run past this point
-      }
-
-      // Freeing up 'possibly allocated' memory for envp, argv
-
-      if(envp && envp != envp0) // was envp re-allocated by the toolkit?
-      {
-        WBFree(envp); // use 'WBFree' to free memory allocated by the toolkit
-      }
-
-      if(argv && argv != argv0) // was argv re-allocated by the toolkit?
-      {
-        WBFree(argv);
-      }
-    }
-    else
-    {
-      WBToolkitUsage(); // print usage information to stderr
+      iRval = 0; // return 'success'
     }
 
     return iRval;
@@ -1313,7 +1299,7 @@
 **/
 
 /** \ingroup core
-  * \defgroup wmatom Window Manager and Clipboard-related Atoms
+  * \defgroup wmatom Atoms for Window Manager and Clipboard
   *
   * Pre-defined Atoms for the Window Manager and Clipboard processing
 **/

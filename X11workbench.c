@@ -126,7 +126,6 @@
 // function prototypes
 
 static int do_main(int argc, char *argv[], char *envp[]);
-static void usage(void);
 static void SetSignalHandlers(void);
 static int MyWindowCallback(Window wID, XEvent *pEvent);
 static int ApplicationPreferences(XClientMessageEvent *pEvent);
@@ -162,35 +161,15 @@ WBFILE_TYPE GetFileType(const char *szFileName); // return one of the WBFILE_TYP
 int nCPU = 0;
 
 
-int main(int argc, char *argv0[], char *envp0[])
+int WBMain(int argc, char *argv[], char *envp[])
 {
 int iRval = 1;
-char **argv = argv0; // re-define as char ** so I can re-allocate it as needed
-char **envp = envp0;
 
+  iRval = do_main(argc, argv, envp);
 
-  if(!(iRval = WBParseStandardArguments(&argc, &argv, &envp)))
+  if(iRval < 0)
   {
-    iRval = do_main(argc, argv, envp);
-
-    if(envp && envp != envp0)
-    {
-      WBFree(envp);
-    }
-
-    if(argv && argv != argv0)
-    {
-      WBFree(argv);
-    }
-  }
-  else
-  {
-    if(iRval < 0)
-    {
-      usage();
-    }
-
-    iRval = 1; // for now;  later, return as-is?
+    WBUsage();
   }
 
   return iRval;
@@ -386,7 +365,7 @@ FW_MENU_HANDLER_END
 
 
 
-static void usage(void)
+void WBUsage(void)
 {
   fputs("X11workbench - Copyright (c) 2010-2019 by S.F.T. Inc. - all rights reserved\n\n"
         "Usage:      X11workbench [options] filename [filename [...]]\n"
@@ -489,9 +468,9 @@ int bNoSplash = 0;
       }
 
       fprintf(stderr, "Unrecognized option \"%s\"\n", argv[1]);
-      usage();
 
-      return 1; // illegal argument
+      WBUsage();
+      return 1; // illegal argument - show 'WBUsage' and return an error
     }
 
     for(i1=1; argv[1][i1]; i1++)
@@ -499,8 +478,8 @@ int bNoSplash = 0;
       if(argv[1][i1] == 'h' ||
          argv[1][i1] == 'H')
       {
-        usage();
-        return 0;
+        WBUsage();
+        return 0; // show 'WBUsage' but do NOT return an error
       }
 #ifndef NO_DEBUG
       else if(argv[1][i1] == 'd')
@@ -512,8 +491,8 @@ int bNoSplash = 0;
       {
         fprintf(stderr, "Unrecognized option \"-%c\"\n", argv[1][i1]);
 
-        usage();
-        return 1;
+        WBUsage();
+        return 1; // show 'WBUsage' and return an error
       }
     }
 
