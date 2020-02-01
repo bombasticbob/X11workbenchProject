@@ -50,7 +50,7 @@
   * \brief Definition file for menu popup window structures and API functions
   *
   * This is the definition file for menu popup window functions and structures
-*/
+**/
 
 /** \ingroup frame
   * \defgroup menu_popup Popup Menus
@@ -70,8 +70,8 @@ extern "C" {
 
 #define MENU_POPUP_WINDOW_TAG (*((const unsigned int *)"MWMP"))
 
-/** \typedef WBMenuPopupWindow
-  * \struct  __WBMenuPopupWindow__
+/** \struct tagWBMenuPopupWindow
+  * \typedef WBMenuPopupWindow
   * \ingroup menu_popup
   * \brief structure for managing a popup menu window
   *
@@ -79,7 +79,7 @@ extern "C" {
   *
   * \code
 
-  typedef struct __WBMenuPopupWindow__
+  typedef struct tagWBMenuPopupWindow
   {
     unsigned int ulTag; // tag indicating I'm a 'Menu Popup' window
     Window wSelf;       // window ID for the Menu Popup window
@@ -105,7 +105,7 @@ extern "C" {
   *
   * \sa \ref \_\_WBMenu "WBMenu"
 **/
-typedef struct __WBMenuPopupWindow__
+typedef struct tagWBMenuPopupWindow
 {
   unsigned int ulTag; ///< tag indicating I'm a 'Menu Popup' window
   Window wSelf;       ///< window ID for the Menu Popup window

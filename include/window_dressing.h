@@ -63,7 +63,7 @@ extern "C" {
 
 // SCROLL BARS
 
-/** \struct __WB_SCROLLINFO__
+/** \struct tagWB_SCROLL_INFO
   * \ingroup window_dressing
   * \copydoc WB_SCROLLINFO
 **/
@@ -77,7 +77,7 @@ extern "C" {
   *
   * \code
 
-  typedef struct __WB_SCROLLINFO__
+  typedef struct tagWB_SCROLL_INFO
   {
     int iScrollState;         // scroll state flags - see enumeration \ref WBScrollState_ENUM
 
@@ -114,7 +114,7 @@ extern "C" {
   *
   * \sa WBInitScrollInfo(), WBUpdateScrollBarGeometry()
 **/
-typedef struct __WB_SCROLLINFO__
+typedef struct tagWB_SCROLL_INFO
 {
   int iScrollState;         ///< scroll state flags - see enumeration \ref WBScrollState_ENUM
 

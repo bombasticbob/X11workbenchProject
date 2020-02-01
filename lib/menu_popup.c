@@ -1293,10 +1293,11 @@ static int MBMenuPopupEvent(Window wID, XEvent *pEvent)
       if(iMenuItemIndex >= 0 && iMenuItemIndex < pMenu->nItems)
       {
         pItem = pMenu->ppItems[iMenuItemIndex];
-        if((unsigned long)pItem == (unsigned long)(((XClientMessageEvent *)pEvent)->data.l[0]))
+        if((void *)pItem == (void *)WBGetPointerFromHash(((XClientMessageEvent *)pEvent)->data.l[0]))
         {
           // NOTE:  this will NOT invoke the handler because it sends a MENU_UI_COMMAND before
-          //        posting the handler event
+          //        posting the handler event - so no recursion, only the 'UI COMMAND' handler is
+          //        synchronous, and the menu event itself is asynchronous.
           MBMenuPopupHandleMenuItem(pDisplay, wID, pSelf, pMenu, pItem);
 
           return 1;  // handled
@@ -1305,7 +1306,7 @@ static int MBMenuPopupEvent(Window wID, XEvent *pEvent)
 
       WB_WARN_PRINT("%s - MENU_ACTIVATE event, invalid menu information, %d %d %p %p\n",
                     __FUNCTION__, iMenuItemIndex, pMenu->nItems,
-                    (void *)pItem, (void *)(((XClientMessageEvent *)pEvent)->data.l[0]));
+                    (void *)pItem, (void *)WBGetPointerFromHash(((XClientMessageEvent *)pEvent)->data.l[0]));
     }
     else if(((XClientMessageEvent *)pEvent)->message_type == aMENU_DISPLAY_POPUP)
     {

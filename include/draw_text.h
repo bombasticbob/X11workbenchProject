@@ -124,12 +124,12 @@ enum DTAlignment
 };
 
 
-/** \ingroup draw_text
-  * \struct __DT_WORD__
+/** \struct tagDT_WORD
+  * \ingroup draw_text
   * \copydoc DT_WORD
 **/
-/** \ingroup draw_text
-  * \typedef DT_WORD
+/** \typedef DT_WORD
+  * \ingroup draw_text
   * \brief Structure defining a 'word' for rendering purposes.
   *
   * A 'word' is defined as one or more characters as a group that is to be rendered in
@@ -140,7 +140,7 @@ enum DTAlignment
   *
   * \code
 
-  typedef struct __DT_WORD__
+  typedef struct tagDT_WORD
   {
     const char *pText;      // pointer to start of word (most likely in the supplied buffer)
                             // for tabs and white space, it will be NULL
@@ -158,7 +158,7 @@ enum DTAlignment
   * \endcode
   *
 **/
-typedef struct __DT_WORD__
+typedef struct tagDT_WORD
 {
   const char *pText;      ///< pointer to start of word (most likely in the supplied buffer)
                           /// for tabs and white space, it will be NULL
@@ -174,12 +174,12 @@ typedef struct __DT_WORD__
 } DT_WORD;
 
 
-/** \ingroup draw_text
-  * \struct __DT_WORDS__
+/** \struct tagDT_WORDS
+  * \ingroup draw_text
   * \copydoc DT_WORDS
 **/
-/** \ingroup draw_text
-  * \typedef DT_WORDS
+/** \typedef DT_WORDS
+  * \ingroup draw_text
   * \brief A collection of DT_WORD structures along with a pointer to the original text
   *
   * A collection of DT_WORD structures, along with a pointer to the original text.  This structure is
@@ -188,31 +188,31 @@ typedef struct __DT_WORD__
   *
   * \code
 
-  typedef struct __DT_WORDS__
+  typedef struct tagDT_WORDS
   {
-    struct __DT_WORDS__ *pPrev; // pointer to previous structure in linked list (reserved)
-    struct __DT_WORDS__ *pNext; // pointer to next structure in linked list (reserved)
-    int nCount;           // number of items in aWords
-    int nMax;             // max number of items in aWords (for memory allocation purposes)
-    int iMaxWidth;        // maximum width of contained text, or -1 if not known
-    int iMaxHeight;       // maximum height of contained text, or -1 if not known
-    const char *szText;   // original text pointer
-    DT_WORD aWords[1];    // The actual data (self-contained within the memory block)
+    struct tagDT_WORDS *pPrev; // pointer to previous structure in linked list (reserved)
+    struct tagDT_WORDS *pNext; // pointer to next structure in linked list (reserved)
+    int nCount;                // number of items in aWords
+    int nMax;                  // max number of items in aWords (for memory allocation purposes)
+    int iMaxWidth;             // maximum width of contained text, or -1 if not known
+    int iMaxHeight;            // maximum height of contained text, or -1 if not known
+    const char *szText;        // original text pointer
+    DT_WORD aWords[1];         // The actual data (self-contained within the memory block)
   } DT_WORDS;
 
   * \endcode
   *
 **/
-typedef struct __DT_WORDS__
+typedef struct tagDT_WORDS
 {
-  struct __DT_WORDS__ *pPrev; ///< pointer to previous structure in linked list (reserved)
-  struct __DT_WORDS__ *pNext; ///< pointer to next structure in linked list (reserved)
-  int nCount;           ///< number of items in aWords
-  int nMax;             ///< max number of items in aWords (for memory allocation purposes)
-  int iMaxWidth;        ///< maximum width of contained text, or -1 if not known
-  int iMaxHeight;       ///< maximum height of contained text, or -1 if not known
-  const char *szText;   ///< original text pointer
-  DT_WORD aWords[1];    ///< The actual data (self-contained within the memory block)
+  struct tagDT_WORDS *pPrev; ///< pointer to previous structure in linked list (reserved)
+  struct tagDT_WORDS *pNext; ///< pointer to next structure in linked list (reserved)
+  int nCount;                ///< number of items in aWords
+  int nMax;                  ///< max number of items in aWords (for memory allocation purposes)
+  int iMaxWidth;             ///< maximum width of contained text, or -1 if not known
+  int iMaxHeight;            ///< maximum height of contained text, or -1 if not known
+  const char *szText;        ///< original text pointer
+  DT_WORD aWords[1];         ///< The actual data (self-contained within the memory block)
 } DT_WORDS;
 
 

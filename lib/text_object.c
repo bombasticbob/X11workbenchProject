@@ -48,11 +48,13 @@
 ******************************************************************************/
 
 /** \file text_object.c
-  * \brief Utilities for copying and drawing text, determining text extents, and so on
+  * \brief A 'C++'-like object for managing text, that can be overridden for custom behavior
   *
-  * X11 Work Bench Toolkit Toolkit API
+  * X11workbench Toolkit API 'text object' for copying and drawing text, determining
+  * text extents for rendering, managing edits and undo for a block of text, and
+  * so on.  In short it encapsulates the core functionality for managing a block
+  * of editable and/or viewable text.
 */
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -70,9 +72,12 @@
 
 // INTERNAL STRUCTURES
 
-struct __internal_undo_redo_buffer
+/** \ingroup internal
+  * \brief Internal-only structure for undo/redo buffer for text object
+**/
+struct s_internal_undo_redo_buffer
 {
-  struct __internal_undo_redo_buffer *pNext; // singly linked list [for now]
+  struct s_internal_undo_redo_buffer *pNext; // singly linked list [for now]
   // NOTE:  a background process can trim this to a reasonable size
 
   // NOTE:  for a simple row/col insert or paste, left=right, top=bottom
@@ -80,7 +85,7 @@ struct __internal_undo_redo_buffer
   WB_RECT rctSelOld; // original select rectangle (as applicable)
   WB_RECT rctSelNew; // new select rectangle after the operation
 
-  int iOperation; // see 'enum _undo_operation_' below
+  int iOperation; // see 'enum e_undo_operation' below
   int iSelMode;   // selection mode
 
   int nOld; // size of 'old' buffer (zero if none)
@@ -89,7 +94,11 @@ struct __internal_undo_redo_buffer
   char aData[2]; // actual data for operation
 };
 
-typedef enum _undo_operation_
+/** \ingroup internal
+  * \brief Internal-only enumeration for undo/redo buffer 'iOperation' member.
+  * \copydoc UNDO_OPERATION;
+**/
+typedef enum e_undo_operation
 {
   UNDO_NONE=-1,   /* for initialization purposes only */
   UNDO_SELECT=0,
@@ -98,7 +107,13 @@ typedef enum _undo_operation_
   UNDO_REPLACE=3, /* currently not used */
   UNDO_INDENT=4,
   UNDO_LAST=4
-} UNDO_OPERATION;
+};
+
+/** \ingroup internal
+  * \brief Internal-only enumeration for undo/redo buffer 'iOperation' member.
+**/
+typedef enum e_undo_operation UNDO_OPERATION;
+
 
 
 #define SEL_RECT_ALL(X) ((X)->rctSel.left < 0)
@@ -117,75 +132,75 @@ typedef enum _undo_operation_
 // LOCAL FUNCTION PROTOTYPES
 // *************************
 
-static void __internal_destroy(struct _text_object_ *pThis);
-static void __internal_init(struct _text_object_ *pThis);
-static void __internal_highlight_colors(struct _text_object_ *pThis, XColor clrHFG, XColor clrHBG);
-static char * __internal_get_text(struct _text_object_ *pThis);
-static void __internal_set_text(struct _text_object_ *pThis, const char *szText, unsigned long cbLen);
-static int __internal_get_rows(const struct _text_object_ *pThis);
-static int __internal_get_cols(struct _text_object_ *pThis);
-static int __internal_get_filetype(const struct _text_object_ *pThis);
-static void __internal_set_filetype(struct _text_object_ *pThis, int iFileType);
-static int __internal_get_linefeed(const struct _text_object_ *pThis);
-static void __internal_set_linefeed(struct _text_object_ *pThis, int iLineFeed);
-static int __internal_get_insmode(const struct _text_object_ *pThis);
-static void __internal_set_insmode(struct _text_object_ *pThis, int iInsMode);
-static int __internal_get_selmode(const struct _text_object_ *pThis);
-static void __internal_set_selmode(struct _text_object_ *pThis, int iSelMode);
-static int __internal_get_tab(const struct _text_object_ *pThis);
-static void __internal_set_tab(struct _text_object_ *pThis, int iTab);
-static int __internal_get_scrollmode(const struct _text_object_ *pThis);
-static void __internal_set_scrollmode(struct _text_object_ *pThis, int iScrollMode);
-static void __internal_get_select(const struct _text_object_ *pThis, WB_RECT *pRct);
-static void __internal_set_select(struct _text_object_ *pThis, const WB_RECT *pRct);
-static int __internal_has_select(const struct _text_object_ *pThis);
-static char* __internal_get_sel_text(const struct _text_object_ *pThis, const WB_RECT *pRct);
-static int __internal_get_row(const struct _text_object_ *pThis);
-static void __internal_set_row(struct _text_object_ *pThis, int iRow);
-static int __internal_get_col(const struct _text_object_ *pThis);
-static void __internal_set_col(struct _text_object_ *pThis, int iCol);
-static void __internal_del_select(struct _text_object_ *pThis);
-static void __internal_replace_select(struct _text_object_ *pThis, const char *szText, unsigned long cbLen);
-static void __internal_del_chars(struct _text_object_ *pThis, int nChar);
-static void __internal_ins_chars(struct _text_object_ *pThis, const char *pChar, int nChar);
-static void __internal_indent(struct _text_object_ *pThis, int nCol);
-static int __internal_can_undo(struct _text_object_ *pThis);
-static void __internal_undo(struct _text_object_ *pThis);
-static int __internal_can_redo(struct _text_object_ *pThis);
-static void __internal_redo(struct _text_object_ *pThis);
-static void __internal_get_view(const struct _text_object_ *pThis, WB_RECT *pRct);
-static void __internal_set_view_origin(struct _text_object_ *pThis, const WB_POINT *pOrig);
-static void __internal_begin_highlight(struct _text_object_ *pThis);
-static void __internal_end_highlight(struct _text_object_ *pThis);
+static void __internal_destroy(TEXT_OBJECT *pThis);
+static void __internal_init(TEXT_OBJECT *pThis);
+static void __internal_highlight_colors(TEXT_OBJECT *pThis, XColor clrHFG, XColor clrHBG);
+static char * __internal_get_text(TEXT_OBJECT *pThis);
+static void __internal_set_text(TEXT_OBJECT *pThis, const char *szText, unsigned long cbLen);
+static int __internal_get_rows(const TEXT_OBJECT *pThis);
+static int __internal_get_cols(TEXT_OBJECT *pThis);
+static int __internal_get_filetype(const TEXT_OBJECT *pThis);
+static void __internal_set_filetype(TEXT_OBJECT *pThis, int iFileType);
+static int __internal_get_linefeed(const TEXT_OBJECT *pThis);
+static void __internal_set_linefeed(TEXT_OBJECT *pThis, int iLineFeed);
+static int __internal_get_insmode(const TEXT_OBJECT *pThis);
+static void __internal_set_insmode(TEXT_OBJECT *pThis, int iInsMode);
+static int __internal_get_selmode(const TEXT_OBJECT *pThis);
+static void __internal_set_selmode(TEXT_OBJECT *pThis, int iSelMode);
+static int __internal_get_tab(const TEXT_OBJECT *pThis);
+static void __internal_set_tab(TEXT_OBJECT *pThis, int iTab);
+static int __internal_get_scrollmode(const TEXT_OBJECT *pThis);
+static void __internal_set_scrollmode(TEXT_OBJECT *pThis, int iScrollMode);
+static void __internal_get_select(const TEXT_OBJECT *pThis, WB_RECT *pRct);
+static void __internal_set_select(TEXT_OBJECT *pThis, const WB_RECT *pRct);
+static int __internal_has_select(const TEXT_OBJECT *pThis);
+static char* __internal_get_sel_text(const TEXT_OBJECT *pThis, const WB_RECT *pRct);
+static int __internal_get_row(const TEXT_OBJECT *pThis);
+static void __internal_set_row(TEXT_OBJECT *pThis, int iRow);
+static int __internal_get_col(const TEXT_OBJECT *pThis);
+static void __internal_set_col(TEXT_OBJECT *pThis, int iCol);
+static void __internal_del_select(TEXT_OBJECT *pThis);
+static void __internal_replace_select(TEXT_OBJECT *pThis, const char *szText, unsigned long cbLen);
+static void __internal_del_chars(TEXT_OBJECT *pThis, int nChar);
+static void __internal_ins_chars(TEXT_OBJECT *pThis, const char *pChar, int nChar);
+static void __internal_indent(TEXT_OBJECT *pThis, int nCol);
+static int __internal_can_undo(TEXT_OBJECT *pThis);
+static void __internal_undo(TEXT_OBJECT *pThis);
+static int __internal_can_redo(TEXT_OBJECT *pThis);
+static void __internal_redo(TEXT_OBJECT *pThis);
+static void __internal_get_view(const TEXT_OBJECT *pThis, WB_RECT *pRct);
+static void __internal_set_view_origin(TEXT_OBJECT *pThis, const WB_POINT *pOrig);
+static void __internal_begin_highlight(TEXT_OBJECT *pThis);
+static void __internal_end_highlight(TEXT_OBJECT *pThis);
 
-static void __internal_mouse_click(struct _text_object_ *pThis, int iMouseXDelta, int iMouseYDelta, int iType, int iACS);
-static void __internal_begin_mouse_drag(struct _text_object_ *pThis);
-static void __internal_end_mouse_drag(struct _text_object_ *pThis);
-static void __internal_cursor_up(struct _text_object_ *pThis);
-static void __internal_cursor_down(struct _text_object_ *pThis);
-static void __internal_cursor_left(struct _text_object_ *pThis);
-static void __internal_cursor_right(struct _text_object_ *pThis);
-static void __internal_page_up(struct _text_object_ *pThis);
-static void __internal_page_down(struct _text_object_ *pThis);
-static void __internal_page_left(struct _text_object_ *pThis);
-static void __internal_page_right(struct _text_object_ *pThis);
+static void __internal_mouse_click(TEXT_OBJECT *pThis, int iMouseXDelta, int iMouseYDelta, int iType, int iACS);
+static void __internal_begin_mouse_drag(TEXT_OBJECT *pThis);
+static void __internal_end_mouse_drag(TEXT_OBJECT *pThis);
+static void __internal_cursor_up(TEXT_OBJECT *pThis);
+static void __internal_cursor_down(TEXT_OBJECT *pThis);
+static void __internal_cursor_left(TEXT_OBJECT *pThis);
+static void __internal_cursor_right(TEXT_OBJECT *pThis);
+static void __internal_page_up(TEXT_OBJECT *pThis);
+static void __internal_page_down(TEXT_OBJECT *pThis);
+static void __internal_page_left(TEXT_OBJECT *pThis);
+static void __internal_page_right(TEXT_OBJECT *pThis);
 
-static void __internal_cursor_home(struct _text_object_ *pThis);
-static void __internal_cursor_end(struct _text_object_ *pThis);
-static void __internal_cursor_top(struct _text_object_ *pThis);
-static void __internal_cursor_bottom(struct _text_object_ *pThis);
+static void __internal_cursor_home(TEXT_OBJECT *pThis);
+static void __internal_cursor_end(TEXT_OBJECT *pThis);
+static void __internal_cursor_top(TEXT_OBJECT *pThis);
+static void __internal_cursor_bottom(TEXT_OBJECT *pThis);
 
-static void __internal_scroll_vertical(struct _text_object_ *pThis, int nRows);
-static void __internal_scroll_horizontal(struct _text_object_ *pThis, int nCols);
+static void __internal_scroll_vertical(TEXT_OBJECT *pThis, int nRows);
+static void __internal_scroll_horizontal(TEXT_OBJECT *pThis, int nCols);
 
-static void __internal_do_expose(struct _text_object_ *pThis, Display *pDisplay, Window wID,
+static void __internal_do_expose(TEXT_OBJECT *pThis, Display *pDisplay, Window wID,
                                  WBGC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
                                  WB_FONTC pFont);
-static void __internal_cursor_blink(struct _text_object_ *pThis, int bHasFocus);
+static void __internal_cursor_blink(TEXT_OBJECT *pThis, int bHasFocus);
 static int __internal_cursor_show(int iBlinkState);
 
-static void __internal_set_save_point(struct _text_object_ *pThis);
-static int __internal_get_modified(struct _text_object_ *pThis);
+static void __internal_set_save_point(TEXT_OBJECT *pThis);
+static int __internal_get_modified(TEXT_OBJECT *pThis);
 
 
 // *********************************
@@ -270,7 +285,7 @@ const TEXT_OBJECT_VTABLE WBDefaultTextObjectVTable =
 
 // line endings translated from 'enum' to 'const char *'
 
-static __inline__ const char * __internal_get_line_ending_text(enum _LineFeed_ iIndex)
+static __inline__ const char * __internal_get_line_ending_text(enum e_LineFeed iIndex)
 {
   static const char * const szLineEndings[LineFeed_ENTRYCOUNT] =
   {
@@ -898,11 +913,11 @@ static void __internal_free_undo_redo_buffer(void *pBuffer)
   {
     // TODO:  validate that it's an undo/redo buffer
 
-    struct __internal_undo_redo_buffer *pU = (struct __internal_undo_redo_buffer *)pBuffer;
+    struct s_internal_undo_redo_buffer *pU = (struct s_internal_undo_redo_buffer *)pBuffer;
 
     do
     {
-      struct __internal_undo_redo_buffer *pUsa = pU;
+      struct s_internal_undo_redo_buffer *pUsa = pU;
 
       pU = pU->pNext;
       WBFree(pUsa); // for now just do this
@@ -914,14 +929,14 @@ static void __internal_free_undo_redo_buffer(void *pBuffer)
 #define UNDO_LIMIT 256
 
 // NULL 'prctStartSel' or 'prctEndSel' implies 'NONE' selected, i.e. {0,0,0,0}
-static void __internal_add_undo(struct _text_object_ *pThis, int iOperation, int iSelMode,
+static void __internal_add_undo(TEXT_OBJECT *pThis, int iOperation, int iSelMode,
                                 int iStartRow, int iStartCol, const WB_RECT *prctStartSel,
                                 const char *pStartText, int cbStartText,
                                 int iEndRow, int iEndCol, const WB_RECT *prctEndSel,
                                 const char *pEndText, int cbEndText)
 {
 int cbLen, cbLen2, i1;
-struct __internal_undo_redo_buffer *pUndo, *pTU, *pTU2;
+struct s_internal_undo_redo_buffer *pUndo, *pTU, *pTU2;
 
 
   if(!WBIsValidTextObject(pThis))
@@ -965,7 +980,7 @@ struct __internal_undo_redo_buffer *pUndo, *pTU, *pTU2;
     }
   }
 
-  pUndo = (struct __internal_undo_redo_buffer *)WBAlloc(cbLen + cbLen2 + 4 + sizeof(*pUndo));
+  pUndo = (struct s_internal_undo_redo_buffer *)WBAlloc(cbLen + cbLen2 + 4 + sizeof(*pUndo));
   if(!pUndo)
   {
     // TODO:  walk the 'undo' chain and start removing stuff, and retry the alloc
@@ -1016,7 +1031,7 @@ struct __internal_undo_redo_buffer *pUndo, *pTU, *pTU2;
 
   // insert undo buffer into the 'chain'
 
-  pTU = pUndo->pNext = (struct __internal_undo_redo_buffer *)(pThis->pUndo);
+  pTU = pUndo->pNext = (struct s_internal_undo_redo_buffer *)(pThis->pUndo);
   pThis->pUndo = pUndo;
 
   // NOW walk the chain and remove things past a certain point.  For now, UNDO_LIMIT
@@ -1051,9 +1066,9 @@ struct __internal_undo_redo_buffer *pUndo, *pTU, *pTU2;
 
 
 #if 0 /* not currently in use - uncomment to implement its functionality */
-static void __internal_add_redo(struct _text_object_ *pThis, struct __internal_undo_redo_buffer *pUndo)
+static void __internal_add_redo(TEXT_OBJECT *pThis, struct s_internal_undo_redo_buffer *pUndo)
 {
-struct __internal_undo_redo_buffer *pRedo;
+struct s_internal_undo_redo_buffer *pRedo;
 int cbLen;
 
 
@@ -1073,7 +1088,7 @@ int cbLen;
 
   cbLen = pUndo->nOld + pUndo->nNew + sizeof(*pUndo);
 
-  pRedo = (struct __internal_undo_redo_buffer *)WBAlloc(cbLen + 2);
+  pRedo = (struct s_internal_undo_redo_buffer *)WBAlloc(cbLen + 2);
 
   if(!pRedo)
   {
@@ -1087,15 +1102,15 @@ int cbLen;
 
   // now add it to the redo chain
 
-  pRedo->pNext = (struct __internal_undo_redo_buffer *)(pThis->pRedo);
+  pRedo->pNext = (struct s_internal_undo_redo_buffer *)(pThis->pRedo);
   pThis->pRedo = pRedo;
 }
 #endif // 0
 
 #if 0 /* not currently in use - uncomment to implement its functionality */
-static void __internal_perform_undo(struct _text_object_ *pThis, struct __internal_undo_redo_buffer *pUndo)
+static void __internal_perform_undo(TEXT_OBJECT *pThis, struct s_internal_undo_redo_buffer *pUndo)
 {
-struct __internal_undo_redo_buffer *pDo = NULL;
+struct s_internal_undo_redo_buffer *pDo = NULL;
 int iOldSel;
 
 
@@ -1157,9 +1172,9 @@ int iOldSel;
 #endif // 0
 
 #if 0 /* not currently in use - uncomment to implement its functionality */
-static void __internal_perform_redo(struct _text_object_ *pThis, struct __internal_undo_redo_buffer *pRedo)
+static void __internal_perform_redo(TEXT_OBJECT *pThis, struct s_internal_undo_redo_buffer *pRedo)
 {
-struct __internal_undo_redo_buffer *pNewUndo;
+struct s_internal_undo_redo_buffer *pNewUndo;
 int iOldSel, cbLen;
 
 
@@ -1218,7 +1233,7 @@ int iOldSel, cbLen;
   // now I must add the 'redo' operation 'as-is' to the 'undo' chain, but NOT blast away the 'redo' chain
   // I'll make a copy of it first, since the caller will need to manage the undo/redo pointers
 
-  pNewUndo = (struct __internal_undo_redo_buffer *)WBAlloc(cbLen + 2);
+  pNewUndo = (struct s_internal_undo_redo_buffer *)WBAlloc(cbLen + 2);
 
   if(!pNewUndo)
   {
@@ -1232,7 +1247,7 @@ int iOldSel, cbLen;
 
   // now add it to the undo chain so I can 'undo the re-do' if I want to
 
-  pNewUndo->pNext = (struct __internal_undo_redo_buffer *)(pThis->pUndo);
+  pNewUndo->pNext = (struct s_internal_undo_redo_buffer *)(pThis->pUndo);
   pThis->pUndo = pNewUndo;
 }
 #endif // 0
@@ -1245,7 +1260,7 @@ int iOldSel, cbLen;
 // iCol is the starting column position
 // iEndRow is the ending row position.  In modes OTHER than 'box mode', this may equal 'iCol'
 // iEndCol is the ending column position.  In modes OTHER than 'box mode' this may be LESS than 'iCol'
-static char * __internal_get_selected_text(const struct _text_object_ *pThis,
+static char * __internal_get_selected_text(const TEXT_OBJECT *pThis,
                                            int iRow, int iCol, int iEndRow, int iEndCol)
 {
 int i1, i2, i3, cb1, cbLF=0;
@@ -1485,7 +1500,7 @@ int iIsBoxMode, iIsLineMode;
   return pRval;
 }
 
-static void __internal_invalidate_cursor(const struct _text_object_ *pThis, int bPaintFlag)
+static void __internal_invalidate_cursor(const TEXT_OBJECT *pThis, int bPaintFlag)
 {
 WB_RECT rctCursor;
 
@@ -1514,7 +1529,7 @@ WB_RECT rctCursor;
   }
 }
 
-static void __internal_invalidate_rect(struct _text_object_ *pThis, WB_RECT *pRect, int bPaintFlag)
+static void __internal_invalidate_rect(TEXT_OBJECT *pThis, WB_RECT *pRect, int bPaintFlag)
 {
 WB_RECT rctInvalid;
 
@@ -1602,7 +1617,7 @@ WB_RECT rctInvalid;
 
 // NOTE:  iStartRow and iStartCol may be 0 but not negative
 //        iEndRow and iEndCol can be negative to indicate "all"
-static void __internal_calc_rect(const struct _text_object_ *pThis, WB_RECT *pRect,
+static void __internal_calc_rect(const TEXT_OBJECT *pThis, WB_RECT *pRect,
                                  int iStartRow, int iStartCol, int iEndRow, int iEndCol)
 {
 int iFontHeight;
@@ -1715,7 +1730,7 @@ TEXT_BUFFER *pBuf;
   }
 }
 
-static void __internal_merge_rect(const struct _text_object_ *pThis, WB_RECT *pRect,
+static void __internal_merge_rect(const TEXT_OBJECT *pThis, WB_RECT *pRect,
                                   int iStartRow, int iStartCol, int iEndRow, int iEndCol)
 {
 WB_RECT rctMerge;
@@ -1761,7 +1776,7 @@ WB_RECT rctMerge;
 // TEXT OBJECT VTABLE FUNCTIONS
 // ****************************
 
-static void __internal_destroy(struct _text_object_ *pThis)
+static void __internal_destroy(TEXT_OBJECT *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -1789,7 +1804,7 @@ static void __internal_destroy(struct _text_object_ *pThis)
   }
 }
 
-static void __internal_init(struct _text_object_ *pThis)
+static void __internal_init(TEXT_OBJECT *pThis)
 {
   pThis->ulTag = TEXT_OBJECT_TAG;
   pThis->wIDOwner = None;
@@ -1847,7 +1862,7 @@ static void __internal_init(struct _text_object_ *pThis)
   }
 }
 
-static void __internal_highlight_colors(struct _text_object_ *pThis, XColor clrHFG, XColor clrHBG)
+static void __internal_highlight_colors(TEXT_OBJECT *pThis, XColor clrHFG, XColor clrHBG)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -1862,12 +1877,12 @@ static void __internal_highlight_colors(struct _text_object_ *pThis, XColor clrH
   }
 }
 
-static char * __internal_get_text(struct _text_object_ *pThis)
+static char * __internal_get_text(TEXT_OBJECT *pThis)
 {
   return __internal_get_selected_text(pThis, -1, -1, -1, -1);
 }
 
-static void __internal_set_text(struct _text_object_ *pThis, const char *szText, unsigned long cbLen)
+static void __internal_set_text(TEXT_OBJECT *pThis, const char *szText, unsigned long cbLen)
 {
 TEXT_BUFFER *pTemp;
 
@@ -1913,7 +1928,7 @@ TEXT_BUFFER *pTemp;
   }
 }
 
-static int __internal_get_rows(const struct _text_object_ *pThis)
+static int __internal_get_rows(const TEXT_OBJECT *pThis)
 {
 TEXT_BUFFER *pBuf;
 
@@ -1941,7 +1956,7 @@ TEXT_BUFFER *pBuf;
 
   return 0; // assume blank
 }
-static int __internal_get_cols(struct _text_object_ *pThis)
+static int __internal_get_cols(TEXT_OBJECT *pThis)
 {
 TEXT_BUFFER *pBuf;
 int i1;
@@ -1991,7 +2006,7 @@ int i1;
   return 0; // assume blank
 }
 
-static int __internal_get_filetype(const struct _text_object_ *pThis)
+static int __internal_get_filetype(const TEXT_OBJECT *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -1999,7 +2014,7 @@ static int __internal_get_filetype(const struct _text_object_ *pThis)
   }
   return 0; // for now
 }
-static void __internal_set_filetype(struct _text_object_ *pThis, int iFileType)
+static void __internal_set_filetype(TEXT_OBJECT *pThis, int iFileType)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -2017,7 +2032,7 @@ static void __internal_set_filetype(struct _text_object_ *pThis, int iFileType)
     }
   }
 }
-static int __internal_get_linefeed(const struct _text_object_ *pThis)
+static int __internal_get_linefeed(const TEXT_OBJECT *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -2025,7 +2040,7 @@ static int __internal_get_linefeed(const struct _text_object_ *pThis)
   }
   return 0; // for now
 }
-static void __internal_set_linefeed(struct _text_object_ *pThis, int iLineFeed)
+static void __internal_set_linefeed(TEXT_OBJECT *pThis, int iLineFeed)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -2035,10 +2050,10 @@ static void __internal_set_linefeed(struct _text_object_ *pThis, int iLineFeed)
                    pThis->iRow, pThis->iCol,
                    pThis->rctSel.left, pThis->rctSel.top, pThis->rctSel.right, pThis->rctSel.bottom);
 
-    pThis->iLineFeed = (enum _LineFeed_)iLineFeed;
+    pThis->iLineFeed = (enum e_LineFeed)iLineFeed;
   }
 }
-static int __internal_get_insmode(const struct _text_object_ *pThis)
+static int __internal_get_insmode(const TEXT_OBJECT *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -2046,7 +2061,7 @@ static int __internal_get_insmode(const struct _text_object_ *pThis)
   }
   return 0; // for now
 }
-static void __internal_set_insmode(struct _text_object_ *pThis, int iInsMode)
+static void __internal_set_insmode(TEXT_OBJECT *pThis, int iInsMode)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -2063,7 +2078,7 @@ static void __internal_set_insmode(struct _text_object_ *pThis, int iInsMode)
     __internal_invalidate_cursor(pThis, 1);  // invalidate the cursor immediately
   }
 }
-static int __internal_get_selmode(const struct _text_object_ *pThis)
+static int __internal_get_selmode(const TEXT_OBJECT *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -2071,7 +2086,7 @@ static int __internal_get_selmode(const struct _text_object_ *pThis)
   }
   return 0; // for now
 }
-static void __internal_set_selmode(struct _text_object_ *pThis, int iSelMode)
+static void __internal_set_selmode(TEXT_OBJECT *pThis, int iSelMode)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -2084,7 +2099,7 @@ static void __internal_set_selmode(struct _text_object_ *pThis, int iSelMode)
     pThis->iSelMode = iSelMode;
   }
 }
-static int __internal_get_tab(const struct _text_object_ *pThis)
+static int __internal_get_tab(const TEXT_OBJECT *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -2093,7 +2108,7 @@ static int __internal_get_tab(const struct _text_object_ *pThis)
 
   return 0; // for now
 }
-static void __internal_set_tab(struct _text_object_ *pThis, int iTab)
+static void __internal_set_tab(TEXT_OBJECT *pThis, int iTab)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -2106,7 +2121,7 @@ static void __internal_set_tab(struct _text_object_ *pThis, int iTab)
     pThis->iTab = iTab;
   }
 }
-static int __internal_get_scrollmode(const struct _text_object_ *pThis)
+static int __internal_get_scrollmode(const TEXT_OBJECT *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -2114,7 +2129,7 @@ static int __internal_get_scrollmode(const struct _text_object_ *pThis)
   }
   return 0; // for now
 }
-static void __internal_set_scrollmode(struct _text_object_ *pThis, int iScrollMode)
+static void __internal_set_scrollmode(TEXT_OBJECT *pThis, int iScrollMode)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -2127,7 +2142,7 @@ static void __internal_set_scrollmode(struct _text_object_ *pThis, int iScrollMo
     pThis->iScrollMode = iScrollMode;
   }
 }
-static void __internal_get_select(const struct _text_object_ *pThis, WB_RECT *pRct)
+static void __internal_get_select(const TEXT_OBJECT *pThis, WB_RECT *pRct)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -2158,7 +2173,7 @@ static void __internal_get_select(const struct _text_object_ *pThis, WB_RECT *pR
     }
   }
 }
-static void __internal_set_select(struct _text_object_ *pThis, const WB_RECT *pRct)
+static void __internal_set_select(TEXT_OBJECT *pThis, const WB_RECT *pRct)
 {
   // setting NULL for the selection rectangle selects 'none'
 
@@ -2181,7 +2196,7 @@ static void __internal_set_select(struct _text_object_ *pThis, const WB_RECT *pR
     }
   }
 }
-static int __internal_has_select(const struct _text_object_ *pThis)
+static int __internal_has_select(const TEXT_OBJECT *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -2189,7 +2204,7 @@ static int __internal_has_select(const struct _text_object_ *pThis)
   }
   return 0;
 }
-static char* __internal_get_sel_text(const struct _text_object_ *pThis, const WB_RECT *pRct)
+static char* __internal_get_sel_text(const TEXT_OBJECT *pThis, const WB_RECT *pRct)
 {
 WB_RECT rctSel;
 
@@ -2235,7 +2250,7 @@ WB_RECT rctSel;
   }
   return NULL; // for now
 }
-static int __internal_get_row(const struct _text_object_ *pThis)
+static int __internal_get_row(const TEXT_OBJECT *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -2243,7 +2258,7 @@ static int __internal_get_row(const struct _text_object_ *pThis)
   }
   return 0; // for now
 }
-static void __internal_set_row(struct _text_object_ *pThis, int iRow)
+static void __internal_set_row(TEXT_OBJECT *pThis, int iRow)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -2265,7 +2280,7 @@ static void __internal_set_row(struct _text_object_ *pThis, int iRow)
     pThis->iRow = iRow;
   }
 }
-static int __internal_get_col(const struct _text_object_ *pThis)
+static int __internal_get_col(const TEXT_OBJECT *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -2273,7 +2288,7 @@ static int __internal_get_col(const struct _text_object_ *pThis)
   }
   return 0; // for now
 }
-static void __internal_set_col(struct _text_object_ *pThis, int iCol)
+static void __internal_set_col(TEXT_OBJECT *pThis, int iCol)
 {
 int iAutoScrollWidth = AUTO_HSCROLL_SIZE;
 
@@ -2320,7 +2335,7 @@ int iAutoScrollWidth = AUTO_HSCROLL_SIZE;
     }
   }
 }
-static void __internal_del_select(struct _text_object_ *pThis)
+static void __internal_del_select(TEXT_OBJECT *pThis)
 {
 char *pTemp, *pL;
 int iSelAll, iLen, i1, i2;
@@ -2675,7 +2690,7 @@ WB_RECT rctSel;
     __internal_invalidate_rect(pThis, NULL, 1); // TODO:  optimize this
   }
 }
-static void __internal_replace_select(struct _text_object_ *pThis, const char *szText, unsigned long cbLen)
+static void __internal_replace_select(TEXT_OBJECT *pThis, const char *szText, unsigned long cbLen)
 {
 WB_RECT rctSel;
 int iSelAll;
@@ -2768,7 +2783,7 @@ int iSelAll;
 
   }
 }
-static void __internal_del_chars(struct _text_object_ *pThis, int nChar)
+static void __internal_del_chars(TEXT_OBJECT *pThis, int nChar)
 {
 TEXT_BUFFER *pBuf;
 int i1, i2, iLen;
@@ -3202,7 +3217,7 @@ WB_RECT rctInvalid;
     }
   }
 }
-static void __internal_ins_chars(struct _text_object_ *pThis, const char *pChar, int nChar)
+static void __internal_ins_chars(TEXT_OBJECT *pThis, const char *pChar, int nChar)
 {
 TEXT_BUFFER *pBuf;
 const char *p1, *p2;
@@ -3745,14 +3760,14 @@ WB_RECT rctInvalid;
 
   // TODO:  anything else??
 }
-static void __internal_indent(struct _text_object_ *pThis, int nCol)
+static void __internal_indent(TEXT_OBJECT *pThis, int nCol)
 {
   if(WBIsValidTextObject(pThis))
   {
     WB_ERROR_PRINT("TODO:  %s - implement 'indent'\n", __FUNCTION__);
   }
 }
-static int __internal_can_undo(struct _text_object_ *pThis)
+static int __internal_can_undo(TEXT_OBJECT *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -3760,14 +3775,14 @@ static int __internal_can_undo(struct _text_object_ *pThis)
 
   return 0; // for now
 }
-static void __internal_undo(struct _text_object_ *pThis)
+static void __internal_undo(TEXT_OBJECT *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
     WB_ERROR_PRINT("TODO:  %s - implement 'undo'\n", __FUNCTION__);
   }
 }
-static int __internal_can_redo(struct _text_object_ *pThis)
+static int __internal_can_redo(TEXT_OBJECT *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -3775,14 +3790,14 @@ static int __internal_can_redo(struct _text_object_ *pThis)
 
   return 0; // for now
 }
-static void __internal_redo(struct _text_object_ *pThis)
+static void __internal_redo(TEXT_OBJECT *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
     WB_ERROR_PRINT("TODO:  %s - implement 'redo'\n", __FUNCTION__);
   }
 }
-static void __internal_get_view(const struct _text_object_ *pThis, WB_RECT *pRct)
+static void __internal_get_view(const TEXT_OBJECT *pThis, WB_RECT *pRct)
 {
   if(!pRct)
   {
@@ -3794,7 +3809,7 @@ static void __internal_get_view(const struct _text_object_ *pThis, WB_RECT *pRct
     memcpy(pRct, &(pThis->rctView), sizeof(*pRct));
   }
 }
-static void __internal_set_view_origin(struct _text_object_ *pThis, const WB_POINT *pOrig)
+static void __internal_set_view_origin(TEXT_OBJECT *pThis, const WB_POINT *pOrig)
 {
   if(!pOrig)
   {
@@ -3856,7 +3871,7 @@ static void __internal_set_view_origin(struct _text_object_ *pThis, const WB_POI
     }
   }
 }
-static void __internal_begin_highlight(struct _text_object_ *pThis)
+static void __internal_begin_highlight(TEXT_OBJECT *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -3869,7 +3884,7 @@ static void __internal_begin_highlight(struct _text_object_ *pThis)
     pThis->iDragState = DragState_CURSOR;
   }
 }
-static void __internal_end_highlight(struct _text_object_ *pThis)
+static void __internal_end_highlight(TEXT_OBJECT *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -3882,7 +3897,7 @@ static void __internal_end_highlight(struct _text_object_ *pThis)
     pThis->iDragState = DragState_NONE;
   }
 }
-static void __internal_mouse_click(struct _text_object_ *pThis, int iMouseXDelta, int iMouseYDelta, int iType, int iACS)
+static void __internal_mouse_click(TEXT_OBJECT *pThis, int iMouseXDelta, int iMouseYDelta, int iType, int iACS)
 {
 TEXT_BUFFER *pBuf;
 int iRow = -1, iCol = -1; // pre-assign error returns
@@ -4024,7 +4039,7 @@ WB_RECT rctSel;
     __internal_invalidate_rect(pThis, NULL, 1);
   }
 }
-static void __internal_begin_mouse_drag(struct _text_object_ *pThis)
+static void __internal_begin_mouse_drag(TEXT_OBJECT *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -4038,7 +4053,7 @@ static void __internal_begin_mouse_drag(struct _text_object_ *pThis)
     pThis->iDragState = DragState_MOUSE;
   }
 }
-static void __internal_end_mouse_drag(struct _text_object_ *pThis)
+static void __internal_end_mouse_drag(TEXT_OBJECT *pThis)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -4052,7 +4067,7 @@ static void __internal_end_mouse_drag(struct _text_object_ *pThis)
     pThis->iDragState = DragState_NONE;
   }
 }
-static void __internal_cursor_up(struct _text_object_ *pThis)
+static void __internal_cursor_up(TEXT_OBJECT *pThis)
 {
 TEXT_BUFFER *pBuf;
 
@@ -4153,7 +4168,7 @@ TEXT_BUFFER *pBuf;
     }
   }
 }
-static void __internal_cursor_down(struct _text_object_ *pThis)
+static void __internal_cursor_down(TEXT_OBJECT *pThis)
 {
 TEXT_BUFFER *pBuf;
 
@@ -4250,7 +4265,7 @@ TEXT_BUFFER *pBuf;
     }
   }
 }
-static void __internal_cursor_left(struct _text_object_ *pThis)
+static void __internal_cursor_left(TEXT_OBJECT *pThis)
 {
 TEXT_BUFFER *pBuf;
 
@@ -4349,7 +4364,7 @@ TEXT_BUFFER *pBuf;
     }
   }
 }
-static void __internal_cursor_right(struct _text_object_ *pThis)
+static void __internal_cursor_right(TEXT_OBJECT *pThis)
 {
 TEXT_BUFFER *pBuf;
 
@@ -4478,7 +4493,7 @@ TEXT_BUFFER *pBuf;
     }
   }
 }
-static void __internal_page_up(struct _text_object_ *pThis)
+static void __internal_page_up(TEXT_OBJECT *pThis)
 {
 TEXT_BUFFER *pBuf;
 
@@ -4589,7 +4604,7 @@ TEXT_BUFFER *pBuf;
   }
 
 }
-static void __internal_page_down(struct _text_object_ *pThis)
+static void __internal_page_down(TEXT_OBJECT *pThis)
 {
 TEXT_BUFFER *pBuf;
 
@@ -4700,7 +4715,7 @@ TEXT_BUFFER *pBuf;
     __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
   }
 }
-static void __internal_page_left(struct _text_object_ *pThis)
+static void __internal_page_left(TEXT_OBJECT *pThis)
 {
 //int iAutoScrollWidth = AUTO_HSCROLL_SIZE;
 TEXT_BUFFER *pBuf;
@@ -4806,7 +4821,7 @@ TEXT_BUFFER *pBuf;
     __internal_invalidate_rect(pThis, NULL, 1); // invalidate entire screen if I'm here
   }
 }
-static void __internal_page_right(struct _text_object_ *pThis)
+static void __internal_page_right(TEXT_OBJECT *pThis)
 {
 TEXT_BUFFER *pBuf;
 
@@ -4909,7 +4924,7 @@ TEXT_BUFFER *pBuf;
   }
 }
 
-static void __internal_cursor_home(struct _text_object_ *pThis)
+static void __internal_cursor_home(TEXT_OBJECT *pThis)
 {
 const char *pL, *p2;
 TEXT_BUFFER *pBuf;
@@ -5021,7 +5036,7 @@ TEXT_BUFFER *pBuf;
   }
 }
 
-static void __internal_cursor_end(struct _text_object_ *pThis)
+static void __internal_cursor_end(TEXT_OBJECT *pThis)
 {
 const char *pL;
 TEXT_BUFFER *pBuf;
@@ -5125,7 +5140,7 @@ TEXT_BUFFER *pBuf;
   }
 }
 
-static void __internal_cursor_top(struct _text_object_ *pThis)
+static void __internal_cursor_top(TEXT_OBJECT *pThis)
 {
 //TEXT_BUFFER *pBuf;
 
@@ -5186,7 +5201,7 @@ static void __internal_cursor_top(struct _text_object_ *pThis)
   }
 }
 
-static void __internal_cursor_bottom(struct _text_object_ *pThis)
+static void __internal_cursor_bottom(TEXT_OBJECT *pThis)
 {
 TEXT_BUFFER *pBuf;
 
@@ -5263,7 +5278,7 @@ TEXT_BUFFER *pBuf;
   }
 }
 
-static void __internal_scroll_vertical(struct _text_object_ *pThis, int nRows)
+static void __internal_scroll_vertical(TEXT_OBJECT *pThis, int nRows)
 {
 TEXT_BUFFER *pBuf;
 
@@ -5337,7 +5352,7 @@ TEXT_BUFFER *pBuf;
   }
 }
 
-static void __internal_scroll_horizontal(struct _text_object_ *pThis, int nCols)
+static void __internal_scroll_horizontal(TEXT_OBJECT *pThis, int nCols)
 {
 TEXT_BUFFER *pBuf;
 
@@ -5539,7 +5554,7 @@ char **ppNames = NULL;
 }
 #endif // 0
 
-static void __internal_do_expose(struct _text_object_ *pThis, Display *pDisplay, Window wID,
+static void __internal_do_expose(TEXT_OBJECT *pThis, Display *pDisplay, Window wID,
                                  WBGC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
                                  WB_FONTC pFont)
 {
@@ -6481,7 +6496,7 @@ static int __internal_cursor_show(int iBlinkState) // determines if blink state 
   return iBlinkState != CURSOR_BLINK_OFF ? 1 : 0;
 }
 
-static void __internal_cursor_blink(struct _text_object_ *pThis, int bHasFocus)
+static void __internal_cursor_blink(TEXT_OBJECT *pThis, int bHasFocus)
 {
   if(WBIsValidTextObject(pThis))
   {
@@ -6512,14 +6527,14 @@ static void __internal_cursor_blink(struct _text_object_ *pThis, int bHasFocus)
   }
 }
 
-static void __internal_set_save_point(struct _text_object_ *pThis)
+static void __internal_set_save_point(TEXT_OBJECT *pThis)
 {
   // TODO:  implement
 
   WB_DEBUG_PRINT(DebugLevel_Verbose, "%s - not yet implemented\n", __FUNCTION__);
 }
 
-static int __internal_get_modified(struct _text_object_ *pThis)
+static int __internal_get_modified(TEXT_OBJECT *pThis)
 {
   WB_DEBUG_PRINT(DebugLevel_Verbose, "%s - not yet implemented - returning 'modified'\n", __FUNCTION__);
 

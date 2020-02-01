@@ -46,6 +46,23 @@
 
 ******************************************************************************/
 
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+//
+// TODO:  support some kind of COM objects on POSIX systems, with an API that
+//        translates directly to OLE 2 on Windows in a platform-indepenent way.
+//
+// COM equivalents (ORBs) on POSIX include the following technologies:
+//
+//   libbonobo
+//   D-Bus
+//   XPCOM (Mozilla)
+//   CORBA and DCOP [obsolete]
+//
+//   'ORB' = 'Object Request Broker'
+//
+// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+
 /** \file platform_helper.h
   * \brief Definition file for platform-specific utility functions
   *
@@ -416,8 +433,8 @@ typedef unsigned long long WB_UINT64;
 
 #else // !defined HAVE_LONGLONG, unlikely (this part won't show up in doxygen either)
 
-typedef struct __WB_INT64__ { WB_UINT32 dw2; WB_INT32 dw1; } WB_INT64;    // note 'dw1' is a signed value
-typedef struct __WB_UINT64__ { WB_UINT32 dw2; WB_UINT32 dw1; } WB_UINT64;
+typedef struct tagWB_INT64 { WB_UINT32 dw2; WB_INT32 dw1; } WB_INT64;    // note 'dw1' is a signed value
+typedef struct tagWB_UINT64 { WB_UINT32 dw2; WB_UINT32 dw1; } WB_UINT64;
 
 #endif // _LONGLONG
 
@@ -676,7 +693,7 @@ void WBPlatformOnExit(void);
   * Header File:  platform_helper.h
   *
   * /sa WBParseStandardArguments() WBPlatformOnInit() WBPlatformOnExit()
-*/
+**/
 #if defined(DOXYGEN) || !defined(_MSC_VER)
 int WBMain(int argc, char *argv[], char *envp[]);
 #else // MSVC
@@ -695,7 +712,7 @@ int __declspec(selectany) WBMain(int argc, char *argv[], char *envp[]);
   * Header File:  platform_helper.h
   *
   * /sa WBToolkitUsage()
-*/
+**/
 #if defined(DOXYGEN) || !defined(_MSC_VER)
 void WBUsage(void);
 #else // _MSC_VER
@@ -1111,12 +1128,12 @@ char *WBConvertMultiByteFrom16(const XChar2b *pwzStr);
 
 #else // !X11WORKBENCH_TOOLKIT_HAVE_XPM or __DOXYGEN__
 
-/** \ingroup pixmap
-  * \struct _XPM_ATTRIBUTES_
+/** \struct tagXPM_ATTRIBUTES
+  * \ingroup pixmap
   * \copydoc XPM_ATTRIBUTES
 **/
-/** \ingroup pixmap
-  * \typedef XPM_ATTRIBUTES
+/** \typedef XPM_ATTRIBUTES
+  * \ingroup pixmap
   * \brief Compatibility structure for use with MyLoadPixmapFromData() whenever libXpm is not in use.
   *
   * When libXpm is in use, XPM_ATTRIBUTES becomes a \#define for XpmAttributes, the structure used
@@ -1132,7 +1149,7 @@ char *WBConvertMultiByteFrom16(const XChar2b *pwzStr);
   *
   * \code
 
-  typedef struct _XPM_ATTRIBUTES_
+  typedef struct tagXPM_ATTRIBUTES
   {
     int width;    // The width of the returned pixmaps
     int height;   // height of the returned pixmaps
@@ -1157,7 +1174,7 @@ char *WBConvertMultiByteFrom16(const XChar2b *pwzStr);
   * For more information, see MyLoadPixmapFromData()
   *
 **/
-typedef struct _XPM_ATTRIBUTES_
+typedef struct tagXPM_ATTRIBUTES
 {
   // I only need certain information from MyLoadPixmapFromData(), so that's all I'm doing with this structure
 

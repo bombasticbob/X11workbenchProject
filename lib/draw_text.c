@@ -297,7 +297,7 @@ DT_WORDS *pRval = *ppWords;
   if(pRval->nCount + 1 >= pRval->nMax)
   {
     int iNewLen = sizeof(*pRval)
-                + ((pRval->nMax & 0xffffff80) + 127) * sizeof(struct __DT_WORD__);
+                + ((pRval->nMax & 0xffffff80) + 127) * sizeof(DT_WORD);
 
     void *p3 = WBReAlloc(pRval, iNewLen);
 
@@ -312,8 +312,8 @@ DT_WORDS *pRval = *ppWords;
     pRval = (DT_WORDS *)p3;
 //#ifdef HAVE_MALLOC_USABLE_SIZE
     pRval->nMax = (WBAllocUsableSize(pRval) - sizeof(DT_WORDS))
-                / sizeof(struct __DT_WORD__)
-                + 1; // because DT_WORDS contains one struct __DT_WORD__
+                / sizeof(DT_WORD)
+                + 1; // because DT_WORDS contains one DT_WORD
 //#else // HAVE_MALLOC_USABLE_SIZE
     pRval->nMax = (pRval->nMax & 0xffffff80) + 128;
 //#endif // HAVE_MALLOC_USABLE_SIZE
@@ -366,7 +366,7 @@ DT_WORDS * DTGetWordsFromText(Display *pDisplay, WB_FONTC pFont, const char *szT
 {
   const char *p1, *p2;
 
-  DT_WORDS *pRval = WBAlloc(sizeof(DT_WORDS) + sizeof(struct __DT_WORD__) * (INITIAL_DT_WORDS_COUNT - 1));
+  DT_WORDS *pRval = WBAlloc(sizeof(DT_WORDS) + sizeof(DT_WORD) * (INITIAL_DT_WORDS_COUNT - 1));
 
   if(!pRval)
   {
@@ -377,8 +377,8 @@ DT_WORDS * DTGetWordsFromText(Display *pDisplay, WB_FONTC pFont, const char *szT
   pRval->szText = szText;
 //#ifdef HAVE_MALLOC_USABLE_SIZE
   pRval->nMax = (WBAllocUsableSize(pRval) - sizeof(DT_WORDS)) // calculate actual # of structs it contains
-              / sizeof(struct __DT_WORD__)
-              + 1; // because DT_WORDS contains one struct __DT_WORD__
+              / sizeof(DT_WORD)
+              + 1; // because DT_WORDS contains one DT_WORD
 //#else // HAVE_MALLOC_USABLE_SIZE
   pRval->nMax = INITIAL_DT_WORDS_COUNT;
 //#endif // HAVE_MALLOC_USABLE_SIZE

@@ -355,12 +355,12 @@ enum XSettingsType
 };
 
 
-/** \ingroup desktop_settings
-  * \struct __XSETTINGS_DATA_COLOR__
+/** \struct tagXSETTINGS_DATA_COLOR
+  * \ingroup desktop_settings
   * \copydoc XSETTINGS_DATA_COLOR
 **/
-/** \ingroup desktop_settings
-  * \typedef XSETTINGS_DATA_COLOR
+/** \typedef XSETTINGS_DATA_COLOR
+  * \ingroup desktop_settings
   * \brief Structure for storing configuration color information, \ref XSettingsTypeColor
   *
   * This structure is part of the X11 Window Manager specification, and is defined here for use
@@ -368,7 +368,7 @@ enum XSettingsType
   *
   * \code
 
-  typedef struct __XSETTINGS_DATA_COLOR__ // also used internally by XSettings
+  typedef struct tagXSETTINGS_DATA_COLOR // also used internally by XSettings
   {
     unsigned short sRed;    // 16-bit RGB value for RED
     unsigned short sBlue;   // 16-bit RGB value for Blue
@@ -379,7 +379,7 @@ enum XSettingsType
   * \endcode
   *
 **/
-typedef struct __XSETTINGS_DATA_COLOR__ // also used internally by XSettings
+typedef struct tagXSETTINGS_DATA_COLOR // also used internally by XSettings
 {
   unsigned short sRed;    ///< 16-bit RGB value for RED
   unsigned short sBlue;   ///< 16-bit RGB value for Blue
@@ -388,12 +388,12 @@ typedef struct __XSETTINGS_DATA_COLOR__ // also used internally by XSettings
 } __PACKED__ XSETTINGS_DATA_COLOR;
 
 
-/** \ingroup desktop_settings
-  * \struct _CHXSetting_
+/** \struct tagCHXSetting
+  * \ingroup desktop_settings
   * \copydoc CHXSetting
 **/
-/** \ingroup desktop_settings
-  * \typedef CHXSetting
+/** \typedef CHXSetting
+  * \ingroup desktop_settings
   * \brief Structure for storing settings information internally
   *
   * This structure is used internally by the \ref conf_help to cache configuration information obtained
@@ -401,7 +401,7 @@ typedef struct __XSETTINGS_DATA_COLOR__ // also used internally by XSettings
   *
   * \code
 
-  typedef struct _CHXSetting_
+  typedef struct tagCHXSetting
   {
     const char *szName;              // pointer to the NAME string within memory that follows CHXSettings::aData
     int   iType;                     // The setting type (\ref XSettingsType enumeration)
@@ -420,7 +420,7 @@ typedef struct __XSETTINGS_DATA_COLOR__ // also used internally by XSettings
   * \endcode
   *
 **/
-typedef struct _CHXSetting_
+typedef struct tagCHXSetting
 {
   const char *szName;              ///< pointer to the NAME string within memory that follows CHXSettings::aData
   int   iType;                     ///< The setting type (\ref XSettingsType enumeration)
@@ -437,12 +437,12 @@ typedef struct _CHXSetting_
 }  __PACKED__ CHXSetting;
 
 
-/** \ingroup desktop_settings
-  * \struct _CHXSettings_
+/** \struct tagCHXSettings
+  * \ingroup desktop_settings
   * \copydoc CHXSettings
 **/
-/** \ingroup desktop_settings
-  * \typedef CHXSettings
+/** \typedef CHXSettings
+  * \ingroup desktop_settings
   * \brief Array wrapper for \ref CHXSetting cache
   *
   * This structure wraps the array of \ref CHXSetting structures and any variable length data that
@@ -451,7 +451,7 @@ typedef struct _CHXSetting_
   *
   * \code
 
-  typedef struct _CHXSettings_
+  typedef struct tagCHXSettings
   {
     Display *pDisplay;      // identifies which display it belongs to (reserved)
     int nSettings;          // the total number of settings in aData
@@ -462,7 +462,7 @@ typedef struct _CHXSetting_
   * \endcode
   *
 **/
-typedef struct _CHXSettings_
+typedef struct tagCHXSettings
 {
   Display *pDisplay;      ///< identifies which display it belongs to (reserved)
   int nSettings;          ///< the total number of settings in aData
@@ -749,12 +749,12 @@ const char *CHGetHighlightBackgroundColor(Display *pDisplay);
 
 // XML help
 
-/** \ingroup desktop_settings
-  * \struct _CHXMLEntry_
+/** \struct tagCHXMLEntry
+  * \ingroup desktop_settings
   * \copydoc CHXMLEntry
 **/
-/** \ingroup text_xml
-  * \typedef CHXMLEntry
+/** \typedef CHXMLEntry
+  * \ingroup text_xml
   * \brief Descriptor for parsed XML entry
   *
   * This structure describes an XML entry. It is expected to be a part of an array of such structures,
@@ -775,7 +775,7 @@ const char *CHGetHighlightBackgroundColor(Display *pDisplay);
   *
   * \code
 
-  typedef struct _CHXMLEntry_
+  typedef struct tagCHXMLEntry
   {
     int iNextIndex;      // 0-based index for next item at this level; <= 0 for none.  0 marks "end of list" for top level
     int iContainer;      // 0-based index for container; <= 0 for none.
@@ -791,7 +791,7 @@ const char *CHGetHighlightBackgroundColor(Display *pDisplay);
   * \endcode
   *
 **/
-typedef struct _CHXMLEntry_
+typedef struct tagCHXMLEntry
 {
   int iNextIndex;      ///< 0-based index for next item at this level; <= 0 for none.  0 marks "end of list" for top level
   int iContainer;      ///< 0-based index for container; <= 0 for none.

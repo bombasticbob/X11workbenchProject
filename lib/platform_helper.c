@@ -4689,9 +4689,9 @@ WB_THREAD WBThreadGetCurrent(void)
 // which lets me set some stuff up.  this will require a locked
 // set of buffers for that purpose.  This sets them up.
 
-struct __WB_THREAD_PARM__
+WB_THREAD_PARM
 {
-  struct __WB_THREAD_PARM__ *pNext;
+  WB_THREAD_PARM *pNext;
 
   void *(*function)(void *);
   void *pParam;
@@ -4700,7 +4700,7 @@ struct __WB_THREAD_PARM__
 
 volatile unsigned int dwThreadParmSpinLock = 0; // spinlock on THIS using WBInterlockedExchange
 
-struct __WB_THREAD_PARM__ aTP[16] =
+WB_THREAD_PARM aTP[16] =
 {
   { &(aTP[1]), NULL, 0 }, // this initializer creates a 'chain'
   { &(aTP[2]), NULL, 0 },
@@ -4720,12 +4720,12 @@ struct __WB_THREAD_PARM__ aTP[16] =
   { NULL, NULL, 0 }
 };
 
-struct __WB_THREAD_PARM__ *pTPHead = &(aTP[0]); // the head of the 'free' list
+WB_THREAD_PARM *pTPHead = &(aTP[0]); // the head of the 'free' list
 
 static void *WBInternalThreadProc(void *pParam)
 {
 void *pRval = NULL;
-struct __WB_THREAD_PARM__ *pParm = (struct __WB_THREAD_PARM__ *)pParam;
+WB_THREAD_PARM *pParm = (WB_THREAD_PARM *)pParam;
 void *(*function2)(void *);
 void *pParam2;
 

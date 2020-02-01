@@ -134,36 +134,36 @@ static int GetWBDialogControlStructSize(Atom aClass)
   if(aClass == aICON_CONTROL ||
      aClass == aIMAGE_CONTROL)
   {
-    return sizeof(struct _WB_IMAGE_CONTROL_);
+    return sizeof(WBImageControl);
   }
 
   if(aClass == aPUSHBUTTON_CONTROL ||
      aClass == aDEFPUSHBUTTON_CONTROL ||
      aClass == aCANCELBUTTON_CONTROL)
   {
-    return sizeof(struct _WB_PUSHBUTTON_CONTROL_);
+    return sizeof(WBPushButtonControl);
   }
 
   if(aClass == aEDIT_CONTROL)
   {
-    return sizeof(struct _WB_EDIT_CONTROL_);
+    return sizeof(WBEditControl);
   }
 
   if(aClass == aCOMBO_CONTROL)
   {
-    return sizeof(struct _WB_COMBO_CONTROL_);
+    return sizeof(WBComboControl);
   }
 
   if(aClass == aLIST_CONTROL ||
      aClass == aFILE_LIST_CONTROL)
   {
-    return sizeof(struct _WB_LIST_CONTROL_);
+    return sizeof(WBListControl);
   }
 
   if(aClass == aTREE_CONTROL ||
      aClass == aPATH_TREE_CONTROL)
   {
-    return sizeof(struct _WB_TREE_CONTROL_);
+    return sizeof(WBTreeControl);
   }
 
   return sizeof(WBDialogControl);
@@ -909,7 +909,7 @@ BEGIN_CREATE_CONTROL(ICON_CONTROL);
   }
 
   // TODO:  scan properties for 'ICON' property, load icon, assign to
-  //        ((struct _WB_IMAGE_CONTROL_ *)pDialogControl)->pixmap
+  //        ((WBImageControl *)pDialogControl)->pixmap
 
   if(pDialogControl->pDlgControlEntry &&
      (pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_VISIBLE))
@@ -2007,11 +2007,11 @@ static int static_callback(Window wID, XEvent *pEvent)
          pDialogControl->aClass == aIMAGE_CONTROL)
       {
 
-        Pixmap pxOld = ((struct _WB_IMAGE_CONTROL_ *)pDialogControl)->pixmap;
-        Pixmap pxOld2 = ((struct _WB_IMAGE_CONTROL_ *)pDialogControl)->pixmap2;
+        Pixmap pxOld = ((WBImageControl *)pDialogControl)->pixmap;
+        Pixmap pxOld2 = ((WBImageControl *)pDialogControl)->pixmap2;
 
-        ((struct _WB_IMAGE_CONTROL_ *)pDialogControl)->pixmap = None;
-        ((struct _WB_IMAGE_CONTROL_ *)pDialogControl)->pixmap2 = None;
+        ((WBImageControl *)pDialogControl)->pixmap = None;
+        ((WBImageControl *)pDialogControl)->pixmap2 = None;
 
         if(pxOld != None)
         {
@@ -2327,9 +2327,9 @@ int iType;
          pDialogControl->aClass == aDEFPUSHBUTTON_CONTROL ||
          pDialogControl->aClass == aCANCELBUTTON_CONTROL)
       {
-        Pixmap pxOld = ((struct _WB_PUSHBUTTON_CONTROL_ *)pDialogControl)->pixmap;
+        Pixmap pxOld = ((WBPushButtonControl *)pDialogControl)->pixmap;
 
-        ((struct _WB_PUSHBUTTON_CONTROL_ *)pDialogControl)->pixmap = None;
+        ((WBPushButtonControl *)pDialogControl)->pixmap = None;
 
         if(pxOld != None)
         {
@@ -4670,8 +4670,8 @@ WB_GEOM geomPaint, geomBorder;
   // where I put the text matters based on the control type (see iHPos, iVPos)
   if(iType == STATIC_Icon || iType == STATIC_Image)
   {
-    Pixmap pixmap = ((struct _WB_IMAGE_CONTROL_ *)pSelf)->pixmap;
-    Pixmap pixmap2 = ((struct _WB_IMAGE_CONTROL_ *)pSelf)->pixmap2;
+    Pixmap pixmap = ((WBImageControl *)pSelf)->pixmap;
+    Pixmap pixmap2 = ((WBImageControl *)pSelf)->pixmap2;
 
     // TODO:  get the image's geometry so I can properly center it (etc.)
 

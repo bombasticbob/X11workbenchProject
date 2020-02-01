@@ -61,8 +61,7 @@ extern "C" {
 #endif // __cplusplus
 
 #ifndef __DOXYGEN__ /* exclude these so I don't mess up the docs */
-// forward definitions
-typedef struct _WBGC_ * WBGC;
+typedef struct s_WBGC * WBGC; // forward declaration - see window_helper.h
 #endif // __DOXYGEN__ /* exclude these so I don't mess up the docs */
 
 

@@ -694,12 +694,12 @@ Atom aNULL=None;             // Atom for 'NULL'
 
 
 
-/** \ingroup wcore_internal
-  * \struct __internal_window_entry__
+/** \struct s_internal_window_entry
+  * \ingroup wcore_internal
   * \copydoc _WINDOW_ENTRY_
 **/
-/** \ingroup wcore_internal
-  * \typedef _WINDOW_ENTRY_
+/** \typedef _WINDOW_ENTRY_
+  * \ingroup wcore_internal
   * \brief Core (internal) structure for window management, one per window
   *
   * Each '_WINDOW_ENTRY_' structure is mapped 1:1 to a window ID, and is allocated
@@ -717,7 +717,7 @@ Atom aNULL=None;             // Atom for 'NULL'
   *
   * \code
 
-  typedef struct __internal_window_entry__     // the structure that identifies the window and what to do with it
+  typedef struct s_internal_window_entry       // the structure that identifies the window and what to do with it
   {
     Window wID;                                // window to which the structure is mapped
     const char *szClassName;                   // window 'class name', mostly for debug and tracing, points to NULL or persistent name string
@@ -757,7 +757,7 @@ Atom aNULL=None;             // Atom for 'NULL'
   * \endcode
   *
 **/
-typedef struct __internal_window_entry__     // the structure that identifies the window and what to do with it
+typedef struct s_internal_window_entry       // the structure that identifies the window and what to do with it
 {
   Window wID;                                ///< window to which the structure is mapped
   const char *szClassName;                   ///< window 'class name', mostly for debug and tracing, points to NULL or persistent name string
@@ -859,17 +859,16 @@ XStandardColormap cmapDefault; // a copy of teh XStandardColormap for the Colorm
 #define EVENT_ARRAY_SIZE 0x2000 /* this many events maximum */
 #define EVENT_ARRAY_MASK 0x1fff /* 'and' this for modular math */
 
-/** \ingroup wcore_internal
-  * \struct __EVENT_ENTRY__
+/** \struct s_EVENT_ENTRY
+  * \ingroup wcore_internal
   * \copydoc EVENT_ENTRY
 **/
-/** \ingroup wcore_internal
-  * \typedef EVENT_ENTRY
-
+/** \typedef EVENT_ENTRY
+  * \ingroup wcore_internal
   * \brief Core (internal) structure for storing and dispatching events
   *
 **/
-typedef struct __EVENT_ENTRY__
+typedef struct s_EVENT_ENTRY
 {
   Display *pDisplay; ///< the Display pointer for the event
   int iNext;         ///< index for 'next' in a linked list
@@ -897,17 +896,17 @@ static int (* pAppEventCallback)(XEvent *pEvent) = NULL;
 
 #define TIMER_ARRAY_SIZE  512
 
-/** \struct __TIMER_ENTRY__
+/** \struct s_TIMER_ENTRY
   * \ingroup wcore_internal
   * \copydoc TIMER_ENTRY
 **/
-/** \ingroup wcore_internal
-  * \typedef TIMER_ENTRY
+/** \typedef TIMER_ENTRY
+  * \ingroup wcore_internal
   * \brief Core (internal) structure for managing timers
 **/
-typedef struct __TIMER_ENTRY__
+typedef struct s_TIMER_ENTRY
 {
-  struct __TIMER_ENTRY__ *pNext; ///< linked lists for performance
+  struct s_TIMER_ENTRY *pNext;  ///< linked lists for performance
   WB_UINT64 lTimeIndex;          ///< time index for which this timer next expires
   unsigned long lTimeInterval;   ///< interval (or zero for one-shot timer)
 
@@ -920,17 +919,17 @@ static TIMER_ENTRY axWBTimer[TIMER_ARRAY_SIZE];
 static TIMER_ENTRY *pTimerEntryActive = NULL, *pTimerEntryFree = NULL;
   // pointers for two linked lists.  entries must be in either 'active' or 'free' list.
 
-/** \struct __DELAYED_EVENT_ENTRY__
+/** \struct s_DELAYED_EVENT_ENTRY
   * \ingroup wcore_internal
   * \copydoc DELAYED_EVENT_ENTRY
 **/
-/** \ingroup wcore_internal
-  * \typedef DELAYED_EVENT_ENTRY
+/** \typedef DELAYED_EVENT_ENTRY
+  * \ingroup wcore_internal
   * \brief Core (internal) structure for managing delayed events
 **/
-typedef struct __DELAYED_EVENT_ENTRY__
+typedef struct s_DELAYED_EVENT_ENTRY
 {
-  struct __DELAYED_EVENT_ENTRY__ *pNext; ///< linked lists for performance
+  struct s_DELAYED_EVENT_ENTRY *pNext;  ///< linked lists for performance
   WB_UINT64 lTimeIndex;                  ///< time index for which this timer next expires
 
   XEvent event;                          ///< copy of delayed event
@@ -3330,9 +3329,9 @@ _WINDOW_ENTRY_ *pEntry;
 
 //#define TIMER_ARRAY_SIZE  512
 //
-//static struct __TIMER_ENTRY__
+//static struct s_TIMER_ENTRY
 //{
-//  struct __TIMER_ENTRY__ *pNext; // linked lists for performance
+//  struct s_TIMER_ENTRY *pNext; // linked lists for performance
 //  unsigned long long lTimeIndex; // time index for which this timer next expires
 //  unsigned long lTimeInterval;   // interval (or zero for one-shot timer)
 //

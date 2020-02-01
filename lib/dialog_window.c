@@ -46,8 +46,9 @@
 
 ******************************************************************************/
 
-/** \file dialog_window.c Implementation for dialog (frame) window and intercommunication structures and APIs
-*/
+/** \file dialog_window.c
+  * \brief Implementation for dialog (frame) window and intercommunication structures and APIs
+**/
 
 
 #include <stdio.h>
@@ -73,21 +74,22 @@
 #include "conf_help.h"
 #include "draw_text.h"
 
-
 #define THIS_SUBSYSTEM DebugSubSystem_Dialog
 
 
-/** \ingroup dlgwindow_structures
-  * \struct __DIALOG_WINDOW__
+
+
+/** \struct s_DIALOG_WINDOW
+  * \ingroup dlgwindow_structures
   * \copydoc DIALOG_WINDOW
 **/
-/** \ingroup dlgwindow
-  * \typedef DIALOG_WINDOW
-  * \brief DIALOG_WINDOW structure (internal), an extension of WBDialogWindow
+/** \typedef DIALOG_WINDOW
+  * \ingroup dlgwindow
+  * \brief DIALOG_WINDOW structure, an extension of WBDialogWindow
   *
   * \code
 
-  typedef struct __DIALOG_WINDOW__
+  typedef struct s_DIALOG_WINDOW
   {
     WBDialogWindow wbDLG;            // WBDialogWIndow structure, required to be at the beginning
 
@@ -100,7 +102,7 @@
 
     WBWinEvent pDLGCallback;         // pointer to dialog window callback function
 
-    struct __DIALOG_WINDOW__ *pNext; // internal use only, pointer to next entry in chain (linked list)
+    struct s_DIALOG_WINDOW *pNext; // internal use only, pointer to next entry in chain (linked list)
 
   } DIALOG_WINDOW;
 
@@ -111,8 +113,8 @@
   * properties.  See also \ref WB_DIALOG_PROP and \ref WBDialogPropList.\n
   *
   * \sa WBDialogEntry, WBDialogWindow
-*/
-typedef struct __DIALOG_WINDOW__
+**/
+typedef struct s_DIALOG_WINDOW
 {
   WBDialogWindow wbDLG;            ///< WBDialogWIndow structure, required to be at the beginning
 
@@ -124,7 +126,7 @@ typedef struct __DIALOG_WINDOW__
 
   WBWinEvent pDLGCallback;         ///< pointer to dialog window callback function
 
-  struct __DIALOG_WINDOW__ *pNext; ///< internal use only, pointer to next entry in chain (linked list)
+  struct s_DIALOG_WINDOW *pNext; ///< internal use only, pointer to next entry in chain (linked list)
 
 } DIALOG_WINDOW;
 

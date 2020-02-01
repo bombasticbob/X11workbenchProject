@@ -64,7 +64,7 @@
   * Each edited text object uses the TEXT_OBJECT structure to manage the data and the
   * user interface.  The currently active text object will receive all of the appropriate
   * events.  The Edit Window also provides for horizontal and vertical scrolling, as needed.
-*/
+**/
 
 
 /** \ingroup child_frame
@@ -79,12 +79,12 @@ extern "C" {
 
 // OBSOLETE 'IDEA' CODE, LEFT FOR REFERENCE
 //
-//typedef struct __WBLineBuffer
+//typedef struct tagWBLineBuffer
 //{
 //  int iLength;  // length of buffer (not including the structure size)
 //  int iMaxPos;  // maximum position into which any text has been entered (usually end of line)
 //  int iEndOfLine;  // the actual end of line (not counting trailing white space)
-//  struct __WBLineBuffer *pPrev, *pNext;  // linked list of buffers
+//  struct tagWBLineBuffer *pPrev, *pNext;  // linked list of buffers
 //  char data[4];  // the actual data for the line (typically ASCII)
 //  // variable length following this
 //} WBLineBuffer;
@@ -115,8 +115,8 @@ extern "C" {
 //};
 
 
-/** \ingroup edit_window
-  * \struct __WBEditWindow__
+/** \struct tagWBEditWindow
+  * \ingroup edit_window
   * \copydoc WBEditWindow
 **/
 /** \typedef WBEditWindow
@@ -132,7 +132,7 @@ extern "C" {
   *
   * \code
 
-  typedef struct __WBEditWindow__
+  typedef struct tagWBEditWindow
   {
     WBChildFrame childframe;          // elements common to a 'child frame' (derived object)
 
@@ -155,7 +155,7 @@ extern "C" {
   *
   * \sa \ref TEXT_OBJECT
 **/
-typedef struct __WBEditWindow__
+typedef struct tagWBEditWindow
 {
   WBChildFrame childframe;          ///< elements common to a 'child frame' (derived object)
 

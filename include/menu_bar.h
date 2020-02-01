@@ -50,7 +50,7 @@
   * \brief Definition file for menu bar window structures and API functions
   *
   * This is the definition file for menus bar window functions and structures
-*/
+**/
 
 /** \ingroup frame
   * \defgroup menu_bar Menu Bar window - functions and structures
@@ -75,8 +75,8 @@ extern "C" {
 
 #define MENU_WINDOW_TAG (*((const unsigned int *)"MWMW"))
 
-/** \ingroup menu_bar
-  * \struct  __WBMenuBarWindow__
+/** \struct tagWBMenuBarWindow
+  * \ingroup menu_bar
   * \copydoc WBMenuBarWindow
 **/
 /** \typedef WBMenuBarWindow
@@ -87,7 +87,7 @@ extern "C" {
   *
   * \code
 
-  typedef struct __WBMenuBarWindow__
+  typedef struct tagWBMenuBarWindow
   {
     unsigned int ulTag; // tag indicating I'm a 'Menu Bar' window
     Window wSelf;       // The window ID of the menu bar window
@@ -110,7 +110,7 @@ extern "C" {
   * \sa WBMenu
   *
 **/
-typedef struct __WBMenuBarWindow__
+typedef struct tagWBMenuBarWindow
 {
   unsigned int ulTag; ///< tag indicating I'm a 'Menu Bar' window
   Window wSelf;       ///< The window ID of the menu bar window

@@ -1871,20 +1871,6 @@ int bNoClip;
   return iRval;
 }
 
-//  typedef struct _WBGC_
-//  {
-//    Display *display;   // the Display associated with the WBGC (NULL implies 'Default Display')
-//    Drawable dw;        // the Drawable for which this WBGC was created (None implies default Window)
-//    GC gc;              // the associated 'GC'
-//    XGCValues values;   // cached XGCValues for the GC
-//    WB_FONT pFont; // cached XFontStruct for the GC, for 'font' member
-//    Region clip_rgn;    // clipping region (or None to use clip_image)
-//    XImage *clip_image; // cached XImage for the GC, for 'clip mask'
-//    XImage *tile_image; // cached XImage for the GC, for 'tile'
-//    XImage *stip_image; // cached XImage for the GC, for 'stipple'
-//  } * WBGC;
-
-
 int WBXDrawPoints(XImage *pImage, WBGC hGC,
                   XPoint *points, int npoints, int mode)
 {
@@ -2118,7 +2104,7 @@ int WBXFillPolygon(XImage *pImage, WBGC hGC,
   return -1; // for now
 }
 
-int WBXDrawString(XImage *pImage, WB_FONT pFont, WBGC hGC,
+int WBXDrawString(XImage *pImage, WB_FONTC pFont, WBGC hGC,
                   int x, int y, const char *string, int length)
 {
 //Display *pDisplay = WBGetDefaultDisplay(); // in case I need one

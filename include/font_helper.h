@@ -60,7 +60,7 @@
   * and render them.  Xft uses a completely different font set than the ones
   * provided by the 'classic' font interface.
   *
-*/
+**/
 
 
 #ifndef _FONT_HELPER_H_INCLUDED_
@@ -76,7 +76,7 @@ extern "C" {
 #endif // X11WORKBENCH_TOOLKIT_HAVE_XFT
 
 #ifndef _WINDOW_HELPER_H_INCLUDED_
-typedef struct _WBExtent_ WB_EXTENT; // forward reference on WB_EXTENT structure for WBTextExtent()
+typedef struct s_WB_EXTENT WB_EXTENT; // forward reference on WB_EXTENT structure for WBTextExtent()
 #endif // _WINDOW_HELPER_H_INCLUDED_
 
 

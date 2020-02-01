@@ -583,11 +583,11 @@ Display *pDisplay = NULL;
   if(pCtrl->aClass == aICON_CONTROL ||
      pCtrl->aClass == aIMAGE_CONTROL)
   {
-    Pixmap pxOld = ((struct _WB_IMAGE_CONTROL_ *)pCtrl)->pixmap;
-    Pixmap pxOld2 = ((struct _WB_IMAGE_CONTROL_ *)pCtrl)->pixmap2;
+    Pixmap pxOld = ((WBImageControl *)pCtrl)->pixmap;
+    Pixmap pxOld2 = ((WBImageControl *)pCtrl)->pixmap2;
 
-    ((struct _WB_IMAGE_CONTROL_ *)pCtrl)->pixmap = pixmap;
-    ((struct _WB_IMAGE_CONTROL_ *)pCtrl)->pixmap2 = None;
+    ((WBImageControl *)pCtrl)->pixmap = pixmap;
+    ((WBImageControl *)pCtrl)->pixmap2 = None;
 
     BEGIN_XCALL_DEBUG_WRAPPER
     if(pxOld != None)
@@ -604,11 +604,11 @@ Display *pDisplay = NULL;
   if(pCtrl->aClass == aPUSHBUTTON_CONTROL || pCtrl->aClass == aDEFPUSHBUTTON_CONTROL
      || pCtrl->aClass == aCANCELBUTTON_CONTROL)
   {
-    Pixmap pxOld = ((struct _WB_PUSHBUTTON_CONTROL_ *)pCtrl)->pixmap;
-    Pixmap pxOld2 = ((struct _WB_PUSHBUTTON_CONTROL_ *)pCtrl)->pixmap2;
+    Pixmap pxOld = ((WBPushButtonControl *)pCtrl)->pixmap;
+    Pixmap pxOld2 = ((WBPushButtonControl *)pCtrl)->pixmap2;
 
-    ((struct _WB_PUSHBUTTON_CONTROL_ *)pCtrl)->pixmap = pixmap;
-    ((struct _WB_PUSHBUTTON_CONTROL_ *)pCtrl)->pixmap2 = None;
+    ((WBPushButtonControl *)pCtrl)->pixmap = pixmap;
+    ((WBPushButtonControl *)pCtrl)->pixmap2 = None;
 
     BEGIN_XCALL_DEBUG_WRAPPER
     if(pxOld != None)
@@ -633,13 +633,13 @@ Pixmap WBDialogControlGetPixmap(WBDialogControl *pCtrl)
   if(pCtrl->aClass == aICON_CONTROL ||
      pCtrl->aClass == aIMAGE_CONTROL)
   {
-    return ((struct _WB_IMAGE_CONTROL_ *)pCtrl)->pixmap;
+    return ((WBImageControl *)pCtrl)->pixmap;
   }
 
   if(pCtrl->aClass == aPUSHBUTTON_CONTROL || pCtrl->aClass == aDEFPUSHBUTTON_CONTROL
      || pCtrl->aClass == aCANCELBUTTON_CONTROL)
   {
-    return ((struct _WB_PUSHBUTTON_CONTROL_ *)pCtrl)->pixmap;
+    return ((WBPushButtonControl *)pCtrl)->pixmap;
   }
 
   return None;
@@ -667,11 +667,11 @@ Display *pDisplay = NULL;
   if(pCtrl->aClass == aICON_CONTROL ||
      pCtrl->aClass == aIMAGE_CONTROL)
   {
-    Pixmap pxOld = ((struct _WB_IMAGE_CONTROL_ *)pCtrl)->pixmap;
-    Pixmap pxOld2 = ((struct _WB_IMAGE_CONTROL_ *)pCtrl)->pixmap2;
+    Pixmap pxOld = ((WBImageControl *)pCtrl)->pixmap;
+    Pixmap pxOld2 = ((WBImageControl *)pCtrl)->pixmap2;
 
-    ((struct _WB_IMAGE_CONTROL_ *)pCtrl)->pixmap = pixmap;
-    ((struct _WB_IMAGE_CONTROL_ *)pCtrl)->pixmap2 = pixmap2;
+    ((WBImageControl *)pCtrl)->pixmap = pixmap;
+    ((WBImageControl *)pCtrl)->pixmap2 = pixmap2;
 
     BEGIN_XCALL_DEBUG_WRAPPER
     if(pxOld != None)
@@ -688,11 +688,11 @@ Display *pDisplay = NULL;
   if(pCtrl->aClass == aPUSHBUTTON_CONTROL || pCtrl->aClass == aDEFPUSHBUTTON_CONTROL
      || pCtrl->aClass == aCANCELBUTTON_CONTROL)
   {
-    Pixmap pxOld = ((struct _WB_PUSHBUTTON_CONTROL_ *)pCtrl)->pixmap;
-    Pixmap pxOld2 = ((struct _WB_PUSHBUTTON_CONTROL_ *)pCtrl)->pixmap2;
+    Pixmap pxOld = ((WBPushButtonControl *)pCtrl)->pixmap;
+    Pixmap pxOld2 = ((WBPushButtonControl *)pCtrl)->pixmap2;
 
-    ((struct _WB_PUSHBUTTON_CONTROL_ *)pCtrl)->pixmap = pixmap;
-    ((struct _WB_PUSHBUTTON_CONTROL_ *)pCtrl)->pixmap2 = pixmap2;
+    ((WBPushButtonControl *)pCtrl)->pixmap = pixmap;
+    ((WBPushButtonControl *)pCtrl)->pixmap2 = pixmap2;
 
     BEGIN_XCALL_DEBUG_WRAPPER
     if(pxOld != None)
@@ -719,10 +719,10 @@ Pixmap WBDialogControlGetIconPixmap(WBDialogControl *pCtrl, Pixmap *pPixmap2)
   {
     if(pPixmap2)
     {
-      *pPixmap2 = ((struct _WB_PUSHBUTTON_CONTROL_ *)pCtrl)->pixmap2;
+      *pPixmap2 = ((WBPushButtonControl *)pCtrl)->pixmap2;
     }
 
-    return ((struct _WB_IMAGE_CONTROL_ *)pCtrl)->pixmap;
+    return ((WBImageControl *)pCtrl)->pixmap;
   }
 
   if(pCtrl->aClass == aPUSHBUTTON_CONTROL || pCtrl->aClass == aDEFPUSHBUTTON_CONTROL
@@ -730,10 +730,10 @@ Pixmap WBDialogControlGetIconPixmap(WBDialogControl *pCtrl, Pixmap *pPixmap2)
   {
     if(pPixmap2)
     {
-      *pPixmap2 = ((struct _WB_PUSHBUTTON_CONTROL_ *)pCtrl)->pixmap2;
+      *pPixmap2 = ((WBPushButtonControl *)pCtrl)->pixmap2;
     }
 
-    return ((struct _WB_PUSHBUTTON_CONTROL_ *)pCtrl)->pixmap;
+    return ((WBPushButtonControl *)pCtrl)->pixmap;
   }
 
   return None;
@@ -1357,27 +1357,6 @@ void **paData;
   WBFree(pListInfo);
 }
 
-//typedef struct __LISTINFO__
-//{
-//  int nItems, nMaxItems;              // size/max size of aItems (must re-alloc to increase nMaxItems)
-//  int nFlags;                         // flags (sorted, etc.)
-//  Window wOwner;                      // owning window [to be notified on change]
-//  void *(*pfnAllocator)(void *, int); // copy constructor to call for each item that's added
-//                                      // typically this will call 'WBAlloc' followed by 'memcpy'
-//                                      // if NULL, the caller-supplied pointer is assigned to 'aItems' as-is
-//  void (*pfnDestructor)(void *);      // destructor to call for each item that's removed
-//                                      // typically this will point to 'WBFree'
-//                                      // if NULL, the caller-supplied pointer is ignored
-//
-//  void (*pfnDisplay)(WBDialogControl *pControl, void *pData, int iSelected, WBGC gcPaint, WB_GEOM *pGeom);
-//                                      // generic function to display contents of item within 'pGeom' using WBGC
-//                                      // typically one of the listbox 'display item' functions
-//
-//  int (*pfnSort)(const void *, const void *); // sort proc (NULL implies strcmp)
-//
-//  void *aItems[1];                    // array of item data (remainder of struct)
-//} LISTINFO;
-
 const char * DLGGetControlListText(WBDialogControl *pCtrl, int iIndex)
 {
   const LISTINFO *pListInfo;
@@ -1676,15 +1655,6 @@ void DLGDelControlListEntry(WBDialogControl *pCtrl, int iIndex)
 //  WB_ERROR_PRINT("TEMPORARY:  %s:%s:%d\n", __FILE__, __FUNCTION__, __LINE__);
 //  DEBUG_DUMP_LIST(pCtrl);
 }
-
-
-//typedef struct _WB_LIST_CURSEL_
-//{
-//  int iCurSel;      // current selection
-//  int iTopIndex;    // index of item at top of window
-//  int iHeight;      // calculated height of window in "entries" (see next member)
-//  int iEntryHeight; // cached display height of each entry (calculated by Expose handler)
-//} WBListCurSel; // intended to be member following WBDialogControl for "list" controls
 
 
 // getting "extension" structures from dialog control structure

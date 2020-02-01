@@ -106,12 +106,12 @@ extern "C" {
 **/
 #define DIALOG_CONTROL_TAG (*((const unsigned int *)"DLGC"))
 
-/** \ingroup dlgctrl_structures
-  * \struct __WB_DIALOG_PROP__
+/** \struct s_WB_DIALOG_PROP
+  * \ingroup dlgctrl_structures
   * \copydoc WB_DIALOG_PROP
 **/
-/** \ingroup dlgctrl_types
-  * \typedef WB_DIALOG_PROP
+/** \typedef WB_DIALOG_PROP
+  * \ingroup dlgctrl_types
   * \brief Dialog property storage structure
   *
   * Internally dialog properties are stored using this structure.  An
@@ -121,7 +121,7 @@ extern "C" {
   * structure.\n
   * \code
 
-  typedef struct __WB_DIALOG_PROP__
+  typedef struct s_WB_DIALOG_PROP
   {
     Atom aProp;          // Atom identifying the property
     unsigned long lVal;  // 'long' data value, assigned as needed
@@ -133,9 +133,9 @@ extern "C" {
   * Dialog property storage structure.  Additional details can be found in the
   * documentation for \ref WB_DIALOG_PROP and \ref WBDialogPropList.\n
   *
-  *  \sa  __WB_DIALOG_PROP__ and WBDialogPropList
-*/
-typedef struct __WB_DIALOG_PROP__
+  *  \sa  s_WB_DIALOG_PROP and WBDialogPropList
+**/
+typedef struct s_WB_DIALOG_PROP
 {
   Atom aProp;          ///< Atom identifying the property
   unsigned long lVal;  ///< 'long' data value, assigned as needed
@@ -143,12 +143,12 @@ typedef struct __WB_DIALOG_PROP__
 } WB_DIALOG_PROP;
 
 
-/** \ingroup dlgctrl_structures
-  * \struct __WB_DIALOG_PROPLIST__
+/** \struct s_WB_DIALOG_PROPLIST
+  * \ingroup dlgctrl_structures
   * \copydoc WBDialogPropList
 **/
-/** \ingroup dlgctrl_types
-  * \typedef WBDialogPropList
+/** \typedef WBDialogPropList
+  * \ingroup dlgctrl_types
   * \brief Dialog Property List, container for \ref WB_DIALOG_PROP
   *
   * Container structure for WB_DIALOG_PROP structures, pre-allocated
@@ -158,7 +158,7 @@ typedef struct __WB_DIALOG_PROP__
   *
   * \code
 
-  typedef struct __WB_DIALOG_PROPLIST__
+  typedef struct s_WB_DIALOG_PROPLIST
   {
     int nProps, nMaxProps;      // total number of active properties and maximum size of aDlgProp
     WB_DIALOG_PROP aDlgProp[1]; // Array of property definitions (contiguous, pre-allocated)
@@ -176,8 +176,8 @@ typedef struct __WB_DIALOG_PROP__
   * \li simplified string property functions:  DLGSetControlProperty(), DLGGetControlProperty()\n
   * \li combined with dialog window:  DLGSetControlCaption(), DLGGetControlCaption()\n
   *
-*/
-typedef struct __WB_DIALOG_PROPLIST__
+**/
+typedef struct s_WB_DIALOG_PROPLIST
 {
 /** \brief current number of (contiguous) properties in 'aDlgProp' */
   int nProps,
@@ -195,12 +195,12 @@ typedef struct __WB_DIALOG_PROPLIST__
 } WBDialogPropList;
 
 
-/** \ingroup dlgctrl_structures
-  * \struct __WB_DIALOG_CONTROL__
+/** \struct s_WB_DIALOG_CONTROL
+  * \ingroup dlgctrl_structures
   * \copydoc WBDialogControl
 **/
-/** \ingroup dlgctrl_types
-  * \typedef WBDialogControl
+/** \typedef WBDialogControl
+  * \ingroup dlgctrl_types
   * \brief Structure identifying the properties of a dialog box control
   *
   * All dialog box controls have certain properties in common, and most of them
@@ -212,7 +212,7 @@ typedef struct __WB_DIALOG_PROPLIST__
   *
   * \code
 
-  typedef struct __WB_DIALOG_CONTROL__
+  typedef struct s_WB_DIALOG_CONTROL
   {
     unsigned int ulTag;               // The value DIALOG_CONTROL_TAG
     Window wID;                       // Window ID of the dialog control window
@@ -243,9 +243,9 @@ typedef struct __WB_DIALOG_PROPLIST__
   * For each dialog control, a pointer to this structure is assigned to window property index 0, and can be
   * easily obtained using DLGGetDialogControlStruct() (preferred method)
   *
-  * \sa  __WB_DIALOG_CONTROL__ and WBDialogPropList
-*/
-typedef struct __WB_DIALOG_CONTROL__
+  * \sa  s_WB_DIALOG_CONTROL and WBDialogPropList
+**/
+typedef struct s_WB_DIALOG_CONTROL
 {
   unsigned int ulTag;               ///< The value DIALOG_CONTROL_TAG
   Window wID;                       ///< Window ID of the dialog control window
@@ -1315,7 +1315,7 @@ extern Atom aDLGC_PATH; // PATH information for file-related controls
   * \brief LIST-related constants for the index of an item within a list
   *
   * \sa \ref DLGGetControlListText(), \ref DLGGetControlListData(), \ref DLGAddControlListEntry(), \ref DLGDelControlListEntry()
-*/
+**/
 enum ControlListIndex
 {
   ControlListIndex_FIRST = 0,                ///< first list index
@@ -1329,7 +1329,7 @@ enum ControlListIndex
 /** \ingroup dlgctrl_definitions dlglist
   * \hideinitializer
   * \brief Create flags specified in the call to DLGInitControlListInfo()
-*/
+**/
 enum ListInfoFlags
 {
   ListInfoFlags_SORTED = 1,         ///< list is sorted
@@ -1348,7 +1348,7 @@ enum ListInfoFlags
 /** \ingroup dlgctrl_definitions
   * \hideinitializer
   * \brief Control 'Get/Set' properties used by aDLGC_CONTROL_SET and aDLGC_CONTROL_GET
-*/
+**/
 enum ControlGetSetProperties
 {
   ControlGetSet_CHECK = 1,    ///< 'checked' flag.  when 'setting', -1 'toggles', 1 sets it, 0 clears it.  when 'getting', zero is 'unchecked', non-zero 'checked'
@@ -1368,7 +1368,7 @@ enum ControlGetSetProperties
   * Intended for the 'ulFlags' member of the WBDialogControl structure.  Bits 0000ffff are 'common' flags
   * for all controls.  Bits 00ff0000 are control-specific flags.  Bits ff000000 are 'reserved' for
   * custom usage.
-*/
+**/
 enum CONTROL_FLAGS
 {
   // COMMON bits (APPLIES TO ALL) - MASK 0000FFFFH

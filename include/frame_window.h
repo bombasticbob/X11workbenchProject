@@ -182,7 +182,7 @@ extern "C" {
 #define FRAME_WINDOW_TAG (*((const unsigned int *)"FWFW"))
 
 
-/** \struct __WB_FW_MENU_HANDLER__
+/** \struct tagWB_FW_MENU_HANDLER
   * \ingroup frame_menu
   * \copydoc WBFWMenuHandler
 **/
@@ -200,7 +200,7 @@ extern "C" {
   *
   * \code
 
-  typedef struct __WB_FW_MENU_HANDLER__
+  typedef struct tagWB_FW_MENU_HANDLER
   {
     uintptr_t lMenuID;                           // menu ID (< 0x10000L) or const pointer to string
 
@@ -214,7 +214,7 @@ extern "C" {
   *
   * \sa \ref FW_MENU_HANDLER_ENTRY "FW_MENU_HANDLER_ENTRY", \ref FW_MENU_HANDLER_BEGIN "FW_MENU_HANDLER_BEGIN"
 **/
-typedef struct __WB_FW_MENU_HANDLER__
+typedef struct tagWB_FW_MENU_HANDLER
 {
   uintptr_t lMenuID;                       ///< menu ID (< 0x10000L) or const pointer to string
 
@@ -230,7 +230,7 @@ typedef struct __WB_FW_MENU_HANDLER__
 
 
 
-/** \struct __WB_FRAME_WINDOW__
+/** \struct tagWB_FRAME_WINDOW
   * \ingroup frame_window
   * \copydoc WBFrameWindow
 **/
@@ -253,7 +253,7 @@ typedef struct __WB_FW_MENU_HANDLER__
   *
   * \code
 
-  typedef struct __WB_FRAME_WINDOW__
+  typedef struct tagWB_FRAME_WINDOW
   {
     unsigned int ulTag;                  // tag indicating I'm a frame window
     Window wID;                          // Window id for the frame window
@@ -271,7 +271,7 @@ typedef struct __WB_FW_MENU_HANDLER__
   * \sa \ref frame_window "Frame Window APIs and Structures"
   *
 **/
-typedef struct __WB_FRAME_WINDOW__
+typedef struct tagWB_FRAME_WINDOW
 {
   unsigned int ulTag;                  ///< tag indicating I'm a frame window
   Window wID;                          ///< Window id for the frame window
@@ -324,9 +324,9 @@ enum WBStatusTabInfo_FLAGS
 // NOTE:  WBChildFrame and WBChildFrameUI are defined HERE to avoid circular header file dependencies
 // (also defining supporting structs for same reason)
 
-struct __WBChildFrameUI__; // forward declaration
+struct tagWBChildFrameUI; // forward declaration
 
-/** \struct __WBChildFrame__
+/** \struct tagWBChildFrame
   * \ingroup child_frame
   * \copydoc WBChildFrame
 **/
@@ -350,7 +350,7 @@ struct __WBChildFrameUI__; // forward declaration
   *
   * \code
 
-  typedef struct __WBChildFrame__
+  typedef struct tagWBChildFrame
   {
     unsigned int ulTag;
       // tag indicating I'm a 'Child Frame' window
@@ -408,13 +408,13 @@ struct __WBChildFrameUI__; // forward declaration
 
     WBWinEvent pUserCallback;
       // message callback function pointer (can be NULL)
-    void (*destructor)(struct __WBChildFrame__ *);
+    void (*destructor)(struct tagWBChildFrame *);
       // pointer to a destructor.  if not NULL, will be called by FWDestroyChildFrame()
 
     WBChildFrameUI *pUI;
       // pointer to 'WBChildFrameUI' function pointer table (assigned by 'superclass')
 
-    struct __WBChildFrame__ *pNext;
+    struct tagWBChildFrame *pNext;
       // 'Next Object' pointer in an internally stored linked list (do not alter or use this)
   } WBChildFrame;
 
@@ -423,7 +423,7 @@ struct __WBChildFrameUI__; // forward declaration
   * \sa \ref frame "Frame Windows"
   *
 **/
-typedef struct __WBChildFrame__
+typedef struct tagWBChildFrame
 {
   unsigned int ulTag;               ///< tag indicating I'm a 'Child Frame' window
   Window wID;                       ///< window identifier for the 'Child Frame' window.  may contain 'None' while being destroyed
@@ -456,14 +456,14 @@ typedef struct __WBChildFrame__
   int iContextMenuID;               ///< menu ID (from pszMenuResource or owning frame's menu) for context popup, -1 if none
 
   WBWinEvent pUserCallback;         ///< message callback function pointer (can be NULL)
-  void (*destructor)(struct __WBChildFrame__ *);  ///< pointer to a 'superclass' destructor.  If not NULL, will be called by FWDestroyChildFrame()
-  struct __WBChildFrameUI__ *pUI;   ///< pointer to 'WBChildFrameUI' function pointer table (assigned by 'superclass')
+  void (*destructor)(struct tagWBChildFrame *);  ///< pointer to a 'superclass' destructor.  If not NULL, will be called by FWDestroyChildFrame()
+  struct tagWBChildFrameUI *pUI;   ///< pointer to 'WBChildFrameUI' function pointer table (assigned by 'superclass')
 
-  struct __WBChildFrame__ *pNext;   ///< 'Next Object' pointer in an internally stored linked list (do not alter or use this)
+  struct tagWBChildFrame *pNext;   ///< 'Next Object' pointer in an internally stored linked list (do not alter or use this)
 } WBChildFrame;
 
 
-/** \struct __WBChildFrameUI__
+/** \struct tagWBChildFrameUI
   * \ingroup child_frame
   * \copydoc WBChildFrameUI
 **/
@@ -479,7 +479,7 @@ typedef struct __WBChildFrame__
   *
   * \code
 
-  typedef struct __WBChildFrameUI__
+  typedef struct tagWBChildFrameUI
   {
     unsigned int ulTag;
       // tag indicating I'm a 'Child Frame UI' structure
@@ -674,7 +674,7 @@ typedef struct __WBChildFrame__
   * passing the correct 'iACS' parameter value.
   *
 **/
-typedef struct __WBChildFrameUI__
+typedef struct tagWBChildFrameUI
 {
   unsigned int ulTag;                                       ///< tag indicating I'm a 'Child Frame UI' structure
   void (*do_char)(WBChildFrame *, XClientMessageEvent *);   ///< handler for regular WB_CHAR Client Messages (typed-in characters). \details The XClientMessageEvent will be interpreted and characters added to the associated document or object.  This function should NOT be called for 'special' characters, like cursors, backspace, and so on.

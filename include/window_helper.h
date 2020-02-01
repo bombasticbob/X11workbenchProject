@@ -66,6 +66,45 @@
   *   X11 API 'wrapper' functions
 **/
 
+/** \defgroup wcore_wm Window Manager Window Properties
+  * \ingroup wcore
+**/
+
+/** \defgroup wcore_cursor Pointer/Cursor management
+  * \ingroup wcore
+  *
+  * Window-related API for managing the window's cursor.  The cursor can be changed
+  * depending on the current context, and is a property of the window itself.
+  *
+  * Use these API funtions to manage the cursor for a particular window.
+  *
+  * See Also: \ref WB_DEFAULT_CURSOR, \ref WB_WAIT_CURSOR
+**/
+
+/** \defgroup wcore_geom Points, Rectangles, and Geometries
+  * \ingroup wcore
+  *
+  * The following functions, data types, and macro definitions are related
+  * to window geometries, querying, translating coordinate mapping, and comparing
+  * points, rectangles, and geometries to one another.
+  *
+  * See Also:  \ref WB_RECT, \ref WB_GEOM
+**/
+
+/** \defgroup wcore_gc Graphics Context APIs related to Windows
+  * \ingroup wcore
+  *
+  * See Also: \ref graphics
+**/
+
+/** \defgroup core_struct_str structures
+  * \ingroup core_struct
+**/
+
+
+/** \headerfile <>
+**/
+
 // doxygen top-level stuff has been moved to doxy_comments.dox
 
 //////////////////////////////////////////
@@ -101,34 +140,34 @@
 extern "C" {
 #endif // __cplusplus
 
-/** \ingroup defaults
+/** \ingroup wbdefaults
   * \brief The default window cursor (this is what xterm uses)
-*/
+**/
 #define WB_DEFAULT_CURSOR XC_left_ptr
-/** \ingroup defaults
+/** \ingroup wbdefaults
   * \brief The 'wait' cursor (this is what xterm uses)
 **/
 #define WB_WAIT_CURSOR XC_watch /*XC_clock*/
-/** \ingroup defaults
+/** \ingroup wbdefaults
   * \brief The default X11 font name (currently "fixed")
 **/
 #define WB_DEFAULT_FONT    "fixed"
-/** \ingroup defaults
+/** \ingroup wbdefaults
   * \brief The default X11 font size (currently 13)
 **/
 #define WB_DEFAULT_FONT_SIZE 13 /* override via settings */
-/** \ingroup defaults
+/** \ingroup wbdefaults
   * \brief The 'window data' array size (currently 4 void pointers)
 **/
 #define WINDOW_DATA_SIZE 4 /* size of a 'void *' array that stores per-window data */
 
-/** \ingroup defaults
+/** \ingroup wbdefaults
   * \brief An event mask for ALL events, with bits 0 through 24 set - see X.h which only defines bits 0 to 24 for an event mask
 **/
 #define EVENT_ALL_MASK 0x01ffffffL /* 2^24 | 2^23 ... 2^0 - see X.h */
 
 
-/** \ingroup defaults
+/** \ingroup wbdefaults
   * \brief A bit mask for ALL GC properties (used when copying a GC)
 **/
 #define GCAll (GCFunction | GCPlaneMask | GCForeground | GCBackground | GCLineWidth | \
@@ -165,6 +204,12 @@ extern int i_xcall_line;
   * \ingroup events
   * \brief event callback function type for window events
   *
+  * \code
+
+  typedef int (* WBWinEvent)(Window wID, XEvent *pEvent);
+
+  * \endcode
+  *
   * \param wID The Window ID for the window receiving the event notification
   * \param pEvent A pointer to the XEvent structure passed to the callback function
   * \return Event-specific value.  Typically returns zero if the event was not processed, non-zero if further processing is not necessary
@@ -176,7 +221,13 @@ extern int i_xcall_line;
 typedef int (* WBWinEvent)(Window wID, XEvent *pEvent);
 /** \typedef WBAppEvent
   * \ingroup events
-  * \brief event callback function type for application events
+  * \brief event callback function type definition for application events
+  *
+  * \code
+
+  typedef int (* WBAppEvent)(XEvent *pEvent);
+
+  * \endcode
   *
   * \param pEvent A pointer to the XEvent structure passed to the callback function
   * \return Event-specific value.  Typically returns zero if the event was not processed, non-zero if further processing is not necessary
@@ -200,40 +251,23 @@ typedef int (* WBAppEvent)(XEvent *pEvent);
 ////////////////////////////////////////////////////////////////////////////////////////////
 
 
-/** \defgroup core_struct_struct structures
-  * \ingroup core_struct
-**/
-
-/** \struct _WBGC_
-  * \ingroup core_struct_struct
+/** \struct s_WBGC
+  * \ingroup core_struct_str
   * \copydoc WBGC
 **/
 /** \typedef WBGC
   * \ingroup core_struct
   * \brief internal wrapper struct for GC with local cache
   *
-  * The WBGC structure has been defined for a couple of reasons:
-  * First, it is a similar concept to using 'HDC' in Win32, so it can help
-  * to translate all of the GC-related operations in a 1:1 manner for Win32;
-  * Second, it enables the toolkit to cache locally EVERYTHING that might
-  * enhance performance for X11 implmentations.  Win-Win.
+  * The WBGC data type (and its associated structure) represent a locally cached 'Graphics Context'
+  * that can be efficiently used by the X11workbench Toolkit .  It is similar to a GC structure in
+  * X11, and an HDC in windows, and exists for basically the same purpose.
   *
-  * The biggest single performance problem in X11 exists when you want to
-  * use a remote client and also want to enhance operations beyond the simple
-  * features that are natively supported by an X server, things like anti-aliasing
-  * and transparency [for example].  In order to simplify implementing these things
-  * in a way that does NOT impact performance is to cache everything locally that
-  * might otherwise result in an RPC-like call into the X Server.  The single slowest
-  * operation in this case is obtaining an XImage from a Pixmap or Window, and so this
-  * is specifically cached in the toolkit.  Additionally, functions that can perform
-  * operations on these resources locally (rather than remotely) can then leverage the
-  * cached information, often giving you a significant performance boost.
-  *
-  * The only down side is the additional housekeeping needed to track all of this.
+  * Local cacheing of context information improves efficiency, especially for remote X11 clients.
   *
   * \code
 
-  typedef struct _WBGC_
+  typedef struct s_WBGC
   {
     Display *display;   // the Display associated with the WBGC (NULL implies 'Default Display')
     Drawable dw;        // the Drawable for which this WBGC was created (None implies default Window)
@@ -248,7 +282,6 @@ typedef int (* WBAppEvent)(XEvent *pEvent);
 
   * \endcode
   *
-  *
   * It is generally safe to query the 'values' member in order to get
   * cached information about the WBGC.  You should not change them, however.
   *
@@ -256,30 +289,31 @@ typedef int (* WBAppEvent)(XEvent *pEvent);
   *
   * \code
 
-  typedef struct {
-         int function;               // logical operation
-         unsigned long plane_mask;   // plane mask
-         unsigned long foreground;   // foreground pixel
-         unsigned long background;   // background pixel
-         int line_width;             // line width (in pixels)
-         int line_style;             // LineSolid, LineOnOffDash, LineDoubleDash
-         int cap_style;              // CapNotLast, CapButt, CapRound, CapProjecting
-         int join_style;             // JoinMiter, JoinRound, JoinBevel
-         int fill_style;             // FillSolid, FillTiled, FillStippled FillOpaqueStippled
-         int fill_rule;              // EvenOddRule, WindingRule
-         int arc_mode;               // ArcChord, ArcPieSlice
-         Pixmap tile;                // tile pixmap for tiling operations
-         Pixmap stipple;             // stipple 1 plane pixmap for stippling
-         int ts_x_origin;            // offset for tile or stipple operations
-         int ts_y_origin;
-         Font font;                  // default text font for text operations
-         int subwindow_mode;         // ClipByChildren, IncludeInferiors
-         Bool graphics_exposures;    // boolean, should exposures be generated
-         int clip_x_origin;          // origin for clipping
-         int clip_y_origin;
-         Pixmap clip_mask;           // bitmap clipping; other calls for rects
-         int dash_offset;            // patterned/dashed line information
-         char dashes;
+  typedef struct // XGCValues
+  {
+    int function;               // logical operation
+    unsigned long plane_mask;   // plane mask
+    unsigned long foreground;   // foreground pixel
+    unsigned long background;   // background pixel
+    int line_width;             // line width (in pixels)
+    int line_style;             // LineSolid, LineOnOffDash, LineDoubleDash
+    int cap_style;              // CapNotLast, CapButt, CapRound, CapProjecting
+    int join_style;             // JoinMiter, JoinRound, JoinBevel
+    int fill_style;             // FillSolid, FillTiled, FillStippled FillOpaqueStippled
+    int fill_rule;              // EvenOddRule, WindingRule
+    int arc_mode;               // ArcChord, ArcPieSlice
+    Pixmap tile;                // tile pixmap for tiling operations
+    Pixmap stipple;             // stipple 1 plane pixmap for stippling
+    int ts_x_origin;            // offset for tile or stipple operations
+    int ts_y_origin;
+    Font font;                  // default text font for text operations
+    int subwindow_mode;         // ClipByChildren, IncludeInferiors
+    Bool graphics_exposures;    // boolean, should exposures be generated
+    int clip_x_origin;          // origin for clipping
+    int clip_y_origin;
+    Pixmap clip_mask;           // bitmap clipping; other calls for rects
+    int dash_offset;            // patterned/dashed line information
+    char dashes;
   } XGCValues;
 
   * \endcode
@@ -359,8 +393,8 @@ typedef int (* WBAppEvent)(XEvent *pEvent);
   *
   * Additional information can be found in the aforementioned manual page.
   *
-*/
-typedef struct _WBGC_
+**/
+typedef struct s_WBGC
 {
   Display *display;   ///< the Display associated with the WBGC (NULL implies 'Default Display')
   Drawable dw;        ///< the Drawable for which this WBGC was created (None implies default Window)
@@ -373,8 +407,8 @@ typedef struct _WBGC_
   XImage *stip_image; ///< cached XImage for the GC, for 'stipple'
 } * WBGC;
 
-/** \struct _WBPoint_
-  * \ingroup core_struct_struct
+/** \struct s_WB_POINT
+  * \ingroup core_struct_str
   * \copydoc WB_POINT
 **/
 /** \typedef WB_POINT
@@ -387,7 +421,7 @@ typedef struct _WBGC_
   *
   * \code
 
-  typedef struct _WBPoint_
+  typedef struct s_WB_POINT
   {
     int x;   // the 'x' value of the point.  can be negative.
     int y;   // the 'y' value of the point.  can be negative.
@@ -406,15 +440,15 @@ typedef struct _WBGC_
 
   * \endcode
   *
-*/
-typedef struct _WBPoint_
+**/
+typedef struct s_WB_POINT
 {
   int x;   ///< the 'x' value of the point.  can be negative.
   int y;   ///< the 'y' value of the point.  can be negative.
 } WB_POINT;
 
-/** \struct _WBExtent_
-  * \ingroup core_struct_struct
+/** \struct s_WB_EXTENT
+  * \ingroup core_struct_str
   * \copydoc WB_EXTENT
 **/
 /** \typedef WB_EXTENT
@@ -427,7 +461,7 @@ typedef struct _WBPoint_
   *
   * \code
 
-  typedef struct _WBExtent_
+  typedef struct s_WB_EXTENT
   {
     unsigned int width;   // the 'width' value of the extent.
     unsigned int height;  // the 'height' value of the extent.
@@ -435,16 +469,15 @@ typedef struct _WBPoint_
 
   * \endcode
   *
-  *
-*/
-typedef struct _WBExtent_
+**/
+typedef struct s_WB_EXTENT
 {
   unsigned int width;   ///< the 'width' value of the extent.
   unsigned int height;  ///< the 'height' value of the extent.
 } WB_EXTENT;
 
-/** \struct _WBRect_
-  * \ingroup core_struct_struct
+/** \struct s_WB_RECT
+  * \ingroup core_struct_str
   * \copydoc WB_RECT
 **/
 /** \typedef WB_RECT
@@ -458,7 +491,7 @@ typedef struct _WBExtent_
   *
   * \code
 
-  typedef struct _WBRect_
+  typedef struct s_WB_RECT
   {
     int left, top, right, bottom;
   } WB_RECT;
@@ -477,8 +510,8 @@ typedef struct _WBExtent_
 
   * \endcode
   *
-*/
-typedef struct _WBRect_
+**/
+typedef struct s_WB_RECT
 {
   int left;   /**< X coordinate for rectangle upper left corner */
   int top;    /**< Y coordinate for rectangle upper left corner */
@@ -486,8 +519,8 @@ typedef struct _WBRect_
   int bottom; /**< Y coordinate for rectangle lower right corner */
 } WB_RECT;
 
-/** \struct _WBGeom_
-  * \ingroup core_struct_struct
+/** \struct s_WB_GEOM
+  * \ingroup core_struct_str
   * \copydoc WB_GEOM
 **/
 /** \typedef WB_GEOM
@@ -503,7 +536,7 @@ typedef struct _WBRect_
   *
   * \code
 
-  typedef struct _WBGeom_
+  typedef struct s_WB_GEOM
   {
     int x, y;
     unsigned int width, height, border;
@@ -523,8 +556,8 @@ typedef struct _WBRect_
 
   * \endcode
   *
-*/
-typedef struct _WBGeom_
+**/
+typedef struct s_WB_GEOM
 {
   int x; /**< X coordinate for geometry upper left corner (excluding border) */
   int y; /**< Y coordinate for geometry upper left corner (excluding border) */
@@ -605,16 +638,14 @@ int WBInitDisplay(Display *pDisplay);
 **/
 int WBInitClipboardSystem(Display *pDisplay, const char *szDisplayName);
 
-/** \ingroup startup
-  * \internal
+/** \ingroup startup_internal
   * \brief initializes clipboard sub-system
   *
   * first half of 'WBInitClipboardSystem()
 **/
 int __StartInitClipboardSystem(Display *pDisplay, const char *szDisplayName);
 
-/** \ingroup startup
-  * \internal
+/** \ingroup startup_internal
   * \brief initializes clipboard sub-system
   *
   * final half of 'WBInitClipboardSystem()
@@ -768,7 +799,7 @@ void WBInitSizeHints(XSizeHints *pSH, Display *pDisplay, int iMinHeight, int iMi
 //                                                        //
 ////////////////////////////////////////////////////////////
 
-/** \ingroup defaults
+/** \ingroup wbdefaults
   * \brief Returns the default Display
   *
   * The default display is usually the ONLY display in use by the
@@ -789,7 +820,7 @@ static __inline__ Display * WBGetDefaultDisplay(void)
 Display *WBGetDefaultDisplay();
 #endif // defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
 
-/** \ingroup defaults
+/** \ingroup wbdefaults
   * \brief Returns a pointer to the default font WB_FONT for the default display.  This is a shared resource; do NOT free it nor alter it!
   *
   * \returns A pointer to a WB_FONT object (const), or 'NULL' on error.  This is a shared resource; do NOT free it nor alter it!
@@ -803,7 +834,7 @@ Display *WBGetDefaultDisplay();
 **/
 WB_FONTC WBGetDefaultFont(void);
 
-/** \ingroup defaults
+/** \ingroup wbdefaults
   * \brief Returns a special 'hidden' window used for information purposes
   *
   * This function returns a special window that was created for information
@@ -828,7 +859,7 @@ Window WBGetHiddenHelperWindow(void);  // if you need "a window" for the default
 
 // global atoms (for convenience they are referenced directly via global variables)
 
-#if !defined(_WINDOW_HELPER_C_) && !defined(_CLIPBOARD_HELPER_C)
+#if !defined(_WINDOW_HELPER_C_) && !defined(_CLIPBOARD_HELPER_C) && !defined(__DOXYGEN__)
      /* this declares the atoms 'const' outside of window_helper.c, and does NOT declare them in clipboard_helper.c */
      /* These atoms are GLOBAL variables, assigned by the DEFAULT Display, and may not work for other threads.      */
 extern const Atom aMENU_COMMAND;     // commands sent by menus via ClientMessage
@@ -890,7 +921,7 @@ extern const Atom aNULL;             // Atom for 'NULL'
   *
   * Enumeration of values used in scroll notification messages.\n
   * \sa  \ref WBScrollBarEvent()
-*/
+**/
 enum WBScrollEventParam
 {
   WB_SCROLL_DEFAULT = 0,    ///< 1st parameter (bar) - 'Default Bar', currently not implemented, probably won't be used
@@ -952,37 +983,6 @@ enum WBScrollEventParam
 **/
 #define WB_MOUSE_INPUT_MASK (ButtonPressMask | ButtonReleaseMask | PointerMotionMask | EnterWindowMask | LeaveWindowMask)
 
-
-/** \defgroup wcore_wm Window Manager Window Properties
-  * \ingroup wcore
-**/
-
-/** \defgroup wcore_cursor Pointer/Cursor management
-  * \ingroup wcore
-  *
-  * Window-related API for managing the window's cursor.  The cursor can be changed
-  * depending on the current context, and is a property of the window itself.
-  *
-  * Use these API funtions to manage the cursor for a particular window.
-  *
-  * See Also: \ref WB_DEFAULT_CURSOR, \ref WB_WAIT_CURSOR
-**/
-
-/** \defgroup wcore_geom Points, Rectangles, and Geometries
-  * \ingroup wcore
-  *
-  * The following functions, data types, and macro definitions are related
-  * to window geometries, querying, translating coordinate mapping, and comparing
-  * points, rectangles, and geometries to one another.
-  *
-  * See Also:  \ref WB_RECT, \ref WB_GEOM
-**/
-
-/** \defgroup wcore_gc Graphics Context APIs related to Windows
-  * \ingroup wcore
-  *
-  * See Also: \ref graphics
-**/
 
 /** \ingroup wcore_wm
   * \hideinitializer
@@ -1070,7 +1070,7 @@ enum WBCreateWindow_flags
   // The following flags indicate WM_PROTOCOLS support
   // Assigning these directly can have unexpected consequences
   WBCreateWindow_flagsDefault             = 0, ///< equivalent to 'CWBorderPixel | CWBackPixel | CWColormap | CWBitGravity' when specified without any additional 'CW' flags
-#ifdef HAS_WB_UINT64_BUILTIN
+#if defined(__DOXYGEN__) || defined(HAS_WB_UINT64_BUILTIN)
   WBCreateWindow_flagsNoImageCache      = 0x100000000LL,  ///< do not use a 'backing store' when drawing the window (native X11 calls)
 #endif // HAS_WB_UINT64_BUILTIN
 };
@@ -1600,8 +1600,8 @@ void *WBGetWindowData(Window wID, int iIndex);
 /** \ingroup wcore_geom
   * \brief Returns the RAW geometry of the window as reported by the window manager
   *
-  * \param wID The Window ID to obtain the WB_GEOM data for
-  * \param pGeom A pointer to the WB_GEOM structure to receive the data
+  * \param wID The Window ID to obtain the \ref WB_GEOM data for
+  * \param pGeom A pointer to the \ref WB_GEOM structure to receive the data
   *
   * Header File:  window_helper.h
 **/
@@ -1610,8 +1610,8 @@ void WBGetWindowGeom(Window wID, WB_GEOM *pGeom);
 /** \ingroup wcore_geom
   * \brief Returns the geometry of the window relative to the root window
   *
-  * \param wID The Window ID to obtain the WB_GEOM data for
-  * \param pGeom A pointer to the WB_GEOM structure to receive the data
+  * \param wID The Window ID to obtain the \ref WB_GEOM data for
+  * \param pGeom A pointer to the \ref WB_GEOM structure to receive the data
   *
   * Header File:  window_helper.h
 **/
@@ -1619,10 +1619,10 @@ void WBGetWindowGeom2(Window wID, WB_GEOM *pGeom);
 
 
 /** \ingroup wcore_geom
-  * \brief Returns the ABSOLUTE window geometry relative the screen
+  * \brief Returns the ABSOLUTE window geometry relative to the screen
   *
-  * \param wID The Window ID to obtain the WB_GEOM data for
-  * \param pGeom A pointer to the WB_GEOM structure to receive the data
+  * \param wID The Window ID to obtain the \ref WB_GEOM data for
+  * \param pGeom A pointer to the \ref WB_GEOM structure to receive the data
   *
   * The 'ABSOLUTE' window geometry is the position of the window relative to the
   * origin point (the upper left corner of the screen).  Window managers typically
@@ -1638,20 +1638,20 @@ void WBGetWindowGeom2(Window wID, WB_GEOM *pGeom);
 void WBGetWindowGeom0(Window wID, WB_GEOM *pGeom);  // absolute window geometry (from latest notification)
 
 /** \ingroup wcore_geom
-  * \brief Returns the WB_RECT (rectangle) defined by the window's geometry, including the border area
+  * \brief Returns the \ref WB_RECT (rectangle) defined by the window's geometry, including the border area
   *
-  * \param wID The Window ID to obtain the WB_RECT data for
-  * \param pRect A pointer to the WB_RECT structure to receive the data
+  * \param wID The Window ID to obtain the \ref WB_RECT data for
+  * \param pRect A pointer to the \ref WB_RECT structure to receive the data
   *
   * Header File:  window_helper.h
 **/
 void WBGetWindowRect(Window wID, WB_RECT *pRect);
 
 /** \ingroup wcore_geom
-  * \brief Returns the WB_RECT (rectangle) defined by the window's geometry, excluding the border area
+  * \brief Returns the \ref WB_RECT (rectangle) defined by the window's geometry, excluding the border area
   *
-  * \param wID The Window ID to obtain the WB_RECT data for
-  * \param pRect A pointer to the WB_RECT structure to receive the data
+  * \param wID The Window ID to obtain the \ref WB_RECT data for
+  * \param pRect A pointer to the \ref WB_RECT structure to receive the data
   *
   * Header File:  window_helper.h
 **/
@@ -1722,7 +1722,7 @@ int WBIsChildWindow(Window wIDParent, Window wIDChild);  // non-zero if 'wIDPare
   * \brief Returns logical TRUE if the point (X,Y) is within the borders of the rectangle 'R'
   * \param X The X value to check for
   * \param Y The Y value to check for
-  * \param R A WB_RECT structure bounding the area to check
+  * \param R A \ref WB_RECT structure bounding the area to check
   * \return logical TRUE if (X,Y) lies within 'R', FALSE otherwise
   *
 **/
@@ -1732,15 +1732,15 @@ int WBIsChildWindow(Window wIDParent, Window wIDChild);  // non-zero if 'wIDPare
   * \brief Returns logical TRUE if the point (X,Y) is within the borders of the geometry 'G'
   * \param X The X value to check for
   * \param Y The Y value to check for
-  * \param G A WB_GEOM structure bounding the area to check
+  * \param G A \ref WB_GEOM structure bounding the area to check
   * \return logical TRUE if (X,Y) lies within 'G', FALSE otherwise
 **/
 #define WBPointInGeom(X,Y,G) ((X) >= (G).x && (X) < ((G).x + (G).width) && (Y) >= (G).y && (Y) < ((G).y + (G).height))
 
 /** \ingroup wcore_geom
   * \brief Returns logical TRUE if the rectangle R1 overlaps/intersects R2
-  * \param R1 A WB_RECT structure bounding the first area to check
-  * \param R2 A second WB_RECT structure bounding the second area to check
+  * \param R1 A \ref WB_RECT structure bounding the first area to check
+  * \param R2 A second \ref WB_RECT structure bounding the second area to check
   * \return logical TRUE if the two WB_RECTs intersect, FALSE otherwise
 **/
 #define WBRectOverlapped(R1,R2) \
@@ -1751,8 +1751,8 @@ int WBIsChildWindow(Window wIDParent, Window wIDChild);  // non-zero if 'wIDPare
 
 /** \ingroup wcore_geom
   * \brief Returns logical TRUE if the geometry G1 overlaps/intersects G2
-  * \param G1 A WB_GEOM structure bounding the first area to check
-  * \param G2 A second WB_GEOM structure bounding the second area to check
+  * \param G1 A \ref WB_GEOM structure bounding the first area to check
+  * \param G2 A second \ref WB_GEOM structure bounding the second area to check
   * \return logical TRUE if the two WB_GEOMs intersect, FALSE otherwise
 **/
 #define WBGeomOverlapped(G1,G2) \
@@ -1784,9 +1784,9 @@ void WBXlatCoordPoint(Window wIDSrc, int iXSrc, int iYSrc, Window wIDDest, int *
   * \brief Translate geometry coordinates relative to a window
   *
   * \param wIDSrc The source Window ID
-  * \param pGeomSrc A const pointer to a WB_GEOM structure containing the coordinates to translate
+  * \param pGeomSrc A const pointer to a \ref WB_GEOM structure containing the coordinates to translate
   * \param wIDDest The destination Window ID
-  * \param pGeomDest A pointer to a WB_GEOM structure that receives the translated coordinates
+  * \param pGeomDest A pointer to a \ref WB_GEOM structure that receives the translated coordinates
   *
   * For many operations, coordinates relative to one window must be translated into
   * coordinates relative to a different window so that they can be used for the
@@ -1801,9 +1801,9 @@ void WBXlatCoordGeom(Window wIDSrc, const WB_GEOM *pGeomSrc, Window wIDDest, WB_
   * \brief Translate rectangle coordinates relative to a window
   *
   * \param wIDSrc The source Window ID
-  * \param pRectSrc A const pointer to a WB_RECT structure containing the coordinates to translate
+  * \param pRectSrc A const pointer to a \ref WB_RECT structure containing the coordinates to translate
   * \param wIDDest The destination Window ID
-  * \param pRectDest A pointer to a WB_RECT structure that receives the translated coordinates
+  * \param pRectDest A pointer to a \ref WB_RECT structure that receives the translated coordinates
   *
   * For many operations, coordinates relative to one window must be translated into
   * coordinates relative to a different window so that they can be used for the
@@ -1962,19 +1962,34 @@ int WBKeyEventProcessKey(const XKeyEvent *pEvent, char *pBuf, int *pcbLen, int *
 **/
 #define WB_POINTER_BUTTON5 16
 
-// (you can add multiple menus to multiple windows)
-/** \ingroup wcore
+/** \ingroup wcore_internal
   * \brief (internal) Register a MENU callback for a window
+  *
+  * The various 'menu' windows and popups will make use of the assigned 'menu callback' function to register a special
+  * event handler that deals with main window events.  Event processing via WBWindowDispatch() invokes the menu callback
+  * whenever it is assigned.  To disable the special event handling, assign the 'menu callback' function to NULL.
+  *
+  * Normally, you should not make use of this function in your own application.
   *
   * Header File:  window_helper.h
 **/
 void WBRegisterMenuCallback(Window wID, WBWinEvent pCallback);
 
 /** \ingroup wcore
-  * \brief Add a MENU WINDOW to a (frame) window - more than one is possible, only one currently supported
+  * \brief Add a MENU WINDOW to a (frame) window
   *
   * \param wID The Window ID to which a menu window will be added (typically only one)
   * \param wIDMenu The Window ID of the menu window to add/assign to wID
+  *
+  * This function will add a MENU WINDOW to a (frame) window.  The menu window will process all hotkeys and mouse clicks
+  * that are related to menus and menu activation.  In many cases, hotkeys may need to be checked within the owner window's
+  * event callback (see MBMenuProcessHotKey() for more on this).  If the focus is currently on the menu window itself, then
+  * the menu window's callback function will handle them.  Also, Frame Windows will handle the menu hotkeys automatically
+  * within their default event handlers.
+  *
+  * \sa \ref frame, \ref child_frame
+  *
+  * NOTE: you can add multiple menus to multiple windows.  however, at this time, only a 1:1 relationship is supported
   *
   * Header File:  window_helper.h
 **/
@@ -1998,7 +2013,7 @@ Window WBGetMenuWindow(Window wID);  // returns ID of menu window assigned by ab
 **/
 void WBRemoveMenuWindow(Window wID, Window wIDMenu);
 
-/** \ingroup xcore
+/** \ingroup wcore
   * \brief returns non-zero if 'valid' (i.e. 'not destroyed')
   *
   * \param pDisplay The Display pointer associated with the specified window
@@ -3616,7 +3631,7 @@ void DeleteTimer(Display *pDisplay, Window wID, long lID);  // deletes entry wit
 //
 // ****************************************************
 
-/** \struct __WB_ERROR_INFO__
+/** \struct s_WB_ERROR_INFO
   * \ingroup error
   * \copydoc WB_ERROR_INFO
 **/
@@ -3626,7 +3641,7 @@ void DeleteTimer(Display *pDisplay, Window wID, long lID);  // deletes entry wit
   *
   * \code
 
-  typedef struct __WB_ERROR_INFO__
+  typedef struct s_WB_ERROR_INFO
   {
     Display *pDisplay;     // Display pointer passed into error handler function (NULL if no error)
     const char *pFunc;     // Name of the function as assigned by BEGIN_XCALL_DEBUG_WRAPPER
@@ -3640,7 +3655,7 @@ void DeleteTimer(Display *pDisplay, Window wID, long lID);  // deletes entry wit
 
   * \endcode
 **/
-typedef struct __WB_ERROR_INFO__
+typedef struct s_WB_ERROR_INFO
 {
   Display *pDisplay;     ///< Display pointer passed into error handler function (NULL if no error)
   const char *pFunc;     ///< Name of the function as assigned by BEGIN_XCALL_DEBUG_WRAPPER

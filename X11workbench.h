@@ -108,7 +108,7 @@ typedef enum __WBFILE_TYPE__
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // external types (prototype definitions for functions)
-typedef struct __WB_FRAME_WINDOW__ WBFrameWindow; // see frame_window.h
+typedef struct tagWB_FRAME_WINDOW WBFrameWindow; // see frame_window.h [TODO:  remove the need for this line of code]
 
 
 // global variables

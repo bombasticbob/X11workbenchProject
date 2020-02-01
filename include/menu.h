@@ -84,8 +84,8 @@ extern "C" {
 **/
 
 
-/** \ingroup menu
-  * \struct __WBMenuItem__
+/** \struct tagWBMenuItem__
+  * \ingroup menu
   * \copydoc WBMenuItem
 **/
 /** \typedef WBMenuItem
@@ -96,7 +96,7 @@ extern "C" {
   *
   * \code
 
-  typedef struct __WBMenuItem__
+  typedef struct tagWBMenuItem__
   {
     unsigned int uiTag;    // a 'tag' identifying this as a WBMenuItem
 
@@ -124,7 +124,7 @@ extern "C" {
   * \sa WBMenu
   *
 **/
-typedef struct __WBMenuItem__
+typedef struct tagWBMenuItem__
 {
   unsigned int uiTag;    ///< a 'tag' identifying this as a WBMenuItem
 
@@ -148,8 +148,8 @@ typedef struct __WBMenuItem__
 } WBMenuItem;
 
 
-/** \ingroup menu
-  * \struct __WBMenu
+/** \struct tagWBMenu
+  * \ingroup menu
   * \copydoc WBMenu
 **/
 /** \typedef WBMenu
@@ -161,7 +161,7 @@ typedef struct __WBMenuItem__
   *
   * \code
 
-  typedef struct __WBMenu
+  typedef struct tagWBMenu
   {
     unsigned int uiTag;          // a 'tag' identifying this as a WBMenu
 
@@ -171,7 +171,7 @@ typedef struct __WBMenuItem__
     int nItems;                  // The number of menu item entries in the 'ppItems' array
     int nMaxItems;               // The maximum number of menu item entries that can be stored in 'ppItems'
 
-    struct __WBMenu **ppPopups;  // An allocated array of 'popup' menus contained by this menu
+    struct tagWBMenu **ppPopups; // An allocated array of 'popup' menus contained by this menu
     int nPopups;                 // The number of popup menu entries in the 'ppPopups' array
     int nMaxPopups;              // The maximum number of popup menu entries that can be stored in 'ppPopups'
 
@@ -182,7 +182,7 @@ typedef struct __WBMenuItem__
   * \sa WBMenuItem
   *
 **/
-typedef struct __WBMenu
+typedef struct tagWBMenu
 {
     unsigned int uiTag;          ///< a 'tag' identifying this as a WBMenu
 
@@ -192,7 +192,7 @@ typedef struct __WBMenu
     int nItems;                  ///< The number of menu item entries in the 'ppItems' array
     int nMaxItems;               ///< The maximum number of menu item entries that can be stored in 'ppItems'
 
-    struct __WBMenu **ppPopups;  ///< An allocated array of 'popup' menus contained by this menu
+    struct tagWBMenu **ppPopups; ///< An allocated array of 'popup' menus contained by this menu
     int nPopups;                 ///< The number of popup menu entries in the 'ppPopups' array
     int nMaxPopups;              ///< The maximum number of popup menu entries that can be stored in 'ppPopups'
 

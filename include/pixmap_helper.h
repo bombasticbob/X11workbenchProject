@@ -920,7 +920,7 @@ int WBXFillPolygon(XImage *pImage, WBGC hGC,
   * \brief XImage version for XDrawString() or DTDrawString()
   *
   * \param pImage A pointer to the XImage to draw to
-  * \param pFont A WB_FONT to use for rendering text.  May be NULL, in which case a default font set (based on the WBGC) will be used
+  * \param pFont A WB_FONTC to use for rendering text.  May be NULL, in which case a default font set (based on the WBGC) will be used
   * \param hGC A WBGC that describes the device context (mostly for colors, clipping, etc.)
   * \param x The 'x' coordinate for the text alignment (left)
   * \param y The 'y' coordinate for the text alignment (bottom)
@@ -937,7 +937,7 @@ int WBXFillPolygon(XImage *pImage, WBGC hGC,
   * Header File:  pixmap_helper.h
 **/
 
-int WBXDrawString(XImage *pImage, WB_FONT pFont, WBGC hGC,
+int WBXDrawString(XImage *pImage, WB_FONTC pFont, WBGC hGC,
                   int x, int y, const char *string, int length);
 
 

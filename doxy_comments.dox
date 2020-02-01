@@ -892,6 +892,13 @@
   * as well as useful utilities for argument parsing, and querying options.
 **/
 
+/** \defgroup startup_internal Internal-only Startup and SHutdown
+  * Internal-only functions and variables associated with application startup and shutdown
+  *
+  * Required functions for API startup and shutdown, resource pre-allocation, and final cleanup,
+  * as well as useful utilities for argument parsing, and querying options.
+**/
+
 /** \defgroup core Core API
   *
   * The 'Core' API for the X11workbench Toolkit identifies those functions that implement the
@@ -1235,7 +1242,7 @@
   }
 
   * \endcode
-*/
+**/
 
 /** \ingroup core
   * \defgroup graphics Graphics Abstraction Layer
@@ -1259,7 +1266,7 @@
   * less than the processing time of an event, a timer may be 'missed' as a
   * a result.  For this reason you should use a worker thread for timing that
   * requires precise accuracy.
-*/
+**/
 
 /** \ingroup core
   * \defgroup clipboard Clipboard and Selections
@@ -1273,7 +1280,7 @@
 **/
 
 /** \ingroup core
-  * \defgroup defaults Default Parameters and Definitions
+  * \defgroup wbdefaults Default Parameters and Definitions
   *
   * Functions and variables associated with default parameters, and default definitions
 **/
@@ -1289,13 +1296,16 @@
   *
   * Atoms used for XClientMessageEvent notifications\n
   * Includes details on the various message parameters
+  *
+  * \sa \ref pointer, \ref aWB_POINTER
 **/
 
 /** \ingroup events
-  * \defgroup events_types Data Types and Definitions
+  * \defgroup events_types Data Types, Enumerations, and Definitions
   *
-  * Various data types and definitions used for XClientMessageEvent notifications\n
+  * Data types. enumerations, and definitions used for XClientMessageEvent notifications\n
   *
+  * \sa \ref events_atoms, \ref pointer
 **/
 
 /** \ingroup core
@@ -1321,7 +1331,28 @@
   *
   * The X11workbench Toolkit API provides for mid-level pointer event handling via
   * WB_POINTER ClientMessage notification events.\n
+  *
+  * \code
+
+  pointer event definitions - WB_POINTER
+
+    data.l[0] is one of the notification codes
+    data.l[1] is bitmap of mouse button state (button 1 is bit 0, button 2 is bit 1, etc.)
+    data.l[2] is 'WB_KEYEVENT_' mask for CTRL+ALT+SHIFT
+    data.l[3] is translated X coordinate
+    data.l[4] is translated Y coordinate
+
+  * \endcode
+  *
+  * The X11workbench Toolkit framework generates 'ClientMessage' events with a message type of
+  * 'aWB_POINTER' to the window callback function associated with the Window containing the
+  * mouse cursor.  You can intercept these events in your window's callback function and process
+  * them.  They can be considered 'mid-level' API events (low-level could be raw pointer data,
+  * as an example, and high-level would determine a result and just notify you, such as a focus change).
+  *
   * See \ref aWB_POINTER for more info.
+  *
+  * \sa \ref events_atoms, \ref events_types
 **/
 
 

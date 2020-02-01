@@ -60,8 +60,8 @@ extern "C" {
 /** \file dialog_window.h Definitions for dialog (frame) window and intercommunication structures and dialog-related APIs
 **/
 
-/** \ingroup dialog
-  * \defgroup dialog_api High Level Dialog Box API Functions and definitions
+/** \defgroup dialog_api High Level Dialog Box API Functions and definitions
+  * \ingroup dialog
   *
   * This section describes High Level Dialog Box API functions and definitions.
   * Normally you will use these to create dialog boxes of various types.
@@ -84,8 +84,8 @@ extern "C" {
   *
 **/
 
-/** \ingroup dialog
-  * \defgroup dialog_events ClientMessage Event Atoms
+/** \defgroup dialog_events ClientMessage Event Atoms
+  * \ingroup dialog
   *
   * Atoms for ClientMessage Events associated with Dialog Boxes
   *
@@ -96,29 +96,29 @@ extern "C" {
   * (like dialog box initialization or control activation).
  **/
 
-/** \ingroup dialog_api
-  * \defgroup dialog_api_definitions Definitions
+/** \defgroup dialog_api_definitions Definitions
+  * \ingroup dialog_api
   *
   * Definitions for the High Level Dialog Box API
  **/
 
-/** \ingroup dialog_api
-  * \defgroup dialog_api_types Data Types and Structures
+/** \defgroup dialog_api_types Data Types and Structures
+  * \ingroup dialog_api
   *
   * Data Types and Structures for the High Level Dialog Box API
  **/
 
-/** \ingroup dialog_api
-  * \defgroup dialog_api_functions Functions
+/** \defgroup dialog_api_functions Functions
+  * \ingroup dialog_api
   *
   * API Functions for the High Level Dialog Box API
  **/
 
 
-/** \ingroup dialog
-  * \defgroup dlgwindow Dialog (Frame) Windows
+/** \defgroup dlgwindow Dialog Frame Windows
+  * \ingroup dialog
   *
-  * Dialog (Frame) Windows are specialized frame windows that normally execute
+  * Dialog Frame Windows are specialized frame windows that normally execute
   * as MODAL windows ( see WBShowModal() and WBEndModal() ).\n
   * A lot of specialized processing needs to be done for a proper dialog window, including
   * all of the hot keys necessary to change focus and activate 'default' buttons and controls.
@@ -129,28 +129,28 @@ extern "C" {
   *
 **/
 
-/** \ingroup dlgwindow
-  * \defgroup dlgwindow_definitions Definitions
+/** \defgroup dlgwindow_definitions Definitions
+  * \ingroup dlgwindow
   *
   * Definitions for Dialog (Frame) Windows
  **/
 
-/** \ingroup dlgwindow
-  * \defgroup dlgwindow_structures Structures
+/** \defgroup dlgwindow_structures Structures
+  * \ingroup dlgwindow
   *
   * Structures for Dialog (Frame) Windows
  **/
 
 
-/** \ingroup dialog
-  * \defgroup dlgctrl Dialog Box Controls
+/** \defgroup dlgctrl Dialog Box Controls
+  * \ingroup dialog
   *
   * Structures and API functions used for dialog controls
   *
 **/
 
-/** \ingroup dialog
-  * \defgroup dlglist List Support
+/** \defgroup dlglist List Support
+  * \ingroup dialog
   *
   * Designed specifically for dialog controls, 'List Support' APIs and
   * structures contain lists of objects or strings that are 'self-maintained'
@@ -170,17 +170,17 @@ extern "C" {
 
 
 
-/** \ingroup dlgwindow_structures
-  * \struct __WB_DIALOG_ENTRY__
+/** \struct s_WB_DIALOG_ENTRY
+  * \ingroup dlgwindow_structures
   * \copydoc WBDialogEntry
 **/
-/** \ingroup dlgwindow
-  * \typedef WBDialogEntry
+/** \typedef WBDialogEntry
+  * \ingroup dlgwindow
   * \brief Structure identifying one of the controls that appears on a dialog window
   *
   * \code
 
-  typedef struct __WB_DIALOG_ENTRY__
+  typedef struct s_WB_DIALOG_ENTRY
   {
     unsigned int ulTag;  // tag word DIALOG_ENTRY_TAG
     Window wID;          // window ID of control
@@ -202,7 +202,7 @@ extern "C" {
   * \sa WBDialogWindow
   *
 **/
-typedef struct __WB_DIALOG_ENTRY__
+typedef struct s_WB_DIALOG_ENTRY
 {
   unsigned int ulTag; ///< tag word, always assigned to DIALOG_ENTRY_TAG
   Window wID;         ///< window ID of control
@@ -217,17 +217,17 @@ typedef struct __WB_DIALOG_ENTRY__
 } WBDialogEntry;
 
 
-/** \ingroup dlgwindow_structures
-  * \struct __WB_DIALOG_WINDOW__
+/** \struct s_WB_DIALOG_WINDOW
+  * \ingroup dlgwindow_structures
   * \copydoc WBDialogWindow
 **/
-/** \ingroup dlgwindow
-  * \typedef WBDialogWindow
+/** \typedef WBDialogWindow
+  * \ingroup dlgwindow
   * \brief Structure identifying a dialog (frame) window
   *
   * \code
 
-  typedef struct __WB_DIALOG_WINDOW__
+  typedef struct s_WB_DIALOG_WINDOW
   {
     unsigned int ulTag;    // tag word, always assigned to DIALOG_WINDOW_TAG
     Window wID;            // window ID of the dialog (frame) window
@@ -253,7 +253,7 @@ typedef struct __WB_DIALOG_ENTRY__
   * \sa WBDialogEntry
   *
 **/
-typedef struct __WB_DIALOG_WINDOW__
+typedef struct s_WB_DIALOG_WINDOW
 {
   unsigned int ulTag;    ///< tag word, always assigned to DIALOG_WINDOW_TAG
   Window wID;            ///< window ID of the dialog (frame) window

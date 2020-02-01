@@ -115,14 +115,14 @@ extern "C" {
   * header file:  file_help.h
 **/
 
-/** \ingroup file_help_buf
-  * \struct __file_help_buf__
+/** \struct tag_file_help_buf
+  * \ingroup file_help_buf
   * \copydoc file_help_buf_t
   *
   * header file:  file_help.h
 **/
-/** \ingroup file_help_buf
-  * \typedef file_help_buf_t
+/** \typedef file_help_buf_t
+  * \ingroup file_help_buf
   * \brief basic 'buffered I/O' object structure for 'FileBuf' APIs
   *
   * This structure is intended to assist implementing buffered I/O for files
@@ -134,10 +134,10 @@ extern "C" {
   *
   * \code
 
-  typedef struct __file_help_buf__
+  typedef struct tag_file_help_buf
   {
-    struct __file_help_buf__ *pPrev; // pointer to 'previous' item in linked list (NULL for owner object)
-    struct __file_help_buf__ *pNext; // pointer to 'next' item in linked list (NULL for last object)
+    struct tag_file_help_buf *pPrev; // pointer to 'previous' item in linked list (NULL for owner object)
+    struct tag_file_help_buf *pNext; // pointer to 'next' item in linked list (NULL for last object)
     long lBufferSize;                // size of entire buffer
     long lBufferCount;               // number of bytes of valid data
     long lLineCount;                 // number of lines in 'cData' when ppLineBuf not NULL
@@ -159,10 +159,10 @@ extern "C" {
   *
   * header file:  file_help.h
 **/
-typedef struct __file_help_buf__
+typedef struct tag_file_help_buf
 {
-  struct __file_help_buf__ *pPrev; ///< pointer to 'previous' item in linked list (NULL for owner object)
-  struct __file_help_buf__ *pNext; ///< pointer to 'next' item in linked list (NULL for last object)
+  struct tag_file_help_buf *pPrev; ///< pointer to 'previous' item in linked list (NULL for owner object)
+  struct tag_file_help_buf *pNext; ///< pointer to 'next' item in linked list (NULL for last object)
   long lBufferSize;                ///< size of entire buffer
   long lBufferCount;               ///< number of bytes of valid data
   long lLineCount;                 ///< number of lines in 'cData' when ppLineBuf not NULL
@@ -172,8 +172,8 @@ typedef struct __file_help_buf__
   char cData[sizeof(char *)];      ///< the data itself (aligned to size of a pointer)
 } file_help_buf_t;
 
-/** \ingroup file_help_buf
-  * \enum __file_help_buf_flags__
+/** \enum tag_file_help_buf_flags
+  * \ingroup file_help_buf
   * \hideinitializer
   * \brief bit flags for \ref file_help_buf_t 'iFlags' member
   *
@@ -181,7 +181,7 @@ typedef struct __file_help_buf__
   *
   * header file:  file_help.h
 **/
-enum __file_help_buf_flags__
+enum tag_file_help_buf_flags
 {
   file_help_buf_dirty      = 1,    ///< TRUE when file is 'dirty' (not written)
   file_help_buf_reserved01 = 2,    ///< reserved
