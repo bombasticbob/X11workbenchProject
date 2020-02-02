@@ -51,14 +51,18 @@
 
 
 
-/** \mainpage X11workbench Toolkit Documentation
+/** \mainpage X11workbench IDE and Toolkit Documentation
   * \tableofcontents
   *
-  * Welcome to the main page for the X11workbench Toolkit documentation.  As you will no
-  * doubt see, this was generated using Doxygen, using the 'doxy.txt' file that is an
+  * Welcome to the main page for the X11workbench and Toolkit documentation.  As you will
+  * no doubt see, this was generated using Doxygen, using the 'doxy.txt' file that is an
   * integral part of the project.  You are welcome to use and/or customize this documentation
   * to any extent that you might you see fit, in accordance with the Copyright and License Terms.
   * \n
+  * \n
+  * For quick reference, see:\n
+  * &nbsp;&nbsp;&nbsp;&nbsp; \ref workbench_application \n
+  * &nbsp;&nbsp;&nbsp;&nbsp; \ref mainpage_tutorial \n
   * \n
   * For \ref mainpage_copyright, see the appropriate section (below).
   * \n
@@ -239,6 +243,14 @@
   *
   * http://bombasticbob.github.io/X11workbench
   *
+**/
+
+/** \page workbench_application The X11workbench IDE Application
+  * \details
+  *
+  * Documentation on the X11workbench IDE Application, T.B.D.
+  *
+  * \sa \ref mainpage_4, \ref wbapp
 **/
 
 /** \page mainpage_style X11workbench Toolkit Coding Style Guidelines
@@ -455,6 +467,9 @@
   *
   * \par For basic sample code, you can start here:
   * \ref mainpage_4 \n
+  * \n
+  *
+  * \par For information on event handling (in general):
   * \ref events \n
   * \n
   *
@@ -463,8 +478,8 @@
   * \ref menu \n
   * \n
   *
-  * \par For information on dialog boxes:
-  * \ref dialog_api\n
+  * \par For information on dialog boxes:\n
+  * \ref dialog_api \n
   * \ref dialog_resource \n
   * \n
   *
@@ -879,10 +894,15 @@
   *
 **/
 
-
 //-------------------------------------------------------------------------------------------------
 // doxygen top-level group (module) definitions go here to preserve correct order.  no exceptions!
 //-------------------------------------------------------------------------------------------------
+
+/** \defgroup wbapp X11workbench IDE Application Documentation
+  *
+  * To be determined
+  *
+**/
 
 
 /** \defgroup startup Application Startup and Shutdown

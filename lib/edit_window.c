@@ -906,7 +906,10 @@ char *pBuf;
   else if(CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->has_select)(&(pE->xTextObject)) : 0)
   {
 //    WB_ERROR_PRINT("TEMPORARY:  %s - set text to \"%.*s\"\n", __FUNCTION__, nChar, pBuf);
-    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->set_text)(&(pE->xTextObject), pBuf, nChar);
+    // CALLBACK_CHECK_NULL(pE->xTextObject.vtable->replace_select)(&(pE->xTextObject), pBuf, nChar);
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->del_select)(&(pE->xTextObject));
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->ins_chars)(&(pE->xTextObject), pBuf, nChar);
+
     internal_notify_change(pC, 0);
   }
   else
@@ -969,6 +972,11 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   {
     XBell(WBGetWindowDisplay(pC->wID), -100); // for now give audible feedback that I'm ignoring it
   }
+  else if(CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->has_select)(&(pE->xTextObject)) : 0)
+  {
+    CALLBACK_CHECK_NULL(pE->xTextObject.vtable->del_select)(&(pE->xTextObject));
+    internal_notify_change(pC, 0);
+  }
   else
   {
     CALLBACK_CHECK_NULL(pE->xTextObject.vtable->del_chars)(&(pE->xTextObject), -1);
@@ -1019,6 +1027,8 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   }
   else if(CALLBACK_CHECK_NULL2(pE->xTextObject.vtable->has_select)(&(pE->xTextObject)) : 0)
   {
+    // for now, pressing backspace with a selection behaves the same as it does when
+    // you press delete.  This should be consistent behavior.
     CALLBACK_CHECK_NULL(pE->xTextObject.vtable->del_select)(&(pE->xTextObject));
     internal_notify_change(pC, 0);
   }

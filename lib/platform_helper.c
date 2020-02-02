@@ -138,7 +138,8 @@ char **envp = envp0;
 
   WBPlatformOnInit();
 
-  if(!WBParseStandardArguments(&argc, &argv, &envp))
+  iRval = WBParseStandardArguments(&argc, &argv, &envp);
+  if(!iRval)
   {
     iRval = WBMain(argc, argv, envp);
 
@@ -153,7 +154,11 @@ char **envp = envp0;
   }
   else
   {
-    WBUsage();
+    if(iRval < 0)
+    {
+      WBUsage();
+    }
+
     iRval = 1;
   }
 
