@@ -1187,16 +1187,21 @@ static int MBMenuPopupEvent(Window wID, XEvent *pEvent)
         else if(!(pEvent->xmotion.state & (Button1Mask | Button2Mask | Button3Mask)))
         {
           // "hover select" - hover far left or far far right, close popup
-          //                    TODO: open adjacent menu popup
+          //                  hover over menu bar, select apropriate menu item
           //                  vertical hover over, select (immediate)
           //                  hover over far right, open popup (as needed)
           //                  hover below, scroll (as needed)
           //                  hover above, scroll (as needed)
 
-          // hover far left or far far right
-
-          if(iX < pSelf->iX - WB_MOUSE_FAR || iX > pSelf->iX + pSelf->iWidth + 2 * WB_MOUSE_FAR)
+          /*if(owner menu bar rectangle contains mouse pointer)
           {
+            // mouse hover selects different popup when in range of owning menu bar
+            POOBAH
+          }
+          else*/ if(iX < pSelf->iX - WB_MOUSE_FAR || iX > pSelf->iX + pSelf->iWidth + 2 * WB_MOUSE_FAR)
+          {
+            // hover far left or far far right
+
             WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_Menu | DebugSubSystem_Mouse,
                            "%s.%d  hover outside of popup menu  iX=%d   menu: left=%d right=%d\n",
                            __FUNCTION__, __LINE__, iX, pSelf->iX, pSelf->iX + pSelf->iWidth);

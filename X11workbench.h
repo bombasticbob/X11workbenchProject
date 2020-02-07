@@ -58,9 +58,13 @@
 
 ******************************************************************************/
 
+#ifndef _X11WORKBENCH_H_INCLUDED_
+#define _X11WORKBENCH_H_INCLUDED_
 
 // common includes (this also includes 'X' headers)
 #include "window_helper.h"
+#include "frame_window.h"
+#include "child_frame.h"
 
 
 #define APP_NAME "X11workbench" /* for dialog boxes and similar things */
@@ -91,8 +95,10 @@ typedef enum __WBFILE_TYPE__
   WBFILE_TYPE_JS       = 20,
   WBFILE_TYPE_PHP      = 21,
   WBFILE_TYPE_ARDUINO  = 22, // PDE or INO file for Arduino script
+  WBFILE_TYPE_CONF     = 23, // '.conf' config files - special case, INI style formatting
+  WBFILE_TYPE_JSON     = 24, // JSON formatted data files
 
-  WBFILE_TYPE_LAST     = 22 // update this if I add more types
+  WBFILE_TYPE_LAST     = 24 // update this if I add more types
 } WBFILE_TYPE;
 
 
@@ -111,23 +117,31 @@ typedef enum __WBFILE_TYPE__
 typedef struct tagWB_FRAME_WINDOW WBFrameWindow; // see frame_window.h [TODO:  remove the need for this line of code]
 
 
-// global variables
+// global variables and access to global vars/params
 
-// TODO:  any globals?  get/set methods are better, like GetFrameWindowID() below
+extern int nCPU; // number of CPUs detected
 
-
+WBFrameWindow *GetFrameWindow();
+Display *GetX11Display();
 Window GetFrameWindowID(); // get the frame window's window ID (for dialog boxen and such)
+const char * GetKnownFileTypes();
+
 
 // general purpose utilities to be called by external things
 
 int DoFileOpen(WBFrameWindow *pMainFrame, const char *szFileName);
+
 WBFILE_TYPE GetFileType(const char *szFileName);
 const char *GetFileTypeDesc(WBFILE_TYPE nFileType);
 int GetDefaultTabSetting(WBFILE_TYPE nFileType);
 int GetDefaultLineEnding(WBFILE_TYPE nFileType);
 const char *GetFileTypeHighlightInfo(WBFILE_TYPE nFileType);
 
+int ApplicationPreferences(XClientMessageEvent *pEvent);
+
+int DoFileSave(WBChildFrame *pCF);
+int DoFileSaveAs(WBChildFrame *pCF, const char *szFileName);
 
 
-
+#endif // _X11WORKBENCH_H_INCLUDED_
 

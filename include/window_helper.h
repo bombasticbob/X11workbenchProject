@@ -1598,9 +1598,28 @@ const char *WBGetWindowClassName(Window wID);
 void *WBGetWindowData(Window wID, int iIndex);
 
 /** \ingroup wcore_geom
+  * \brief Returns the geometry of the default screen
+  *
+  * \param pGeom A pointer to the \ref WB_GEOM structure to receive the data
+  *
+  * This macro is a simple wrapper for a call to WBGetWindowGeom() in which the wID parameter is 'None'.
+  *
+  * Use this as the canonical method for obtaining the default screen size.  Often you will need this
+  * kind of information for window placement, or to determine the screen orientation, or to select a
+  * layout that is appropriate for the screen resolution.  This is the canonical method by which you
+  * can determine the size of the default screen.
+  *
+  * If you are using multiple screens, you can use various methods to determine the screen's root window,
+  * and pass the root window's ID to WBGetWindowGeom() to get the geometry of a particular screen.
+  *
+  * Header File:  window_helper.h
+**/
+#define WBGetScreenGeom(pGeom) WBGetWindowGeom(None, pGeom)
+
+/** \ingroup wcore_geom
   * \brief Returns the RAW geometry of the window as reported by the window manager
   *
-  * \param wID The Window ID to obtain the \ref WB_GEOM data for
+  * \param wID The Window ID to obtain the \ref WB_GEOM data for.  If this value is 'None', the root window of the default screen is used
   * \param pGeom A pointer to the \ref WB_GEOM structure to receive the data
   *
   * Header File:  window_helper.h
@@ -1610,7 +1629,7 @@ void WBGetWindowGeom(Window wID, WB_GEOM *pGeom);
 /** \ingroup wcore_geom
   * \brief Returns the geometry of the window relative to the root window
   *
-  * \param wID The Window ID to obtain the \ref WB_GEOM data for
+  * \param wID The Window ID to obtain the \ref WB_GEOM data for.  If this value is 'None', the root window of the default screen is used, and the function calls WBGetWindowGeom()
   * \param pGeom A pointer to the \ref WB_GEOM structure to receive the data
   *
   * Header File:  window_helper.h
@@ -1621,7 +1640,7 @@ void WBGetWindowGeom2(Window wID, WB_GEOM *pGeom);
 /** \ingroup wcore_geom
   * \brief Returns the ABSOLUTE window geometry relative to the screen
   *
-  * \param wID The Window ID to obtain the \ref WB_GEOM data for
+  * \param wID The Window ID to obtain the \ref WB_GEOM data for.  If this value is 'None', the root window of the default screen is used, and the function calls WBGetWindowGeom()
   * \param pGeom A pointer to the \ref WB_GEOM structure to receive the data
   *
   * The 'ABSOLUTE' window geometry is the position of the window relative to the

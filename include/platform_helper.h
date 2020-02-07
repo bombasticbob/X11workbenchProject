@@ -1574,6 +1574,43 @@ char * WBGetAtomName(Display *pDisplay, Atom aAtom);
 
 
 
+////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                        //
+//   _____  _  _         ____                         _            _                      //
+//  |  ___|(_)| |  ___  |  _ \  ___  _ __  _ __ ___  (_) ___  ___ (_)  ___   _ __   ___   //
+//  | |_   | || | / _ \ | |_) |/ _ \| '__|| '_ ` _ \ | |/ __|/ __|| | / _ \ | '_ \ / __|  //
+//  |  _|  | || ||  __/ |  __/|  __/| |   | | | | | || |\__ \\__ \| || (_) || | | |\__ \  //
+//  |_|    |_||_| \___| |_|    \___||_|   |_| |_| |_||_||___/|___/|_| \___/ |_| |_||___/  //
+//                                                                                        //
+//                                                                                        //
+////////////////////////////////////////////////////////////////////////////////////////////
+
+/** \ingroup platform_functions
+  * \brief a wrapper for 'eaccess()' (or its WIN32 equivalent) that indicates if the file permissions allow reading
+  *
+  * \param szFileName A const pointer to a character string containing a file or path name
+  * \returns a zero value if successful, non-zero if it failed.
+  *
+  * Use this function to determine whether or not you can read a file based on user/group permissions
+  *
+  * Header File:  platform_helper.h
+**/
+int WBFileIsReadable(const char *szFileName);
+
+
+/** \ingroup platform_functions
+  * \brief a wrapper for 'eaccess()' (or its WIN32 equivalent) that indicates if the file permissions allow writing
+  *
+  * \param szFileName A const pointer to a character string containing a file or path name
+  * \returns a zero value if successful, non-zero if it failed.
+  *
+  * Use this function to determine whether or not you can read a file based on user/group permissions
+  *
+  * Header File:  platform_helper.h
+**/
+int WBFileIsWriteable(const char *szFileName);
+
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                                               //
@@ -1594,7 +1631,7 @@ char * WBGetAtomName(Display *pDisplay, Atom aAtom);
   * \brief a wrapper for 'mkdir' that makes directories recursively (as needed)
   *
   * \param szFileName A const pointer to a character string containing a file or path name
-  * \returns a zero value if succssful, non-zero if it failed.
+  * \returns a zero value if successful, non-zero if it failed.
   *
   * This is a wrapper for 'mkdir' that also handles recursive directory creation when
   * not all paths exist already.
@@ -1619,6 +1656,7 @@ int WBMkDir(const char *szFileName, int flags);
   * Header File:  platform_helper.h
 **/
 char * WBSearchPath(const char *szFileName);
+
 
 /** \ingroup platform_functions
   * \brief Get the name for a new, unique temporary file, creating the file in the process, and save its name for later deletion

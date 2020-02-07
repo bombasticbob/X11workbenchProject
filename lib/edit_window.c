@@ -537,14 +537,21 @@ int iRval = -1;
 
 int WBEditWindowSaveFile(WBEditWindow *pEditWindow, const char *pszFileName)
 {
+int iRval = -1;
+char *pOldFileName, *pBuf;
+
+  CALLBACK_TRACKER;
+
   if(!pEditWindow || !WBIsValidEditWindow(pEditWindow))
   {
     return -1;
   }
 
+  pOldFileName = pEditWindow->szFileName;
+
   if(!pszFileName || !*pszFileName)
   {
-    pszFileName = pEditWindow->szFileName;
+    pszFileName = pOldFileName;
   }
 
   if(!pszFileName || !*pszFileName)
@@ -552,13 +559,97 @@ int WBEditWindowSaveFile(WBEditWindow *pEditWindow, const char *pszFileName)
     return -1; // error (no file name)
   }
 
-  // TODO:  implement 'file save'
+  // TODO:  unicode prefix for text files:
+  //          UTF-8 - no prefix OR 0xEF,0xBB,0xBF
+  //          UTF-16 - low endian:  0xFF,0xFE  high endian:  0xFE,0xFF
+  //          UTF-32 - low endian:  0xFF,0xFE,0x00,0x00  high endian:  0x00,0x00,0xFE,0xFF
+  //
+  // Programming language files will be assumed to be ASCII only
+  // XML and JSON may have different coding schemes (TO BE DETERMINED)
 
-  pEditWindow->llModDateTime = WBGetFileModDateTime(pEditWindow->szFileName);
+  // *ALL* text data is converted to UTF-8 before ending up in the edit window, and converted
+  // back to the correct format before saving it.
 
 
+  if(pEditWindow->xTextObject.vtable->get_text)
+  {
+    pBuf = pEditWindow->xTextObject.vtable->get_text(&(pEditWindow->xTextObject));
 
-  return -1; // error
+    if(pBuf)
+    {
+      // TODO:  do I need to convert the UTF-8 data to UTF-16 or UTF-32?  If so, do that now,
+      //        and include the correct prefix (see above).
+      //        This is ONLY for text files, and NOT program-related files (which are ASCII)
+
+      if(pEditWindow->szFileName != pszFileName)
+      {
+        pEditWindow->szFileName = WBCopyString(pszFileName); // new name, if it changed
+
+        if(!pEditWindow->szFileName)
+        {
+          pEditWindow->szFileName = pOldFileName; // whatever it was before
+
+          // TODO:  is this an error condition?  For now it's a fallback position...
+          goto error_spot;
+        }
+      }
+
+      iRval = WBWriteFileFromBuffer(pEditWindow->szFileName, pBuf, strlen(pBuf));
+
+      if(pEditWindow->szFileName != pszFileName)
+      {
+        if(iRval) // on save error...
+        {
+          WBFree(pEditWindow->szFileName);        // free new name pointer
+          pEditWindow->szFileName = pOldFileName; // re-assign whatever it was before
+        }
+        else if(pOldFileName) // if I succeeded and also had a name before...
+        {
+          WBFree(pOldFileName);
+        }
+      }
+
+      if(!iRval) // was not an error; assign file date/time to llModDateTime
+      {
+        pEditWindow->llModDateTime = WBGetFileModDateTime(pEditWindow->szFileName); // cache file mod time
+      }
+
+error_spot:
+
+      WBFree(pBuf);
+    }
+  }
+
+  FWChildFrameRecalcLayout(&(pEditWindow->childframe)); // as a matter of course.
+
+//  if(pEditWindow->pUserCallback)
+//  {
+//    XClientMessageEvent evt;
+//
+//    bzero(&evt, sizeof(evt));
+//
+//    evt.type=ClientMessage;
+//    evt.display=WBGetWindowDisplay(pEditWindow->childframe.wID);
+//    evt.window=pEditWindow->childframe.wID;
+//    evt.message_type=aEW_EDIT_CHANGE;
+//    evt.format=32;
+//
+//    evt.data.l[0] = 0; // undo
+//    evt.data.l[1] = 0; // cursor x,y
+//    evt.data.l[2] = 0;
+//
+//    pEditWindow->pUserCallback(pEditWindow->childframe.wID, (XEvent *)&evt);
+//  }
+
+  if(iRval)
+  {
+    // TODO:  make this more informative
+    DLGMessageBox(MessageBox_OK, None,
+                  "Unable to save file",
+                  "An unexpected error happened while trying to save the file");
+  }
+
+  return iRval;
 }
 
 void WBEditWindowClear(WBEditWindow *pEditWindow)

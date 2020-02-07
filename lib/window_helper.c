@@ -6476,6 +6476,12 @@ void WBGetWindowGeom0(Window wID, WB_GEOM *pGeom)  // absolute window geometry (
 
   if(pGeom)
   {
+    if(wID == None) // root window
+    {
+      WBGetWindowGeom(wID, pGeom);
+      return;
+    }
+
     if(!pEntry || (!pEntry->geomAbsolute.width && !pEntry->geomAbsolute.height))
     {
       bzero(pGeom, sizeof(*pGeom));
@@ -6531,8 +6537,28 @@ void WBGetWindowGeom(Window wID, WB_GEOM *pGeom)
     return;
   }
 
-//  bzero(&xwa, sizeof(xwa));
   bzero(pGeom, sizeof(*pGeom));
+
+  if(wID == None) // I want the root window's geometry, i.e. the screen size
+  {
+    Window winTemp;
+
+    winRoot = DefaultRootWindow(pDisp);
+    if(winRoot == None) // an error
+    {
+      return; // just leave it zero'd
+    }
+
+    BEGIN_XCALL_DEBUG_WRAPPER
+    XSync(pDisp, 0);
+    XGetGeometry(pDisp, winRoot, &winTemp,
+                 &(pGeom->x), &(pGeom->y),
+                 &(pGeom->width), &(pGeom->height),
+                 &(pGeom->border), &uiDepth);
+    END_XCALL_DEBUG_WRAPPER
+
+    return;
+  }
 
   if(WB_LIKELY(pEntry) &&
      WB_UNLIKELY(WB_IS_WINDOW_DESTROYED(*pEntry) || WB_IS_WINDOW_BEING_DESTROYED(*pEntry)))
@@ -6613,6 +6639,12 @@ void WBGetWindowGeom2(Window wID, WB_GEOM *pGeom)
   WB_GEOM geom;
 
   bzero(pGeom, sizeof(*pGeom));
+
+  if(wID == None) // root window
+  {
+    WBGetWindowGeom(wID, pGeom);
+    return;
+  }
 
   if(WB_LIKELY(pEntry) &&
      WB_UNLIKELY(WB_IS_WINDOW_DESTROYED(*pEntry) || WB_IS_WINDOW_BEING_DESTROYED(*pEntry)))

@@ -628,6 +628,7 @@ WB_GEOM geomParent;
 
 struct _FILE_DIALOG_
 {
+  int iType;
   const char *szDefPath;
   const char *szDefName;
   const char *szExtAndDescList;
@@ -951,28 +952,86 @@ char *p1, *p2;
   return 0;
 }
 
-#define FILE_DIALOG_WIDTH 520
+// NOTE:  dialog unit is 2 pixels, x or y
+#define FILE_DIALOG_WIDTH 780
 #define FILE_DIALOG_HEIGHT 500
+#define FILE_DIALOG_NARROW_WIDTH 520
+#define FILE_DIALOG_NARROW_HEIGHT 400
+#define FILE_DIALOG_FOLDER_WIDTH 240
+#define FILE_DIALOG_FOLDER_HEIGHT 400
+
 
 char *DLGFileDialog(int iType, Window wIDOwner, const char *szDefPath, const char *szDefName,
                     const char *szExtAndDescList)
 {
 static const char szFileDialogRes[]=
-  "BEGIN_DIALOG FONT:Variable HEIGHT:250 WIDTH:260 TITLE:\"File Dialog\"\n"
+  "BEGIN_DIALOG FONT:Variable HEIGHT:250 WIDTH:390 TITLE:\"File Dialog\"\n"
   "  CONTROL:PathTree ID:1000 X:2 Y:2 HEIGHT:200 WIDTH:116 VISIBLE\n"
-  "  CONTROL:FileList ID:1001 X:122 Y:2 HEIGHT:200 WIDTH:136 VISIBLE\n"
-  "  CONTROL:Edit ID:1002 X:2 Y:206 WIDTH:296 HEIGHT:16 VISIBLE\n"
-  "  CONTROL:DefPushButton ID:IDOK TITLE:OK X:40 Y:230 WIDTH:40 HEIGHT:18 VISIBLE\n"
-  "  CONTROL:CancelButton ID:IDCANCEL TITLE:Cancel X:180 Y:230 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "  CONTROL:FileList ID:1001 X:122 Y:2 HEIGHT:200 WIDTH:266 VISIBLE\n"
+  "  CONTROL:Edit ID:1002 X:2 Y:206 WIDTH:386 HEIGHT:16 VISIBLE\n"
+  "  CONTROL:DefPushButton ID:IDOK TITLE:OK X:110 Y:230 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "  CONTROL:CancelButton ID:IDCANCEL TITLE:Cancel X:240 Y:230 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "END_DIALOG\n";
+static const char szFileDialogResNarrow[]=
+  "BEGIN_DIALOG FONT:Variable HEIGHT:200 WIDTH:260 TITLE:\"File Dialog\"\n"
+  "  CONTROL:PathTree ID:1000 X:2 Y:2 HEIGHT:150 WIDTH:116 VISIBLE\n"
+  "  CONTROL:FileList ID:1001 X:122 Y:2 HEIGHT:150 WIDTH:136 VISIBLE\n"
+  "  CONTROL:Edit ID:1002 X:2 Y:156 WIDTH:256 HEIGHT:16 VISIBLE\n"
+  "  CONTROL:DefPushButton ID:IDOK TITLE:OK X:40 Y:180 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "  CONTROL:CancelButton ID:IDCANCEL TITLE:Cancel X:180 Y:180 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "END_DIALOG\n";
+static const char szFileDialogResFolder[]=
+  "BEGIN_DIALOG FONT:Variable HEIGHT:200 WIDTH:120 TITLE:\"File Dialog\"\n"
+  "  CONTROL:PathTree ID:1000 X:2 Y:2 HEIGHT:150 WIDTH:116 VISIBLE\n"
+  "  CONTROL:Edit ID:1002 X:2 Y:156 WIDTH:116 HEIGHT:16 VISIBLE\n"
+  "  CONTROL:DefPushButton ID:IDOK TITLE:OK X:16 Y:180 WIDTH:40 HEIGHT:18 VISIBLE\n"
+  "  CONTROL:CancelButton ID:IDCANCEL TITLE:Cancel X:64 Y:180 WIDTH:40 HEIGHT:18 VISIBLE\n"
   "END_DIALOG\n";
 WBDialogWindow *pDlg;
 struct _FILE_DIALOG_ data;
-int iX, iY, iRval;
+int iX, iY, iW, iH, iRval;
 Window wIDDlg;
-WB_GEOM geomParent;
-
+WB_GEOM geomParent, geomScreen;
+const char *szRes, *szTitle;
 
   bzero(&geomParent, sizeof(geomParent));
+
+  // To improve usability, there are 2 versions of the dialog box.  the larger
+  // one is used when monitor resolution allows for it; otherwise the smaller one
+  // is used.  The larger one accomodates larger file names and more of them, and so
+  // it really is better, but way too big to fit on very small monitors.  And so this
+  // first section checks the window geometry of the root window to see how large it
+  // is, then acts upon that information.
+
+  WBGetWindowGeom(None, &geomScreen);
+
+//  WB_ERROR_PRINT("%s.%d - TEMPORARY, root window geometry: %d, %d, %d, %d\n",
+//                 __FUNCTION__, __LINE__, geomScreen.x, geomScreen.y, geomScreen.width, geomScreen.height);
+
+  if((iType & FileDialog_MASK) == FileDialog_Folder)
+  {
+    iW = FILE_DIALOG_FOLDER_WIDTH;
+    iH = FILE_DIALOG_FOLDER_HEIGHT;
+
+    szRes = szFileDialogResFolder;
+  }
+  else if(geomScreen.width > FILE_DIALOG_WIDTH + MESSAGE_BOX_OFFSET &&
+          geomScreen.height > FILE_DIALOG_HEIGHT + MESSAGE_BOX_OFFSET)
+  {
+    // when the screen is bigger, use the bigger one
+    iW = FILE_DIALOG_WIDTH;
+    iH = FILE_DIALOG_HEIGHT;
+
+    szRes = szFileDialogRes;
+  }
+  else
+  {
+    // this one is for smaller screens
+    iW = FILE_DIALOG_NARROW_WIDTH;
+    iH = FILE_DIALOG_NARROW_HEIGHT;
+
+    szRes = szFileDialogResNarrow;
+  }
 
   if(wIDOwner != None)
   {
@@ -985,22 +1044,40 @@ WB_GEOM geomParent;
   {
     // center in screen with slight random offset (so that every window won't always appear in exactly the same place)
     iY = (DisplayHeight(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()))
-          - FILE_DIALOG_HEIGHT + MESSAGE_BOX_OFFSET - (int)(WBGetTimeIndex() % (2 * MESSAGE_BOX_OFFSET)))
+          - iH + MESSAGE_BOX_OFFSET - (int)(WBGetTimeIndex() % (2 * MESSAGE_BOX_OFFSET)))
        / 2;
 
     iX = (DisplayWidth(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()))
-          - FILE_DIALOG_WIDTH + MESSAGE_BOX_OFFSET - (int)((~WBGetTimeIndex()) % (2 * MESSAGE_BOX_OFFSET)))
+          - iW + MESSAGE_BOX_OFFSET - (int)((~WBGetTimeIndex()) % (2 * MESSAGE_BOX_OFFSET)))
        / 2;
   }
 
+  data.iType = iType;
   data.szDefPath = szDefPath;
   data.szDefName = szDefName;
   data.szExtAndDescList = szExtAndDescList;
   data.szPathName = NULL;
 
+  szTitle = "File Select";
 
-  pDlg = DLGCreateDialogWindow(wIDOwner, "File Select",szFileDialogRes,
-                               iX, iY,FILE_DIALOG_WIDTH,FILE_DIALOG_HEIGHT,
+  if((iType & FileDialog_MASK) == FileDialog_Save ||
+     (iType & FileDialog_MASK) == FileDialog_SaveAs)
+  {
+    szTitle = "File Save";
+
+    if(iType & FileDialog_ReadOnly)
+    {
+      DLGMessageBox(MessageBox_OK | MessageBox_Bang, wIDOwner,
+                    szTitle, "'Read Only' flag not valid for 'Save' or 'Save As'");
+
+      return NULL;
+    }
+  }
+
+  // TODO:  should 'save' pre-select the file name?
+
+  pDlg = DLGCreateDialogWindow(wIDOwner, szTitle, szRes,
+                               iX, iY, iW, iH,
                                FileDialogCallback,
                                WBDialogWindow_VISIBLE,&data);
 
@@ -1014,6 +1091,54 @@ WB_GEOM geomParent;
     {
       if(data.szPathName)
       {
+        if((iType & FileDialog_MASK) == FileDialog_Save ||
+           (iType & FileDialog_MASK) == FileDialog_SaveAs)
+        {
+          unsigned long dwFlags = 0;
+          if(!WBStat(data.szPathName, &dwFlags)) // file exists?
+          {
+            if(iType & FileDialog_NoOverwrite) // not supposed to overwrite
+            {
+              // TODO:  do I pop up a dialog saying "file already exists" ?
+              goto exit_point;
+            }
+            else if(!(iType & FileDialog_NoOverwritePrompt)) // prompt for overwrite
+            {
+              if(DLGMessageBox(MessageBox_OKCancel | MessageBox_Question, wIDOwner,
+                               szTitle, "File exists - overwrite?") != IDOK)
+              {
+                goto exit_point;
+              }
+            }
+            else if(!(iType & FileDialog_ReadOnly))
+            {
+              // TODO:  verify I have write access to files that might be read-only for me
+              //        and warn about them if I'm a 'Save' or 'Save As' dialog box...
+              //        (this may also apply to 'file open' ... should it?)
+
+              if(WBFileIsWriteable(data.szPathName)) // NOT writeable
+              {
+                if(DLGMessageBox(MessageBox_YesNo | MessageBox_Question, wIDOwner,
+                                 szTitle, "File exists and is not writeable. Open anyway?") != IDYES)
+                {
+                  goto exit_point;
+                }
+              }
+            }
+          }
+          else if(iType & FileDialog_ReadOnly) // this is actually bogus for a save dialog anyway
+          {
+            DLGMessageBox(MessageBox_OK | MessageBox_Bang, wIDOwner,
+                          szTitle, "File does not exist, and cannot create in 'Read Only' mode");
+
+            goto exit_point;
+          }
+          else
+          {
+            // TODO: check writeability of the directory containing this file
+          }
+        }
+
         return data.szPathName;
       }
       else
@@ -1024,7 +1149,7 @@ WB_GEOM geomParent;
   }
 
   // it ends up here on 'cancel', etc. - so if a buffer was allocated, free it
-
+exit_point:
   if(data.szPathName)
   {
     WBFree(data.szPathName);

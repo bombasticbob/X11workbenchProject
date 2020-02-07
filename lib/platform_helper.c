@@ -59,7 +59,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <memory.h>
-#ifndef WIN23
+#ifndef WIN32
 #include <pthread.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -3308,6 +3308,79 @@ int iRval = 0;
 
 
 #endif // !defined(HAVE_XPM)
+
+
+
+////////////////////////////////////////////////////////////////////////////////////////////
+//                                                                                        //
+//   _____  _  _         ____                         _            _                      //
+//  |  ___|(_)| |  ___  |  _ \  ___  _ __  _ __ ___  (_) ___  ___ (_)  ___   _ __   ___   //
+//  | |_   | || | / _ \ | |_) |/ _ \| '__|| '_ ` _ \ | |/ __|/ __|| | / _ \ | '_ \ / __|  //
+//  |  _|  | || ||  __/ |  __/|  __/| |   | | | | | || |\__ \\__ \| || (_) || | | |\__ \  //
+//  |_|    |_||_| \___| |_|    \___||_|   |_| |_| |_||_||___/|___/|_| \___/ |_| |_||___/  //
+//                                                                                        //
+//                                                                                        //
+////////////////////////////////////////////////////////////////////////////////////////////
+
+#if !defined(WIN32) || defined(__DOXYGEN__)
+/** \ingroup internal
+  * \brief obtain group 'GID' list via 'getgroups()'
+  *
+  * \returns A 'WBAlloc()'d pointer to a list of GIDs, the first of which is the count
+**/
+gid_t * internalWBGetGroupList(void)
+{
+gid_t *pRval;
+gid_t temp;
+int nEntries;
+
+  nEntries = getgroups(0, &temp);
+
+  if(nEntries < 0)
+    return NULL;
+
+  pRval = (gid_t *)WBAlloc(sizeof(gid_t) * (nEntries + 2));
+
+  if(pRval)
+  {
+    memset(pRval, 0, sizeof(gid_t) * (nEntries + 2));
+    pRval[0] = nEntries;
+
+    if(getgroups(nEntries, pRval + 1))
+    {
+      WBFree(pRval);
+      return NULL;
+    }
+  }
+
+  return pRval;
+}
+#endif // !WIN32 || __DOXYGEN__
+
+int WBFileIsReadable(const char *szFileName)
+{
+#ifdef WIN32
+#error implement for WIN32
+#else // !WIN32
+//int iRval;
+//struct stat sF;
+//
+//  iRval = stat(szFileName, &sF);
+//
+//  // TODO check sF.st_mode for permision flags via matches to geteuid() and the group list from above
+
+  return eaccess(szFileName, R_OK);
+#endif // WIN32
+}
+
+int WBFileIsWriteable(const char *szFileName)
+{
+#ifdef WIN32
+#error implement for WIN32
+#else // !WIN32
+  return eaccess(szFileName, W_OK);
+#endif // WIN32
+}
 
 
 

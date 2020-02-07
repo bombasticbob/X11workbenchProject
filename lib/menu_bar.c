@@ -780,6 +780,50 @@ int i1; //, iHPos, iVPos;
       {
         // todo - highlight selections by simulating button press, drop into a popup, etc.
       }
+      else if(!(pEvent->xmotion.state & (Button2Mask | Button3Mask | Button4Mask | Button5Mask
+                                         | ShiftMask | LockMask | ControlMask)))
+      {
+        // mouse hover within menu bar
+
+#if 0 // for reference in case I want to handle this here
+        if(pSelf->iSelected >= 0) // I have a selected item
+        {
+          // just hovering, so see if I need to do highlight a different menu and switch popups...
+
+          WBXlatCoordPoint(pEvent->xbutton.window, pEvent->xbutton.x, pEvent->xbutton.y,
+                           wID, &iX, &iY);
+
+          for(i1=0; pMenu->ppItems && i1 < pMenu->nItems; i1++)
+          {
+            WBMenuItem *pItem = pMenu->ppItems[i1];
+            if(!pItem)
+              continue;
+
+            if(pItem->iPosition <= iX && pItem->iTextWidth + pItem->iPosition >= iX)  // between them
+            {
+              if(i1 != pSelf->iSelected && // already selected?
+                 pItem->iAction != -1)     // don't do anything with this menu item
+              {
+                // if I am doing this here, then it's likely to be within
+                // a modal loop, and I'm recursing.  The trick now is to cause
+                // the current menu to go away and a new one take its place.
+
+                WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Menu | DebugSubSystem_Window | DebugSubSystem_Event,
+                               "%s.%d - mouse hover in menu bar, different menu item - %d, %d\n",
+                               __FUNCTION__, __LINE__, pSelf->iSelected, i1);
+
+                //POOBAH
+                MBMenuHandleMenuItem(pDisplay, pSelf, pMenu, pItem);
+              }
+
+              return 1;
+            }
+          }
+
+          return 0; // _NOT_ handled
+        }
+#endif // 0
+      }
     }
     else if(pEvent->type == ButtonPress && pMenu)
     {

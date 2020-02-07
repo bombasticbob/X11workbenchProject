@@ -73,13 +73,14 @@
 
 // project includes
 #include "X11workbench.h"
+#include "main_frame.h"
 #include "gizzard.h"
 #include "gdb_helper.h"
 #include "refactor.h"
 #include "context_help.h"
 #include "resource_edit.h"
 
-// X11workbench toolkit library includes
+// X11workbench toolkit library includes (some already included from above, do it anyway)
 #include "window_helper.h"
 #include "pixmap_helper.h"  // pixmap helpers, including pre-defined icons
 #include "frame_window.h"
@@ -127,31 +128,6 @@
 
 static int do_main(int argc, char *argv[], char *envp[]);
 static void SetSignalHandlers(void);
-static int MyWindowCallback(Window wID, XEvent *pEvent);
-static int ApplicationPreferences(XClientMessageEvent *pEvent);
-static int FileExitHandler(XClientMessageEvent *);
-static int FileNewHandler(XClientMessageEvent *);
-static int FileOpenHandler(XClientMessageEvent *);
-static int FileSaveHandler(XClientMessageEvent *);
-static int FileSaveUIHandler(WBMenu *, WBMenuItem *);
-static int FileSaveAsHandler(XClientMessageEvent *);
-static int FileSaveAsUIHandler(WBMenu *, WBMenuItem *);
-static int FileSaveAllHandler(XClientMessageEvent *);
-static int FileSaveAllUIHandler(WBMenu *, WBMenuItem *);
-static int FileCloseHandler(XClientMessageEvent *);
-
-static int HelpAboutHandler(XClientMessageEvent *);
-static int HelpContentsHandler(XClientMessageEvent *);
-static int HelpContextHandler(XClientMessageEvent *);
-
-static int TabLeftHandler(XClientMessageEvent *);
-static int TabRightHandler(XClientMessageEvent *);
-static int TabMoveLeftHandler(XClientMessageEvent *);
-static int TabMoveRightHandler(XClientMessageEvent *);
-static int TabUIHandler(WBMenu *, WBMenuItem *);
-
-static int ToolBoxHandler(XClientMessageEvent *pEvent);
-static int ToolBoxUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem);
 
 int DoFileOpen(WBFrameWindow *pMainFrame, const char *szFileName);
 WBFILE_TYPE GetFileType(const char *szFileName); // return one of the WBFILE_TYPE constants
@@ -161,209 +137,9 @@ WBFILE_TYPE GetFileType(const char *szFileName); // return one of the WBFILE_TYP
 int nCPU = 0;
 
 
-int WBMain(int argc, char *argv[], char *envp[])
-{
-int iRval = 1;
-
-  iRval = do_main(argc, argv, envp);
-
-  if(iRval < 0)
-  {
-    WBUsage();
-  }
-
-  return iRval;
-}
-
-
-// global variables
-
-static Display       *pX11Display = NULL;            /* X server connection */
-static WBFrameWindow *pMainFrame = NULL;
-static XColor         clrGreen;
-
-
-Window GetFrameWindowID()
-{
-  if(!pMainFrame)
-  {
-    return None;
-  }
-
-  return pMainFrame->wID;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//   _____                          __        ___           _                 ____  _                   _         //
-//  |  ___| __ __ _ _ __ ___   ___  \ \      / (_)_ __   __| | _____      __ / ___|| |_ _ __ _   _  ___| |_ ___   //
-//  | |_ | '__/ _` | '_ ` _ \ / _ \  \ \ /\ / /| | '_ \ / _` |/ _ \ \ /\ / / \___ \| __| '__| | | |/ __| __/ __|  //
-//  |  _|| | | (_| | | | | | |  __/   \ V  V / | | | | | (_| | (_) \ V  V /   ___) | |_| |  | |_| | (__| |_\__ \  //
-//  |_|  |_|  \__,_|_| |_| |_|\___|    \_/\_/  |_|_| |_|\__,_|\___/ \_/\_/   |____/ \__|_|   \__,_|\___|\__|___/  //
-//                                                                                                                //
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-// application menu and the application menu handler structure 'main_menu_handlers'
-
-///////////////////////////////////////////////////////////////////////
-// default application menu - what I see when there's no open document
-///////////////////////////////////////////////////////////////////////
-static char szAppMenu[]="1\n"
-                        "_File\tpopup\t2\n"
-                        "_Tools\tpopup\t5\n"
-                        "\tseparator\n"
-                        "_Help\tpopup\t3\n"
-                        "\n"
-                        "2\n"
-                        "_New File\tIDM_FILE_NEW\tNew File\tCtrl+N\n"
-                        "_Open File\tIDM_FILE_OPEN\tOpen File\tCtrl+O\n"
-                        "\tseparator\n"
-                        "_Preferences\tIDM_PREFERENCES\tApplication Preferences\tCtrl+P\n"
-                        "\tseparator\n"
-                        "E_xit\tIDM_FILE_EXIT\tClose Application\tAlt+F4\n"
-                        "\n"
-                        "3\n"
-                        "_Contents\tIDM_HELP_CONTENTS\tHelp Contents\tAlt+F1\n"
-                        "Conte_xt\tIDM_HELP_CONTEXT\tContext Help\tF1\n"
-                        "\tseparator\n"
-                        "_About X11workbench\tIDM_HELP_ABOUT\tAbout X11workbench\tAlt+F1\n"
-                        "\n"
-                        "5\n"
-                        "_Toolbox\tIDM_TOOLBOX\tDisplay (or hide) the Toolbox\n"
-                        "_Options\tIDM_TOOLS_OPTIONS\tDisplay Options Editor\n"
-                        "\n";
-
-////////////////////////////////////////////////////////////
-// edit menu - what I see when there's a child frame active
-////////////////////////////////////////////////////////////
-static char szEditMenu[]="1\n"
-                        "_File\tpopup\t2\n"
-                        "_Edit\tpopup\t4\n"
-                        "_Tools\tpopup\t5\n"
-                        "\tseparator\n"
-                        "_Window\tpopup\t6\n"
-                        "\tseparator\n"
-                        "_Help\tpopup\t3\n"
-                        "\n"
-                        "2\n"
-                        "_New File\t" FW_FILE_NEW_MENU "\tNew File\t" FW_FILE_NEW_ACCEL "\n"
-                        "_Open File\t" FW_FILE_OPEN_MENU "\tOpen File\t" FW_FILE_OPEN_ACCEL "\n"
-                        "_Save File\t" FW_FILE_SAVE_MENU "\tSave File\t" FW_FILE_SAVE_ACCEL "\n"
-                        "Save _As\t" FW_FILE_SAVE_AS_MENU "\tSave As\t" FW_FILE_SAVE_AS_ACCEL "\n"
-                        "Save A_ll\t" FW_FILE_SAVE_ALL_MENU "\tSave All\t" FW_FILE_SAVE_ALL_ACCEL "\n"
-                        "\tseparator\n"
-                        "_Close File\t" FW_FILE_CLOSE_MENU "\tClose File\tCtrl+F4\n"
-                        "\tseparator\n"
-                        "_Preferences\tIDM_PREFERENCES\tApplication Preferences\tCtrl+P\n"
-                        "\tseparator\n"
-                        "E_xit\tIDM_FILE_EXIT\tClose Application\tAlt+F4\n"
-                        "\n"
-                        "3\n"
-                        "_Contents\tIDM_HELP_CONTENTS\tHelp Contents\tAlt+F1\n"
-                        "Conte_xt\tIDM_HELP_CONTEXT\tContext Help\tF1\n"
-                        "\tseparator\n"
-                        "_About X11workbench\tIDM_HELP_ABOUT\tAbout X11workbench\tAlt+F1\n"
-                        "\n"
-                        "4\n"
-                        "_Undo\t" FW_EDIT_UNDO_MENU "\tUn-do last action\t" FW_EDIT_UNDO_ACCEL "\n"
-                        "_Redo\t" FW_EDIT_REDO_MENU "\tRe-do last action\t" FW_EDIT_REDO_ACCEL "\n"
-                        "\tseparator\n"
-                        "Cu_t\t" FW_EDIT_CUT_MENU "\tCut to Clipboard\t" FW_EDIT_CUT_ACCEL "\n"
-                        "_Copy\t" FW_EDIT_COPY_MENU "\tCopy to Clipboard\t" FW_EDIT_COPY_ACCEL "\n"
-                        "_Paste\t" FW_EDIT_PASTE_MENU "\tPaste from Clipboard\t" FW_EDIT_PASTE_ACCEL "\n"
-                        "_Delete\t" FW_EDIT_DELETE_MENU "\tDelete selection\n"
-                        "\tseparator\n"
-                        "Select _All\t" FW_EDIT_SELECT_ALL_MENU "\tSelect All in context\t" FW_EDIT_SELECT_ALL_ACCEL "\n"
-                        "Select _None\t" FW_EDIT_SELECT_NONE_MENU "\tSelect None in context\t" FW_EDIT_SELECT_NONE_ACCEL "\n"
-                        "\tseparator\n"
-                        "_Find\tIDM_EDIT_FIND\tFind within Document\tCtrl+F\n"
-                        "Find Ne_xt\tIDM_EDIT_FIND_NEXT\tFind next occurence within Document\tCtrl+G\n"
-                        "_Project Find\tIDM_EDIT_PROJ_FIND\tFind within entire project\tCtrl+Shift+F\n"
-                        "Pro_ject Find Next\tIDM_EDIT_PROJ_FIND_NEXT\tFind next occurrence within entire project\tCtrl+Shift+G\n"
-                        "\tseparator\n"
-                        "Properties\t" FW_EDIT_PROPERTIES_MENU "\tFind next occurrence within entire project\t" FW_EDIT_PROPERTIES_ACCEL "\n"
-                        "\n"
-                        "5\n"
-                        "_Toolbox\tIDM_TOOLBOX\tDisplay (or hide) the Toolbox\n"
-                        "_Options\tIDM_TOOLS_OPTIONS\tDisplay Options Editor\n"
-                        "\n"
-                        "6\n"
-                        "Tab _Left\tIDM_TAB_LEFT\tScroll Tab Left\tCtrl+Alt+PgUp\n"
-                        "Tab _Right\tIDM_TAB_RIGHT\tScroll Tab Right\tCtrl+Alt+PgDown\n"
-                        "\tseparator\n"
-                        "Re-order Le_ft\tIDM_TAB_MOVE_LEFT\tScroll Tab Left\tCtrl+Alt+Shift+PgUp\n"
-                        "Re-order R_ight\tIDM_TAB_MOVE_RIGHT\tScroll Tab Right\tCtrl+Alt+Shift+PgDown\n"
-                        "\tseparator\n" // NOTE:  I can add a list of windows here, with hotkeys
-                        "\n";
-
-
-// NOTES ON 'F' KEYS - these were compiled by someone else with respect to winders
-// CTRL+ALT (and +SHIFT) any F key in X11 switches to a virtual desktop in console mode
-//
-// F1 - brings up a help window
-//      Alt - system menu
-// F2 - in winders, rename selected object.
-//      Alt+Ctrl - in MS Orifice, opens documents library (don't do this in X11)
-// F3 - in winders, open search box
-// F4 - in winders XP, display address bar list (or similar)
-//      Alt - close application/window
-// F5 - window refresh/update (such as in Firefox)
-// F6 - cycle through screen elements of a window
-// F7 - turn on/off "caret mode" in Firefox; in MS Weird, spell/grammar checking
-// F8 - extend selection (MS orifice)
-// F9 - update fields (MS orifice, particularly ExHell)
-// F10 - activates the menu
-//       SHIFT - pops up a context menu (in X11 at least) like a right-click would
-//       ALT - in X11, maximize/normal (retaining window decorations)
-// F11 - toggle between "true full-screen" (no window decorations) and normal [works in gnome/mate as well]
-// F12 - opens 'save as' dialog (in MS Orifice)
-
-
-
-
-// menu handler, similar to what MFC does
-// in theory I can swap in a new menu handler when the window focus changes
-// this is the DEFAULT handler, when no 'child frame' has the focus.  It also handles
-// all of the OTHER menu stuff, out of convenience
-
-FW_MENU_HANDLER_BEGIN(main_menu_handlers)
-  FW_MENU_HANDLER_ENTRY("IDM_FILE_EXIT",FileExitHandler,NULL)
-  FW_MENU_HANDLER_ENTRY("IDM_FILE_NEW",FileNewHandler,NULL)
-  FW_MENU_HANDLER_ENTRY("IDM_FILE_OPEN",FileOpenHandler,NULL)
-  FW_MENU_HANDLER_ENTRY("IDM_FILE_SAVE",FileSaveHandler,FileSaveUIHandler)
-  FW_MENU_HANDLER_ENTRY("IDM_FILE_SAVE_AS",FileSaveAsHandler,FileSaveAsUIHandler)
-  FW_MENU_HANDLER_ENTRY("IDM_FILE_SAVE_ALL",FileSaveAllHandler,FileSaveAllUIHandler)
-
-  FW_MENU_HANDLER_ENTRY("IDM_FILE_CLOSE",FileCloseHandler,NULL) // TODO:  do a UI handler?
-
-  FW_MENU_HANDLER_ENTRY("IDM_PREFERENCES", ApplicationPreferences,NULL)
-
-  FW_MENU_HANDLER_ENTRY("IDM_TOOLBOX",ToolBoxHandler,ToolBoxUIHandler)
-
-  FW_MENU_HANDLER_ENTRY("IDM_TAB_LEFT",TabLeftHandler, TabUIHandler)
-  FW_MENU_HANDLER_ENTRY("IDM_TAB_RIGHT",TabRightHandler, TabUIHandler)
-  FW_MENU_HANDLER_ENTRY("IDM_TAB_MOVE_LEFT",TabMoveLeftHandler, TabUIHandler)
-  FW_MENU_HANDLER_ENTRY("IDM_TAB_MOVE_RIGHT",TabMoveRightHandler, TabUIHandler)
-
-  FW_MENU_HANDLER_ENTRY("IDM_HELP_ABOUT",HelpAboutHandler,NULL)
-  FW_MENU_HANDLER_ENTRY("IDM_HELP_CONTEXT",HelpContextHandler,NULL)
-  FW_MENU_HANDLER_ENTRY("IDM_HELP_CONTENTS",HelpContentsHandler,NULL)
-
-#if 0
-  // additional EDIT MENU HANDLERS
-
-  FW_MENU_HANDLER_ENTRY("IDM_EDIT_FIND",EditFindHandler,EditFindUIHandler)
-  FW_MENU_HANDLER_ENTRY("IDM_EDIT_FIND_NEXT",EditFindNextHandler,EditFindNextUIHandler)
-  FW_MENU_HANDLER_ENTRY("IDM_EDIT_PROJ_FIND",EditProjFindHandler,EditProjFindUIHandler)
-  FW_MENU_HANDLER_ENTRY("IDM_EDIT_PROJ_FIND_NEXT",EditProjFindNextHandler,EditProjFindNextUIHandler)
-#endif // 0
-
-FW_MENU_HANDLER_END
-
-
-
-// end of global variables
-
-
+// =======
+// M A I N
+// =======
 
 void WBUsage(void)
 {
@@ -384,38 +160,63 @@ void WBUsage(void)
   WBToolkitUsage();
 }
 
-static void get_min_window_height_width(int *piMinHeight, int *piMinWidth)
+
+int WBMain(int argc, char *argv[], char *envp[])
 {
-#if 0 // old code, consider removing this
+int iRval = 1;
 
-  // DEMO CODE - using the 'STRING' size, calculate the minimum width/height and pass that
-  //             as parameters to WBInitSizeHints
+  iRval = do_main(argc, argv, envp);
 
-  // calculating the actual font height for the default font
-
-  unsigned long fth = WBGetDefaultFont()->max_bounds.ascent  // default font height
-                    + WBGetDefaultFont()->max_bounds.descent;
-
-  // the pad and border are part of the 'hello world' text and green border displayed for the demo
-  unsigned long pad = 32 /*BORDER*/; // font padding (only used here) [TODO:  fix this better]
-  unsigned long bw = 1;              // border width (only used here)
-
-  *piMinHeight = fth + pad * 2 + bw * 2;
-  *piMinWidth = XTextWidth(WBGetDefaultFont(),     // minimum width (based on text width)
-                           STRING,
-                           strlen(STRING)) + pad * 2 + bw * 2;
-#endif // 0
-
-  if(*piMinHeight)
+  if(iRval < 0)
   {
-    *piMinHeight = 360; // for now just hard-code it
+    WBUsage();
   }
 
-  if(*piMinWidth)
-  {
-    *piMinWidth = 512; // for now just hard-code it
-  }
+  return iRval;
 }
+
+
+// static global variables that (may) need to be exposed via 'get' functions
+
+static Display       *pX11Display = NULL;            /* X server connection */
+static WBFrameWindow *pMainFrame = NULL;
+static XColor         clrGreen;
+
+static const char szKnownFileTypes[] = // for 'File Open' dialog boxen
+  ".txt\tText Files\n"
+  ".c\tC language file\n"
+  ".cpp\tC language file\n"
+  ".h\tC language header\n"
+  "Makefile\tMake Files\n"
+  ".mk\tMake 'include' Files\n"
+  ".am\tAutotools File\n"
+  ".*\tAll Files\n";
+
+WBFrameWindow *GetFrameWindow()
+{
+  return pMainFrame;
+}
+
+Display *GetX11Display()
+{
+  return pX11Display;
+}
+
+Window GetFrameWindowID()
+{
+  if(!pMainFrame)
+  {
+    return None;
+  }
+
+  return pMainFrame->wID;
+}
+
+const char * GetKnownFileTypes()
+{
+  return szKnownFileTypes;
+}
+
 
 
 ///////////////////////////////////////////////
@@ -587,34 +388,12 @@ next_argument:
   }
 #endif // NO_SPLASH
 
-  get_min_window_height_width(&iMinHeight, &iMinWidth);
-
-  // I will need to center the new window, so figure out how to do that
-
-  WBInitSizeHints(&xsh,        // pointer to XSizeHints
-                  pX11Display, // Display pointer
-                  iMinHeight,  // minimum height (based on font height)
-                  iMinWidth);  // minimum width
-
-//  // init window attributes
-//
-//  WBInitWindowAttributes(&xswa,           // attribute structure
-//                         bd,              // border pixel color
-//                         bg,              // background window color
-//                         colormap,        // colormap
-//                         CenterGravity);  // gravity
-
-  // create frame window object (always uses default display)
-
-  pMainFrame = FWCreateFrameWindow("X11workbench",            // title
-                                   ID_APPLICATION,           // icon
-                                   szAppMenu,                // application menu
-                                   xsh.x, xsh.y,             // position
-                                   xsh.width, xsh.height,    // size
-                                   MyWindowCallback,         // callback
-                                   WBFrameWindow_APP_WINDOW  // flags and attributes
-                                   | WBFrameWindow_VISIBLE
-                                   | WBFrameWindow_STATUS_BAR);
+  pMainFrame = DoCreateMainFrameWindow("X11workbench",            // title
+                                       ID_APPLICATION,            // icon
+                                       szAppMenu,                 // application menu
+                                       WBFrameWindow_APP_WINDOW  // flags and attributes
+                                       | WBFrameWindow_VISIBLE
+                                       | WBFrameWindow_STATUS_BAR);
 
   if(!pMainFrame)
   {
@@ -623,18 +402,6 @@ next_argument:
     WBExit();
     return 2;
   }
-
-//  {
-//    const char *pNothing = szEditMenu; // to avoid certain warnings - remove later
-//
-//    pNothing = pNothing;
-//  }
-
-  // assign menu handlers to the frame window (this does the callback functions for me)
-  // this is part of the frame window functionality for the DEFAULT menu
-
-  FWSetMenuHandlers(pMainFrame, main_menu_handlers);
-
 
   // open files specifed on command line
 
@@ -708,173 +475,6 @@ next_argument:
 
 
 
-///////////////////////
-// CALLBACK FUNCTIONS
-///////////////////////
-
-extern void TestFunc(Display *pDisplay, WBGC gc, Window wID, int iX, int iY);
-
-static int MyWindowCallback(Window wID, XEvent *pEvent)
-{
-XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
-int iRval = 0;
-
-  /*
-    * On the last of each group of Expose events,  repaint the entire
-    * window.  See Section 8.4.5.1.
-    */
-
-  if(pEvent->type == DestroyNotify &&
-     pEvent->xdestroywindow.window == wID)
-  {
-    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Application,
-                   "%s - DestroyNotify\n", __FUNCTION__);
-
-    if(pMainFrame && pMainFrame->wID == wID)
-    {
-      pMainFrame = NULL;  // because I'm destroying it
-    }
-
-    return 0;  // let remaining default processing happen
-  }
-
-  if(pEvent->type == ClientMessage &&
-     pEvent->xclient.message_type == aQUERY_CLOSE)
-  {
-    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Application,
-                   "%s - QUERY_CLOSE\n", __FUNCTION__);
-
-    if(pEvent->xclient.data.l[0]) // close is imminent if I return 0
-    {
-      if(pMainFrame && pMainFrame->wID == wID)
-      {
-        pMainFrame = NULL;  // because I'm destroying it
-      }
-    }
-
-    return 0; // "ok to close" (let frame window handle anything else)
-  }
-
-  if (pEvent->type == Expose && pEvent->xexpose.count == 0)
-  {
-    WBGC gc;
-    WB_GEOM geom;
-
-// NOTE:  this is managed by the toolkit
-//    /*
-//      * Remove any other pending Expose events from the queue to
-//      * avoid multiple repaints. See Section 8.7.
-//      */
-//    while(!bQuitFlag && XCheckTypedWindowEvent(pX11Display, wID, Expose, pEvent))
-//      ;
-//
-//    if(bQuitFlag)
-//    {
-//      iRval = 1;
-//      WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Application,
-//                     "%s - Quit flag set - returning %d\n", __FUNCTION__, iRval);
-//
-//      return iRval;  // let default processing happen
-//    }
-
-    /*
-      * Find out how big the window is now,  so that we can center
-      * the text in it.
-      */
-    if(XGetWindowAttributes(pX11Display, wID, &xwa) == 0)
-    {
-      WB_ERROR_PRINT("%s - Cannot get correct attributes for window!  Returning %d\n",
-                    __FUNCTION__, iRval);
-      return iRval;
-    }
-
-    gc = WBBeginPaint(wID, &(pEvent->xexpose), &geom);  // begin paint, get a gc for it
-
-    if(gc == None)
-    {
-      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Expose,
-                     "%s.%d - WBBeginPaint returns 'None'\n",
-                    __FUNCTION__, __LINE__);
-
-      return 1; // handled (this is because a None gc means I didn't have anything to update)
-    }
-
-    WBClearWindow(wID, gc);  // does the erase background intelligently
-
-#ifdef DISPLAY_HELLO_WORLD
-    {
-      XFontStruct *pFont;
-      int x, y, x0, y0, x1, y1;
-
-      pFont = WBGetWindowFontStruct(wID);
-      if(!pFont)
-      {
-        WB_ERROR_PRINT("%s - No font - returning %d\n", __FUNCTION__, iRval);
-        return iRval;  // let default processing happen
-      }
-
-      x0 = XTextWidth(pFont, STRING, strlen(STRING));
-      y0 = pFont->max_bounds.ascent
-          - pFont->max_bounds.descent;
-
-      x = (xwa.width - x0) / 2;
-      y = (xwa.height + pFont->max_bounds.ascent
-        - pFont->max_bounds.descent) / 2;
-
-      // adjust new values for X0 and y0 to surround x and y
-
-      x1 = x + x0 + 20;
-      x0 = x - 20;
-
-      y1 = y + pFont->max_bounds.descent + 20;
-      y0 = y - y0 - 20;
-
-      /*
-        * Fill the window with the background color,  and then paint
-        * the centered string.
-        */
-
-      XSetForeground(pX11Display, gc, WBGetWindowFGColor(wID));
-      XDrawString(pX11Display, wID, gc, x, y, STRING, strlen(STRING));
-
-      XSetForeground(pX11Display, gc, clrGreen.pixel);
-
-      // draw my green rectangle
-
-      XDrawRectangle(pX11Display, wID, gc, x0, y0, x1 - x0, y1 - y0);
-      XSetForeground(pX11Display, gc, WBGetWindowFGColor(wID));  // restore it at the end
-    }
-#endif // DISPLAY_HELLO_WORLD
-
-//    TestFunc(pX11Display, gc, wID, x0 - 32, y0 - 32); // TEMPORARY
-
-    WBEndPaint(wID, gc);  // done now [free resources]
-
-    iRval = 1;  // processed
-
-    WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Window,
-                   "%s - Expose returning %d\n", __FUNCTION__, iRval);
-
-    return iRval;  // let default processing happen
-  }
-
-  // menu events
-  if(pEvent->type == ClientMessage && pEvent->xclient.message_type == aMENU_COMMAND)
-  {
-    iRval = 1;
-
-    WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Window | DebugSubSystem_Menu | DebugSubSystem_Event,
-                   "%s - detecting main window menu event %ld\n", __FUNCTION__,
-                   pEvent->xclient.data.l[0]);
-  }
-
-  WB_DEBUG_PRINT(DebugLevel_Excessive | DebugSubSystem_Window,
-                 "%s - Returning %d\n", __FUNCTION__, iRval);
-
-  return iRval;  // let default processing happen if zero, else 'processed'
-}
-
-
 ///////////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                           //
 //   _   _  _    _  _  _  _            _____                     _    _                      //
@@ -942,7 +542,7 @@ int iTab, iLineEnd;
 
     // 1st, create a new 'WBEditWindow', attaching it to the frame
 
-    WBEditWindow *pEW = WBCreateEditWindow(pMainFrame, NULL, szEditMenu, main_menu_handlers, 0);
+    WBEditWindow *pEW = DoCreateEditChildFrame(pMainFrame);
 
     if(!pEW)
     {
@@ -1058,6 +658,83 @@ int iTab, iLineEnd;
   return pCF ? 0 : -1;
 }
 
+int DoFileSave(WBChildFrame *pCF)
+{
+WBEditWindow *pEditWindow;
+
+  if(!pCF)
+    return -1;
+
+  // TODO:  be more generic about whether it's an 'Edit WIndow' or not
+
+  pEditWindow = WBEditWindowFromWindowID(pCF->wID);
+
+  if(!pEditWindow || !WBIsValidEditWindow(pEditWindow))
+    return -1;
+
+  if(!pEditWindow->szFileName)
+  {
+    return -1; // for now; no file name!
+  }
+
+  return WBEditWindowSaveFile(pEditWindow, NULL);
+}
+
+int DoFileSaveAs(WBChildFrame *pCF, const char *szFileName)
+{
+WBEditWindow *pEditWindow;
+int iRval;
+
+  if(!pCF)
+  {
+    DLGMessageBox(MessageBox_OK | MessageBox_Error, None,
+                  "File Save As", "'File Save As' - no child frame");
+    return -1;
+  }
+
+  // TODO:  be more generic about whether it's an 'Edit WIndow' or not
+
+  pEditWindow = WBEditWindowFromWindowID(pCF->wID);
+
+  if(!pEditWindow || !WBIsValidEditWindow(pEditWindow))
+  {
+    DLGMessageBox(MessageBox_OK | MessageBox_Error, None,
+                  "File Save As", "'File Save As' - edit window not valid");
+    return -1;
+  }
+
+  WBBeginWaitCursor(pCF->wID);
+
+  iRval = WBEditWindowSaveFile(pEditWindow, szFileName);
+
+  WBEndWaitCursor(pCF->wID);
+
+  if(iRval)
+  {
+    char tbuf[256];
+
+    snprintf(tbuf, sizeof(tbuf), "'File Save As' - WBEditWindowSaveFile() returned %d", iRval);
+
+    DLGMessageBox(MessageBox_OK | MessageBox_Error, None,
+                  "File Save As", tbuf);
+  }
+  else
+  {
+    const char *pDisplayName;
+
+    // display file name with no path info within tab
+    pDisplayName = szFileName + strlen(szFileName);
+
+    while(pDisplayName > szFileName && *(pDisplayName - 1) != '/')
+    {
+      pDisplayName--;
+    }
+
+    FWSetChildFrameDisplayName(pCF, pDisplayName);
+  }
+
+  return iRval;
+}
 
 WBFILE_TYPE GetFileType(const char *szFileName) // return one of the WBFILE_TYPE constants
 {
@@ -1083,33 +760,78 @@ const char *pFN, *pExt;
   // TODO:  don't just check the extension, read the first few lines, check for
   //        invalid/unprintable characters, etc.
 
-  if(pExt && !strcasecmp("makefile", pExt))
+  if(pExt && (!strcasecmp("makefile", pExt) || !strcasecmp("BSDmakefile", pExt)))
   {
     return WBFILE_TYPE_MAKEFILE;
   }
+  else if(!strcmp("ini", pExt) || !strcmp("conf", pExt))
+  {
+    // TODO:  see if this is a text or binary format file
+    //        and handle it properly
+
+    return WBFILE_TYPE_CONF; // for now assume an INI-style formatted config file
+  }
+  else if(!strcmp("sh", pExt))
+  {
+    // TODO: look for hash-bang or if it is a binary file
+    //       this can make a difference, as it might be Perl or Python, etc.
+
+    return WBFILE_TYPE_SHELL; // for now assume THIS
+  }
   else if(!pExt)
   {
-    // TODO: look for hash-bang
+    // TODO: look for hash-bang or if it is a binary file
+    //       also see if it's executable.  Could also be a 'source' command file
+    //
+    // Additionally could be a C++ header file...
+
+    return WBFILE_TYPE_TEXT; // for now...
   }
+
+  // ----------------------------
+  // Makefile and autoconf files
+  // ----------------------------
+
   else if(!strcasecmp("mk", pExt)) // '.mk' '.Mk' or '.MK' (or even '.mK') extension
   {
     return WBFILE_TYPE_MAKEFILE;
   }
-  else if(!strcasecmp("h", pExt)) // also allow case-insensitive naming, in case 'windows'
+  else if(!strcasecmp("makefile", pExt)) // also allow case-insensitive naming, in case 'windows'
   {
     return WBFILE_TYPE_MAKEFILE;
   }
+  else if(!strcmp("ac", pExt) || !strcmp("am", pExt))
+  {
+    // TODO:  do I want to also include '.in' files?
+    //        do I want to check the names, i.e. automake.am, config.ac, etc.
+
+    return WBFILE_TYPE_AUTOCONF;
+  }
+
+  // ----------------------------------
+  // Programming language source files
+  // ----------------------------------
+
   else if(!strcasecmp("c", pExt)) // also allow case-insensitive naming, in case 'windows'
   {
     return WBFILE_TYPE_CPROG;
   }
-  else if(!strcasecmp("h", pExt)) // also allow case-insensitive naming, in case 'windows'
+  else if(!strcasecmp("h", pExt) || !strcasecmp("hpp", pExt)
+          || !strcasecmp("h++", pExt) ) // also allow case-insensitive naming, in case 'windows'
   {
     return WBFILE_TYPE_CHEADER;
   }
-  else if(!strcasecmp("cpp", pExt)) // also allow case-insensitive naming, in case 'windows'
+  else if(!strcasecmp("cpp", pExt) || !strcasecmp("c++", pExt)) // also allow case-insensitive naming, in case 'windows'
   {
     return WBFILE_TYPE_CPP;
+  }
+  else if(!strcasecmp("s", pExt) || !strcasecmp("asm", pExt)) // also allow case-insensitive naming, in case 'windows'
+  {
+    return WBFILE_TYPE_ASM;
+  }
+  else if(!strcasecmp("pde", pExt) || !strcasecmp("ino", pExt)) // also allow case-insensitive naming, in case 'windows'
+  {
+    return WBFILE_TYPE_ARDUINO; // arduino script may require some additional 'special help'
   }
   else if(!strcmp("java", pExt)) // for now I only do the lower-case extension naming here
   {
@@ -1127,38 +849,6 @@ const char *pFN, *pExt;
   {
     return WBFILE_TYPE_PYTHON;
   }
-  else if(!strcmp("xpm", pExt))
-  {
-    return WBFILE_TYPE_PIXMAP;
-  }
-  else if(!strcmp("ac", pExt) || !strcmp("am", pExt))
-  {
-    return WBFILE_TYPE_AUTOCONF;
-  }
-  else if(!strcasecmp("xwb", pExt)) // also allow case-insensitive naming, in case 'windows'
-  {
-    return WBFILE_TYPE_PROJECT;
-  }
-  else if(!strcasecmp("xwbrc", pExt)) // also allow case-insensitive naming, in case 'windows'
-  {
-    return WBFILE_TYPE_RESOURCE;
-  }
-  else if(!strcasecmp("xwbdlg", pExt)) // also allow case-insensitive naming, in case 'windows'
-  {
-    return WBFILE_TYPE_DIALOG;
-  }
-  else if(!strcasecmp("xwbmenu", pExt)) // also allow case-insensitive naming, in case 'windows'
-  {
-    return WBFILE_TYPE_MENU;
-  }
-  else if(!strcasecmp("xwbbar", pExt)) // also allow case-insensitive naming, in case 'windows'
-  {
-    return WBFILE_TYPE_TOOLBAR;
-  }
-  else if(!strcmp("sh", pExt))
-  {
-    return WBFILE_TYPE_SHELL;
-  }
   else if(!strcasecmp("php", pExt)) // also allow case-insensitive naming, in case 'windows'
   {
     return WBFILE_TYPE_PHP;
@@ -1167,13 +857,55 @@ const char *pFN, *pExt;
   {
     return WBFILE_TYPE_HTML;
   }
+
+  // ---------------------------------
+  // standard text-based file formats
+  // ---------------------------------
+
+  else if(!strcasecmp("txt", pExt)) // also allow case-insensitive naming, in case 'windows'
+  {
+    return WBFILE_TYPE_TEXT; // TODO:  should unicode-16 text be indicated differently?
+  }
+  else if(!strcmp("xpm", pExt)) // PIXMAP FILE - somewhat special, usually in C language
+  {
+    return WBFILE_TYPE_PIXMAP;
+  }
   else if(!strcasecmp("xml", pExt)) // also allow case-insensitive naming, in case 'windows'
   {
     return WBFILE_TYPE_XML;
   }
-  else if(!strcasecmp("pde", pExt) || !strcasecmp("ino", pExt)) // also allow case-insensitive naming, in case 'windows'
+  else if(!strcasecmp("json", pExt)) // also allow case-insensitive naming, in case 'windows'
   {
-    return WBFILE_TYPE_ARDUINO; // arduino script may require some additional 'special help'
+    return WBFILE_TYPE_JSON;
+  }
+
+  // ------------------------------------------
+  // X11workbench private file extension types
+  // ------------------------------------------
+
+  else if(!strcasecmp("xwb", pExt)) // also allow case-insensitive naming, in case 'windows'
+  {
+    return WBFILE_TYPE_PROJECT;
+  }
+  else if(!strcasecmp("xwbrc", pExt)) // also allow case-insensitive naming, in case 'windows'
+  {
+    // generic resource files
+    return WBFILE_TYPE_RESOURCE;
+  }
+  else if(!strcasecmp("xwbdlg", pExt)) // also allow case-insensitive naming, in case 'windows'
+  {
+    // dialog box resource files
+    return WBFILE_TYPE_DIALOG;
+  }
+  else if(!strcasecmp("xwbmenu", pExt)) // also allow case-insensitive naming, in case 'windows'
+  {
+    // menu resource files
+    return WBFILE_TYPE_MENU;
+  }
+  else if(!strcasecmp("xwbbar", pExt)) // also allow case-insensitive naming, in case 'windows'
+  {
+    // toolbar resource files
+    return WBFILE_TYPE_TOOLBAR;
   }
 
 
@@ -1244,7 +976,9 @@ static const char * const aszDesc[] =
   "Java Program Source",
   "JavaScript Program",
   "PHP Program",
-  "Arduino Script"
+  "Arduino Script",
+  "Config File",
+  "JSON Data"
 };
 
 
@@ -1443,8 +1177,6 @@ const char *GetFileTypeHighlightInfo(WBFILE_TYPE nFileType)
 }
 
 
-
-
 ////////////////////////////////////////////////////////////////////////////
 //   __  __                     ____      _ _ _                _          //
 //  |  \/  | ___ _ __  _   _   / ___|__ _| | | |__   __ _  ___| | _____   //
@@ -1454,7 +1186,8 @@ const char *GetFileTypeHighlightInfo(WBFILE_TYPE nFileType)
 //                                                                        //
 ////////////////////////////////////////////////////////////////////////////
 
-static int ApplicationPreferences(XClientMessageEvent *pEvent)
+
+int ApplicationPreferences(XClientMessageEvent *pEvent)
 {
 XColor clr; // temporary
 
@@ -1473,289 +1206,6 @@ XColor clr; // temporary
 }
 
 
-static int FileExitHandler(XClientMessageEvent *pEvent)
-{
-  // TODO:  'OnExit' processing for open files (files to be saved, etc.)
-
-  bQuitFlag = 1;  // time to die
-
-  return 1; // handled
-}
-
-static int FileNewHandler(XClientMessageEvent *pEvent)
-{
-WBEditWindow *pEW;
-
-  if(!pMainFrame)
-  {
-    DLGMessageBox(MessageBox_OK | MessageBox_Error, None,
-                  "File New", "'File _New' and no container window");
-    return 1;
-  }
-
-  // create a new child frame within the main frame
-  // this should be pretty straightforward as I implement it properly
-
-  // 1st, create a new 'WBEditWindow', attaching it to the frame
-
-  pEW = WBCreateEditWindow(pMainFrame, NULL, szEditMenu, main_menu_handlers, 0);
-
-  if(!pEW)
-  {
-    DLGMessageBox(MessageBox_OK | MessageBox_Error, None,
-                  "File New", "'File _New' unable to create edit window");
-  }
-
-  return 1; // handled
-}
-
-
-static int FileOpenHandler(XClientMessageEvent *pEvent)
-{
-  Window wIDOwner = pMainFrame ? pMainFrame->wID : None;
-  WBEditWindow *pEW;
-  char *pFile;
-
-  pFile = DLGFileDialog(FileDialog_Open, wIDOwner, ".", "",
-                        ".txt\tText Files\n"
-                        ".c\tC language file\n"
-                        ".cpp\tC language file\n"
-                        ".h\tC language header\n"
-                        "Makefile\tMake Files\n"
-                        ".mk\tMake 'include' Files\n"
-                        ".am\tAutotools File\n"
-                        ".*\tAll Files\n");
-
-  if(pFile)
-  {
-    DoFileOpen(pMainFrame, pFile);
-
-    WBFree(pFile);  // required resource cleanup
-  }
-
-  return 1; // handled
-}
-
-static int FileSaveHandler(XClientMessageEvent *pEvent)
-{
-  Window wIDOwner = pMainFrame ? pMainFrame->wID : None;
-
-  DLGMessageBox(MessageBox_OK | MessageBox_MiddleFinger, wIDOwner,
-                "File Save",
-                "'File _Save' not currently implemented");
-
-  return 1; // handled
-}
-
-static int FileSaveUIHandler(WBMenu *pMenu, WBMenuItem *pItem)
-{
-  return -1; // disabled
-}
-
-static int FileSaveAsHandler(XClientMessageEvent *pEvent)
-{
-  Window wIDOwner = pMainFrame ? pMainFrame->wID : None;
-
-  DLGMessageBox(MessageBox_OK | MessageBox_Warning, wIDOwner,
-                "File Save As",
-                "'File Save _As' not currently implemented");
-
-  return 1; // handled
-}
-
-static int FileSaveAsUIHandler(WBMenu *pMenu, WBMenuItem *pItem)
-{
-  return -1; // disabled
-}
-
-static int FileSaveAllHandler(XClientMessageEvent *pEvent)
-{
-  Window wIDOwner = pMainFrame ? pMainFrame->wID : -1;
-
-  DLGMessageBox(MessageBox_OK | MessageBox_Warning, wIDOwner,
-                "File Save All",
-                "'File Save A_ll' not currently implemented");
-
-  return 1; // handled
-}
-
-static int FileSaveAllUIHandler(WBMenu *pMenu, WBMenuItem *pItem)
-{
-  return -1; // disabled
-}
-
-static int HelpAboutHandler(XClientMessageEvent *pEvent)
-{
-  Window wIDOwner = pMainFrame ? pMainFrame->wID : None;
-
-
-  DLGMessageBox(MessageBox_OK | /*MessageBox_Info*/ MessageBox_App, wIDOwner,
-                "About X11workbench",
-                "X11workbench - BBB's answer to a proper development environment for X11");
-
-  return 1; // handled
-}
-
-static int FileCloseHandler(XClientMessageEvent *pEvent)
-{
-  WBChildFrame *pC;
-
-  if(!pMainFrame)
-  {
-    return 0;
-  }
-
-  pC = FWGetFocusWindow(pMainFrame);
-
-  if(pC)
-  {
-    // TODO:  check for 'safe to close it' ?
-
-    FWRemoveContainedWindow(pMainFrame, pC);
-
-    FWDestroyChildFrame(pC); // this will destroy the super-class as well
-  }
-
-  return 1;
-}
-
-static int TabLeftHandler(XClientMessageEvent *pEvent)
-{
-int iIndex;
-
-  if(!pMainFrame)
-  {
-    return 0;
-  }
-
-  iIndex = FWGetChildFrameIndex(pMainFrame, NULL);
-
-  WB_ERROR_PRINT("TEMPORARY:  %s - move left %d\n", __FUNCTION__, iIndex);
-
-  if(iIndex > 0)
-  {
-    FWSetFocusWindowIndex(pMainFrame, iIndex - 1);
-  }
-
-  return 1;
-}
-
-static int TabRightHandler(XClientMessageEvent *pEvent)
-{
-int iIndex;
-
-  if(!pMainFrame)
-  {
-    return 0;
-  }
-
-  iIndex = FWGetChildFrameIndex(pMainFrame, NULL);
-
-  WB_ERROR_PRINT("TEMPORARY:  %s - move right %d\n", __FUNCTION__, iIndex);
-
-  if(iIndex >= 0)
-  {
-    FWSetFocusWindowIndex(pMainFrame, iIndex + 1);
-  }
-
-  return 1;
-}
-
-static int TabMoveLeftHandler(XClientMessageEvent *pEvent)
-{
-  WBChildFrame *pC;
-
-  if(!pMainFrame)
-  {
-    return 0;
-  }
-
-  pC = FWGetFocusWindow(pMainFrame);
-
-  if(pC)
-  {
-    FWMoveChildFrameTabIndex(pMainFrame, pC, MOVE_CHILD_FRAME_TAB_INDEX_LEFT);
-  }
-
-  return 1;
-}
-
-static int TabMoveRightHandler(XClientMessageEvent *pEvent)
-{
-  WBChildFrame *pC;
-
-  if(!pMainFrame)
-  {
-    return 0;
-  }
-
-  pC = FWGetFocusWindow(pMainFrame);
-
-  if(pC)
-  {
-    FWMoveChildFrameTabIndex(pMainFrame, pC, MOVE_CHILD_FRAME_TAB_INDEX_RIGHT);
-  }
-
-  return 1;
-}
-
-static int TabUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem)
-{
-  if(FWGetNumContWindows(pMainFrame) > 1)
-  {
-    return 1; // enabled (more than one tab)
-  }
-
-  return -1; // disabled (zero or one child frames)
-}
-
-static int ToolBoxHandler(XClientMessageEvent *pEvent)
-{
-  DLGMessageBox(MessageBox_WTF | MessageBox_No, None, "X11workbench - Unimplemented",
-                "ToolBox Handler not (yet) implemented");
-
-  return 1; // "handled"
-}
-
-static int ToolBoxUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem)
-{
-  return 1; // enabled  (TODO:  check # of tabs, etc.)
-}
-
-
-
-static int HelpContentsHandler(XClientMessageEvent *pEvent)
-{
-  Window wIDOwner = pMainFrame ? pMainFrame->wID : None;
-
-  char *pTemp = DLGInputBox(wIDOwner, "Help Contents", "Enter a search term for the documentation", "WBInit", -1, -1);
-
-  if(pTemp)
-  {
-    DoContextSensitiveHelp(pTemp);
-
-    WBFree(pTemp);
-  }
-//  else
-//  {
-//    DLGMessageBox(MessageBox_OK | MessageBox_Bang, wIDOwner,
-//                  "Something Bad Happened", "Unexpected 'NULL' return from DLGInputBox");
-//  }
-
-  return 1; // handled
-}
-
-static int HelpContextHandler(XClientMessageEvent *pEvent)
-{
-  Window wIDOwner = pMainFrame ? pMainFrame->wID : None;
-
-  DLGMessageBox(MessageBox_OK | MessageBox_Bang, wIDOwner,
-                "Context Help", "TODO:  implement the context-sensitive help");
-
-//  DoContextSensitiveHelp(szWhateverWord);
-
-  return 1; // handled
-}
 
 
 
