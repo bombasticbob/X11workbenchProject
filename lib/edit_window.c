@@ -119,7 +119,8 @@ static void internal_cut_to_cb(WBChildFrame *);                        // delete
 static void internal_delete_sel(WBChildFrame *);                       // delete selection only
 static void internal_select_all(WBChildFrame *);                       // select all
 static void internal_select_none(WBChildFrame *);                      // select none
-static void internal_save(WBChildFrame *, const char *szFileName);     // save to specified file name (WBChildFrame *, NULL to keep same file name)
+static int internal_has_changed(WBChildFrame *);                       // > 0 if changed since last save, 0 if not changed, < 0 error
+static int internal_save(WBChildFrame *, const char *szFileName);      // save to specified file name (WBChildFrame *, NULL to keep same file name)
 static WB_PCSTR internal_get_file_name(WBChildFrame *);                // get (const) pointer to file name string
 static void internal_mouse_click(WBChildFrame *, int iX, int iY,
                                  int iButtonMask, int iACS);           // 'mouse click' notification.  \sa aWB_POINTER
@@ -157,18 +158,19 @@ static int iInitColorFlag = 0;
 static WBChildFrameUI internal_CFUI =
 {
   CHILD_FRAME_UI_TAG,
-  internal_do_char,         internal_scancode,     internal_bkspace,        internal_del,
-  internal_tab,             internal_enter,        internal_properties,
+  internal_do_char,         internal_scancode,        internal_bkspace,        internal_del,
+  internal_tab,             internal_enter,           internal_properties,
   internal_uparrow,         internal_downarrow,
-  internal_leftarrow,       internal_rightarrow,   internal_home,           internal_end,
-  internal_pgup,            internal_pgdown,       internal_pgleft,         internal_pgright,
-  internal_help,            internal_hover_notify, internal_hover_cancel,   internal_is_ins_mode,
-  internal_toggle_ins_mode, internal_copy_to_cb,   internal_paste_from_cb,  internal_cut_to_cb,
-  internal_delete_sel,      internal_select_all,   internal_select_none,    internal_save,
-  internal_get_file_name,   internal_mouse_click,  internal_mouse_dblclick, internal_mouse_drag,
-  internal_mouse_drop,      internal_mouse_move,   internal_scroll_vert,    internal_scroll_horiz,
-  internal_mouse_cancel,    internal_get_row_col,  internal_has_selection,  internal_undo,
-  internal_redo,            internal_can_undo,     internal_can_redo,       internal_is_empty
+  internal_leftarrow,       internal_rightarrow,      internal_home,           internal_end,
+  internal_pgup,            internal_pgdown,          internal_pgleft,         internal_pgright,
+  internal_help,            internal_hover_notify,    internal_hover_cancel,   internal_is_ins_mode,
+  internal_toggle_ins_mode, internal_copy_to_cb,      internal_paste_from_cb,  internal_cut_to_cb,
+  internal_delete_sel,      internal_select_all,      internal_select_none,    internal_has_changed,
+  internal_save,            internal_get_file_name,   internal_mouse_click,    internal_mouse_dblclick,
+  internal_mouse_drag,      internal_mouse_drop,      internal_mouse_move,     internal_scroll_vert,
+  internal_scroll_horiz,    internal_mouse_cancel,    internal_get_row_col,    internal_has_selection,
+  internal_undo,            internal_redo,            internal_can_undo,       internal_can_redo,
+  internal_is_empty
 };
 
 
@@ -1638,6 +1640,16 @@ WBEditWindow *pE = (WBEditWindow *)pC;
     return;
   }
 
+  // check the current selection, and see if I have a word or other
+  // searchable term selected.  If it contains a non-alphanumeric character,
+  // consider stopping "at that point".  For now, just deliver it as-is
+  // to the Frame Window's registered context help handler.
+
+  if(pC->pOwner && pC->pOwner->context_help)
+  {
+    pC->pOwner->context_help("WBInit"); // TODO:  make this work properly
+  }
+
 }
 
 static void internal_hover_notify(WBChildFrame *pC, int x, int y)
@@ -1955,7 +1967,12 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   internal_new_cursor_pos((WBEditWindow *)pC);
 }
 
-static void internal_save(WBChildFrame *pC, const char *szFileName)
+static int internal_has_changed(WBChildFrame *pC)
+{
+  return 1; // for now, "always changed" and in need of saving - later, implement this properly
+}
+
+static int internal_save(WBChildFrame *pC, const char *szFileName)
 {
 WBEditWindow *pE = (WBEditWindow *)pC;
 
@@ -1966,10 +1983,10 @@ WBEditWindow *pE = (WBEditWindow *)pC;
   {
     WB_ERROR_PRINT("ERROR:  %s - WBChildFrame and/or WBEditWindow not valid, %p\n", __FUNCTION__, pE);
 
-    return;
+    return -1;
   }
 
-  WBEditWindowSaveFile(pE, szFileName);
+  return WBEditWindowSaveFile(pE, szFileName);
 }
 
 static WB_PCSTR internal_get_file_name(WBChildFrame *pC)

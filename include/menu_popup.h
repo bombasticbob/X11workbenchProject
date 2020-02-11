@@ -127,6 +127,17 @@ typedef struct tagWBMenuPopupWindow
 
 } WBMenuPopupWindow;
 
+/** \ingroup menu_popup
+  * \brief Flags for creating a WBMenuPopupWindow object
+**/
+enum e_WBMenuPopupWindowFlags
+{
+  MenuPopup_Default    = 0,  ///< 'Default Owner' flag, popup menu belongs to owning window that is 'not a menu'
+  MenuPopup_MenuBar    = 1,  ///< 'Menu Bar Owner' flag, popup menu belongs to a menu bar window
+  MenuPopup_MenuPopup  = 2,  ///< 'Menu Popup Owner' flag, popup menu belongs to a menu popup window
+  MenuPopup_OWNER_MASK = 7   ///< Bitmask for 'Owner' flags
+};
+
 
 /** \ingroup menu_popup
   * \brief Create a WBMenuPopupWindow object and associated window

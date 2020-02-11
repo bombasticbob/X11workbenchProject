@@ -505,8 +505,8 @@ int iRval;
 
   evt.data.l[1] = WBCreatePointerHash(pMenu);
   evt.data.l[2] = WBCreatePointerHash(pItem);
-  evt.data.l[3] = 0; // this is a sort of 'flag' saying I'm using a pointer hash
-  evt.data.l[4] = 0;
+  evt.data.l[3] = 0; // reserved
+  evt.data.l[4] = 0; // reserved
 
   ////////////////////////////////////////////////////////////////////
   // TODO:  handle things differently for a DYNAMIC menu UI handler?
@@ -544,7 +544,9 @@ static void MBMenuPopupHandleMenuItem(Display *pDisplay, Window wID, WBMenuPopup
     evt.message_type = aMENU_DISPLAY_POPUP;
     evt.format = 32;
     evt.data.l[0] = pItem->iAction & WBMENU_POPUP_MASK;
-    evt.data.l[1] = pItem->iPosition;
+    evt.data.l[1] = pSelf->iX + pSelf->iWidth;
+    evt.data.l[2] = evt.data.l[1]; // TODO:  what to put here... ? (not being used)
+    evt.data.l[3] = pItem->iPosition; // TODO:  make sure it doesn't go off screen??
 
     WBPostPriorityEvent(wID, (XEvent *)&evt);
   }
@@ -591,7 +593,7 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
   XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
   WB_FONTC pFont, pTempFont, pDefaultMenuFont;
   WB_FONT pOldFont;
-  XPoint xpt[3];
+  XPoint xpt[4];
   WBGC gc; // = WBGetWindowDefaultGC(wID);
 //  XGCValues xgc;
   WB_GEOM geomPaint;
@@ -714,9 +716,19 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
       WB_ERROR_PRINT("TODO:  %s - handle dynamic menu\n", __FUNCTION__);
     }
 
-    iUIState = MBMenuPopupHandleMenuItemUI(pDisplay, pSelf, pMenu, pItem);
-      // iUIState is 0 if menu NOT handled (default action, disable it)
-      // iUIState is < 0 to disable, > 0 to enable.  See aMENU_UI_ITEM docs for more info
+    if(pItem->iAction != WBMENU_SEPARATOR &&
+       (pItem->iAction & WBMENU_POPUP_HIGH_BIT) &&
+       !(pItem->iAction & WBMENU_DYNAMIC_HIGH_BIT))
+    {
+      // it's a popup, so it's always available
+        iUIState = 1;
+    }
+    else
+    {
+      iUIState = MBMenuPopupHandleMenuItemUI(pDisplay, pSelf, pMenu, pItem);
+        // iUIState is 0 if menu NOT handled (default action, disable it)
+        // iUIState is < 0 to disable, > 0 to enable.  See aMENU_UI_ITEM docs for more info
+    }
 
     // TODO:  do I cache the state so I don't allow activation?
 
@@ -842,7 +854,25 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
       WBDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
     }
 
-    if(i1 == pSelf->iSelected)  // selected item
+    // if it's a popup menu item, put a triangle on the right side
+    if(pItem->iAction != WBMENU_SEPARATOR &&
+       (pItem->iAction & WBMENU_POPUP_HIGH_BIT) &&
+       !(pItem->iAction & WBMENU_DYNAMIC_HIGH_BIT))
+    {
+      // for popups, indicate as such with a filled in '>' at the right edge
+      xpt[0].x=xwa.width + xwa.border_width - 2 - WBTextWidth(pFont, " ", 1);
+      xpt[0].y = pItem->iPosition + iHeight / 2;
+      xpt[1].x = xpt[0].x - iHeight / 3 - 1;
+      xpt[1].y = xpt[0].y - iHeight / 3 - 1;
+      xpt[2].x = xpt[1].x;
+      xpt[2].y = xpt[0].y + iHeight / 3 + 1;
+      xpt[3].x = xpt[0].x;
+      xpt[3].y = xpt[0].y;
+
+      WBFillPolygon(pDisplay, wID, gc, xpt, 4, Nonconvex, CoordModeOrigin);
+    }
+
+    if(i1 == pSelf->iSelected)  // selected item - restore normal colors
     {
       WBSetForeground(gc, clrMenuFG.pixel);
       WBSetBackground(gc, clrMenuBG.pixel);
@@ -1193,12 +1223,15 @@ static int MBMenuPopupEvent(Window wID, XEvent *pEvent)
           //                  hover below, scroll (as needed)
           //                  hover above, scroll (as needed)
 
-          /*if(owner menu bar rectangle contains mouse pointer)
+          /*if((pSelf->iFlags & MenuPopup_OWNER_MASK) == MenuPopup_MenuBar &&
+               owner menu bar rectangle contains mouse pointer)
           {
             // mouse hover selects different popup when in range of owning menu bar
             POOBAH
           }
-          else*/ if(iX < pSelf->iX - WB_MOUSE_FAR || iX > pSelf->iX + pSelf->iWidth + 2 * WB_MOUSE_FAR)
+          else*/
+          if((iX < pSelf->iX - WB_MOUSE_FAR || iX > pSelf->iX + pSelf->iWidth + 2 * WB_MOUSE_FAR)
+             && (pSelf->iFlags & MenuPopup_OWNER_MASK) != MenuPopup_MenuPopup) // for now, generically do this
           {
             // hover far left or far far right
 
@@ -1319,6 +1352,7 @@ static int MBMenuPopupEvent(Window wID, XEvent *pEvent)
       int iRval = -1;
       int iMenuItem = ((XClientMessageEvent *)pEvent)->data.l[0];
       int iPosition = ((XClientMessageEvent *)pEvent)->data.l[1];
+      int iYPosition = ((XClientMessageEvent *)pEvent)->data.l[3];
 
       for(i1=0; i1 < pMenu->nPopups; i1++)
       {
@@ -1330,7 +1364,7 @@ static int MBMenuPopupEvent(Window wID, XEvent *pEvent)
             (pMenu->ppPopups[i1]->iMenuID & WBMENU_POPUP_MASK) == iMenuItem)
         {
           pPopup = MBCreateMenuPopupWindow(pSelf->wSelf, pSelf->wOwner, pMenu->ppPopups[i1],
-                                           iPosition, pSelf->iY + pSelf->iHeight, 0);
+                                           iPosition, iYPosition, MenuPopup_MenuPopup);
 
           if(pPopup)
           {
@@ -1349,6 +1383,8 @@ static int MBMenuPopupEvent(Window wID, XEvent *pEvent)
 
           WBInvalidateGeom(pSelf->wSelf, NULL, 1);  // re-paint (sort of a bug fix)
           WBEndModal(wID, iRval);
+
+          break; // so I don't keep searching [after all I found it]
         }
       }
       if(i1 >= pMenu->nPopups)

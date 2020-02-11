@@ -142,7 +142,7 @@ extern "C" {
 
 
 /** \ingroup child_frame
-  * \brief Initialize a child frame (assumed to be a base 'class' for the window)
+  * \brief Initialize a child frame using a frame window parent (assumed to be a base 'class' for the window)
   *
   * \param pChildFrame a pointer to the WBChildFrame associated with the window.  Can not be NULL.
   * \param pOwner A pointer to the owning WBFrameWindow.  Can not be NULL.
@@ -175,6 +175,43 @@ extern "C" {
 int FWInitChildFrame(WBChildFrame *pChildFrame, WBFrameWindow *pOwner, WB_FONTC pFont,
                      const char *szFocusMenu, const WBFWMenuHandler *pHandlerArray,
                      WBWinEvent pUserCallback, int fFlags);
+
+/** \ingroup child_frame
+  * \brief Initialize a child frame using a child frame parent (assumed to be a base 'class' for the window)
+  *
+  * \param pChildFrame a pointer to the WBChildFrame associated with the window.  Can not be NULL.
+  * \param pOwner A pointer to the owning WBChildFrame.  Can not be NULL.
+  * \param pFont The desired WB_FONTC font, or 'NULL' to use the default
+  * \param szFocusMenu A const pointer to a text-based menu resource describing the menu that should appear when the Child Frame's tab has the focus.  Can be NULL if none.
+  * \param pHandlerArray A const pointer to an array of WBFWMenuHandler structures for the 'focus' menu handler.  Can be NULL if none.
+  * \param pUserCallback A pointer to the callback function that handles messages (Return 0 for default handling, != 0 if handled).  Can be NULL.
+  * \param fFlags A bitwise 'or' of the desired flags associated with this Child Frame.  See 'WBChildFrame_FLAGS'
+  * \returns an integer value, 0 on success, anything else being an error code
+  *
+  * This function creates the actual window for a 'derived' Child Frame window, as a direct child
+  * of a containing Child Frame window, and correctly initializes that portion of the internal data
+  * structure corresponding to a Child Frame.  It is similar to \ref FWInitChildFrame(), except that the
+  * owner is a \ref WBChildFrame, and not a \ref WBFrameWindow.  The target 'WBChildFrame' structure should
+  * normally be the first member of the data structure representing the 'derived' Child Frame window, so you
+  * can do a direct type cast of the pointer, similar to the way abstraction and polymorphism works in C++.\n
+  * A child frame is not created directly.  Instead, create the 'derived' version's structure, and initialize
+  * the structure for the derived behavior, with the WBChildFrame structure as the first element.  Then initialize
+  * the WBChildFrame structure with this function, which will create the child frame window ID and register it with
+  * the specified WBFrameWindow.\n
+  * Failure to call this function will prevent the 'Child Frame' functionality from working correctly, and will not
+  * register the relationship between the Window ID and the WBChildFrame structure.
+  *
+  * NOTE:  To create a stand-alone 'derived' Child Frame, first create a minimal frame window, with disabled 'tabs'.
+  * Then, create the Child Frame 'derived' window using WBInitChildFrame().  Only one will be allowed.\n
+  * NOTE 2:  If WBInitChildFrame() returns a non-zero value, do NOT call WBDestroyChildFrame() on that WBChildFrame .
+  *
+  * \sa \ref frame "Frame Windows"
+  *
+  * Header File:  child_frame.h
+**/
+int FWInitChildFrame2(WBChildFrame *pChildFrame, WBChildFrame *pOwner, WB_FONTC pFont,
+                      const char *szFocusMenu, const WBFWMenuHandler *pHandlerArray,
+                      WBWinEvent pUserCallback, int fFlags);
 
 /** \ingroup child_frame
   * \brief Destroy an Child Frame

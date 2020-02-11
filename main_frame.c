@@ -91,6 +91,25 @@ static int ToolBoxUIHandler(WBMenu *pMenu, WBMenuItem *pMenuItem);
 //                                                                                                                //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#define FW_FILE_NEW_PROJECT_MENU   "IDM_NEW_PROJECT"
+#define FW_FILE_NEW_PROJECT_ACCEL  ""
+#define FW_FILE_NEW_SOURCE_MENU    "IDM_NEW_SOURCE"
+#define FW_FILE_NEW_SOURCE_ACCEL   ""
+#define FW_FILE_NEW_HEADER_MENU    "IDM_NEW_HEADER"
+#define FW_FILE_NEW_HEADER_ACCEL   ""
+#define FW_FILE_NEW_DIALOG_MENU    "IDM_NEW_DIALOG"
+#define FW_FILE_NEW_DLG_ACCEL      ""
+#define FW_FILE_NEW_MENU_MENU      "IDM_NEW_MENU"
+#define FW_FILE_NEW_MENU_ACCEL     ""
+#define FW_FILE_NEW_MAKE_MENU      "IDM_NEW_MAKE"
+#define FW_FILE_NEW_MAKE_ACCEL     ""
+#define FW_FILE_NEW_AUTOCONF_MENU  "IDM_NEW_AUTOCONF"
+#define FW_FILE_NEW_AUTOCONF_ACCEL ""
+#define FW_FILE_NEW_AUTOMAKE_MENU  "IDM_NEW_AUTOMAKE"
+#define FW_FILE_NEW_AUTOMAKE_ACCEL ""
+
+
+
 // application menu and the application menu handler structure 'main_menu_handlers'
 
 ///////////////////////////////////////////////////////////////////////
@@ -103,7 +122,8 @@ const char szAppMenu[]="1\n"
                        "_Help\tpopup\t3\n"
                        "\n"
                        "2\n"
-                       "_New File\tIDM_FILE_NEW\tNew File\tCtrl+N\n"
+//                       "_New File\tIDM_FILE_NEW\tNew File\tCtrl+N\n"
+                       "_New File\tpopup\t7\n"
                        "_Open File\tIDM_FILE_OPEN\tOpen File\tCtrl+O\n"
                        "\tseparator\n"
                        "_Preferences\tIDM_PREFERENCES\tApplication Preferences\tCtrl+P\n"
@@ -119,6 +139,17 @@ const char szAppMenu[]="1\n"
                        "5\n"
                        "_Toolbox\tIDM_TOOLBOX\tDisplay (or hide) the Toolbox\n"
                        "_Options\tIDM_TOOLS_OPTIONS\tDisplay Options Editor\n"
+                        "\n"
+                        "7\n"
+                        "_Text File\t" FW_FILE_NEW_MENU "\tNew Text File\t" FW_FILE_NEW_ACCEL "\n"
+                        "_Project\t" FW_FILE_NEW_PROJECT_MENU "\tNew Project\t" FW_FILE_NEW_PROJECT_ACCEL "\n"
+                        "_Source File\t" FW_FILE_NEW_SOURCE_MENU "\tNew Source File\t" FW_FILE_NEW_SOURCE_ACCEL "\n"
+                        "_Header File\t" FW_FILE_NEW_HEADER_MENU "\tNew Source File\t" FW_FILE_NEW_HEADER_ACCEL "\n"
+                        "_Dialog Box\t" FW_FILE_NEW_DIALOG_MENU "\tNew Project\t" FW_FILE_NEW_DLG_ACCEL "\n"
+                        "Menu _Resource\t" FW_FILE_NEW_MENU_MENU "\tNew Menu\t" FW_FILE_NEW_MENU_ACCEL "\n"
+                        "_Make File\t" FW_FILE_NEW_MAKE_MENU "\tNew Make File\t" FW_FILE_NEW_MAKE_ACCEL "\n"
+                        "_Autoconf File\t" FW_FILE_NEW_AUTOCONF_MENU "\tNew Make File\t" FW_FILE_NEW_AUTOCONF_ACCEL "\n"
+                        "Automa_ke File\t" FW_FILE_NEW_AUTOMAKE_MENU "\tNew Automake File\t" FW_FILE_NEW_AUTOMAKE_ACCEL "\n"
                        "\n";
 
 ////////////////////////////////////////////////////////////
@@ -134,7 +165,8 @@ const char szEditMenu[]="1\n"
                         "_Help\tpopup\t3\n"
                         "\n"
                         "2\n"
-                        "_New File\t" FW_FILE_NEW_MENU "\tNew File\t" FW_FILE_NEW_ACCEL "\n"
+//                        "_New File\t" FW_FILE_NEW_MENU "\tNew File\t" FW_FILE_NEW_ACCEL "\n"
+                        "_New File\tpopup\t7\n"
                         "_Open File\t" FW_FILE_OPEN_MENU "\tOpen File\t" FW_FILE_OPEN_ACCEL "\n"
                         "_Save File\t" FW_FILE_SAVE_MENU "\tSave File\t" FW_FILE_SAVE_ACCEL "\n"
                         "Save _As\t" FW_FILE_SAVE_AS_MENU "\tSave As\t" FW_FILE_SAVE_AS_ACCEL "\n"
@@ -182,6 +214,17 @@ const char szEditMenu[]="1\n"
                         "Re-order Le_ft\tIDM_TAB_MOVE_LEFT\tScroll Tab Left\tCtrl+Alt+Shift+PgUp\n"
                         "Re-order R_ight\tIDM_TAB_MOVE_RIGHT\tScroll Tab Right\tCtrl+Alt+Shift+PgDown\n"
                         "\tseparator\n" // NOTE:  I can add a list of windows here, with hotkeys
+                        "\n"
+                        "7\n"
+                        "_Text File\t" FW_FILE_NEW_MENU "\tNew Text File\t" FW_FILE_NEW_ACCEL "\n"
+                        "_Project\t" FW_FILE_NEW_PROJECT_MENU "\tNew Project\t" FW_FILE_NEW_PROJECT_ACCEL "\n"
+                        "_Source File\t" FW_FILE_NEW_SOURCE_MENU "\tNew Source File\t" FW_FILE_NEW_SOURCE_ACCEL "\n"
+                        "_Header File\t" FW_FILE_NEW_HEADER_MENU "\tNew Source File\t" FW_FILE_NEW_HEADER_ACCEL "\n"
+                        "_Dialog Box\t" FW_FILE_NEW_DIALOG_MENU "\tNew Project\t" FW_FILE_NEW_DLG_ACCEL "\n"
+                        "Menu _Resource\t" FW_FILE_NEW_MENU_MENU "\tNew Menu\t" FW_FILE_NEW_MENU_ACCEL "\n"
+                        "_Make File\t" FW_FILE_NEW_MAKE_MENU "\tNew Make File\t" FW_FILE_NEW_MAKE_ACCEL "\n"
+                        "_Autoconf File\t" FW_FILE_NEW_AUTOCONF_MENU "\tNew Make File\t" FW_FILE_NEW_AUTOCONF_ACCEL "\n"
+                        "Automa_ke File\t" FW_FILE_NEW_AUTOMAKE_MENU "\tNew Automake File\t" FW_FILE_NEW_AUTOMAKE_ACCEL "\n"
                         "\n";
 
 
@@ -327,6 +370,7 @@ WBFrameWindow *pRval;
     // this is part of the frame window functionality for the DEFAULT menu
 
     FWSetMenuHandlers(pRval, main_menu_handlers);
+    FWRegisterFrameWindowContextHelp(pRval, DoContextSensitiveHelp);
   }
 
   return pRval;
@@ -545,6 +589,8 @@ WBEditWindow *pEW;
     return 1;
   }
 
+  // TODO:  ask for document type first???  Create window based on THAT ???
+
   // create a new child frame within the main frame
   // this should be pretty straightforward as I implement it properly
 
@@ -585,34 +631,18 @@ static int FileSaveHandler(XClientMessageEvent *pEvent)
 {
 WBFrameWindow *pMainFrame = GetFrameWindow();
 WBChildFrame *pC;
-WBEditWindow *pEditWindow;
 Window wIDOwner = pMainFrame ? pMainFrame->wID : None;
 
 
   pC = FWGetFocusWindow(pMainFrame); // current active child frame
 
-  if(!pC)
+  if(!pC || !pC->pUI || !pC->pUI->save)
     return 0;
 
-  // TODO:  be more generic about whether it's an 'Edit WIndow' or not
+  if(!pC->pUI->get_file_name || !pC->pUI->get_file_name(pC) || !pC->pUI->get_file_name(pC)[0])
+    return 0; // no file name, can't use 'File Save'
 
-  pEditWindow = WBEditWindowFromWindowID(pC->wID);
-
-  if(!pEditWindow || !WBIsValidEditWindow(pEditWindow))
-    return 0;
-
-  if(!pEditWindow->szFileName) // file name is not valid
-  {
-    return 0; // no file name!  do not attempt to save [TODO:  invoke 'save as' ?]
-  }
-
-  // TODO:  has the document been altered?  If so allow saving it
-//  if()
-  {
-    DoFileSaveAs(pC, pEditWindow->szFileName);
-  }
-
-  return 1; // handled
+  return DoFileSave(pC);
 }
 
 static int FileSaveUIHandler(WBMenu *pMenu, WBMenuItem *pItem)
@@ -623,22 +653,14 @@ WBEditWindow *pEditWindow;
 
   pC = FWGetFocusWindow(pMainFrame); // current active child frame
 
-  if(!pC)
+  if(!pC || !pC->pUI || !pC->pUI->save)
     return 0;
 
-  // TODO:  be more generic about whether it's an 'Edit WIndow' or not
+  if(!pC->pUI->get_file_name || !pC->pUI->get_file_name(pC) || !pC->pUI->get_file_name(pC)[0])
+    return 0; // no file name, can't use 'File Save'
 
-  pEditWindow = WBEditWindowFromWindowID(pC->wID);
-
-  if(!pEditWindow || !WBIsValidEditWindow(pEditWindow))
-    return 0;
-
-  if(!pEditWindow->szFileName) // file name is not valid
-  {
-    return 0; // no file name!  do not activate menu
-  }
-
-  // TODO:  has the document been altered?  If so allow saving it
+  if(!pC->pUI->has_changed(pC))
+    return 0; // file has not changed, so no 'file save'
 
   return 1; // enabled (for now just always do this)
 }
@@ -650,21 +672,21 @@ Window wIDOwner = pMainFrame ? pMainFrame->wID : None;
 WBChildFrame *pC;
 char *pFile;
 
+  pC = FWGetFocusWindow(pMainFrame);
+
+  if(!pC || !pC->pUI || !pC->pUI->save)
+    return 0;
+
   pFile = DLGFileDialog(FileDialog_Save, wIDOwner, ".", "",
                         GetKnownFileTypes());
 
   if(pFile)
   {
-    pC = FWGetFocusWindow(pMainFrame);
-
-    if(pC)
-    {
-      DoFileSaveAs(pC, pFile);
-    }
+    DoFileSaveAs(pC, pFile);
 
     WBFree(pFile);  // required resource cleanup
 
-    return 1; // handled
+    return pC ? 1 : 0; // handled
   }
 
   return -1; // error
@@ -679,12 +701,10 @@ WBChildFrame *pC;
 
   pC = FWGetFocusWindow(pMainFrame);
 
-  if(pC)
-  {
-    return 1; // allow it
-  }
+  if(!pC || !pC->pUI || !pC->pUI->save)
+    return 0;
 
-  return -1; // disabled
+  return 1; // allow it
 }
 
 static int FileSaveAllHandler(XClientMessageEvent *pEvent)
@@ -877,12 +897,29 @@ Window wIDOwner = pMainFrame ? pMainFrame->wID : None;
 static int HelpContextHandler(XClientMessageEvent *pEvent)
 {
 WBFrameWindow *pMainFrame = GetFrameWindow();
+WBChildFrame *pCH = pMainFrame ? FWGetFocusWindow(pMainFrame) : NULL;
 Window wIDOwner = pMainFrame ? pMainFrame->wID : None;
 
-  DLGMessageBox(MessageBox_OK | MessageBox_Bang, wIDOwner,
-                "Context Help", "TODO:  implement the context-sensitive help");
+  // see if there's an active child frame, and if it is
+  // possible to see its selection, and it's text, and it's
+  // a single word, activate context-sensitive help
+
+  if(pCH)
+  {
+    if(pCH->pUI && pCH->pUI->help)
+    {
+      pCH->pUI->help(pCH, 0);
+      return 1; // handled
+    }
+
+    // TODO:  check to see if it's actually handled?
 
 //  DoContextSensitiveHelp(szWhateverWord);
+
+  }
+
+  DLGMessageBox(MessageBox_OK | MessageBox_Bang, wIDOwner,
+                "Context Help", "No Context Available");
 
   return 1; // handled
 }

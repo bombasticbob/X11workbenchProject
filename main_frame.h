@@ -23,10 +23,10 @@
 #include "frame_window.h"
 #include "edit_window.h"
 
-#ifdef __cplusplus__
+#ifdef __cplusplus
 extern "C"
 {
-#endif // __cplusplus__
+#endif // __cplusplus
 
 extern const char szAppMenu[];
 extern const char szEditMenu[];
@@ -39,9 +39,9 @@ WBFrameWindow *DoCreateMainFrameWindow(const char *szTitle, int idIcon,
 WBEditWindow * DoCreateEditChildFrame(WBFrameWindow *pFrame);
 
 
-#ifdef __cplusplus__
+#ifdef __cplusplus
 }
-#endif // __cplusplus__
+#endif // __cplusplus
 
 #endif // _MAIN_FRAME_H_INCLUDED_
 

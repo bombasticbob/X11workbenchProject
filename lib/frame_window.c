@@ -796,6 +796,18 @@ void FWDestroyFrameWindow2(WBFrameWindow *pFrameWindow)
   }
 }
 
+void FWRegisterFrameWindowContextHelp(WBFrameWindow *pFrame, void (*pContextHelpCallback)(const char *))
+{
+  if(!pFrame || pFrame->ulTag != FRAME_WINDOW_TAG)
+  {
+    WB_ERROR_PRINT("ERROR:  %s - invalid frame window pointer!\n", __FUNCTION__);
+
+    return;
+  }
+
+  pFrame->context_help = pContextHelpCallback;
+}
+
 void FWSetUserCallback(WBFrameWindow *pFW, WBWinEvent pCallBack)
 {
 FRAME_WINDOW *pFrameWindow;
@@ -1347,6 +1359,15 @@ int iRval;
     return -1;
   }
 
+  // if this child window is actually contained in another child window, then I need
+  // to invoke the proper function for the container child window.
+  if(pNew->pCHOwner)
+  {
+    // TODO:  implement this
+    WB_ERROR_PRINT("ERROR:  %s - 'grandparent' option not implemented (yet)\n", __FUNCTION__);
+    return -1;
+  }
+
   if(!pFrameWindow->ppChildFrames)
   {
     pFrameWindow->nMaxChildFrames = 256; // for now
@@ -1409,6 +1430,15 @@ int iIndex, i2;
   {
     WB_ERROR_PRINT("ERROR:  %s - no frame window pointer or invalid child window pointer!\n", __FUNCTION__);
 
+    return;
+  }
+
+  // if this child window is actually contained in another child window, then I need
+  // to invoke the proper function for the container child window.
+  if(pCont->pCHOwner)
+  {
+    // TODO:  implement this
+    WB_ERROR_PRINT("ERROR:  %s - 'grandparent' option not implemented (yet)\n", __FUNCTION__);
     return;
   }
 
@@ -1533,6 +1563,15 @@ int iIndex;
     return; // no child windows in list
   }
 
+  // if this child window is actually contained in another child window, then I need
+  // to invoke the proper function for the container child window.
+  if(pCont->pCHOwner || pContNew->pCHOwner)
+  {
+    // TODO:  implement this
+    WB_ERROR_PRINT("ERROR:  %s - 'grandparent' option not implemented (yet)\n", __FUNCTION__);
+    return;
+  }
+
   for(iIndex=0; iIndex < pFrameWindow->nChildFrames; iIndex++)
   {
     if(pFrameWindow->ppChildFrames[iIndex] == pCont)
@@ -1576,6 +1615,15 @@ int iIndex;
   {
     WB_ERROR_PRINT("ERROR:  %s - no frame window pointer!\n", __FUNCTION__);
 
+    return;
+  }
+
+  // if this child window is actually contained in another child window, then I need
+  // to invoke the proper function for the container child window.
+  if(pCont->pCHOwner)
+  {
+    // TODO:  implement this
+    WB_ERROR_PRINT("ERROR:  %s - 'grandparent' option not implemented (yet)\n", __FUNCTION__);
     return;
   }
 
@@ -1734,6 +1782,15 @@ int iIndex;
     return pFrameWindow->nFocusTab; // return focus tab index
   }
 
+  // if this child window is actually contained in another child window, then I need
+  // to invoke the proper function for the container child window.
+  if(pCont->pCHOwner)
+  {
+    // TODO:  implement this
+    WB_ERROR_PRINT("ERROR:  %s - 'grandparent' option not implemented (yet)\n", __FUNCTION__);
+    return -1;
+  }
+
   for(iIndex=0; iIndex < pFrameWindow->nChildFrames; iIndex++)
   {
     if(pFrameWindow->ppChildFrames[iIndex] == pCont)
@@ -1766,6 +1823,15 @@ WBChildFrame *pC = NULL;
   if(!pFrameWindow->ppChildFrames || !pFrameWindow->nChildFrames)
   {
     return; // no child windows in list
+  }
+
+  // if this child window is actually contained in another child window, then I need
+  // to invoke the proper function for the container child window.
+  if(pCont->pCHOwner)
+  {
+    // TODO:  implement this
+    WB_ERROR_PRINT("ERROR:  %s - 'grandparent' option not implemented (yet)\n", __FUNCTION__);
+    return;
   }
 
   iI = FWGetChildFrameIndex(pFW, pCont);

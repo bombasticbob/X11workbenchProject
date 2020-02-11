@@ -120,10 +120,10 @@ static WB_FONT pDefaultMenuFont = NULL;  // default menu font
   * \hideinitializer
   * \brief Internal Client Message Atom for 'RESIZE' notification (tells menu bar to resize itself)
   *
-  * XCLientMessageEvent members:
-  *   window = menu bar window ID
-  *   message_type = aMENU_RESIZE
-  *   format = 32
+  * XClientMessageEvent members:\n
+  *   window = menu bar window ID\n
+  *   message_type = aMENU_RESIZE\n
+  *   format = 32\n
   *
   * (no data members)
 **/
@@ -133,18 +133,18 @@ Atom aMENU_RESIZE = 0;
   * \hideinitializer
   * \brief Internal Client Message Atom for 'ACTIVATE' notification
   *
-  * XClientMessageEvent members:
-  *   window = menu bar window ID
-  *   message_type = aMENU_ACTIVATE
-  *   format = 32
+  * XClientMessageEvent members:\n
+  *   window = menu bar window ID\n
+  *   message_type = aMENU_ACTIVATE\n
+  *   format = 32\n
   *
-  * To activate a specific menu item:
-  *   data.l[0] = Hashed pointer to WBMenuItem - see WBGetPointerFromHash()
-  *   data.l[1] = the index for menu item
+  * To activate a specific menu item:\n
+  *   data.l[0] = Hashed pointer to WBMenuItem - see WBGetPointerFromHash()\n
+  *   data.l[1] = the index for menu item\n
   *
-  * To move to the previous or next menu item in the list:
-  *   data.l[0] = 0
-  *   data.l[1] = 1 or -1; 1 moves 'next', -1 'previous', 0 'first'.  others undefined.
+  * To move to the previous or next menu item in the list:\n
+  *   data.l[0] = 0\n
+  *   data.l[1] = 1 or -1; 1 moves 'next', -1 'previous', 0 'first'.  others undefined.\n
   *
 **/
 Atom aMENU_ACTIVATE = 0;
@@ -153,13 +153,14 @@ Atom aMENU_ACTIVATE = 0;
   * \hideinitializer
   * \brief Internal Client Message Atom for 'DISPLAY POPUP' action
   *
-  * XClientMessageEvent members:
-  *   window = menu bar window ID
-  *   message_type = aMENU_DISPLAY_POPUP
-  *   format = 32
-  *   data.l[0] = popup menu identifier
-  *   data.l[1] = X coordinate for popup 'left' side
-  *   data.l[2] = X coordinate for popup 'right' side (left side plus text extent)
+  * XClientMessageEvent members:\n
+  *   window = owner (menu bar, popup menu) window ID\n
+  *   message_type = aMENU_DISPLAY_POPUP\n
+  *   format = 32\n
+  *   data.l[0] = popup menu identifier\n
+  *   data.l[1] = X coordinate for popup 'left' side\n
+  *   data.l[2] = X coordinate for popup 'right' side (left side plus text extent)\n
+  *   data.l[3] = Y coordinate for popup (same coordinate ref as owner window)
   *
 **/
 Atom aMENU_DISPLAY_POPUP = 0;
@@ -608,6 +609,7 @@ Window wID = pSelf->wSelf;
     evt.data.l[0] = pItem->iAction & WBMENU_POPUP_MASK;
     evt.data.l[1] = pItem->iPosition;                     // minimum extent
     evt.data.l[2] = pItem->iPosition + pItem->iTextWidth; // maximum extent
+    evt.data.l[3] = pSelf->iY + pSelf->iHeight; // top of popup is bottom of menu bar
 
     WBPostPriorityEvent(wID, (XEvent *)&evt);
 
@@ -663,8 +665,8 @@ static int MBMenuHandleMenuItemUI(Display *pDisplay, WBMenuBarWindow *pSelf, WBM
 
   evt.data.l[1] = WBCreatePointerHash(pMenu);
   evt.data.l[2] = WBCreatePointerHash(pItem);
-  evt.data.l[3] = 0; // this is a sort of 'flag' saying I'm using a pointer hash
-  evt.data.l[4] = 0;
+  evt.data.l[3] = 0; // reserved
+  evt.data.l[4] = 0; // reserved
 
   iRval = WBWindowDispatch(pSelf->wOwner, (XEvent *)&evt); // 'send event'
 
@@ -1107,6 +1109,7 @@ try_select_next:
       int iMenuItem = ((XClientMessageEvent *)pEvent)->data.l[0];
       int iPosition = ((XClientMessageEvent *)pEvent)->data.l[1];
       int iRightPos = ((XClientMessageEvent *)pEvent)->data.l[2];
+      int iTopPos = ((XClientMessageEvent *)pEvent)->data.l[3];
 
       for(i1=0; i1 < pMenu->nPopups; i1++)
       {
@@ -1125,7 +1128,7 @@ try_select_next:
           END_XCALL_DEBUG_WRAPPER
 
           pPopup = MBCreateMenuPopupWindow(pSelf->wSelf, pSelf->wOwner, pMenu->ppPopups[i1],
-                                           iPosition, pSelf->iY + pSelf->iHeight, 0);
+                                           iPosition, iTopPos, MenuPopup_MenuBar);
 
           if(pPopup)
           {

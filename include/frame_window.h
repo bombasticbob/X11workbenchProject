@@ -264,6 +264,8 @@ typedef struct tagWB_FW_MENU_HANDLER
     int iClientWidth;                    // The current width of the frame window's client area
     int iClientHeight;                   // The current height of the frame window's client area
 
+    void (*context_help)(const char *);  // registered context help UI function for the frame and its child windows
+
   } WBFrameWindow;
 
   * \endcode
@@ -281,6 +283,8 @@ typedef struct tagWB_FRAME_WINDOW
   int iClientY;                        ///< The current Y position of the frame window's client area (relative to the window)
   int iClientWidth;                    ///< The current width of the frame window's client area
   int iClientHeight;                   ///< The current height of the frame window's client area
+
+  void (*context_help)(const char *);  ///< registered context help UI function for the frame and its child windows
 
 } WBFrameWindow;
 
@@ -354,18 +358,24 @@ struct tagWBChildFrameUI; // forward declaration
   {
     unsigned int ulTag;
       // tag indicating I'm a 'Child Frame' window
+
     Window wID;
       // window identifier for the 'Child Frame' window.  may contain 'None' while being destroyed
+
     WBFrameWindow *pOwner;
-      // a pointer to the WBFrameWindow owner
+      // a pointer to the WBFrameWindow owner.  If owned by a child window, this is the owner child window's owner
+
+    struct tagWBChildFrame *pCHOwner;
+      // a pointer to the WBChildFrame owner (may be NULL)
+
     WB_FONT pFont;
       // default font for the window
 
     WB_GEOM geom;
-      // client-area geometry (excludes scroll bars)
+      // Total client-area geometry (excludes scroll bars)
 
     WB_GEOM geomEntire;
-      // entire client-area geometry (for painting scroll bars)
+      // Entire client-area geometry (includes scroll bars)
 
     WB_POINT origin;
       // 'origin' in 'client units' (such as chars and lines) - determines scroll behavior
@@ -427,11 +437,13 @@ typedef struct tagWBChildFrame
 {
   unsigned int ulTag;               ///< tag indicating I'm a 'Child Frame' window
   Window wID;                       ///< window identifier for the 'Child Frame' window.  may contain 'None' while being destroyed
-  WBFrameWindow *pOwner;            ///< a pointer to the WBFrameWindow owner
+  WBFrameWindow *pOwner;            ///< a pointer to the WBFrameWindow owner.  If owned by a child window, this is the owner child window's owner
+  struct tagWBChildFrame *pCHOwner; ///< a pointer to the WBChildFrame owner (may be NULL)
+
   WB_FONT pFont;                    ///< default font for the window
 
   WB_GEOM geom;                     ///< total client-area geometry (excludes scroll bars) in 'pixels'
-  WB_GEOM geomEntire;               ///< client-area geometry (excludes scroll bars)
+  WB_GEOM geomEntire;               ///< Entire client-area geometry (includes scroll bars)
   WB_POINT origin;                  ///< viewport 'origin' in 'client units' (such as chars and lines) - determines scroll behavior
   WB_EXTENT extent;                 ///< viewport 'extent' in 'client units' (such as chars and lines) - determines scroll behavior
 
@@ -457,9 +469,9 @@ typedef struct tagWBChildFrame
 
   WBWinEvent pUserCallback;         ///< message callback function pointer (can be NULL)
   void (*destructor)(struct tagWBChildFrame *);  ///< pointer to a 'superclass' destructor.  If not NULL, will be called by FWDestroyChildFrame()
-  struct tagWBChildFrameUI *pUI;   ///< pointer to 'WBChildFrameUI' function pointer table (assigned by 'superclass')
+  struct tagWBChildFrameUI *pUI;    ///< pointer to 'WBChildFrameUI' function pointer table (assigned by 'superclass')
 
-  struct tagWBChildFrame *pNext;   ///< 'Next Object' pointer in an internally stored linked list (do not alter or use this)
+  struct tagWBChildFrame *pNext;    ///< 'Next Object' pointer in an internally stored linked list (do not alter or use this)
 } WBChildFrame;
 
 
@@ -584,8 +596,11 @@ typedef struct tagWBChildFrame
     void (*select_none)(WBChildFrame *);
       // select none
 
-    void (*save)(WBChildFrame *, const char *szFileName);
-      // save to specified file name (NULL to keep same file name)
+    int (*has_changed)(WBChildFrame *);
+     // returns > 0 if changed since last save, 0 if no change, < 0 on error
+
+    int (*save)(WBChildFrame *, const char *szFileName);
+      // save to specified file name (NULL to keep same file name) - returns 0 on success
 
     WB_PCSTR (* get_file_name)(WBChildFrame *);
       // get (const) pointer to file name string
@@ -705,7 +720,9 @@ typedef struct tagWBChildFrameUI
   void (*delete_sel)(WBChildFrame *);                       ///< delete selection only \details deletes the current selection, but has no effect if there is no selection.  To delete a character, see 'del()'
   void (*select_all)(WBChildFrame *);                       ///< select all \details implements the 'select all' functionality
   void (*select_none)(WBChildFrame *);                      ///< select none \details implements the 'select none' functionality
-  void (*save)(WBChildFrame *, const char *szFileName);     ///< save to specified file name \details A value of 'NULL' will keep same file name.  If the file name is also NULL (or blank), nothing will be saved.
+
+  int (*has_changed)(WBChildFrame *);                       ///< returns > 0 if changed since last save, 0 if no change, < 0 on error
+  int (*save)(WBChildFrame *, const char *szFileName);      ///< save to specified file name - returns 0 on success. \details A value of 'NULL' will keep same file name.  If the file name is also NULL (or blank), nothing will be saved.
 
   WB_PCSTR (* get_file_name)(WBChildFrame *);               ///< get a (const) pointer to the file name string \details Use this function to find out what the currently assigned file name is.  The returned pointer is NOT persistent across function calls.  If you need a copy, use SBCopyString() or similar
 
@@ -794,6 +811,19 @@ extern const Atom aTAB_MESSAGE;  // command sent by Client Message related to ta
 WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *szMenuResource,
                                    int iX, int iY, int iWidth, int iHeight,
                                    WBWinEvent pUserCallback, int iFlags);
+
+/** \ingroup frame_window
+  * \brief Register a Context Help callback function for a frame window
+  *
+  * \param pFrame A pouinter to the WBFrameWindow structure
+  * \param pContextHelpCallback A pointer to the callback function that displays context-based help using the passed-in (text) parameter.  May be NULL.
+  *
+  * Registers a callback function with the frame window to handle context-sensitive help.
+  *
+  * Header File:  frame_window.h
+**/
+void FWRegisterFrameWindowContextHelp(WBFrameWindow *pFrame, void (*pContextHelpCallback)(const char *));
+
 
 /** \ingroup frame_window
   * \brief Force a frame window to recalculate its layout, which may involve resizing multiple contained windows

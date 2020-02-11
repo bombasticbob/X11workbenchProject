@@ -660,12 +660,23 @@ int iTab, iLineEnd;
 
 int DoFileSave(WBChildFrame *pCF)
 {
-WBEditWindow *pEditWindow;
+//WBEditWindow *pEditWindow;
+int iRval;
 
-  if(!pCF)
+  if(!pCF || !pCF->pUI || !pCF->pUI->save)
+  {
+    DLGMessageBox(MessageBox_OK | MessageBox_Error, None,
+                  "File Save As", "'File Save As' - no 'save-able' child frame");
     return -1;
+  }
 
-  // TODO:  be more generic about whether it's an 'Edit WIndow' or not
+  WBBeginWaitCursor(pCF->wID);
+
+  iRval = pCF->pUI->save(pCF, NULL);
+
+  WBEndWaitCursor(pCF->wID);
+
+#if 0
 
   pEditWindow = WBEditWindowFromWindowID(pCF->wID);
 
@@ -678,20 +689,40 @@ WBEditWindow *pEditWindow;
   }
 
   return WBEditWindowSaveFile(pEditWindow, NULL);
+#endif // 0
+
+  if(iRval)
+  {
+    char tbuf[256];
+
+    snprintf(tbuf, sizeof(tbuf), "'File Save As' - WBChildWindow::save() returned %d", iRval);
+
+    DLGMessageBox(MessageBox_OK | MessageBox_Error, None,
+                  "File Save", tbuf);
+  }
+
+  return iRval;
 }
 
 int DoFileSaveAs(WBChildFrame *pCF, const char *szFileName)
 {
-WBEditWindow *pEditWindow;
 int iRval;
+//WBEditWindow *pEditWindow;
 
-  if(!pCF)
+  if(!pCF || !pCF->pUI || !pCF->pUI->save)
   {
     DLGMessageBox(MessageBox_OK | MessageBox_Error, None,
-                  "File Save As", "'File Save As' - no child frame");
+                  "File Save As", "'File Save As' - no 'save-able' child frame");
     return -1;
   }
 
+  WBBeginWaitCursor(pCF->wID);
+
+  iRval = pCF->pUI->save(pCF, szFileName);
+
+  WBEndWaitCursor(pCF->wID);
+
+#if 0
   // TODO:  be more generic about whether it's an 'Edit WIndow' or not
 
   pEditWindow = WBEditWindowFromWindowID(pCF->wID);
@@ -708,12 +739,13 @@ int iRval;
   iRval = WBEditWindowSaveFile(pEditWindow, szFileName);
 
   WBEndWaitCursor(pCF->wID);
+#endif // 0
 
   if(iRval)
   {
     char tbuf[256];
 
-    snprintf(tbuf, sizeof(tbuf), "'File Save As' - WBEditWindowSaveFile() returned %d", iRval);
+    snprintf(tbuf, sizeof(tbuf), "'File Save As' - WBChildWindow::save() returned %d", iRval);
 
     DLGMessageBox(MessageBox_OK | MessageBox_Error, None,
                   "File Save As", tbuf);

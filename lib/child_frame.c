@@ -314,7 +314,7 @@ int iRval = -1;
   // FINALLY, inform the frame window, which will set up some other stuff for me
 
   pChildFrame->pOwner = pOwner;
-  iRval = FWAddContainedWindow(pOwner, pChildFrame); // TODO:  make THIS assign the owner pointer?
+  iRval = FWAddContainedWindow(pOwner, pChildFrame);
 
   if(iRval < 0) // error? (returns negative on error, otherwise the tab index)
   {
@@ -325,6 +325,219 @@ int iRval = -1;
 
   return iRval;
 }
+
+int FWInitChildFrame2(WBChildFrame *pChildFrame, WBChildFrame *pOwner, WB_FONTC pFont,
+                      const char *szFocusMenu, const WBFWMenuHandler *pHandlerArray,
+                      WBWinEvent pUserCallback, int fFlags)
+{
+WBChildFrame *pC;
+XSetWindowAttributes xswa;  /* Temporary Set Window Attribute struct */
+Display *pDisplay = WBGetDefaultDisplay();
+int iRval = -1;
+
+
+  if(!pChildFrame || !pOwner || pOwner->wID == None || !pOwner->pOwner)
+  {
+    // TODO:  validate 'pOwner' as a valid WBChildFrame ??
+
+    WB_ERROR_PRINT("%s - invalid pointers or owner window does not exist\n", __FUNCTION__);
+
+    return -1;
+  }
+
+  // zero out entire structure beforehand
+  bzero(pChildFrame, sizeof(*pChildFrame));
+
+
+  // FIRST, attach the child frame to my list o' child frames, making sure
+  // that it is not already there [if it is assume this was called twice]
+  // while I'm at it, zero out the structure BEFORE I assign 'pNext'
+
+  if(!pChildFrames)
+  {
+    pChildFrames = pChildFrame;
+    pChildFrame->pNext = NULL; // make sure
+  }
+  else
+  {
+    pC = pChildFrames;
+
+    while(pC->pNext)
+    {
+      if(pC == pChildFrame) // just in case
+      {
+        WB_ERROR_PRINT("%s - unexpected error condition, did you call this function before?\n", __FUNCTION__);
+
+        return -2;
+      }
+
+      pC = pC->pNext;
+    }
+
+    if(pC)
+    {
+      // zero out entire structure beforehand
+      bzero(pChildFrame, sizeof(*pChildFrame));
+
+      pC->pNext = pChildFrame;
+      pChildFrame->pNext = NULL;
+    }
+    else
+    {
+      // internal error, flag it for now and return "fail"
+      WB_ERROR_PRINT("%s - unexpected condition, returning error\n", __FUNCTION__);
+
+      return -3;
+    }
+  }
+
+  // initialize scroll info
+  WBInitScrollInfo(&(pChildFrame->scroll)); // re-initialize (TODO:  must I do this every time?)
+
+#if 0
+  // if the owner is valid, but NOT tabbed, and it already has
+  // a WBChildFrame, then I fail to create this one.
+
+  if((WBFrameWindow_NO_TABS & pOwner->iFlags)) // window has NO tabs
+  {
+    if(FWGetNumContWindows(pOwner)) // error *OR* > 0, doesn't matter, can ONLY have one tab in the frame
+    {
+      FWDestroyChildFrame(pChildFrame); // this unhooks everything (alloc'd things are zero'd by bzero)
+
+      return -4; // can't create, SDI
+    }
+  }
+#endif // 0
+
+  // NEXT, set up all of the various 'things' in the structure that are simple assignments
+  pChildFrame->ulTag = CHILD_FRAME_TAG;
+  pChildFrame->destructor = NULL; // make sure
+
+  if(!pFont)
+  {
+    pFont = FWGetFont(pOwner);    // make copy of owning frame's font
+
+    if(!pFont)
+      pFont = WBGetDefaultFont(); // make copy of default font
+  }
+
+  pChildFrame->pFont = WBCopyFont(pDisplay, pFont);
+
+  if(!pChildFrame->pFont)
+  {
+    FWDestroyChildFrame(pChildFrame); // this unhooks everything (alloc'd things are zero'd by bzero)
+
+    return -5; // same as 'not enough memory' if I can't create a copy of the font
+  }
+
+  if(szFocusMenu)
+  {
+    pChildFrame->pszMenuResource = WBCopyString(szFocusMenu);
+
+    if(!pChildFrame->pszMenuResource)
+    {
+      FWDestroyChildFrame(pChildFrame); // this unhooks everything (alloc'd things are zero'd by bzero)
+      return -5; // not enough memory
+    }
+  }
+  else
+  {
+    pChildFrame->pszMenuResource = NULL;
+  }
+
+  pChildFrame->iContextMenuID = -1; // default; use
+
+  if(pHandlerArray)
+  {
+    const WBFWMenuHandler *pH;
+    int iN;
+
+    // count the number of entries in the menu handler
+    for(iN=0, pH = pHandlerArray; pH->lMenuID || pH->callback || pH->UIcallback; iN++, pH++)
+    {
+      // NOTHING inside the loop.  just count.
+    }
+
+    // allocate space and make a copy
+
+    pChildFrame->pMenuHandler = (WBFWMenuHandler *)WBAlloc(sizeof(WBFWMenuHandler)
+                                                           * (iN + 1
+                                                              + sizeof(aChildFrameMenuHandler)
+                                                                / sizeof(aChildFrameMenuHandler[0])
+                                                              )
+                                                           );
+
+    if(pChildFrame->pMenuHandler)
+    {
+      if(iN > 0)
+      {
+        memcpy(pChildFrame->pMenuHandler, pHandlerArray,
+               sizeof(WBFWMenuHandler) * iN);
+      }
+
+      memcpy(pChildFrame->pMenuHandler + iN,
+             aChildFrameMenuHandler,
+             sizeof(aChildFrameMenuHandler)); // this includes the NULL entry at the end
+    }
+    else
+    {
+      FWDestroyChildFrame(pChildFrame); // this unhooks everything (alloc'd things are zero'd by bzero)
+      return -5; // not enough memory
+    }
+  }
+
+  // Next, I need to create the window via 'WBCreateWindow()'
+
+  bzero(&xswa, sizeof(xswa));
+
+  xswa.border_pixel = FWGetDefaultBD().pixel;
+  xswa.background_pixel = FWGetDefaultBG().pixel;  // typically a 'grey' color
+  xswa.colormap = DefaultColormap(pDisplay, DefaultScreen(pDisplay));
+  xswa.bit_gravity = CenterGravity;
+
+  pChildFrame->wID = WBCreateWindow(pDisplay, pOwner->wID, FWChildFrameEvent, "ChildFrame",
+                                    pOwner->geom.x + 1, pOwner->geom.y + 1,
+                                    pOwner->geom.width - 2, pOwner->geom.height - 2, // border is 1 pixel, so subtract 2
+                                    1, InputOutput,
+                                    CWBorderPixel | CWBackPixel | CWColormap | CWBitGravity,
+                                    &xswa);
+
+  if(pChildFrame->wID == None)
+  {
+    FWDestroyChildFrame(pChildFrame);
+    return -6; // could not create the window
+  }
+
+  // immediately identify this window's data struct using window data
+  WBSetWindowData(pChildFrame->wID, 0, (void *)pChildFrame); // window data is pointer to this struct
+  pChildFrame->pUserCallback = pUserCallback;
+
+
+  // create the default graphics context using the frame's color info
+  WBCreateWindowDefaultGC(pChildFrame->wID, FWGetDefaultFG().pixel, FWGetDefaultBG().pixel);
+
+  // now allow specific kinds of input messages.  I won't need 'structure notify' as they won't work
+  // anyway.  those end up going to the frame window, and it passes them (as needed) to me.
+  XSelectInput(pDisplay, pChildFrame->wID,
+               WB_STANDARD_INPUT_MASK | WB_MOUSE_INPUT_MASK | WB_KEYBOARD_INPUT_MASK);
+
+
+  // FINALLY, inform the frame window, which will set up some other stuff for me
+
+  pChildFrame->pOwner = pOwner->pOwner;
+  pChildFrame->pCHOwner = pOwner;
+  iRval = FWAddContainedWindow(pOwner->pOwner, pChildFrame);
+
+  if(iRval < 0) // error? (returns negative on error, otherwise the tab index)
+  {
+    FWDestroyChildFrame(pChildFrame); // this frees up all of the resources (but does not free the mem block)
+  }
+
+  // TODO:  other things
+
+  return iRval;
+}
+
 
 void FWDestroyChildFrame(WBChildFrame *pChildFrame)
 {
