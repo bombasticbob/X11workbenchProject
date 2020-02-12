@@ -124,12 +124,13 @@ static char szAppName[PATH_MAX * 2]="";
 //                                                                          //
 //////////////////////////////////////////////////////////////////////////////
 
-#if !defined(DOXYGEN) && defined(_MSC_VER)
+#if !defined(__DOXYGEN__) && defined(_MSC_VER)
 //#pragma comment(linker, "/alternatename:_main=___main__")
 //int __main__(int argc, char *argv0[], char *envp0[])
 int __declspec(selectany) main(int argc, char *argv0[], char *envp0[])
 #else // _MSC_VER
-int main(int argc, char *argv0[], char *envp0[]) __attribute__((weak)) __attribute__((section("text_main")))
+int main(int argc, char *argv0[], char *envp0[]) __attribute__((weak)) __attribute__((section("text_main")));
+int main(int argc, char *argv0[], char *envp0[])
 #endif // _MSC_VER
 {
 int iRval;
@@ -166,24 +167,26 @@ char **envp = envp0;
   return iRval;
 }
 
-#if !defined(DOXYGEN) && defined(_MSC_VER)
+#if !defined(__DOXYGEN__) && defined(_MSC_VER)
 //#pragma comment(linker, "/alternatename:_WBMain=___WBMain__")
 //int __WBMain__(int argc, char *argv0[], char *envp0[])
 int __declspec(selectany) __WBMain__(int argc, char *argv0[], char *envp0[])
 #else // _MSC_VER
-int WBMain(int argc, char *argv0[], char *envp0[]) __attribute__((weak)) __attribute__((section("text_wbmain")))
+int WBMain(int argc, char *argv0[], char *envp0[]) __attribute__((weak)) __attribute__((section("text_wbmain")));
+int WBMain(int argc, char *argv0[], char *envp0[])
 #endif // _MSC_VER
 {
   fputs("You need to define 'WBMain' in your code\n", stderr);
   return 1;
 }
 
-#if !defined(DOXYGEN) && defined(_MSC_VER)
+#if !defined(__DOXYGEN__) && defined(_MSC_VER)
 //#pragma comment(linker, "/alternatename:_WBUsage=___WBUsage__")
 //void __WBUsage__(void)
 void __declspec(selectany) WBUsage(void)
 #else // _MSC_VER
-void WBUsage(void) __attribute__((weak)) __attribute__((section("text_wbusage")))
+void WBUsage(void) __attribute__((weak)) __attribute__((section("text_wbusage")));
+void WBUsage(void)
 #endif // _MSC_VER
 {
   WBToolkitUsage(); // default just does this

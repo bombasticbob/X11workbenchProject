@@ -204,7 +204,7 @@ int iRval = -1;
 
   if(!pFont)
   {
-    pFont = FWGetFont(pOwner);    // make copy of owning frame's font
+    pFont = FWGetFont(pOwner);    // I'll make copy of owning frame's font (see below)
 
     if(!pFont)
       pFont = WBGetDefaultFont(); // make copy of default font
@@ -415,7 +415,7 @@ int iRval = -1;
 
   if(!pFont)
   {
-    pFont = FWGetFont(pOwner);    // make copy of owning frame's font
+    pFont = pOwner->pFont;        // I'll make copy of owning frame's font (see below)
 
     if(!pFont)
       pFont = WBGetDefaultFont(); // make copy of default font
