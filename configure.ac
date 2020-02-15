@@ -22,7 +22,7 @@ AM_PROG_CC_C_O
 
 # consider adding this for make -j support.  currently I do my own...
 # AX_AM_JOBSERVER([default_value])
-# see https://www.gnu.org/software/autoconf-archive/ax_am_jobserver.html 
+# see https://www.gnu.org/software/autoconf-archive/ax_am_jobserver.html
 # this will enable the '--enable-jobserver' configure parameter
 
 AC_PROG_RANLIB
@@ -205,6 +205,10 @@ AC_CHECK_FUNCS([strchr])
 AC_CHECK_FUNCS([strncasecmp])
 AC_CHECK_FUNCS([strrchr])
 AC_CHECK_FUNCS([strstr])
+
+# BSD and clang extensions that might require support for gcc, others
+AC_CHECK_FUNCS([strlcpy])
+AC_CHECK_FUNCS([strlcat])
 
 
 # This is where I check for the presence of libXpm - if the configure script uses the

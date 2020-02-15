@@ -1188,8 +1188,9 @@ void *WBAllocDirectoryList(const char *szDirSpec)
 {
 DIRLIST *pRval;
 char *p1, *p2;
-int iLen, nMaxLen;
+int iLen, nMaxLen, cbRval;
 char *pBuf;
+
 
   if(!szDirSpec || !*szDirSpec)
   {
@@ -1311,7 +1312,8 @@ char *pBuf;
     }
   }
 
-  pRval = WBAlloc(sizeof(DIRLIST) + iLen + strlen(p1) + 2);
+  cbRval = sizeof(DIRLIST) + iLen + strlen(p1) + 2;
+  pRval = WBAlloc(cbRval);
 
   if(pRval)
   {
@@ -1319,10 +1321,10 @@ char *pBuf;
     pRval->szNameSpec = p1;
 
     p2 = (char *)(pRval + 1);
-    strcpy(p2, pBuf);
+    strlcpy(p2, pBuf, cbRval - (p2  - (char *)pRval));
     p2 += strlen(p2);
     *(p2++) = '/';
-    strcpy(p2, p1);
+    strlcpy(p2, p1, cbRval - (p2 - (char *)pRval));
     p1 = (char *)(pRval + 1);
 
 #ifdef WIN32
@@ -1396,6 +1398,7 @@ struct dirent *pD;
 struct stat sF;
 #endif // WIN32
 char *p1, *pBuf;
+int cbBuf;
 //static char *p2; // temporary
 int iRval = 1;  // default 'EOF'
 DIRLIST *pDL = (DIRLIST *)pDirectoryList;
@@ -1407,14 +1410,15 @@ DIRLIST *pDL = (DIRLIST *)pDirectoryList;
   }
 
   // TODO:  improve this, maybe cache buffer or string length...
-  pBuf = WBAlloc(strlen(pDL->szPath) + 8 + NAME_MAX);
+  cbBuf = strlen(pDL->szPath) + 8 + NAME_MAX;
+  pBuf = WBAlloc(cbBuf);
 
   if(!pBuf)
   {
     return -2;
   }
 
-  strcpy(pBuf, pDL->szPath);
+  strlcpy(pBuf, pDL->szPath, cbBuf);
   p1 = pBuf + strlen(pBuf);
   if(p1 > pBuf && *(p1 - 1) != '/') // it does not already end in /
   {
@@ -1443,7 +1447,7 @@ DIRLIST *pDL = (DIRLIST *)pDirectoryList;
         continue;  // no '.' or '..'
       }
 
-      strcpy(p1, pD->d_name);
+      strlcpy(p1, pD->d_name, cbBuf - (p1 - pBuf));
 
       if(!lstat(pBuf, &sF)) // 'lstat' returns data about a file, and if it's a symlink, returns info about the link itself
       {
@@ -1458,7 +1462,7 @@ DIRLIST *pDL = (DIRLIST *)pDirectoryList;
 
           if(szNameReturn && cbNameReturn > 0)
           {
-            strncpy(szNameReturn, p1, cbNameReturn);
+            strlcpy(szNameReturn, p1, cbNameReturn);
           }
 
           break;
@@ -1491,6 +1495,7 @@ DIRLIST *pDL = (DIRLIST *)pDirectoryList;
 char *WBGetDirectoryListFileFullPath(const void *pDirectoryList, const char *szFileName)
 {
 char *pRval, *pBuf, *p1;
+int cbBuf;
 DIRLIST *pDL = (DIRLIST *)pDirectoryList;
 
   if(!pDirectoryList)
@@ -1509,16 +1514,18 @@ DIRLIST *pDL = (DIRLIST *)pDirectoryList;
   }
 
   // TODO:  improve this, maybe cache buffer or string length...
-  pBuf = (char *)WBAlloc(strlen(pDL->szPath) + 8 + (szFileName ? strlen(szFileName) : 0) + NAME_MAX);
+  cbBuf = strlen(pDL->szPath) + 8 + (szFileName ? strlen(szFileName) : 0) + NAME_MAX;
+  pBuf = (char *)WBAlloc(cbBuf);
 
   if(!pBuf)
   {
     return NULL;
   }
 
-  strcpy(pBuf, pDL->szPath);
+  strlcpy(pBuf, pDL->szPath, cbBuf);
   p1 = pBuf + strlen(pBuf);
-  if(p1 > pBuf && *(p1 - 1) != '/') // ends in a slash?
+  if(p1 > pBuf && p1 < (pBuf + (cbBuf - 1)) // no memory bounds problem
+     && *(p1 - 1) != '/') // ends in a slash?
   {
     *(p1++) = '/';  // for now assume this
     *p1 = 0;  // by convention (though probably not necessary)
@@ -1526,7 +1533,7 @@ DIRLIST *pDL = (DIRLIST *)pDirectoryList;
 
   if(szFileName)
   {
-    strcpy(p1, szFileName);
+    strlcpy(p1, szFileName, cbBuf - (p1 - pBuf));
   }
 
   pRval = WBGetCanonicalPath(pBuf);

@@ -177,7 +177,7 @@ int iCount=0;
       WB_WARN_PRINT("%s - WARNING:  WBFontNameFromAlias returns iCount > 1\n", __FUNCTION__);
     }
 
-    strncpy(szDest, ppNames[0], cbDest);
+    strlcpy(szDest, ppNames[0], cbDest);
   }
 
   XFreeFontInfo(ppNames, pFSInfo, iCount);
@@ -198,8 +198,8 @@ char *p1, /* *p2,*/ *p3;
     WBFontNameFromAlias(szFontName, tbuf, sizeof(tbuf));
     if(!*tbuf)
     {
-      strcpy(tbuf, "-*-");
-      strcat(tbuf, szFontName);
+      strlcpy(tbuf, "-*-", sizeof(tbuf));
+      strlcat(tbuf, szFontName, sizeof(tbuf));
     }
     szFontName = tbuf;
   }
@@ -218,6 +218,7 @@ char *p1, /* *p2,*/ *p3;
 
   bzero(pRval, sizeof(WB_FONT_INFO) + strlen(szFontName));
 
+  // I've already checked for room for szFontName, so strcpy is ok
   p1 = (char *)(pRval->data);
   strcpy(p1, szFontName + 1);  // copy everything past the leading '-'
 
@@ -437,7 +438,7 @@ static void InternalBuildFontString(const char *szFontName, int iSize, int iFlag
 
   if(!pFI)
   {
-    strncpy(pBuf, szFontName, cbBuf);
+    strlcpy(pBuf, szFontName, cbBuf);
     return;
   }
 
@@ -447,7 +448,7 @@ static void InternalBuildFontString(const char *szFontName, int iSize, int iFlag
   // build the string using 'pFI' and iFlags
 
 #define DO_FONT_BUILD_THING(X) if((p1 + 2) >= pEnd) return; *(p1++) = '-'; \
-  if(__string_valid_check(X)) { strncpy(p1, X, (pEnd - p1)); p1 += strlen(p1); } else *(p1++) = '*'; \
+  if(__string_valid_check(X)) { strlcpy(p1, X, (pEnd - p1)); p1 += strlen(p1); } else *(p1++) = '*'; \
   *p1 = 0; if((p1 + 1) >= pEnd) return
 
   DO_FONT_BUILD_THING(pFI->szFoundry);
@@ -457,19 +458,19 @@ static void InternalBuildFontString(const char *szFontName, int iSize, int iFlag
   switch(pFI->iWeight)
   {
     case 1:
-      strcpy(tbuf, "regular");
+      strlcpy(tbuf, "regular", sizeof(tbuf));
       break;
     case 2:
-      strcpy(tbuf, "medium");
+      strlcpy(tbuf, "medium", sizeof(tbuf));
       break;
     case 3:
-      strcpy(tbuf, "demibold");
+      strlcpy(tbuf, "demibold", sizeof(tbuf));
       break;
     case 4:
-      strcpy(tbuf, "bold");
+      strlcpy(tbuf, "bold", sizeof(tbuf));
       break;
     case -1:
-      strcpy(tbuf, "*");
+      strlcpy(tbuf, "*", sizeof(tbuf));
       break;
     default:
       *tbuf = 0;
@@ -478,20 +479,20 @@ static void InternalBuildFontString(const char *szFontName, int iSize, int iFlag
   switch(iFlags & WBFontFlag_WT_MASK)  // iFlags overrides
   {
     case WBFontFlag_WT_REGULAR:
-      strcpy(tbuf, "regular");
+      strlcpy(tbuf, "regular", sizeof(tbuf));
       break;
     case WBFontFlag_WT_MEDIUM:
-      strcpy(tbuf, "medium");
+      strlcpy(tbuf, "medium", sizeof(tbuf));
       break;
     case WBFontFlag_WT_DEMIBOLD:
-      strcpy(tbuf, "demibold");
+      strlcpy(tbuf, "demibold", sizeof(tbuf));
       break;
     case WBFontFlag_WT_BOLD:
-      strcpy(tbuf, "bold");
+      strlcpy(tbuf, "bold", sizeof(tbuf));
       break;
     case WBFontFlag_WT_ANY:
       if(bForceWildcard || !*tbuf)
-        strcpy(tbuf, "*");
+        strlcpy(tbuf, "*", sizeof(tbuf));
       break;
   }
 
@@ -501,16 +502,16 @@ static void InternalBuildFontString(const char *szFontName, int iSize, int iFlag
   switch(pFI->iSlant)
   {
     case 1:
-      strcpy(tbuf, "r");
+      strlcpy(tbuf, "r", sizeof(tbuf));
       break;
     case 2:
-      strcpy(tbuf, "o");
+      strlcpy(tbuf, "o", sizeof(tbuf));
       break;
     case 3:
-      strcpy(tbuf, "i");
+      strlcpy(tbuf, "i", sizeof(tbuf));
       break;
     case -1:
-      strcpy(tbuf, "*");
+      strlcpy(tbuf, "*", sizeof(tbuf));
       break;
     default:
       *tbuf = 0;
@@ -519,17 +520,17 @@ static void InternalBuildFontString(const char *szFontName, int iSize, int iFlag
   switch(iFlags & WBFontFlag_SLANT_MASK)  // iFlags overrides
   {
     case WBFontFlag_SLANT_REGULAR:
-      strcpy(tbuf, "r");
+      strlcpy(tbuf, "r", sizeof(tbuf));
       break;
     case WBFontFlag_SLANT_OBLIQUE:
-      strcpy(tbuf, "o");
+      strlcpy(tbuf, "o", sizeof(tbuf));
       break;
     case WBFontFlag_SLANT_ITALIC:
-      strcpy(tbuf, "i");
+      strlcpy(tbuf, "i", sizeof(tbuf));
       break;
     case WBFontFlag_SLANT_ANY:
       if(bForceWildcard || !*tbuf)
-        strcpy(tbuf, "*");
+        strlcpy(tbuf, "*", sizeof(tbuf));
       break;
   }
 
@@ -539,16 +540,16 @@ static void InternalBuildFontString(const char *szFontName, int iSize, int iFlag
   switch(pFI->iWidth)
   {
     case 1:
-      strcpy(tbuf, "normal");
+      strlcpy(tbuf, "normal", sizeof(tbuf));
       break;
     case 2:
-      strcpy(tbuf, "semicondensed");
+      strlcpy(tbuf, "semicondensed", sizeof(tbuf));
       break;
-    case 3:                        // RESERVED (may not matter)
-      strcpy(tbuf, "condensed");  // for now I have it here anyway
+    case 3:                                      // RESERVED (may not matter)
+      strlcpy(tbuf, "condensed", sizeof(tbuf));  // for now I have it here anyway
       break;
     case -1:
-      strcpy(tbuf, "*");
+      strlcpy(tbuf, "*", sizeof(tbuf));
       break;
     default:
       *tbuf = 0;
@@ -557,33 +558,33 @@ static void InternalBuildFontString(const char *szFontName, int iSize, int iFlag
   switch(iFlags & WBFontFlag_WIDTH_MASK)
   {
     case WBFontFlag_WIDTH_NORMAL:
-      strcpy(tbuf, "normal");
+      strlcpy(tbuf, "normal", sizeof(tbuf));
       break;
     case WBFontFlag_WIDTH_SEMICOND:
-      strcpy(tbuf, "semicondensed");
+      strlcpy(tbuf, "semicondensed", sizeof(tbuf));
       break;
     case WBFontFlag_WIDTH_ANY:
       if(bForceWildcard || !*tbuf)
-        strcpy(tbuf, "*");
+        strlcpy(tbuf, "*", sizeof(tbuf));
       break;
   }
 
   DO_FONT_BUILD_THING(tbuf);  // commit what I just did
 
-  strncpy(tbuf, pFI->szAdStyle, sizeof(tbuf));
+  strlcpy(tbuf, pFI->szAdStyle, sizeof(tbuf));
 
   // if I'm insisting on serif then this must be blank
   switch(iFlags & WBFontFlag_STYLE_MASK)
   {
     case WBFontFlag_STYLE_SANS:
-      strcpy(tbuf, "sans");
+      strlcpy(tbuf, "sans", sizeof(tbuf));
       break;
     case WBFontFlag_STYLE_SERIF:
       *tbuf = 0;
       break;
     case WBFontFlag_STYLE_ANY:
       if(bForceWildcard)
-        strcpy(tbuf, "*");
+        strlcpy(tbuf, "*", sizeof(tbuf));
       break;
   }
 
@@ -597,27 +598,27 @@ static void InternalBuildFontString(const char *szFontName, int iSize, int iFlag
   if((iFlags & WBFontFlag_SIZE_MASK) == WBFontFlag_SIZE_PIXELS)
   {
     if(pFI->iPixelSize > 0 && iSize < 0 && !bForceWildcard)
-      sprintf(tbuf, "%d", pFI->iPixelSize);
+      snprintf(tbuf, sizeof(tbuf), "%d", pFI->iPixelSize);
     else if(iSize > 0)
     {
       if(pFI->iPixelSize != iSize)
         iAvgWidth = -1;  // force this to be a wildcard
-      sprintf(tbuf, "%d", iSize);
+      snprintf(tbuf, sizeof(tbuf), "%d", iSize);
     }
     else
-      strcpy(tbuf, "*");
+      strlcpy(tbuf, "*", sizeof(tbuf));
 
     DO_FONT_BUILD_THING(tbuf);
 
     if(pFI->iPointSize > 0 && !bForceWildcard)
     {
       if(iSize <= 0 || iSize == pFI->iPixelSize)
-        sprintf(tbuf, "%d", pFI->iPointSize);
+        snprintf(tbuf, sizeof(tbuf), "%d", pFI->iPointSize);
       else
-        sprintf(tbuf, "%d", ((pFI->iPointSize * 2 * iSize / pFI->iPixelSize) + 1) / 2);
+        snprintf(tbuf, sizeof(tbuf), "%d", ((pFI->iPointSize * 2 * iSize / pFI->iPixelSize) + 1) / 2);
     }
     else
-      strcpy(tbuf, "*");
+      strlcpy(tbuf, "*", sizeof(tbuf));
 
     DO_FONT_BUILD_THING(tbuf);
   }
@@ -632,76 +633,76 @@ static void InternalBuildFontString(const char *szFontName, int iSize, int iFlag
          ((iFlags & WBFontFlag_SIZE_MASK) == WBFontFlag_SIZE_TWIPS
           && iSize / 2 == pFI->iPointSize))
       {
-        sprintf(tbuf, "%d", pFI->iPixelSize);
+        snprintf(tbuf, sizeof(tbuf), "%d", pFI->iPixelSize);
       }
       else if(!iSize)
       {
-        strcpy(tbuf, "*");
+        strlcpy(tbuf, "*", sizeof(tbuf));
       }
       else if((iFlags & WBFontFlag_SIZE_MASK) == WBFontFlag_SIZE_POINTS)
       {
-        sprintf(tbuf, "%d", ((pFI->iPixelSize * 20 * iSize / pFI->iPointSize) + 1) / 2);
+        snprintf(tbuf, sizeof(tbuf), "%d", ((pFI->iPixelSize * 20 * iSize / pFI->iPointSize) + 1) / 2);
       }
       else
       {
-        sprintf(tbuf, "%d", ((pFI->iPixelSize * iSize / pFI->iPointSize) + 1) / 2);
+        snprintf(tbuf, sizeof(tbuf), "%d", ((pFI->iPixelSize * iSize / pFI->iPointSize) + 1) / 2);
       }
     }
     else
-      strcpy(tbuf, "*");
+      strlcpy(tbuf, "*", sizeof(tbuf));
 
     DO_FONT_BUILD_THING(tbuf);
 
     if(pFI->iPointSize > 0 && iSize < 0 && !bForceWildcard)
-      sprintf(tbuf, "%d", pFI->iPointSize);
+      snprintf(tbuf, sizeof(tbuf), "%d", pFI->iPointSize);
     else if(iSize > 0)
     {
       if((iFlags & WBFontFlag_SIZE_MASK) == WBFontFlag_SIZE_POINTS)
       {
-        sprintf(tbuf, "%d", iSize * 10);
+        snprintf(tbuf, sizeof(tbuf), "%d", iSize * 10);
         if(pFI->iPointSize != iSize * 10)
           iAvgWidth = -1;  // force this to be a wildcard
       }
       else
       {
-        sprintf(tbuf, "%d", iSize / 2);
+        snprintf(tbuf, sizeof(tbuf), "%d", iSize / 2);
         if(pFI->iPointSize != iSize / 2)
           iAvgWidth = -1;  // force this to be a wildcard
       }
     }
     else
-      strcpy(tbuf, "*");
+      strlcpy(tbuf, "*", sizeof(tbuf));
 
     DO_FONT_BUILD_THING(tbuf);
   }
   else // a 'just in case' catchall
   {
     if(pFI->iPixelSize > 0 && !bForceWildcard)
-      sprintf(tbuf, "%d", pFI->iPixelSize);
+      snprintf(tbuf, sizeof(tbuf), "%d", pFI->iPixelSize);
     else
-      strcpy(tbuf, "*");
+      strlcpy(tbuf, "*", sizeof(tbuf));
 
     DO_FONT_BUILD_THING(tbuf);
 
     if(pFI->iPointSize > 0 && !bForceWildcard)
       sprintf(tbuf, "%d", pFI->iPointSize);
     else
-      strcpy(tbuf, "*");
+      strlcpy(tbuf, "*", sizeof(tbuf));
 
     DO_FONT_BUILD_THING(tbuf);
   }
 
   if(!bForceWildcard && pFI->iResX > 0)  // for now wildcard applies to resX
-    sprintf(tbuf, "%d", pFI->iResX);
+    snprintf(tbuf, sizeof(tbuf), "%d", pFI->iResX);
   else
-    strcpy(tbuf, "*");
+    strlcpy(tbuf, "*", sizeof(tbuf));
 
   DO_FONT_BUILD_THING(tbuf);
 
   if(!bForceWildcard && pFI->iResY > 0)  // for now wildcard applies to resY
-    sprintf(tbuf, "%d", pFI->iResY);
+    snprintf(tbuf, sizeof(tbuf), "%d", pFI->iResY);
   else
-    strcpy(tbuf, "*");
+    strlcpy(tbuf, "*", sizeof(tbuf));
 
   DO_FONT_BUILD_THING(tbuf);
 
@@ -709,33 +710,33 @@ static void InternalBuildFontString(const char *szFontName, int iSize, int iFlag
   switch(pFI->iSpacing)
   {
     case 1:
-      strcpy(tbuf, "c");
+      strlcpy(tbuf, "c", sizeof(tbuf));
       break;
     case 2:
-      strcpy(tbuf, "m");
+      strlcpy(tbuf, "m", sizeof(tbuf));
       break;
     case 7:
-      strcpy(tbuf, "p");
+      strlcpy(tbuf, "p", sizeof(tbuf));
       break;
     case -1:
-      strcpy(tbuf, "*");
+      strlcpy(tbuf, "*", sizeof(tbuf));
       break;
   }
 
   switch(iFlags & WBFontFlag_PITCH_MASK)
   {
     case WBFontFlag_PITCH_FIXED:
-      strcpy(tbuf, "m");
+      strlcpy(tbuf, "m", sizeof(tbuf));
       break;
     case WBFontFlag_PITCH_CONDENSED:
-      strcpy(tbuf, "c");
+      strlcpy(tbuf, "c", sizeof(tbuf));
       break;
     case WBFontFlag_PITCH_VARIABLE:
-      strcpy(tbuf, "p");
+      strlcpy(tbuf, "p", sizeof(tbuf));
       break;
     case WBFontFlag_PITCH_ANY:
       if(!*tbuf || bForceWildcard)
-        strcpy(tbuf, "*");
+        strlcpy(tbuf, "*", sizeof(tbuf));
       break;
   }
 
@@ -743,27 +744,27 @@ static void InternalBuildFontString(const char *szFontName, int iSize, int iFlag
 
   // average width (with forced wildcard, ALWAYS make it a wildcard; else actual value)
   if(bForceWildcard || iAvgWidth <= 0) // cached from above
-    strcpy(tbuf, "*");
+    strlcpy(tbuf, "*", sizeof(tbuf));
   else
-    sprintf(tbuf, "%d", pFI->iAvgWidth);
+    snprintf(tbuf, sizeof(tbuf), "%d", pFI->iAvgWidth);
 
   DO_FONT_BUILD_THING(tbuf);
 
   // registry + encoding
 
   if(!bForceWildcard || pFI->szRegistry[0]) // wildcard for a blank implies '*'
-    strcpy(tbuf, pFI->szRegistry);
+    strlcpy(tbuf, pFI->szRegistry, sizeof(tbuf));
   else
-    strcpy(tbuf, "*");
+    strlcpy(tbuf, "*", sizeof(tbuf));
 
   // TODO:  the effect of 'iFlags' on these two
 
   DO_FONT_BUILD_THING(tbuf);
 
   if(!bForceWildcard || pFI->szEncoding[0]) // wildcard for a blank implies '*'
-    strcpy(tbuf, pFI->szEncoding);
+    strlcpy(tbuf, pFI->szEncoding, sizeof(tbuf));
   else
-    strcpy(tbuf, "*");
+    strlcpy(tbuf, "*", sizeof(tbuf));
 
   DO_FONT_BUILD_THING(tbuf);
 }
@@ -824,15 +825,15 @@ char tbuf[512], tbuf2[512], tbuf3[512];
 
     if(!*tbuf)
     {
-      strcpy(tbuf, "-*-");
-      strncpy(tbuf + 3, szFontName, sizeof(tbuf) - 3);
+      strlcpy(tbuf, "-*-", sizeof(tbuf));
+      strlcpy(tbuf + 3, szFontName, sizeof(tbuf) - 3);
     }
   }
   else
   {
 //    iWildcardFlag = 1;  // additional information (TODO:  use this?)
 
-    strncpy(tbuf, szFontName, sizeof(tbuf));
+    strlcpy(tbuf, szFontName, sizeof(tbuf));
   }
 
   // at this point 'tbuf' is assumed to be a properly formatted font string
@@ -843,7 +844,7 @@ char tbuf[512], tbuf2[512], tbuf3[512];
   }
   else
   {
-    strncpy(tbuf2, tbuf, sizeof(tbuf2));
+    strlcpy(tbuf2, tbuf, sizeof(tbuf2));
   }
 
   ppNames = XListFontsWithInfo(pDisplay, tbuf2, 2, &iCount, &pFSInfo);
@@ -1456,7 +1457,7 @@ char tbuf[512];
   }
   else
   {
-    strncpy(tbuf, pName, sizeof(tbuf));
+    strlcpy(tbuf, pName, sizeof(tbuf));
   }
 
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Font,
@@ -1557,7 +1558,7 @@ XFontStruct *pFSInfo;
           *(p1++) = ','; // comma-separated font name list
         }
 
-        strcpy(p1, ppNames[i1]);
+        strcpy(p1, ppNames[i1]); // safe to use strcpy, I checked size earlier
         p1 += strlen(p1);
       }
     }
@@ -1656,14 +1657,6 @@ static const char szISO[]="-ISO8859-";
   // ( TODO:  check for other language-dependent things, or maybe just do the last 2 '-'s ? )
 
 
-//  // if the starting string is "-Misc-", change to "-*-" to allow ALL
-//
-//  if(!strncasecmp(pName, "-Misc-", 6))
-//  {
-//    strcpy(pName, "-*-");
-//    strcpy(pName + 3, pName + 6);
-//  }
-
   p1 = pName + strlen(pName) - sizeof(szISO);
 
   while(p1 > pName && strncasecmp(p1, szISO, sizeof(szISO)-1)) // note must be case INsensitive compare...
@@ -1673,32 +1666,19 @@ static const char szISO[]="-ISO8859-";
 
   if(p1 > pName) // found
   {
+    // strcpy usage ok, checked size already, left room for editing things
     strcpy(p1, "-*-*"); // this allows all of the code sets to be included (fastest method)
   }
 
-//#ifndef NO_DEBUG
-//  ullTemp = WBGetTimeIndex();
-//#endif // NO_DEBUG
-
   pLocale = InternalCheckSetLocale();
-
-//#ifndef NO_DEBUG
-//  WB_ERROR_PRINT("TEMPORARY:  %s - setlocale took %ld micros\n", __FUNCTION__, (long)(WBGetTimeIndex() - ullTemp));
-//  ullTemp = WBGetTimeIndex();
-//#endif // NO_DEBUG
 
   // NOTE:  'pDef' is owned by the font set.  do NOT XFree it or modify its contents
 
   rVal = XCreateFontSet(pDisplay, pName, &ppMissing, &nMissing, &pDef); // 6-7 milliseconds!!!
 
-//#ifndef NO_DEBUG
-//  WB_ERROR_PRINT("TEMPORARY:  %s - XCreateFontSet took %ld micros\n", __FUNCTION__, (long)(WBGetTimeIndex() - ullTemp));
-//  ullTemp = WBGetTimeIndex();
-//#endif // NO_DEBUG
-
   if(pLocale)
   {
-//    WB_ERROR_PRINT("TEMPORARY:  %s - setting locale back to \"%s\"\n", __FUNCTION__, pLocale);
+//    WB_TEMPORARY_PRINT("setting locale back to \"%s\"\n", pLocale);
 
     setlocale(LC_CTYPE, pLocale);
 
@@ -1718,14 +1698,14 @@ static const char szISO[]="-ISO8859-";
   {
     if(ppMissing)
     {
-  //    int i1;
-  //
-  //    WB_ERROR_PRINT("TEMPORARY:  %s\n", __FUNCTION__);
-  //
-  //    for(i1=0; i1 < nMissing; i1++)
-  //    {
-  //      WB_ERROR_PRINT("  %d : %s\n", i1, ppMissing[i1]);
-  //    }
+//      int i1;
+//
+//      WB_ERROR_PRINT("TEMPORARY:  %s\n", __FUNCTION__);
+//
+//      for(i1=0; i1 < nMissing; i1++)
+//      {
+//        WB_ERROR_PRINT("  %d : %s\n", i1, ppMissing[i1]);
+//      }
 
       XFreeStringList(ppMissing);
     }
@@ -2218,19 +2198,19 @@ char temp[1024];
 
   if(!szFontName || !*szFontName)
   {
-    strcpy(temp, "*");
+    strlcpy(temp, "*", sizeof(temp));
   }
   else if(szFontName[0] != '-')
   {
-    strcpy(temp, "*-");
-    strcat(temp, szFontName);
-    strcat(temp, "-*");
+    strlcpy(temp, "*-", sizeof(temp));
+    strlcat(temp, szFontName, sizeof(temp));
+    strlcat(temp, "-*", sizeof(temp));
   }
   else
   {
-    strcpy(temp, "*");
-    strcat(temp, szFontName);
-    strcat(temp, "*");
+    strlcpy(temp, "*", sizeof(temp));
+    strlcat(temp, szFontName, sizeof(temp));
+    strlcat(temp, "*", sizeof(temp));
   }
 
   if(szFontName && *szFontName)
@@ -2283,7 +2263,7 @@ char temp[1024];
 
         if(pName)
         {
-          strncpy(temp, pName, sizeof(temp));
+          strlcpy(temp, pName, sizeof(temp));
           WBFree(pName);
         }
         else

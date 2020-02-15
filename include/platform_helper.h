@@ -921,11 +921,74 @@ void WBSubAllocTrashMasher(void);
 
 // simple but helpful string utilities
 
+#if defined(__DOXYGEN__) || !defined(HAVE_STRLCPY)
+/** \ingroup text
+  * \brief 'Safe' version of strncpy()
+  *
+  * \param dst The destination pointer for the output string
+  * \param src The source pointer for the string to copy
+  * \param dstsize The buffer size for the destination, including the terminating '0' pointer.
+  *
+  * \return The total number of bytes copied to the destination
+  *
+  * Use this function in a platform-independent way in lieu of \ref strncpy() or \ref strcpy()
+  *
+  * When this function is implemented by the C library of the target system, the C library version
+  * will be used.  Otherwise, an internal implementation will be used.
+**/
+size_t strlcpy(char * dst, const char * src, size_t dstsize);
+#endif // defined(__DOXYGEN__) || !defined(HAVE_STRLCPY)
+
+#if defined(__DOXYGEN__) || !defined(HAVE_STRLCAT)
+/** \ingroup text
+  * \brief 'Safe' version of strncat()
+  *
+  * \param dst The destination pointer for the output string
+  * \param src The source pointer for the string to concatenate
+  * \param dstsize The buffer size for the destination, including the terminating '0' pointer.
+  *
+  * \return The total number of bytes copied to the destination
+  *
+  * Use this function in a platform-independent way in lieu of \ref strncat() or \ref strcat()
+  *
+  * When this function is implemented by the C library of the target system, the C library version
+  * will be used.  Otherwise, an internal implementation will be used.
+**/
+size_t strlcat(char * dst, const char * src, size_t dstsize);
+#endif // defined(__DOXYGEN__) || !defined(HAVE_STRLCAT)
+
+
+/** \ingroup text
+  * \brief A simple utility that returns a WBAlloc() formatted string, similar to sprintf()
+  *
+  * \param pFmt A pointer to a 'printf' compatible format string
+  *
+  * Additional parameters are those required by the format string
+  *
+  * \return a 'WBAlloc()'d formatted output string (0-byte terminated).  You must use WBFree() on any non-NULL returned value to free the allocated memory.
+  *
+  * This function creates a 'WBAlloc() copy of szStr, up to the 0-byte.  The returned string
+  * ALWAYS ends in a zero byte.  The caller must deallocate the returned pointer using 'WBFree()'.\n
+  * The function returns NULL on error.
+  *
+  * NOTE:  this function is compatible with UTF-8 and mbcs in general; however, it does not
+  *        test any characters for validity.  The terminating 0 byte and the use of '%'
+  *        within the format string should allow this functino to perform correctly with
+  *        respect to UTF-8 characters as well as standard ASCII.
+  *
+  * Header File:  platform_helper.h
+**/
+#ifdef __GNUC__
+char *WBFormatString(const char *pFmt, ...) __attribute__ ((format(printf, 1, 2)));
+#else // __GNUC__
+char *WBFormatString(const char *pFmt, ...);
+#endif // __GNUC__
+
 /** \ingroup text
   * \brief A simple utility that returns a WBAlloc() copy of a 0-byte terminated string
   *
   * \param pSrc A pointer to the original ASCII string (0-byte terminated)
-  * \return a 'WBAlloc() copy of the string (0-byte terminated)
+  * \return a 'WBAlloc() copy of the string (0-byte terminated).  You must use WBFree() on any non-NULL returned value to free the allocated memory.
   *
   * This function creates a 'WBAlloc() copy of szStr, up to the 0-byte.  The returned string
   * ALWAYS ends in a zero byte.  The caller must deallocate the returned pointer using 'WBFree()'.\n
@@ -938,9 +1001,9 @@ char *WBCopyString(const char *pSrc);
 /** \ingroup text
   * \brief A simple utility that returns a WBAlloc() copy of a string up to a maximum length (can also be 0-byte terminated)
   *
-  * \param pSrc A pointer to the original ASCII string (can be 0-byte terminated)
+  * \param pSrc A pointer to the original ASCII string (can be 0-byte terminated).
   * \param nMaxChars The maximum number of characters to be copied, or until a 0-byte is found
-  * \return a 'WBAlloc() copy of the string (0-byte terminated)
+  * \return a 'WBAlloc() copy of the string (0-byte terminated).  You must use WBFree() on any non-NULL returned value to free the allocated memory.
   *
   * This function creates a 'WBAlloc() copy of pStr, up to 'nMaxChars' or until a 0-byte is
   * found, whichever happens first.  The returned string ALWAYS ends in a zero byte.
@@ -954,8 +1017,10 @@ char *WBCopyStringN(const char *pSrc, unsigned int nMaxChars);
 /** \ingroup text
   * \brief A simple utility that concatenates a string onto the end of a 0-byte terminated WBAlloc() string
   *
-  * \param ppDest A pointer to a pointer to a WBAlloc() string containing the first portion of the concatenated result (also the return value)
+  * \param ppDest A pointer to a 'WBAlloc()'d pointer to a string containing the first portion of the concatenated result (also the return value).
   * \param pSrc A pointer to a character string to concatenate onto the end of the first string
+  *
+  * NOTE:  As with WBCopyString(), you must use WBFree() on any non-NULL returned value to free the allocated memory.
   *
   * This function concatenates two strings together.  The first parameter must point to the character pointer variable
   * that points to the first string to be concatenated.  This must either be a WBAlloc() pointer or NULL, and the string
@@ -971,9 +1036,11 @@ void WBCatString(char **ppDest, const char *pSrc);
 /** \ingroup text
   * \brief A simple utility that concatenates a string onto the end of a 0-byte terminated WBAlloc() string up to a maximum length (can also be 0-byte terminated)
   *
-  * \param ppDest A pointer to a pointer to a WBAlloc() string containing the first portion of the concatenated result (also the return value)
+  * \param ppDest A pointer to a 'WBAlloc()'d pointer to a string containing the first portion of the concatenated result (also the return value).
   * \param pSrc A pointer to a character string to concatenate onto the end of the first string (can be 0-byte terminated)
   * \param nMaxChars The maximum number of characters to be concatenated, or until a 0-byte is found in pSrc
+  *
+  * NOTE:  As with WBCopyString(), you must use WBFree() on any non-NULL returned value to free the allocated memory.
   *
   * This function concatenates two strings together.  The first parameter must point to the character pointer variable
   * that points to the first string to be concatenated.  This must either be a WBAlloc() pointer or NULL, and the string

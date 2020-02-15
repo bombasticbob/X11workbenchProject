@@ -82,7 +82,7 @@ static int iInitScrollColorFlag = 0;
 /** \hideinitializer
   * \brief macro to get a color name or use default if it does not exist in settings
 **/
-#define COPY_COLOR_NAME(X,Y,Z) {const char *pX = X(WBGetDefaultDisplay()); if(pX) strncpy(Y,pX,sizeof(Y)); else strncpy(Y,Z,sizeof(Y));}
+#define COPY_COLOR_NAME(X,Y,Z) {const char *pX = X(WBGetDefaultDisplay()); if(pX) strlcpy(Y,pX,sizeof(Y)); else strlcpy(Y,Z,sizeof(Y));}
 
 /** \brief internal utility to check and initialize scroll bar standard colors
 **/

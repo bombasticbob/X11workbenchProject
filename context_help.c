@@ -111,15 +111,15 @@ static char * InternalMan2Html(const char *szTerm, const char *szText);
 
 void DoContextSensitiveHelp(const char *szTerm)
 {
-char szDocFilePath[PATH_MAX * 2], szName[PATH_MAX];
+char szDocFilePath[PATH_MAX * 2], szName[PATH_MAX * 2];
 char *p1, *p2, *p3;//, *p5;
 const char *p4;
 void *pSettings, *pDirList;
-int i1;
+int i1, iDocPath = -1, cbPath;
 unsigned long dwAttr;
 FILE *pTemp;
 WB_FILE_HANDLE hProcess;
-static char szLineBuf[4096], szDoxyTag[PATH_MAX * 2 + 512], szHelpBrowser[PATH_MAX];
+static char szLineBuf[4096], szDoxyTag[PATH_MAX * 2 + 512], szHelpBrowser[PATH_MAX * 2];
 
 
   // step 1:  get 'docs' directory from settings, and if there isn't a setting for it,
@@ -132,17 +132,17 @@ static char szLineBuf[4096], szDoxyTag[PATH_MAX * 2 + 512], szHelpBrowser[PATH_M
 
   if(pSettings)
   {
+    iDocPath = CHGetConfFileString(pSettings, "paths","documentation",szDocFilePath, sizeof(szDocFilePath) - 2);
+
     if(0 >= CHGetConfFileString(pSettings, "paths", "browser", szHelpBrowser, sizeof(szHelpBrowser)))
     {
-      WB_ERROR_PRINT("ERROR did not find 'paths' 'browser', using default\n");
+      WB_WARN_PRINT("ERROR did not find 'paths' 'browser', using default\n");
       goto find_url_opener;
     }
 //    else
 //    {
 //      WB_ERROR_PRINT("TEMPORARY: %s - browser \"%s\"\n", __FUNCTION__, szHelpBrowser);
 //    }
-
-    i1 = CHGetConfFileString(pSettings, "paths","documentation",szDocFilePath, sizeof(szDocFilePath) - 2);
 
     CHCloseConfFile(pSettings);
     pSettings = NULL;
@@ -151,10 +151,14 @@ static char szLineBuf[4096], szDoxyTag[PATH_MAX * 2 + 512], szHelpBrowser[PATH_M
   {
 find_url_opener:
 
-    i1 = 0;
+    iDocPath = -1;
 
-    p1 = CHGetMimeDefaultApp("text/html");
     p2 = p3 = NULL;
+
+    // This function calls 'xdg-mime' with the parameters 'query' 'default' {mime-type}
+    // alternately could use "xdg-settings get default-web-browser" if it fails
+
+    p1 = CHGetMimeDefaultApp("x-scheme-handler/http"); // Mate and Gnome 3 use this one
 
     if(!p1 || *p1 <= ' ')
     {
@@ -163,7 +167,23 @@ find_url_opener:
         WBFree(p1);
       }
 
-      p1 = CHGetMimeDefaultApp("x-scheme-handler/http"); // Mate uses this one
+      p1 = CHGetMimeDefaultApp("text/html"); // as a fallback, try this (I think firefox assigns it)
+    }
+
+    if(!p1 || *p1 <= ' ') // no response for that one, either?
+    {
+      // there are two likely places to find desktop application
+      // files, /usr/share/application and /usr/local/share/application
+
+      // TODO:  as a fallback, ~/.local/share/applications/mimeapps.list contains a list of the
+      //        registered default applications for given mime types.
+      //        Additionally, there are .desktop files in the same directory and in
+      //        /usr/share/applications and /usr/local/share/applications that might
+      //        list a mime type.  If only one supports the mime type, use that???
+      //        see also:  CHGetDesktopFileInfo() which checks all of the possible
+      //        paths for a '.desktop' file
+      //
+      // see https://specifications.freedesktop.org/mime-apps-spec/mime-apps-spec-latest.html
     }
 
     if(p1 && *p1 > ' ')
@@ -175,12 +195,17 @@ find_url_opener:
         p1 = CHGetDesktopFileInfo(p2, "Exec");
         // NOTE:  the 'Exec' string will have a '%f' or '%u' or similar in it.  trim that.
 
+        WB_ERROR_PRINT("%s.%d - TEMPORARY - p1=\"%s\", p2=\"%s\"\n", __FUNCTION__, __LINE__, p1, p2);
+
         if(!p1)
         {
+          WB_ERROR_PRINT("%s - .desktop file does not have Exec entry\n", __FUNCTION__);
           p1 = p2; // restore original, hope it still works
         }
         else
         {
+          WB_ERROR_PRINT("%s.%d - TEMPORARY - p1=\"%s\", p2=\"%s\"\n", __FUNCTION__, __LINE__, p1, p2);
+
           WBFree(p2);
           p2 = p1 + strlen(p1);
 
@@ -188,6 +213,8 @@ find_url_opener:
           {
             *(--p2) = 0; // right-trim
           }
+
+          WB_ERROR_PRINT("%s.%d - TEMPORARY - p1=\"%s\", p2-2=\"%s\"\n", __FUNCTION__, __LINE__, p1, p2-2);
 
           if(p2 >= p1 + 2 && *(p2 - 2) == '%' &&
              (*(p2 - 1) == 'u' || *(p2 - 1) == 'U' || *(p2 - 1) == 'f' || *(p2 - 1) == 'F'))
@@ -202,10 +229,12 @@ find_url_opener:
           }
 
           // NOTE:  for _NOW_ assume that there are no extra parameters [later I'll fix that...]
+
+          WB_WARN_PRINT("%s - TEMPORARY - .desktop file Exec: \"%s\"\n", __FUNCTION__, p1);
         }
       }
 
-      strcpy(szHelpBrowser, p1);
+      strlcpy(szHelpBrowser, p1, sizeof(szHelpBrowser));
       WBFree(p1);
 
       p1 = NULL;
@@ -230,8 +259,11 @@ find_url_opener:
     }
   }
 
-  if(i1 <= 0)
+  WB_WARN_PRINT("%s - TEMPORARY - szHelpBrowser: \"%s\"\n", __FUNCTION__, szHelpBrowser);
+
+  if(iDocPath <= 0)
   {
+    // did NOT find doc path in config file
     p1 = WBGetCanonicalPath("doc/html/");
     if(p1)
     {
@@ -240,7 +272,7 @@ find_url_opener:
     }
     else
     {
-      strcpy(szDocFilePath, "doc/html/");
+      strlcpy(szDocFilePath, "doc/html/", sizeof(szDocFilePath));
     }
   }
 
@@ -253,11 +285,12 @@ find_url_opener:
 //  WB_ERROR_PRINT("           %s - szTerm = \"%s\"\n", __FUNCTION__, szTerm);
 
   p1 = szDocFilePath + strlen(szDocFilePath);
+  cbPath = sizeof(szDocFilePath) - (p1 - szDocFilePath); // remaining buffer size
 
   // now that THAT mess is over with, determine which file has the appropriate term in it,
   // and invoke the default web browser to open that link.  I'll do this using 'xdg-open'.
 
-  strcpy(p1, "group__*.html");
+  strlcpy(p1, "group__*.html", cbPath);
 
   pDirList = WBAllocDirectoryList(szDocFilePath);
 
@@ -275,7 +308,7 @@ find_url_opener:
     {
       if(S_ISREG(dwAttr))
       {
-        strcpy(p1, szName);
+        strlcpy(p1, szName, cbPath);
 
 //        WB_ERROR_PRINT("TEMPORARY:  opening \"%s\"\n", szDocFilePath);
 
@@ -329,9 +362,9 @@ find_url_opener:
                       {
                         if(!strncmp(p2, "href=", 5))
                         {
-                          strcpy(szDoxyTag, "file://");
-                          strcat(szDoxyTag, szDocFilePath); // the path only at this point
-                          strcat(szDoxyTag, p2 + 5); // the 'href' text
+                          strlcpy(szDoxyTag, "file://", sizeof(szDoxyTag));
+                          strlcat(szDoxyTag, szDocFilePath, sizeof(szDoxyTag)); // the path only at this point
+                          strlcat(szDoxyTag, p2 + 5, sizeof(szDoxyTag)); // the 'href' text
                           break;
                         }
                       }
@@ -375,10 +408,10 @@ find_url_opener:
                       {
                         if(!strncmp(p2, "ref=", 4))
                         {
-                          strcpy(szDoxyTag, "file://");
-                          strcat(szDoxyTag, szDocFilePath);
-                          strcat(szDoxyTag, "#");
-                          strcat(szDoxyTag, p2 + 4);
+                          strlcpy(szDoxyTag, "file://", sizeof(szDoxyTag));
+                          strlcat(szDoxyTag, szDocFilePath, sizeof(szDoxyTag));
+                          strlcat(szDoxyTag, "#", sizeof(szDoxyTag));
+                          strlcat(szDoxyTag, p2 + 4, sizeof(szDoxyTag));
                           break;
                         }
                       }
@@ -407,8 +440,8 @@ find_url_opener:
 
   if(szDoxyTag[0]) // found the right file
   {
-//    WB_ERROR_PRINT("TEMPORARY:  %s  spawn %s\n   with \"%s\"\n\n",
-//                   __FUNCTION__, szHelpBrowser, szDoxyTag);
+    WB_WARN_PRINT("%s - TEMPORARY - spawn \"%s\" \"%s\"\n",
+                   __FUNCTION__, szHelpBrowser, szDoxyTag);
     hProcess = WBRunAsync(szHelpBrowser, szDoxyTag, NULL);
 
     // TODO:  does '--new-instance' work properly?
@@ -898,7 +931,13 @@ static const char szNBSP[]="&nbsp;";
       {
         if(*p2 == '\x8') // backspace at start of line?
         {
-          strcpy(p2, p2 + 1); // just skip it
+          char *p2a = p2 + 1;
+          while(*p2a) // just skip the backspace - was strcpy(p2, p2 + 1);
+          {
+            *(p2a - 1) = *p2a;
+            p2a++;
+          }
+          *(p2a - 1) = 0; // assign the 0 byte
           continue;
         }
 

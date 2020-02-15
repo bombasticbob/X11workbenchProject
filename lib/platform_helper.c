@@ -54,14 +54,19 @@
   * of platform-specific utilities.
 */
 
+#ifdef linux
+#define _GNU_SOURCE
+#define __USE_GNU
+#endif // linux
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
 #include <memory.h>
 #ifndef WIN32
-#include <pthread.h>
 #include <unistd.h>
+#include <pthread.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <signal.h>
@@ -307,7 +312,8 @@ static const char * const aszDebugSubSys[]=
   "dialog","dialogctrl","frame","keyboard",
   "mouse","font","settings","selection",
   "pixmap","expose","editwindow","scrollbar",
-  "drawtext","clipboard","textobject",
+  "drawtext","clipboard","textobject","file",
+  "memory",
   NULL
 };
 
@@ -328,7 +334,7 @@ enum
 
   // grab the name of the program and cache it.  I'll need the path info.
 
-  strncpy(szAppName, argv[0], sizeof(szAppName));
+  strlcpy(szAppName, argv[0], sizeof(szAppName));
   szAppName[sizeof(szAppName) - 1] = 0; // make sure
 
   // search for DISPLAY environment variable, pre-assign to szStartupDisplayName
@@ -1204,6 +1210,8 @@ unsigned int nAllocSize, nNewSize, nLimit;
 
   if(nSize <= 0)
   {
+    WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Memory,
+                   "ERROR:  %s.%d - nSize not valid (%d)\n", __FUNCTION__, __LINE__, nSize);
     return NULL;
   }
 
@@ -1253,6 +1261,17 @@ unsigned int nAllocSize, nNewSize, nLimit;
 
   }
 
+  if(!pRval)
+  {
+    WB_DEBUG_PRINT(DebugLevel_WARN | DebugSubSystem_Memory,
+                   "WARNING:  %s.%d - unable to allocate %d bytes\n", __FUNCTION__, __LINE__, nSize);
+  }
+  else
+  {
+    WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Memory,
+                   "INFO:  %s.%d - allocated %d bytes as %p\n", __FUNCTION__, __LINE__, nSize, pRval);
+  }
+
   return pRval;
 }
 
@@ -1261,74 +1280,82 @@ int WBAllocUsableSize(void *pBuf)
 struct __malloc_header__ *pMH;
 
 
-  if(!pBuf)
+  if(pBuf)
   {
-    return -1; // an error
+    // validate pointer
+    // TODO:  check against linked list of 'allocated' blocks first
+
+    pMH = ((struct __malloc_header__ *)pBuf) - 1;
+
+    if(pMH->iTag == WB_ALLOC_TAG)
+    {
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Memory,
+                     "INFO:  %s.%d - returning allocated size %d for %p\n", __FUNCTION__, __LINE__, pMH->cbSize, pBuf);
+
+      return pMH->cbSize;
+    }
   }
 
-  // validate pointer
-  // TODO:  check against linked list of 'allocated' blocks first
+  WB_DEBUG_PRINT(DebugLevel_WARN | DebugSubSystem_Memory,
+                 "ERROR:  %s.%d - invalid pointer %p\n", __FUNCTION__, __LINE__, pBuf);
 
-  pMH = ((struct __malloc_header__ *)pBuf) - 1;
-
-  if(pMH->iTag == WB_ALLOC_TAG)
-  {
-    return pMH->cbSize;
-  }
-
-  return -1; // not valid (error)
+  return -1; // an error
 }
 
 void WBFree(void *pBuf)
 {
 struct __malloc_header__ *pMH;
+unsigned int nOldSize;
 
-  if(!pBuf)
+  if(pBuf)
   {
-    return;
-  }
+    // validate pointer
+    // TODO:  check against linked list of 'allocated' blocks first
 
-  // validate pointer
-  // TODO:  check against linked list of 'allocated' blocks first
+    pMH = ((struct __malloc_header__ *)pBuf) - 1;
 
-  pMH = ((struct __malloc_header__ *)pBuf) - 1;
-
-  if(pMH->iTag == WB_ALLOC_TAG)
-  {
-    if(pMH->pPrev == PMALLOC_FLAG &&
-       pMH->pNext == PMALLOC_FLAG)
+    if(pMH->iTag == WB_ALLOC_TAG)
     {
-      // assign header values that invalidate re-freeing the same memory
+      nOldSize = pMH->cbSize;
 
-      pMH->iTag = 0; // make sure it's no longer valid (so I don't try to re-free)
-      pMH->pPrev = NULL; // same with these values
-      pMH->pNext = NULL;
-      pMH->cbSize = 0;
+      if(pMH->pPrev == PMALLOC_FLAG &&
+         pMH->pNext == PMALLOC_FLAG)
+      {
+        // assign header values that invalidate re-freeing the same memory
 
-      free(pMH);
-    }
-    else
-    {
-      // TODO:  make sure it's not "already free" somehow since re-freeing free memory is *BAD*
+        pMH->iTag = 0; // make sure it's no longer valid (so I don't try to re-free)
+        pMH->pPrev = NULL; // same with these values
+        pMH->pNext = NULL;
+        pMH->cbSize = 0;
 
-      WB_ERROR_PRINT("TODO:  %s 'pre-alloc' unimplemented - NOT freeing memory %p\n", __FUNCTION__, pBuf);
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Memory,
+                       "INFO:  %s.%d - freeing %d bytes of memory at %p\n", __FUNCTION__, __LINE__, nOldSize, pBuf);
+        free(pMH);
+      }
+      else
+      {
+        // TODO:  make sure it's not "already free" somehow since re-freeing free memory is *BAD*
+
+        WB_ERROR_PRINT("TODO:  %s 'pre-alloc' unimplemented - NOT freeing memory %p\n", __FUNCTION__, pBuf);
+      }
+
+      return;
     }
   }
-  else
-  {
-    WB_ERROR_PRINT("ERROR:  %s NOT freeing (invalid) memory %p\n", __FUNCTION__, pBuf);
-  }
+
+  WB_ERROR_PRINT("ERROR:  %s.%d NOT freeing (invalid) memory %p\n", __FUNCTION__, __LINE__, pBuf);
 }
 
 void * WBReAlloc(void *pBuf, int nNewSize)
 {
 struct __malloc_header__ *pMH;
 unsigned char *pRval = NULL;
-unsigned int nAllocSize, nNewNewSize, nLimit;
+unsigned int nAllocSize, nOldSize, nNewNewSize, nLimit;
 
 
   if(!pBuf || nNewSize <= 0)
   {
+    WB_ERROR_PRINT("ERROR:  %s.%d Invalid parameter (%p, %d)\n", __FUNCTION__, __LINE__, pBuf, nNewSize);
     return NULL;
   }
 
@@ -1339,12 +1366,18 @@ unsigned int nAllocSize, nNewNewSize, nLimit;
 
   if(pMH->iTag == WB_ALLOC_TAG)
   {
+    nOldSize = pMH->cbSize;
+
     // the whole point of this is to minimize the actual need to re-allocate the
     // memory block by maintaining a LARGER block than is actually needed when
     // allocated or re-allocated.  Gradually increasing size is pretty much assumed.
 
-    if(pMH->cbSize >= nNewSize)
+    if(nOldSize >= nNewSize)
     {
+      WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Memory,
+                     "INFO:  %s.%d - memory at %p is already %d bytes (requested %d)\n",
+                     __FUNCTION__, __LINE__, pBuf, nOldSize, nNewSize);
+
       return pBuf; // no change (same pointer) since it's large enough already
     }
 
@@ -1367,11 +1400,19 @@ unsigned int nAllocSize, nNewNewSize, nLimit;
         pRval = WBAlloc(nNewNewSize); // just allocate it with 'WBAlloc' and let 'WBAlloc' do the work
         if(!pRval)
         {
+          WB_DEBUG_PRINT(DebugLevel_WARN | DebugSubSystem_Memory,
+                         "WARN:  %s.%d - not enough memory to re-allocate %p from %d bytes to %d\n",
+                         __FUNCTION__, __LINE__, pBuf, nOldSize, nNewSize);
+
           return NULL; // not enough memory
         }
 
-        memcpy(pRval, pBuf, pMH->cbSize); // copy the old data, but not the stuff in the header.
+        memcpy(pRval, pBuf, nOldSize); // copy the old data, but not the stuff in the header.
         WBFree(pBuf); // free 'pBuf' now that it's not needed
+
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Memory,
+                       "INFO:  %s.%d - re-allocated %p using WBAlloc() from %d bytes to %d\n",
+                       __FUNCTION__, __LINE__, pBuf, nOldSize, nNewSize);
 
         return pRval; // return the new pointer (old is no longer valid, new one is 'malloc'ed version).
       }
@@ -1389,7 +1430,7 @@ unsigned int nAllocSize, nNewNewSize, nLimit;
     if(pRval)
     {
 #ifdef HAVE_MALLOC_USABLE_SIZE
-    void *pActual = pRval;
+      void *pActual = pRval;
 #endif // HAVE_MALLOC_USABLE_SIZE
 
       pMH = (struct __malloc_header__ *)pRval;
@@ -1403,6 +1444,25 @@ unsigned int nAllocSize, nNewNewSize, nLimit;
       }
 #endif // HAVE_MALLOC_USABLE_SIZE
       pMH->cbSize = nNewNewSize - sizeof(*pMH);
+
+      if(pRval != (void *)pMH)
+      {
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Memory,
+                       "INFO:  %s.%d - re-allocated %p as %p, from %d bytes to %d\n",
+                       __FUNCTION__, __LINE__, pBuf, pRval, nOldSize, nNewSize);
+      }
+      else
+      {
+        WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_Memory,
+                       "INFO:  %s.%d - re-allocated %p from %d bytes to %d\n",
+                       __FUNCTION__, __LINE__, pBuf, nOldSize, nNewSize);
+      }
+    }
+    else
+    {
+      WB_DEBUG_PRINT(DebugLevel_WARN | DebugSubSystem_Memory,
+                     "WARN:  %s.%d - not enough memory to re-allocate %p from %d bytes to %d\n",
+                     __FUNCTION__, __LINE__, pBuf, nOldSize, nNewSize);
     }
   }
   else
@@ -1436,6 +1496,100 @@ void WBSubAllocTrashMasher(void)
 // ************************
 // generic string utilities
 // ************************
+
+#ifndef  HAVE_STRLCPY
+size_t strlcpy(char * dst, const char * src, size_t dstsize)
+{
+int nRval = 0;
+char *pE = dst + dstsize - 1;
+
+  if(!dstsize || !dst || !src)
+  {
+    return 0;
+  }
+
+  while(dst < pE && *src)
+  {
+    *(dst++) = *(src++);
+    nRval++;
+  }
+
+  *dst = 0; // always
+
+  return nRval; // # of characters up to but not including the 0 byte
+}
+#endif //  HAVE_STRLCPY
+
+#ifndef  HAVE_STRLCAT
+size_t strlcat(char * dst, const char * src, size_t dstsize)
+{
+int nRval = 0;
+char *pE = dst + dstsize - 1;
+
+  if(!dstsize || !dst || !src)
+  {
+    return 0;
+  }
+
+  while(dst < pE && *dst)
+  {
+    dst++;
+  }
+
+  while(dst < pE && *src)
+  {
+    *(dst++) = *(src++);
+    nRval++;
+  }
+
+  *dst = 0; // always
+
+  return nRval; // # of characters up to but not including the 0 byte
+}
+#endif //  HAVE_STRLCAT
+
+
+
+char * WBFormatString(const char *fmt, ...)
+{
+va_list va;
+int iSize = 1024, iTemp;
+char *pRval, *pTemp;
+
+  pRval = WBAlloc(iSize);
+
+  while(!pRval && iSize >= 256) // desperately try to allocate smaller blocks if out of RAM
+  {
+    iSize /= 2;
+    pRval = WBAlloc(iSize);
+  }
+
+  if(!pRval)
+    return NULL;
+
+  va_start(va, fmt);
+
+  iTemp = vsnprintf(pRval, iSize, fmt, va);
+  if(iTemp >= iSize) // need to realloc
+  {
+    pTemp = WBReAlloc(pRval, iTemp + 2);
+    if(!pTemp)
+    {
+      WBFree(pRval);
+      pRval = NULL;
+    }
+    else
+    {
+      pRval = pTemp;
+      vsnprintf(pRval, iTemp + 2, fmt, va);
+    }
+  }
+
+  va_end(va);
+
+  return(pRval);
+}
+
 
 char *WBCopyString(const char *pSrc)
 {
@@ -3463,6 +3617,8 @@ char * WBSearchPath(const char *szFileName)
 char *pRval = NULL;
 const char *p1, *pCur, *pPath;
 char *p2;
+int iTemp, cbRval;
+
 
   if(0 > WBStat(szFileName, NULL)) // file does not exist?
   {
@@ -3474,8 +3630,8 @@ no_stat:
     }
 
     // check PATH environment variable, and locate first match
-
-    pRval = WBAlloc(2 * PATH_MAX + strlen(szFileName));
+    cbRval = 2 * PATH_MAX + strlen(szFileName);
+    pRval = WBAlloc(cbRval + 2);
 
     if(pRval)
     {
@@ -3494,22 +3650,29 @@ no_stat:
             p1++;
           }
 
-          if((p1 - pCur) + 2 < 2 * PATH_MAX) // only if not a buffer overrun
+          iTemp = p1 - pCur; // the position of the ':'
+
+          if(iTemp + 2 < 2 * PATH_MAX) // only if not a buffer overrun
           {
             // build path name
-            memcpy(pRval, pCur, p1 - pCur);
+            memcpy(pRval, pCur, iTemp);
+            pRval[iTemp] = 0;
 
-            if(pRval[(p1 - pCur) - 1] != '/')
+            WB_DEBUG_PRINT(DebugLevel_Medium | DebugSubSystem_File,
+                           "%s.%d - searching \"%s\"\n", __FUNCTION__, __LINE__, pRval);
+
+            if(pRval[iTemp - 1] != '/')
             {
-              pRval[(p1 - pCur)] = '/';
-              strcpy(pRval + (p1 - pCur) + 1, szFileName);
+              pRval[iTemp] = '/';
+              strlcpy(pRval + iTemp + 1, szFileName, cbRval - (iTemp + 1));
             }
             else
             {
-              strcpy(pRval + (p1 - pCur), szFileName);
+              strlcpy(pRval + iTemp, szFileName, cbRval - iTemp);
             }
 
-//            fprintf(stderr, "TEMPORARY:  trying \"%s\"\n", pRval);
+            WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_File,
+                           "%s.%d - trying \"%s\"\n", __FUNCTION__, __LINE__, pRval);
 
             if(!WBStat(pRval, NULL))
             {
@@ -3522,7 +3685,7 @@ no_stat:
             p1++;
           }
 
-          pCur = p1;
+          pCur = p1; // pointer to next path to search, or end of string
         }
       }
 
@@ -3558,8 +3721,11 @@ no_stat:
 
       if(p2)
       {
-        strcpy(pRval, p2);         // the path for X11workbench's install directory
-        strcat(pRval, szFileName); // use path of X11workbench executable with szFileName
+        strlcpy(pRval, p2, cbRval);         // the path for X11workbench's install directory
+        strlcat(pRval, szFileName, cbRval); // use path of X11workbench executable with szFileName
+
+        WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_File,
+                       "%s.%d - trying \"%s\"\n", __FUNCTION__, __LINE__, pRval);
       }
       else // could not find, nor get path info
       {
@@ -3577,9 +3743,15 @@ no_stat:
 
       goto no_stat;
     }
+
+    WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_File,
+                   "%s.%d - found \"%s\"\n", __FUNCTION__, __LINE__, pRval);
   }
   else
   {
+    WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_File,
+                   "%s.%d - directly found \"%s\"\n", __FUNCTION__, __LINE__, szFileName);
+
     pRval = WBCopyString(szFileName); // file exists, so return as-is
   }
 
@@ -3986,11 +4158,11 @@ WB_FILE_HANDLE hIn, hOut, hErr;
   p1 = strrchr(szAppName, '/');
   if(p1)
   {
-    strcpy(pCur, p1 + 1); // just the name
+    strcpy(pCur, p1 + 1); // just the name (note - safe to use strcpy, I already did a size test before alloc'ing)
   }
   else
   {
-    strcpy(pCur, szAppName);
+    strcpy(pCur, szAppName); // having already tested for 'big enough' it's ok to use strcpy here
   }
 
   argv[0] = pCur;
@@ -4000,7 +4172,7 @@ WB_FILE_HANDLE hIn, hOut, hErr;
   {
     pArg = va_arg(va, const char *);
 
-    strcpy(pCur, pArg);
+    strcpy(pCur, pArg); // having already tested for 'big enough' it's ok to use strcpy here
     argv[i1] = pCur;
     pCur += strlen(pCur) + 1;
   }

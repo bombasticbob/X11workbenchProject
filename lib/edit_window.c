@@ -215,8 +215,8 @@ Atom aEW_EDIT_CHANGE=None;
 
 
 //#define LOAD_COLOR0(X,Y) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) > 0) {  }
-//#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
-#define COPY_COLOR_NAME(X,Y,Z) {const char *pX = X(WBGetDefaultDisplay()); if(pX) strncpy(Y,pX,sizeof(Y)); else strncpy(Y,Z,sizeof(Y));}
+//#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strlcpy(Y,Z,sizeof(Y)); }
+#define COPY_COLOR_NAME(X,Y,Z) {const char *pX = X(WBGetDefaultDisplay()); if(pX) strlcpy(Y,pX,sizeof(Y)); else strlcpy(Y,Z,sizeof(Y));}
 
 static void InternalCheckEWColorsAndAtoms(void)
 {

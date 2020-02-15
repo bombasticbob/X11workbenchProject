@@ -210,7 +210,7 @@ WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDBar, Window wIDOwner, WBMen
   int i1, iHPos, iVPos, iHBorder, iSelected = -1;
   Atom a1;
   unsigned long ul1;
-  char tbuf[256];
+  char tbuf[512];
 
 
   // check/initialize global menu objects
@@ -284,8 +284,8 @@ WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDBar, Window wIDOwner, WBMen
 
     if(strchr(szText, '_'))
     {
-      char *p1;
-      strncpy(tbuf, szText, sizeof(tbuf)/2);
+      char *p1, *p2;
+      strlcpy(tbuf, szText, sizeof(tbuf)/2);
       p1 = tbuf;
       while(*p1)
       {
@@ -303,24 +303,33 @@ WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDBar, Window wIDOwner, WBMen
           {
 // NOTE:  iU2 not being used; commented out because of linux gcc warnings
 //            iU2 = WBTextWidth(pFS, p1, 1);
-            strcpy(p1, p1 + 1);
+
+            p2 = p1 + 1;  // NOTE:  must preserve p1's value
+            while(*p2) // was strcpy(p1, p1 + 1);
+            {
+              *(p2 - 1) = *p2;
+              p2++;
+            }
+
+            *(p2 - 1) = 0; // including ending zero byte
           }
 //          else
 //          {
 //            iU2 = iU1;  // shouldn't happen
 //          }
         }
+
         p1++;
       }
     }
     else
     {
-      strncpy(tbuf, szText, sizeof(tbuf)/2);
+      strlcpy(tbuf, szText, sizeof(tbuf)/2);
     }
 
-    strcat(tbuf, "    ");
+    strlcat(tbuf, "    ", sizeof(tbuf));
     if(pItem->iHotKey >= 0)
-        strcat(tbuf, pItem->data + pItem->iHotKey);
+        strlcat(tbuf, pItem->data + pItem->iHotKey, sizeof(tbuf));
 
     pItem->iPosition = iVPos;  // also needed for mousie/clickie
     pItem->iTextWidth = WBTextWidth(pFS, tbuf, strlen(tbuf));
@@ -597,7 +606,7 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
   WBGC gc; // = WBGetWindowDefaultGC(wID);
 //  XGCValues xgc;
   WB_GEOM geomPaint;
-  char tbuf[128];
+  char tbuf[512];
 
   if (XGetWindowAttributes(pDisplay, wID, &xwa) == 0)
   {
@@ -627,8 +636,6 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
     return 0;
   }
 
-//  xgc.font = pFont->fid;
-//  WBChangeGC(gc, GCFont, &xgc);
   pTempFont = WBQueryGCFont(gc); // gets un-copied font
   if(pTempFont)
   {
@@ -638,8 +645,6 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
 
   WBSetFont(gc, pFont);
 
-////  XClearWindow(pDisplay, wID);  // TODO:  rather than erase background, see if I need to
-//  XClearArea(pDisplay, wID, geomPaint.x, geomPaint.y, geomPaint.width, geomPaint.height, 0);
   WBClearWindow(wID, gc);
 
   // paint a 3D-looking border
@@ -677,7 +682,6 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
     WBMenuItem *pItem = pMenu->ppItems[i1];
     const char *szText;
     int iU1=0, iU2=0;
-
     int iUIState = 0;
 
     if(!pItem)
@@ -700,11 +704,14 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
       WBDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
 
       WBSetForeground(gc, clrMenuBorder2.pixel);
-          xpt[1].y=++(xpt[0].y);
+
+      xpt[1].y=++(xpt[0].y);
+
       WBDrawLines(pDisplay, wID, gc, xpt, 2, CoordModeOrigin);
 
       iVPos += SEPARATOR_HEIGHT;
       WBSetForeground(gc, clrMenuFG.pixel);
+
       continue;
     }
     else if(pItem->iAction & WBMENU_DYNAMIC_HIGH_BIT)
@@ -721,7 +728,7 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
        !(pItem->iAction & WBMENU_DYNAMIC_HIGH_BIT))
     {
       // it's a popup, so it's always available
-        iUIState = 1;
+      iUIState = 1;
     }
     else
     {
@@ -771,28 +778,37 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
     if(pItem->iUnderscore >= 0) //strchr(szText, '_'))
     {
       // locate the first (only the first) underscore
-      char *p1;
+      char *p1, *p2;
+      int iUnderscoreOffset = pItem->iUnderscore - pItem->iMenuItemText;
 
-      strcpy(tbuf, szText);
-      p1 = tbuf + pItem->iUnderscore - pItem->iMenuItemText; // position of underscore
+      memset(tbuf, 0, sizeof(tbuf)); // by convention
+      strlcpy(tbuf, szText, sizeof(tbuf)-1);
+      p1 = tbuf + iUnderscoreOffset; // add position of underscore
 
       if(*p1 == '_') // TODO:  allow multiple underscores?  Not much value in it (could loop)
       {
         *p1 = 0;
 
-        if(p1 == tbuf)
+        if(!iUnderscoreOffset) // it's the first char
           iU1 = 0;
         else
-          iU1 = WBTextWidth(pFont, tbuf, p1 - tbuf);
+          iU1 = WBTextWidth(pFont, tbuf, iUnderscoreOffset); // width of text up to the '_'
 
         if(p1[1]) // character just past underscore
         {
-          iU2 = WBTextWidth(pFont, p1 + 1, 1);
-          strcpy(p1, p1 + 1); // adjust actual text so there is no underscore
+          iU2 = WBTextWidth(pFont, p1 + 1, 1); // width of the char that was under the underscore
+
+          // adjust actual text so there is no underscore - similar to strcpy(p1,p1+1) except it works correctly
+          for(p2=p1+1; *p2; )
+          {
+            *(p1++) = *(p2++);
+          }
+
+          *p1 = 0; // make sure I assign this
         }
         else
         {
-          iU2 = iU1;  // shouldn't happen
+          iU2 = iU2 = WBTextWidth(pFont, " ", 1); // should not happen [width of a space]
         }
       }
       else
@@ -811,10 +827,6 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
     //***************************************************************//
     // TODO:  handle 'checked' menu items, both enabled AND disabled //
     //***************************************************************//
-
-    // TODO:  change string into a series of XTextItem structures and
-    //        then call XDrawText to draw the array of 'XTextItem's
-    // TODO:  use DTDrawXXX and font sets instead
 
     if(*szText)
     {

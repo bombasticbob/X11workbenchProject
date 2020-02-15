@@ -1004,7 +1004,7 @@ extern FT_Library __ftlib; /* located in font_helper.c */
 
 void __internal_startup_display(const char *szVal)
 {
-  strncpy(szStartupDisplayName, szVal, sizeof(szStartupDisplayName));
+  strlcpy(szStartupDisplayName, szVal, sizeof(szStartupDisplayName));
 
   szStartupDisplayName[sizeof(szStartupDisplayName) - 1] = 0;
 }
@@ -1102,8 +1102,13 @@ Display *pRval;
     return NULL;
   }
 
+  // make sure that the 'DISPLAY' environment variable will match
+  // what I have just opened; that way any X11 applications that I run
+  // will continue to use THIS display.  Neat, huh?
+  setenv("DISPLAY", szDisplayName, 1); // assign DISPLAY to whatever is in 'szDisplayName'
+
   // make a copy of the display name for use later on, like for the clipboard initialization
-  strncpy(szDefaultDisplayName, szDisplayName, sizeof(szDefaultDisplayName));
+  strlcpy(szDefaultDisplayName, szDisplayName, sizeof(szDefaultDisplayName));
 
 
   // new I/O error handler - 'quit flag' will be set on error but app will
@@ -5761,11 +5766,11 @@ void WBCreateWindowDefaultGC(Window wID, unsigned long clrFG, unsigned long clrB
 #endif // NO_DEBUG
   pEntry->hGC = WBCreateGC(pEntry->pDisplay, wID, (/*GCFont |*/ GCForeground | GCBackground), &gcv);
 
-// TEMPORARY - for debugging a specific problem
-  if(pEntry->hGC && ((CARD32)pEntry->hGC->values.clip_mask & 0xe0000000))
-  {
-    WB_ERROR_PRINT("ERROR:  %s - hGC clip_mask is NOT VALID\n", __FUNCTION__);
-  }
+//// TEMPORARY - for debugging a specific problem
+//  if(pEntry->hGC && (((CARD32)pEntry->hGC->values.clip_mask) & 0xe0000000))
+//  {
+//    WB_ERROR_PRINT("ERROR:  %s - hGC clip_mask is NOT VALID\n", __FUNCTION__);
+//  }
 
   pEntry->clrFG = clrFG; // cache this info in 'pEntry' as well
   pEntry->clrBG = clrBG;
@@ -5784,11 +5789,11 @@ void WBSetWindowDefaultGC(Window wID, WBGC hGC)
 
     pEntry->hGC = hGC;
 
-// TEMPORARY - for debugging a specific problem
-    if(hGC && ((CARD32)hGC->values.clip_mask & 0xe0000000))
-    {
-      WB_ERROR_PRINT("ERROR:  %s - hGC clip_mask is NOT VALID\n", __FUNCTION__);
-    }
+//// TEMPORARY - for debugging a specific problem
+//    if(hGC && (((CARD32)hGC->values.clip_mask) & 0xe0000000))
+//    {
+//      WB_ERROR_PRINT("ERROR:  %s - hGC clip_mask is NOT VALID\n", __FUNCTION__);
+//    }
   }
 }
 
@@ -7667,13 +7672,14 @@ Region WBCopyRegion(Region rgnSource)
 {
 Region rgnRval;
 
-  if((CARD32)(intptr_t)rgnSource & 0xe0000000) // see man page for XGetGCValues and the implication of invalid XIDs
-  {
-    WB_ERROR_PRINT("ERROR:  %s - invalid source region %d (%08xH), no region created\n",
-                   __FUNCTION__, (int)(intptr_t)rgnSource, (int)(intptr_t)rgnSource);
-
-    return NULL;
-  }
+// * NOTE * this may have been a valid test at one time, but NOW it fails to work in Linux
+//  if(((CARD32)(intptr_t)rgnSource) & 0xe0000000) // see man page for XGetGCValues and the implication of invalid XIDs
+//  {
+//    WB_ERROR_PRINT("ERROR:  %s - invalid source region %d (%08xH), no region created\n",
+//                   __FUNCTION__, (int)(intptr_t)rgnSource, (int)(intptr_t)rgnSource);
+//
+//    return NULL;
+//  }
 
   BEGIN_XCALL_DEBUG_WRAPPER
   rgnRval = XCreateRegion();

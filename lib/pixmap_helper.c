@@ -2224,30 +2224,30 @@ char tbuf[32];
     {
 //      if(tbuf[0])
 //      {
-//        strcat(tbuf, " | ");
+//        strlcat(tbuf, " | ", sizeof(tbuf));
 //      }
 
-      strcat(tbuf, "DoRed");
+      strlcat(tbuf, "DoRed", sizeof(tbuf));
     }
 
     if(pColor->flags & DoGreen)
     {
       if(tbuf[0])
       {
-        strcat(tbuf, " | ");
+        strlcat(tbuf, " | ", sizeof(tbuf));
       }
 
-      strcat(tbuf, "DoGreen");
+      strlcat(tbuf, "DoGreen", sizeof(tbuf));
     }
 
     if(pColor->flags & DoBlue)
     {
       if(tbuf[0])
       {
-        strcat(tbuf, " | ");
+        strlcat(tbuf, " | ", sizeof(tbuf));
       }
 
-      strcat(tbuf, "DoBlue");
+      strlcat(tbuf, "DoBlue", sizeof(tbuf));
     }
 
     if(tbuf[0])

@@ -132,10 +132,10 @@ enum DebugLevel
   DebugSubSystem_DrawText    = 0x00100000,  //!< Draw Text features                  "drawtext"
   DebugSubSystem_Clipboard   = 0x00200000,  //!< Clipboard features                  "clipboard"
   DebugSubSystem_TextObject  = 0x00400000,  //!< Text Object handling                "textobject"
+  DebugSubSystem_File        = 0x00800000,  //!< File System and Path                "file"
+  DebugSubSystem_Memory      = 0x01000000,  //!< Memory allocation                   "memory"
 
   // remaining subsystem bits are reserved - please do not use them
-  DebugSubSystem_RESERVED2   = 0x00800000,  //!< reserved
-  DebugSubSystem_RESERVED3   = 0x01000000,  //!< reserved
   DebugSubSystem_RESERVED4   = 0x02000000,  //!< reserved
   DebugSubSystem_RESERVED5   = 0x04000000,  //!< reserved
   DebugSubSystem_RESERVED6   = 0x08000000,  //!< reserved
@@ -335,6 +335,7 @@ int WBCheckDebugLevel(WB_UINT64 dwLevel);
 
 #ifdef NO_DEBUG /* assign this to disable debugging - most likely a -D in Makefile */
 #define WB_DEBUG_PRINT(...)
+#define WB_TEMPORARY_PRINT(...)
 #define WB_DEBUG_DUMP(L,X,Y,Z)
 #define WB_IF_DEBUG_LEVEL(L) if(0) /* TODO:  turn off the warning? */
 #define WB_DEFINE_PROFILE(__name)
@@ -402,6 +403,23 @@ int WBCheckDebugLevel(WB_UINT64 dwLevel);
   * \sa \ref DebugLevel
 **/
 #define WB_IF_DEBUG_LEVEL(L) if(WBCheckDebugLevel((L)))
+
+/** \ingroup debug
+  * \brief simplified method of implementing temporary debug output
+  *
+  * \param F Format string (as required for debug messages)
+  * (at least one additional parameter is required for the macro to work properly)
+  *
+  * The remaining parameters are passed as-is to \ref WBDebugPrint()
+  *
+  * This macro generates 'temporary' debug output via WBDebugPrint().
+  * The parameters, format string (and one or more extra parameters), are
+  * passed along to the WBDebugPrint function.\n
+  * \sa \ref WBDebugPrint
+**/
+#define WB_TEMPORARY_PRINT(F, ...) \
+    { char *p1 = WBCopyString("%s.%d - TEMPORARY - "); if(p1) { WBCatString(&p1, F); WBDebugPrint(p1, __FUNCTION__, __LINE__, __VA_ARGS__); WBFree(p1); } }
+
 
 
 /** \ingroup debug

@@ -606,13 +606,23 @@ int CHGetResourceInt(Display *pDisplay, const char *szIdentifier)
   int iLen;
   char tbuf[64];
 
+  memset(tbuf, 0, sizeof(tbuf));
+
   if((iLen = CHGetResourceString(pDisplay, szIdentifier, tbuf, sizeof(tbuf) - 1)) > 0)
   {
+    char *p1, *p2;
     tbuf[iLen] = 0;
-    while(tbuf[0] && tbuf[0] <= ' ')
+
+    for(p1 = tbuf; *p1 && *p1 <= ' '; p1++)
+      ; // find first non-white-space
+
+    p2 = tbuf;
+    while(*p1)
     {
-      strcpy(tbuf, tbuf + 1);
+      *(p2++) = *(p1++);
     }
+
+    *p2 = 0;
 
     if(tbuf[0])
     {
@@ -686,13 +696,13 @@ void * CHOpenConfFile(const char *szAppName, int iFlags)
     // TODO:  a utility to move old files to new location?  yeah probably not...
 
 
-    strcpy(szLocalPath0, szLocalPath); // ~/.local/share/
+    strlcpy(szLocalPath0, szLocalPath, sizeof(szLocalPath0)); // ~/.local/share/
     if(!szLocalPath0[0] || szLocalPath0[strlen(szLocalPath0)-1] != '/') // unlikely
     {
-      strcat(szLocalPath0, "/");
+      strlcat(szLocalPath0, "/", sizeof(szLocalPath0));
     }
-//    strcat(szLocalPath0, "."); don't prepend a dot any more
-    strncat(szLocalPath0, szAppName, sizeof(szLocalPath0) - strlen(szLocalPath0) - 1);  // now contains ~/.local/share/appname
+//    strlcat(szLocalPath0, ".", sizeof(szLocalPath0)); don't prepend a dot any more
+    strlcat(szLocalPath0, szAppName, sizeof(szLocalPath0));  // now contains ~/.local/share/appname
 
     // make sure the directory 'szLocalPath0' exists
     p4 = WBGetCanonicalPath(szLocalPath0);
@@ -702,13 +712,13 @@ void * CHOpenConfFile(const char *szAppName, int iFlags)
       {
         WBMkDir(p4, 0755); // TODO:  check user's UMASK ???
       }
-      strncpy(szLocalPath0, p4, sizeof(szLocalPath0)); // the canonical path
+      strlcpy(szLocalPath0, p4, sizeof(szLocalPath0)); // the canonical path
       WBFree(p4);
     }
 
     if(szLocalPath0[strlen(szLocalPath0) - 1] != '/')
     {
-      strcat(szLocalPath0, "/");
+      strlcat(szLocalPath0, "/", sizeof(szLocalPath0));
     }
 
     p4 = DoMakePath(p3, szLocalPath0, LOCAL_CONF_NAME, szConf); // first THIS one
@@ -1642,13 +1652,24 @@ int CHGetConfFileInt(void * hFile, const char *szSection, const char *szIdentifi
   int iLen;
   char tbuf[64];
 
+  memset(tbuf, 0, sizeof(tbuf));
+
   if((iLen = CHGetConfFileString(hFile, szSection, szIdentifier, tbuf, sizeof(tbuf) - 1)) > 0)
   {
+    char *p1, *p2;
+
     tbuf[iLen] = 0;
-    while(tbuf[0] && tbuf[0] <= ' ')
+
+    for(p1 = tbuf; *p1 && *p1 <= ' '; p1++)
+      ; // find first non-white-space
+
+    p2 = tbuf;
+    while(*p1)
     {
-      strcpy(tbuf, tbuf + 1);
+      *(p2++) = *(p1++);
     }
+
+    *p2 = 0;
 
     if(tbuf[0])
     {
@@ -2837,7 +2858,7 @@ int i1, cbRval = 4096;
       memcpy(pC, p1, p2 - p1);
       pC += p2 - p1;
       *(pC++) = '=';
-      strcpy(pC, p5);
+      strcpy(pC, p5); // safe to use this, I checked length already
       pC += strlen(pC) + 1;
       *pC = 0;
 
@@ -3111,6 +3132,8 @@ char *CHGetMimeDefaultApp(const char *szMimeType)
 {
 char *pRval, *p2;
 
+  // see https://specifications.freedesktop.org/mime-apps-spec/mime-apps-spec-latest.html
+
   // this function uses xdg-mime to obtain the correct default application
   // for handling whatever mime type has been passed to the function
 
@@ -3127,7 +3150,20 @@ char *pRval, *p2;
     }
   }
 
-//  if(pRval && *pRval) // make sure the thing exists
+  if(!pRval || !*pRval)
+  {
+    WB_WARN_PRINT("%s - Mime type \"%s\" not supported by xdg-mime\n",
+                  __FUNCTION__, szMimeType);
+
+    // TODO:  as a fallback, ~/.local/share/applications/mimeapps.list contains a list of the
+    //        registered default applications for given mime types.
+    //        Additionally, there are .desktop files in the same directory and in
+    //        /usr/share/applications and /usr/local/share/applications that might
+    //        list a mime type.  If only one supports the mime type, use that???
+    //        see also:  CHGetDesktopFileInfo() (below)
+  }
+
+//  if(pRval && *pRval) // make sure the thing exists - note that is probably NOT in PATH
 //  {
 //    if(WBStat(pRval, NULL));
 //    {
@@ -3154,11 +3190,20 @@ char *pRval, *p2;
 //       %c - the translated application name (see web page)
 //       %k - the desktop file's name/location/URI/whatever (see web page)
 //       (all others are deprecated)
+//
+// Additionally, the docs ALSO state the following:
+//   The Exec key is required if DBusActivatable is not set to true. Even if DBusActivatable
+//   is true, Exec should be specified for compatibility with implementations that do not
+//   understand DBusActivatable.
+//
+// in short, an ill-behaved '.desktop' file might only be activatable via DBus...
+//
+// See also:  man pages for xdg-desktop-icon , xdg-desktop-menu , xdg-open
 
 char *CHGetDesktopFileInfo(const char *szDesktopFile, const char *szInfo)
 {
 char *pRval, *p1, *p2, *pTemp;
-int i1;
+int i1, cbTemp;
 
   p1 = WBSearchPath(szDesktopFile);
   if(!p1)
@@ -3167,7 +3212,9 @@ int i1;
 
     if(*szDesktopFile != '/')
     {
-      p1 = WBAlloc(PATH_MAX * 2 + strlen(szDesktopFile));
+      cbTemp = PATH_MAX * 2 + strlen(szDesktopFile) + 2;
+      p1 = WBAlloc(cbTemp + 2);
+
       if(p1)
       {
         // NOTE:  there may be some system config var that tells me whether to use "/usr/share" or "/usr/local/share"
@@ -3177,25 +3224,29 @@ int i1;
           { "/usr/local/share/applications/", "/usr/share/applications/",
             "/usr/local/share/app-install/desktop/", "/usr/share/app-install/desktop/"  };
 
-        char *p2 = WBGetCanonicalPath("~/.local/share/applications/");
+        char *p2 = WBGetCanonicalPath("~/.local/share/applications/"); // check this first
+
+        *p1 = 0;
+
         if(p2)
         {
-          strcpy(p1, p2);
-          WBFree(p2); // keep non-NULL as a flag for later
+          strlcpy(p1, p2, cbTemp);
+          WBFree(p2);
 
-          strcat(p1, szDesktopFile);
+          strlcat(p1, szDesktopFile, cbTemp);
           if(WBStat(p1, NULL))
           {
-            p2 = NULL; // as a flag, i.e. NOT found
+            *p1 = 0; // as a flag, i.e. NOT found
           }
         }
 
-        if(!p2) // did not find file in '~/.local/share/applications'
+        if(!*p1) // did not find file in '~/.local/share/applications'
         {
           for(i1=0; i1 < sizeof(aszPaths)/sizeof(aszPaths[0]); i1++)
           {
-            strcpy(p1, aszPaths[i1]);
-            strcat(p1, szDesktopFile);
+            strlcpy(p1, aszPaths[i1], cbTemp);
+            strlcat(p1, szDesktopFile, cbTemp);
+
             if(!WBStat(p1, NULL)) // file exists?
             {
               break;
@@ -3240,13 +3291,19 @@ int i1;
   WBFree(p1);
   p1 = NULL;
 
-  WB_ERROR_PRINT("TEMPORARY: %s - result \"%s\"\n", __FUNCTION__, pRval);
+  WB_TEMPORARY_PRINT("result \"%s\"\n", pRval);
 
-
-  if(pRval && strlen(pRval) >= strlen(pTemp))
+  if(pRval && strlen(pTemp) && strlen(pRval) >= strlen(pTemp))
   {
-    strcpy(pRval, pRval + strlen(pTemp) - 1); // note '^' at beginning won't be in the result
-    // TODO:  find the '=' and use THAT instead?
+    char *pT1 = pRval, *pT2 = pRval + strlen(pTemp) - 1;
+    while(*pT2) // NOTE:  strcpy 'undefined' when overlapped
+    {
+      *(pT1++) = *(pT2++);
+    }
+
+    *pT1 = 0; // make sure
+
+    WB_TEMPORARY_PRINT("result \"%s\"\n", pRval);
   }
 
   WBFree(pTemp);
@@ -3274,7 +3331,7 @@ int i1;
 
 // this was what I was doing in dialog_control.c and other places...
 #define LOAD_COLOR0(X,Y) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) > 0) {  }
-#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
+#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strlcpy(Y,Z,sizeof(Y)); }
 
 const char *CHGetBorderColor(Display *pDisplay)
 {

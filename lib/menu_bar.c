@@ -173,7 +173,7 @@ Atom aMENU_DISPLAY_POPUP = 0;
 #define DEBUG_VALIDATE(X) if(!(X)) { WB_WARN_PRINT("%s:%d - %s\n", __FUNCTION__, __LINE__, "WARNING - " #X " failed!\n"); }
 #endif // NO_DEBUG
 
-//#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
+//#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strlcpy(Y,Z,sizeof(Y)); }
 
 int MBInitGlobal(void)
 {
@@ -237,7 +237,7 @@ int MBInitGlobal(void)
 //    static const char*szMenuBorder2="#FFFFFF", *szMenuBorder3="#9C9A94";
     int iY, iU, iV, iR, iG, iB;
 
-#define COPY_COLOR_NAME(X,Y,Z) {const char *pX = X(WBGetDefaultDisplay()); if(pX) strncpy(Y,pX,sizeof(Y)); else strncpy(Y,Z,sizeof(Y));}
+#define COPY_COLOR_NAME(X,Y,Z) {const char *pX = X(WBGetDefaultDisplay()); if(pX) strlcpy(Y,pX,sizeof(Y)); else strlcpy(Y,Z,sizeof(Y));}
 
     colormap = DefaultColormap(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
     COPY_COLOR_NAME(CHGetTextColor, szMenuFG, "#000000");
@@ -1301,7 +1301,7 @@ static int MenuBarDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu, Display *pD
     if(strchr(szText, '_'))
     {
       char *p1;
-      strcpy(tbuf, szText);
+      strlcpy(tbuf, szText, sizeof(tbuf));
       p1 = tbuf;
       while(*p1)
       {
@@ -1316,8 +1316,15 @@ static int MenuBarDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu, Display *pD
 
           if(p1[1])
           {
+            char *p1a = p1 + 1;
             iU2 = WBTextWidth(pFont, p1, 1);
-            strcpy(p1, p1 + 1);
+            while(*p1a) // was strcpy(p1, p1 + 1);
+            {
+              *(p1a - 1) = *p1a;
+              p1a++;
+            }
+
+            *(p1a - 1) = 0;
           }
           else
           {

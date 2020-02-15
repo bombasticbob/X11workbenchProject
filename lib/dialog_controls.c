@@ -465,7 +465,7 @@ int i1;
   return NULL;
 }
 
-#define COPY_COLOR_NAME(X,Y,Z) {const char *pX = X(WBGetDefaultDisplay()); if(pX) strncpy(Y,pX,sizeof(Y)); else strncpy(Y,Z,sizeof(Y));}
+#define COPY_COLOR_NAME(X,Y,Z) {const char *pX = X(WBGetDefaultDisplay()); if(pX) strlcpy(Y,pX,sizeof(Y)); else strlcpy(Y,Z,sizeof(Y));}
 static void alloc_control_colors(WBDialogControl *pDialogControl,int bUseStaticColors)
 {
 char szFG[18], szBG[18], szBD[18], szHFG[18], szHBG[18], szAFG[18], szABG[18];
@@ -545,7 +545,7 @@ int iY, iU, iV, iR, iG, iB;
 
 
 #define LOAD_COLOR0(X,Y) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) > 0) {  }
-#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strcpy(Y,Z); }
+#define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strlcpy(Y,Z,sizeof(Y)); }
 
 static void old_alloc_control_colors(WBDialogControl *pDialogControl,
                                      const char *szFGName, const char *szBGName,
@@ -3353,7 +3353,7 @@ char tbuf[NAME_MAX + 4];
       // always add the '..' first, unless the path is '/'
       if(!p2 || p2[0] != '/' || p2[1])
       {
-        strcpy(tbuf, "@.."); // directory '..'
+        strlcpy(tbuf, "@..", sizeof(tbuf)); // directory '..'
         DLGAddControlListEntry(pDialogControl, tbuf, -1, ControlListIndex_INSERT_FIRST);
       }
 
@@ -4874,7 +4874,7 @@ WB_GEOM geomPaint, geomBorder;
     if(strchr(szText, '_'))  // underline in text?  TODO:  use this info to set hotkey
     {
       char *p1;
-      strcpy(tbuf, szText);
+      strlcpy(tbuf, szText, sizeof(tbuf));
       p1 = tbuf;
       while(*p1)
       {
@@ -4889,8 +4889,16 @@ WB_GEOM geomPaint, geomBorder;
 
           if(p1[1])
           {
+            char *p1a = p1 = 1;
             iU2 = XTextWidth(pFont, p1, 1);
-            strcpy(p1, p1 + 1);
+
+            while(*p1a) // was strcpy(p1, p1 + 1);
+            {
+              *(p1a - 1) = *p1a;
+              p1a++;
+            }
+
+            *(p1a - 1) = 0; // ending 0 byte
           }
           else
             iU2 = iU1;  // shouldn't happen

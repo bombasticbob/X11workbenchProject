@@ -98,7 +98,7 @@ struct s_internal_undo_redo_buffer
   * \brief Internal-only enumeration for undo/redo buffer 'iOperation' member.
   * \copydoc UNDO_OPERATION;
 **/
-typedef enum e_undo_operation
+enum e_undo_operation
 {
   UNDO_NONE=-1,   /* for initialization purposes only */
   UNDO_SELECT=0,
@@ -1837,14 +1837,14 @@ static void __internal_init(TEXT_OBJECT *pThis)
 //#define LOAD_COLOR(X,Y,Z) \
 //    if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0) \
 //    { WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", \
-//                    __FUNCTION__, X, Z); strcpy(Y,Z); }
+//                    __FUNCTION__, X, Z); strlcpy(Y,Z,sizeof(Y)); }
 //
 //    LOAD_COLOR("selected_bg_color", szHBG, "#0040FF"); // a slightly greenish blue for the 'selected' BG color
 //    LOAD_COLOR("selected_fg_color", szHFG, "white");   // white FG when selected
 //
 //#undef LOAD_COLOR
 
-#define COPY_COLOR_NAME(X,Y,Z) {const char *pX = X(WBGetDefaultDisplay()); if(pX) strncpy(Y,pX,sizeof(Y)); else strncpy(Y,Z,sizeof(Y));}
+#define COPY_COLOR_NAME(X,Y,Z) {const char *pX = X(WBGetDefaultDisplay()); if(pX) strlcpy(Y,pX,sizeof(Y)); else strlcpy(Y,Z,sizeof(Y));}
     COPY_COLOR_NAME(CHGetHighlightForegroundColor,szHFG,"#ffffff");
     COPY_COLOR_NAME(CHGetHighlightBackgroundColor,szHBG,"#0040FF");
 
@@ -2440,7 +2440,13 @@ WB_RECT rctSel;
 
             if(pTempL && pTempR)
             {
-              strcpy(pTempL, pTempR); // thereby squeezing the string together and deleting the selection
+              char *pS = pTempR, *pD = pTempL;
+              // squeeze the string together and deleting the selection (was strcpy(pTempL, pTempR) )
+              while(*pS)
+              {
+                *(pD++) = *(pS++);
+              }
+              *pD = 0;
             }
           }
         }
@@ -2577,7 +2583,13 @@ WB_RECT rctSel;
             char *pTempR = WBGetMBCharPtr(pL, rctSel.right, NULL);
             if(pTempR)
             {
-              strcpy(pL, pTempR);
+              char *pD = pL, *pS = pTempR;
+              // was strcpy(pL, pTempR);
+              while(*pS)
+              {
+                *(pD++) = *(pS++);
+              }
+              *pD = 0;
             }
             else
             {
@@ -3075,7 +3087,15 @@ WB_RECT rctInvalid;
                               pL2, pL3 - pL2, // text pointer AND 'true length' in bytes
                               pThis->iRow, pThis->iCol, NULL, NULL, 0);
 
-          strcpy(pL2, pL3); // delete things down
+          // delete things down - was strcpy(pL2, pL3);
+          {
+            char *pD = pL2, *pS = pL3;
+            while(*pS)
+            {
+              *(pD++) = *(pS++);
+            }
+            *pD = 0;
+          }
         }
 
         pThis->iCol -= i2;
@@ -3130,7 +3150,15 @@ WB_RECT rctInvalid;
                               pL3, pL2 - pL3, // text pointer AND 'true length' in bytes
                               pThis->iRow, pThis->iCol + nChar, NULL, NULL, 0);
 
-          strcpy(pL3, pL2); // delete things down
+          // delete things down - was strcpy(pL3, pL2);
+          {
+            char *pD = pL3, *pS = pL2;
+            while(*pS)
+            {
+              *(pD++) = *(pS++);
+            }
+            *pD = 0;
+          }
         }
 
         nChar -= i2;
@@ -6812,7 +6840,7 @@ char *pRval, *p1;
     iLen++;
   }
 
-  strcpy(p1, pJoin);
+  strcpy(p1, pJoin); // safe to use strcpy, I already allocated space
 
   return pRval;
 }
@@ -6898,7 +6926,15 @@ char *pDelChar, *p1;
       iLen--; // update the new length
 
       // i1 is the length of the next character.  slide 'em down! [this is less efficient, but more 'stable']
-      strcpy(p1, p1 + i1); // simplest method
+      // was strcpy(p1, p1 + i1);
+      {
+        char *pD = p1, *pS = p1 + i1;
+        while(*pS)
+        {
+          *(pD++) = *(pS++);
+        }
+        *pD = 0;
+      }
     }
   }
   else
@@ -6957,7 +6993,16 @@ char *pDelChar, *p1;
         }
 
         // i1 is the length of the prev character, so slide 'em down! [this is less efficient, but more 'stable']
-        strcpy(p1, p1 + i1); // simplest method (I could also get the pointer to the 'iCol'th char, but this is more consistent)
+        // simplest method (I could also get the pointer to the 'iCol'th char, but this is more consistent)
+        // was strcpy(p1, p1 + i1);
+        {
+          char *pD = p1, *pS = p1 + i1;
+          while(*pS)
+          {
+            *(pD++) = *(pS++);
+          }
+          *pD = 0;
+        }
       }
       else
       {
