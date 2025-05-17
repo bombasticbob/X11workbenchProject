@@ -13,6 +13,8 @@ will build properly.
 However, it does not (yet) function as in the project description.  Not yet,
 anyway.
 
+(update 5/16/2025 - not abandoned, just on hold)
+
 This project has traditionally been hosted at:
 
   http://sourceforge.net/projects/X11workbench
