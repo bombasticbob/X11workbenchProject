@@ -972,8 +972,15 @@
   * data types, and definitions in this group deal with these specific problems.\n
 **/
 
+/** \defgroup arrays Dynamically re-sizeable Array 'helper' functions
+  * \brief Functions and variables associated with dynamically re-sizeable arrays
+  *
+  * Functions and variables associated with dynamically re-sizeable arrays.  The arrays object is
+  * written in C but is compatible with C++ via use of 'placement' new/delete operators.
+**/
+
 /** \defgroup conf_help Configuration 'helper' functions
-  * Functions and variables associated with application configuration
+  * \brief Functions and variables associated with application configuration
   *
   * Optional functions for configuration management.  Used internally by \ref startup and \ref core.
 **/

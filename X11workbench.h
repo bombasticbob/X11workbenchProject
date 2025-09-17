@@ -65,6 +65,7 @@
 #include "window_helper.h"
 #include "frame_window.h"
 #include "child_frame.h"
+#include "arrays.h"
 
 
 #define APP_NAME "X11workbench" /* for dialog boxes and similar things */

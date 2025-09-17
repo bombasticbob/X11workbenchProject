@@ -1338,6 +1338,32 @@ unsigned long long ullTick;
   }
 
 
+  // now there's a minimum time delay that I need so that any characters
+  // that have been posted to a console window are processed by that console
+  // window and not by me.  If I grab the focus too early, it could interpret the
+  // return for the previous command as an input to the program.
+  //
+  // This needs to be longer for a debug build than for a release one, due to debug output
+  // on stderr (mostly).  At least that's how it seems to me.
+  //
+  // So, I need to delay for about 0.1 seconds at a minimum for debug builds, and 0.05 seconds
+  // for a release build.
+
+#ifdef NO_DEBUG
+#define MIN_STARTUP_DELAY 50000LL
+#else
+#define MIN_STARTUP_DELAY 100000LL /* was 250000LL */
+#endif // NO_DEBUG
+
+  ullTick = WBGetTimeIndex() - ullTick;
+  if(ullTick < MIN_STARTUP_DELAY)
+  {
+    // TODO:  eat all keyboard and mouse input events...
+
+    usleep(MIN_STARTUP_DELAY - ullTick);
+  }
+
+
   // FINALLY, initialize settings and finish the clipboard system
 
   if(__FinishInitClipboardSystem(pDisplay, szDefaultDisplayName)) // initialize clipboard system
@@ -1348,31 +1374,6 @@ unsigned long long ullTick;
   }
 
   CHSettingsRefresh(pDisplay); // must init first part of the clipboard system *FIRST* before I call this
-
-  // now there's a minimum time delay that I need so that any characters
-  // that have been posted to a console window are processed by that console
-  // window and not by me.  If I grab the focus too early, it could interpret the
-  // return for the previous command as an input to the program.
-  //
-  // This needs to be longer for a debug build than for a release one, due to debug output
-  // on stderr (mostly).  At least that's how it seems to me.
-  //
-  // So, I need to delay for about 0.25 seconds at a minimum for debug builds, and 0.1 seconds
-  // for a release build.
-
-#ifdef NO_DEBUG
-#define MIN_STARTUP_DELAY 100000LL
-#else
-#define MIN_STARTUP_DELAY 250000LL
-#endif // NO_DEBUG
-
-  ullTick = WBGetTimeIndex() - ullTick;
-  if(ullTick < MIN_STARTUP_DELAY)
-  {
-    // TODO:  eat all keyboard and mouse input events...
-
-    usleep(MIN_STARTUP_DELAY - ullTick);
-  }
 
   return 0;  // success
 }

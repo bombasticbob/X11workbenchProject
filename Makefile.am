@@ -129,6 +129,7 @@ libX11workbenchToolkit_DOCDEPEND += lib/edit_window.c lib/child_frame.c lib/fram
 libX11workbenchToolkit_DOCDEPEND += lib/dialog_impl.c lib/dialog_controls.c lib/dialog_support.c lib/graphical_api.c
 libX11workbenchToolkit_DOCDEPEND += lib/menu.c lib/menu_bar.c lib/menu_popup.c lib/conf_help.c lib/file_help.c lib/draw_text.c
 libX11workbenchToolkit_DOCDEPEND += lib/window_dressing.c lib/platform_helper.c lib/text_object.c lib/clipboard_helper.c
+libX11workbenchToolkit_DOCDEPEND += lib/arrays.c
 
 libX11workbenchToolkit_DOCDEPEND += include/pixmap_helper.h include/edit_window.h include/child_frame.h
 libX11workbenchToolkit_DOCDEPEND += include/window_helper.h include/font_helper.h include/frame_window.h
@@ -136,6 +137,7 @@ libX11workbenchToolkit_DOCDEPEND += include/dialog_window.h include/dialog_contr
 libX11workbenchToolkit_DOCDEPEND += include/menu.h include/menu_bar.h include/menu_popup.h include/conf_help.h
 libX11workbenchToolkit_DOCDEPEND += include/file_help.h include/draw_text.h include/window_dressing.h
 libX11workbenchToolkit_DOCDEPEND += include/platform_helper.h include/text_object.h include/debug_helper.h
+libX11workbenchToolkit_DOCDEPEND += include/arrays.h
 
 .PHONY: toolkit_doc
 
