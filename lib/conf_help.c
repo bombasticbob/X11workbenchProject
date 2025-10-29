@@ -2421,18 +2421,189 @@ const CHXSetting *pXS;
 // X M L   P A R S I N G //
 ///////////////////////////
 
+
+/** \ingroup text_xml
+  * \brief enumerator used by CHGetSpecialXMLTagType()
+  *
+  * Internal enumerated type returned by CHGetSpecialXMLTagType() for parsing XML
+  *
+**/
+enum
+{
+  Special_NONE = 0,
+  Special_Question,
+  Special_Comment,
+  Special_CDATA,
+  Special_BANG
+};
+
+/** \ingroup text_xml
+  * \brief enumerator used by CHGetSpecialXMLTagType()
+  *
+  * Internal function for use by InternalAddXMLEntry()
+  *
+**/
+static int CHGetSpecialXMLTagType(const char *pTag, const char *pEnd)
+{
+  if((pEnd - pTag) > 2 && (pTag[1] == '?' || pTag[1] == '!')) // special
+  {
+    if(pTag[1] == '?')
+      return Special_Question;  // <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+    else if((pEnd - pTag) > 3 && pTag[2] == '-')
+      return Special_Comment;   // <!-- comment -->
+    else if((pEnd - pTag) > 9 && !strncasecmp(pTag + 2, "[CDATA[", 7))  // be strict with it
+      return Special_CDATA;     // <![CDATA[something]]>
+    else
+      return Special_BANG;      // <!DOCTYPE html>
+  }
+
+  return Special_NONE;
+}
+
+// add an XML entry at *ppCur, incrementing *ppCur and returning a pointer to it
+// re-allocates buffers as needed to fit the entry.  returns NULL if there was an error
+static CHXMLEntry *InternalAddXMLEntry(const char *szTagName, // NULL or "" for embedded data; else tag name
+                                       const char *szValue, // text representation of value with white space stripped from ends
+                                       CHXMLEntry *pContainer, // container pointer or NULL
+                                       CHXMLEntry **ppOrigin, int *pcbOrigin, CHXMLEntry **ppCur,
+                                       char **ppData, int *pcbData, char **ppCurData)
+{
+int cb1, cbNew;
+void *pV;
+//char *p1;
+CHXMLEntry *pC;
+
+
+  if((uint8_t *)(*ppCur + 1) >= (uint8_t *)*ppOrigin + *pcbOrigin)
+  {
+    // reallocate
+    cbNew = *pcbOrigin + 0x1000 * sizeof(CHXMLEntry);
+    pV = realloc(*ppOrigin, cbNew);
+    if(pV)
+    {
+      *ppCur = (CHXMLEntry *)pV + (*ppCur - *ppOrigin);  // relocate *ppCur
+      *ppOrigin = (CHXMLEntry *)pV; // new pointer
+      *pcbOrigin = cbNew;
+    }
+    else
+    {
+      WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
+      return NULL; // error?
+    }
+  }
+
+  if(szTagName)
+    cb1 = strlen(szTagName);
+  else
+    cb1 = 0;
+
+  if(szValue)
+    cb1 += strlen(szValue);
+
+  cb1 += 2;
+
+  if((uint8_t *)*ppCurData + cb1 >= (uint8_t *)*ppData + *pcbData)
+  {
+    // reallocate
+    cbNew = *pcbData + 0x10000; // 64k
+    pV = realloc(*ppData, cbNew);
+    if(pV)
+    {
+      *ppCurData = (char *)pV + (*ppCurData - *ppData);  // relocate *ppCurData
+      *ppData = (char *)pV; // new pointer
+      *pcbData = cbNew;
+    }
+    else
+    {
+      WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
+      return NULL; // error?
+    }
+  }
+
+  pC = (*ppCur)++;
+  pC->iNextIndex = 0; // 'end of chain' for now
+  if(pContainer)
+    pC->iContainer = pContainer - *ppOrigin;
+  else
+    pC->iContainer = -1;
+  pC->iContentsIndex = 0; // indicate no contents (yet)
+
+
+  if(pContainer && pContainer->iContentsIndex <= 0)
+  {
+    pContainer->iContentsIndex = pC - *ppOrigin;
+  }
+  else if(pContainer || pC > *ppOrigin) // NOT the very first one
+  {
+    CHXMLEntry *pS = *ppOrigin + (pContainer ? pContainer->iContentsIndex : 0);
+
+    // walk the list of siblings, add to the end
+
+    while(pS->iNextIndex > 0)
+      pS = *ppOrigin + pS->iNextIndex;
+
+    pS->iNextIndex = pC - *ppOrigin;
+  }
+
+  pC->nLabelOffset = -1;
+  if(szTagName)
+  {
+    cb1 = strlen(szTagName);
+    if(cb1)
+    {
+      pC->nLabelOffset = *ppCurData - *ppData;
+      memcpy(*ppCurData, szTagName, cb1);
+      (*ppCurData) += cb1;
+    }
+  }
+  *((*ppCurData)++) = 0;  // terminating zero byte
+
+  pC->nDataOffset = -1;
+  if(szValue)
+  {
+    cb1 = strlen(szValue);
+    pC->nDataOffset = *ppCurData - *ppData;
+
+    if(cb1)
+    {
+      memcpy(*ppCurData, szValue, cb1);
+      (*ppCurData) += cb1;
+    }
+  }
+  *((*ppCurData)++) = 0;  // terminating zero byte
+
+  WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - add %s=%s\n", __FUNCTION__, __LINE__, szTagName, szValue);
+
+  return pC; // pointer to this element.
+}
+
+
 /** \ingroup text_xml
   * \brief Parses contents of an XML tag, returning as WBAlloc'd string list similar to environment strings
   *
   * \param ppOrigin A pointer to the 'origin' pointer for CHXMLEntry array
+  * \param pcbOrigin A pointer to the size of *ppOrigin in bytes
+  * \param ppCur A pointer to the pointer for the next CHXMLEntry
+  * \param ppData A pointer to the pointer for parsed XML data
+  * \param pcbData A pointer to the size of *ppData in bytes
+  * \param ppCurData A pointer to the pointer to the current/next place to store parsed data
+  * \param pContainer A pointer to the CHXMLEntry that is the container for this block, or NULL for 'top level'
+  * \param ppXMLData A pointer to the pointer to the XML Data
+  * \param pXMLDataEnd A a pointer to the pointer that is just past the end of the XML data
   *
   * Internal function for use by CHParseXML, to recurse levels of XML
   *
 **/
 static const char *InternalParseXML(CHXMLEntry **ppOrigin, int *pcbOrigin, CHXMLEntry **ppCur,
                                     char **ppData, int *pcbData, char **ppCurData,
-                                    const char *ppXMLData, const char *pXMLDataEnd)
+                                    CHXMLEntry *pContainer,
+                                    const char *pXMLData, const char *pXMLDataEnd)
 {
+const char *pC, *pE, *p1; //, *pCE, *p2;
+char *p3, *p4, *p5;
+CHXMLEntry *pEntry;
+
+
   // parse a section of XML, adding contents to the end of 'ppOrigin', and returning
   // a pointer to the next element on success (or NULL otherwise).  This function will
   // re-allocate '*ppOrigin' as needed, storing the max size in '*pcbOrigin'.  It can
@@ -2443,58 +2614,185 @@ static const char *InternalParseXML(CHXMLEntry **ppOrigin, int *pcbOrigin, CHXML
 
   // this isn't needed per se, but having it here can't hurt..
   if(!ppOrigin || !*ppOrigin || !pcbOrigin || !ppCur || !*ppCur ||
-     !ppXMLData || !*ppXMLData || !pXMLDataEnd ||
-     (((WB_UINTPTR)pXMLDataEnd) < ((WB_UINTPTR)*ppXMLData))) // warning abatement, use type cast for WB_UINTPTR
+     !pXMLData || !pXMLDataEnd ||
+     (((WB_UINTPTR)pXMLDataEnd) < ((WB_UINTPTR)pXMLData))) // warning abatement, use type cast for WB_UINTPTR
   {
+    WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
     return NULL; // just reject these possibilities outright and return "error"
   }
 
   // this function will return on error or if it finds and parses the ending tag
 
-    // OK what kind of tag do we have now?
+  pC = pXMLData;
+  pE = pXMLDataEnd;
 
+  // for each tag do the following:
+  //   find start of tag
+  //   find ending tag / end of tag
+  //   interpret embedded values
+  //   interpret data values (recurse if needed)
 
-//    pCur = CHFindNextXMLTag(pCur, cbLength, 0);
-//
-//    if(!pCur) // no more tags
-//    {
-//      break;
-//    }
-//
-//    pCur++; // points past the tag
+  while(pC && pC < pE)
+  {
+    const char *pC2, *pE2, *pV, *pVE;
 
+    pC2 = CHFindNextXMLTag(pC, pE - pC, CHPARSEXML_DEFAULT);
 
-  // returned pointer is the next point at which to parse a 'same level' tag
+    if(!pC2)
+    {
+      WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - NULL from CHFindNextXMLTag, %.*s\n", __FUNCTION__, __LINE__, (int)(pE - pC), pC);
+      return NULL;
+    }
 
-  return pXMLDataEnd; // for now
+    pV = pC;
+
+    while(pV < pC2 && *pV <= ' ')
+      pV++; // skip white space
+
+    if(pV < pC2)  // a value is there
+    {
+      if(!pContainer) // this is a syntax error
+      {
+        WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
+        return NULL;
+      }
+
+      pVE = pC2;
+      while(pVE > pV && *(pVE - 1) <= ' ')
+        pVE--;
+      // TODO - handling multiple embedded un-named values?
+
+      if(pV < pVE) // value found
+      {
+        void * pTemp;
+
+        // add this as a value to the container
+
+        p5 = WBCopyStringN(pV, pVE - pV);
+        pTemp = InternalAddXMLEntry(NULL, p5, pContainer, ppOrigin, pcbOrigin, ppCur, ppData, pcbData, ppCurData);
+        WBFree(p5);
+
+        if(!pTemp)
+        {
+          WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
+          return NULL;
+        }
+
+        pC = pC2; // keep parsing - if pC2 >= pE this will exit
+        continue;
+      }
+    }
+
+    if(pC2 >= pE)
+    {
+      pC = pC2; // the return value
+      break; // done
+    }
+
+    p1 = pC2; // remember start of tag
+    pC = CHFindEndingXMLTag(&pC2, pE - pC, &pE2);
+      // pC = end of XML 'section'
+      // pC2 = start of ending tag
+      // pE2 = end of opening tag
+      // self-closing tag pC == pE2, pC2 == p1
+
+    WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - tag info  %p %p %p %p\n",
+                   __FUNCTION__, __LINE__, p1 - 1, pE2, pC2, pC);
+    WB_DEBUG_PRINT(DebugLevel_Medium, "  %.*s\n=====\n  %.*s\n=====\n  %.*s\n=================================\n",
+                   (int)(pE2 - p1 + 1), p1 - 1,
+                   (int)((pC2 > pE2) ? (pC2 - pE2) : 1), (const char *)((pC2 > pE2) ? pE2 : ""),
+                   (int)((pC - pC2) ? (pC - pC2) : 1), (const char *)((pC - pC2) ? pC2 : ""));
+
+    if(p1 < (pE - 3) && p1[1] == '!' && p1[2] == '-' && p1[3] == '-') // comment
+      continue; // skip the comment
+
+    p3 = CHParseXMLTagContents(p1, pE2 - p1);   // parse contents as name\tvalue\0
+    if(!p3)
+    {
+      WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
+      return NULL;
+    }
+
+    // for each string pair in 'p3' store the value in the output array
+    // the first is always the tag name, followed by a tab and no data.
+    // the last string has a 0 byte as the first char,marking the end
+    // the buffer needs to be WBFree'd
+
+    p4 = p3;  // p3 points to the tag name and also is WBAlloc'd pointer
+    while(*p4 && *p4 != '\t')
+      p4++;
+    if(*p4)
+      *(p4++) = 0;
+    while(*p4)
+      p4++;
+    if(p4[1])
+      p4++;  // pointa to the first name/value pair or '\0'
+
+    // add entry for tag
+    pEntry = InternalAddXMLEntry(p3, NULL, pContainer, ppOrigin, pcbOrigin, ppCur, ppData, pcbData, ppCurData);
+
+    if(!pEntry)
+    {
+      WBFree(p3);
+      WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
+      return NULL;
+    }
+
+    // pEntry will be the container for embedded values in tag
+
+    while(*p4) // parse out embedded name/value pairs
+    {
+      p5 = p4;  // p5 is name
+      while(*p4 && *p4 != '\t')
+        p4++;
+      if(*p4)
+        *(p4++) = 0; // p4 is value
+
+      if(!InternalAddXMLEntry(p5, p4, pEntry, ppOrigin, pcbOrigin, ppCur, ppData, pcbData, ppCurData))
+      {
+        WBFree(p3);
+        WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
+        return NULL;
+      }
+
+      while(*p4)
+        p4++; // end of value
+
+      p4++;  // point to next name, or zero byte if done
+    }
+
+    WBFree(p3);
+
+    // recurse - this handles raw values also
+
+    pV = pE2;  // next spot to look for a tag
+    while(pV && pV < pC2) // recursively parse all contained XML (should happen only once though)
+      pV = InternalParseXML(ppOrigin, pcbOrigin, ppCur, ppData, pcbData, ppCurData, pEntry, pV, pC2);
+
+    // pC should already point at the tag
+  }
+
+  if(!pC)
+  {
+    WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
+  }
+
+  return pC; // where I stopped searching
 }
 
-
-//  typedef struct _CHXMLEntry_
-//  {
-//    int iNextIndex;      // 0-based index for next item at this level; <= 0 for none.  0 marks "end of list" for top level
-//    int iContainer;      // 0-based index for container; <= 0 for none.
-//    int iContentsIndex;  // 0-based first array index for 'contents' for this entry; <= 0 for none
-//
-//    int nLabelOffset;    // BYTE offset to label (zero-byte-terminated) string (from beginning of array)
-//                         // for this entry; <= 0 for 'no label'
-//    int nDataOffset;     // BYTE offset to data (zero-byte-terminated) string (from beginning of array)
-//                         // for the entry data; <= 0 for 'no data'
-//
-//  } CHXMLEntry;
 
 CHXMLEntry *CHParseXML(const char *pXMLData, int cbLength)
 {
 CHXMLEntry *pRval = NULL;
 CHXMLEntry *pXE, *pXCur;
 int cbRval, cbData, cbNeed, cbOffs;
-const char *pEnd = pXMLData + cbLength;
-const char *pCur;
-char *pData, *pCurData;
+const char *pCur, *pEnd;
+char *pData, *pCurData; //, *p1, *p2, *p3;
 
 
   if(!pXMLData || !cbLength || !*pXMLData)
   {
+    WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
     return NULL;
   }
 
@@ -2514,32 +2812,39 @@ char *pData, *pCurData;
     {
       free(pData);
     }
+
+    WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
     return NULL; // not enough memory (oops)
   }
 
 
 
   pCur = pXMLData;
+  pEnd = pXMLData + cbLength;
   pXCur = pRval;
   pCurData = pData;
 
   *pData = 0; // ending zero byte - must be present at pData[length]
 
-  pXCur->iNextIndex = 0; // marks "end of list"
-  pXCur->iContainer = 0; // marks it as "top level"
-  pXCur->iContentsIndex = 0;
-  pXCur->nLabelOffset = 0;
-  pXCur->nDataOffset = 0;
+  pXCur->iNextIndex = 0;       // marks "end of list"
+  pXCur->iContainer = -1;      // marks it as "top level"
+  pXCur->iContentsIndex = 0;   // no hierarchical contents
+  pXCur->nLabelOffset = -1;
+  pXCur->nDataOffset = -1;
 
 
   while(pCur < pEnd)
   {
+    const char *pTemp = pCur;
+
     // call recursive function that does "one level" of XML and all of its contents
 
-    pCur = InternalParseXML(&pRval, &cbRval, &pXCur, &pData, &cbData, &pCurData, pCur, pEnd);
+    pCur = InternalParseXML(&pRval, &cbRval, &pXCur, &pData, &cbData, &pCurData, NULL, pCur, pEnd);
 
     if(!pCur) // error
     {
+      WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - Error from InternalParseXML %.*s\n",
+                     __FUNCTION__, __LINE__, (int)(pEnd - pTemp), pTemp);
       goto error_exit;
     }
 
@@ -2547,13 +2852,17 @@ char *pData, *pCurData;
 
   }
 
+  WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - %d entries\n%s\n",
+                 __FUNCTION__, __LINE__, (int)(pXCur - pRval), pCur);
+
+
   // at this point 'pXCur' is the pointer to the final entry, and there's room in the array for it.
 
-  pXCur->iNextIndex = 0; // marks "end of list"
-  pXCur->iContainer = 0; // assign the other zeros by convention
+  pXCur->iNextIndex = 0;    // marks "end of list"
+  pXCur->iContainer = -1;   // assign the other default values by convention
   pXCur->iContentsIndex = 0;
-  pXCur->nLabelOffset = 0;
-  pXCur->nDataOffset = 0;
+  pXCur->nLabelOffset = -1;
+  pXCur->nDataOffset = -1;
 
   cbOffs = ((char *)(pXCur + 1) - (char *)pRval); // offset to where the data is, for fixups
            // I use 'pXCur + 1' here because I'll increment it later.  but I also need it
@@ -2561,12 +2870,14 @@ char *pData, *pCurData;
   cbNeed = cbOffs + 2 * sizeof(*pXCur)
          + (pCurData - pData); // the actual size of the data
 
-  if(cbNeed > cbRval) // need to re-allocate
+  // CONSOLIDATE DATA INTO 'pRval'
+  if(cbNeed > cbRval) // need to re-allocate 'pRval' block
   {
     void *pTemp = realloc(pRval, cbNeed);
 
     if(!pTemp)
     {
+      WB_ERROR_PRINT("%s.%d - Error alloc mem for return struct\n", __FUNCTION__, __LINE__);
       goto error_exit;
     }
 
@@ -2574,33 +2885,44 @@ char *pData, *pCurData;
     pRval = (CHXMLEntry *)pTemp;                     // new 'pRval'
   }
 
+  memcpy((char *)(pXCur + 1), pData, (pCurData - pData) + 1); // copy data portion
+
   // fix up all of the data indices
   for(pXE=pRval; pXE < pXCur; pXE++)
   {
-    if(pXCur->nLabelOffset >= 0) // allow '0' for this part
+    if(pXE->nLabelOffset >= 0)
     {
-      pXCur->nLabelOffset += cbOffs; // fix up the data offset
+      pXE->nLabelOffset += cbOffs; // fix up the data offset
     }
     else
     {
-      pXCur->nLabelOffset = 0; // make it zero to mark it 'unused'
+      pXE->nLabelOffset = -1; // make it -1 to mark it 'unused'
     }
 
-    if(pXCur->nDataOffset >= 0) // allow '0' for this part
+    if(pXE->nDataOffset >= 0)
     {
-      pXCur->nDataOffset += cbOffs; // fix up the data offset
+      pXE->nDataOffset += cbOffs; // fix up the data offset
     }
     else
     {
-      pXCur->nDataOffset = 0; // make it zero to mark it 'unused'
+      pXE->nDataOffset = -1; // make it -1 to mark it 'unused'
     }
+
+    WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - entry %d\n"
+                   "  iNextIndex     %d\n"
+                   "  iContainer     %d\n"
+                   "  iContentsIndex %d\n"
+                   "  nLabelOffset   %d %s\n"
+                   "  nDataOffset    %d %s\n",
+                   __FUNCTION__, __LINE__, (int)(pXE - pRval),
+                   pXE->iNextIndex,
+                   pXE->iContainer,
+                   pXE->iContentsIndex,
+                   pXE->nLabelOffset,
+                   (const char *)(pXE->nLabelOffset < 0 ? "" : (char *)pRval + pXE->nLabelOffset),
+                   pXE->nDataOffset,
+                   (const char *)(pXE->nDataOffset < 0 ? "" : (char *)pRval + pXE->nDataOffset));
   }
-
-  pXCur++; // this is where the data will start, now
-
-  // copy the data where it needs to be
-
-  memcpy(pXCur, pData, (pCurData - pData) + 1); // copy data, including the final 0-byte at 'pData[length]'
 
   // and now I'm done!
 
@@ -2610,7 +2932,7 @@ error_exit:
 
   free(pRval);
   pRval = NULL;
-
+  WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
 
 the_end:
   free(pData); // not needed any more
@@ -2618,33 +2940,85 @@ the_end:
   return pRval; // the self-contained structure, or NULL on error
 }
 
-char *CHParseXMLTagContents(const char *pTagContents, int cbLength)
+// pTag is tag start, i,e '<' pointer, length points just past the '>'
+// return value is string pairs as name\tvalue\0.  either 'name' or 'value' can be an empty string
+// end of data in returned value is '\0\0'
+// tags like CDATA are returned as-is except '<![CDATA[' and ']]>' are stripped away
+// the tag name, if any, is always the first entry in the returned string
+// the return value is WBAlloc'd and needs to be WBFree'd
+char *CHParseXMLTagContents(const char *pTag, int cbLength)
 {
-const char *pCur = pTagContents, *pEnd = pTagContents + cbLength;
+const char *pCur, *pEnd;
 const char *p1, *p2, *p3;
 char *pRval, *pC, *pE, *p4, *p5;
-int i1, cbRval = 4096;
+int i1, cTag, nSpecial, cbRval = 4096;
+
+
+  pCur = pTag;
 
   if(!pCur)
   {
+    WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
     return NULL;
   }
 
   if(cbLength < 0)
+    cbLength = strlen(pTag);
+
+  pEnd = pTag + cbLength;
+
+  nSpecial = CHGetSpecialXMLTagType(pCur, pEnd);
+
+  if(nSpecial == Special_Comment)
   {
-    cbLength = strlen(pTagContents);
-    pEnd = pTagContents + cbLength;
+    pRval = malloc(4);
+    if(pRval)
+      memset(pRval, 0, 4);
+
+    return pRval;
   }
+  else if(nSpecial == Special_CDATA)
+  {
+    i1 = (pEnd - pCur - 12);
+
+    pRval = (char *)malloc(4 + i1);
+    if(pRval)
+    {
+      pRval[0] = '\t';
+      memcpy(pRval + 1, pCur + 9, i1);
+      pRval[i1 + 1] = 0;
+      pRval[i1 + 2] = 0;
+      pRval[i1 + 3] = 0;
+    }
+
+    return pRval;
+  }
+
+  if(nSpecial == Special_Question)
+  {
+    if((int)(pEnd - pCur) > 2 && *(pEnd - 1) == '>' && *(pEnd - 2) == '?')
+    {
+      pEnd -= 2;
+    }
+  }
+  else
+  {
+    pEnd--;
+    if(pEnd > pCur && *(pEnd - 1) == '/') // self-closing tag
+      pEnd--;
+  }
+
+//   pEnd is now just before the tag end
+  pCur++; // point to 1st char beyond the '<'
 
   pC = pRval = WBAlloc(cbRval);
   if(!pRval)
   {
-    WB_ERROR_PRINT("%s - not enough memory\n", __FUNCTION__);
+    WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
     return NULL;
   }
 
   pE = pRval + cbRval;
-
   pC[0] = pC[1] = 0;
 
 
@@ -2655,80 +3029,24 @@ int i1, cbRval = 4096;
 
   while(pCur < pEnd && *pCur)
   {
-    // find value name
+    // find value name (or embedded no-name value)
     while(pCur < pEnd && *pCur && *pCur <= ' ')
     {
       pCur++; // skip white space
     }
 
-    p1 = pCur;
-    while(pCur < pEnd && *pCur > ' ' && *pCur != '=' && *pCur != '>' && *pCur != '[' && *pCur != '(')
+    if(pCur >= pEnd || !*pCur)
+    {
+      break; // went past the end of the buffer with just white space
+    }
+
+    p1 = pCur; // this part works for '?' and '!' if there is no white space separating them from the name
+    while(pCur < pEnd && *pCur > ' ' && *pCur != '=')
     {
       pCur++; // find end of string
     }
 
-    if(pCur >= pEnd)
-    {
-      break; // went past the end of the buffer
-    }
-
-    if(*pCur == '>') // end of tag?
-    {
-      if(pCur == p1) // empty value
-      {
-        break; // I am done
-      }
-      else if(pCur >= p1 + 2 && *(pCur - 1) == '-' && *(pCur - 2) == '-')
-      {
-        pCur -= 2; // prior to '-->'
-      }
-      else if(*(pCur - 1) == '/')
-      {
-        pCur --; // prior to '/>'
-      }
-    }
-#if 0
-    else if(*pCur == '(' || *pCur == '[') // an embedded section ??? [this only applies to CDATA]
-    {
-      // in this case it's an embedded entity and I want to preserve it in its entirety
-      char cTemp = *pCur;
-
-      if(cTemp == '(')
-      {
-        cTemp = ')';
-      }
-      else
-      {
-        cTemp = ']';
-      }
-
-      pCur++;
-      if(pCur >= pEnd)
-      {
-        break; // I'm outa here - past end of buffer
-      }
-
-      p2 = pCur;
-      pCur = CHFindEndOfXMLSection(pCur, pEnd - pCur, cTemp, 0); // find end of section
-
-      if(pCur < pEnd)
-      {
-        pCur++; // point to next char past the end of this section
-      }
-
-      p5 = WBCopyStringN(p2, pCur - p2); // make a copy of the section, allocated as p5
-
-      goto value_is_now_p5; // this will check for NULL 'p5' also
-    }
-#endif // 0
-
-    if(pCur == p1)
-    {
-      break; // I am done
-    }
-
-
-    p2 = pCur;
+    p2 = pCur; // p2 is end of name
 
     while(pCur < pEnd && *pCur && *pCur <= ' ')
     {
@@ -2765,7 +3083,7 @@ int i1, cbRval = 4096;
           }
         }
 
-        if(*pCur == '"')
+        if(*pCur == c1) // quote char
         {
           pCur++; // now past the quote
         }
@@ -2780,28 +3098,12 @@ int i1, cbRval = 4096;
       }
       else
       {
-        while(pCur < pEnd && *pCur > ' ' && *pCur != '>')
+        while(pCur < pEnd && *pCur > ' ')
         {
           pCur++; // find end of string
         }
 
-        if(*pCur == '>') // end of tag?
-        {
-          if(pCur == p3) // empty value
-          {
-            goto no_value;
-          }
-          else if(pCur >= p3 + 2 && *(pCur - 1) == '-' && *(pCur - 2) == '-')
-          {
-            pCur -= 2; // prior to '-->'
-          }
-          else if(*(pCur - 1) == '/')
-          {
-            pCur --; // prior to '/>'
-          }
-        }
-
-        if(pCur == p3) // 'value= />'  yeah, I accept it
+        if(pCur == p3) // empty value
         {
           goto no_value;
         }
@@ -2829,7 +3131,7 @@ int i1, cbRval = 4096;
       if(pC + (p2 - p1) + strlen(p5) + 4 >= pE)
       {
         i1 = 4096;
-        while((p2 - p1) + strlen(p5) + 4 >= i1)
+        while((int)((p2 - p1) + strlen(p5) + 4) >= i1)
         {
           i1 += 4096; // to make sure it's big enough in 4k increments
         }
@@ -2854,10 +3156,10 @@ int i1, cbRval = 4096;
         pE = pRval + cbRval;
       }
 
-      // now do value=the value\0\0 and point 'pC' to the 2nd '\0'
+      // now do value\tthe value\0\0 and point 'pC' to the 2nd '\0'
       memcpy(pC, p1, p2 - p1);
       pC += p2 - p1;
-      *(pC++) = '=';
+      *(pC++) = '\t';
       strcpy(pC, p5); // safe to use this, I checked length already
       pC += strlen(pC) + 1;
       *pC = 0;
@@ -2894,10 +3196,10 @@ no_value:
         pE = pRval + cbRval;
       }
 
-      // now do value=\0\0 and point 'pC' to the 2nd '\0'
+      // now do value\t\0\0 and point 'pC' to the 2nd '\0'
       memcpy(pC, p1, p2 - p1);
       pC += p2 - p1;
-      *(pC++) = '=';
+      *(pC++) = '\t';
       *(pC++) = 0;
       *pC = 0; // by convention
     }
@@ -2959,6 +3261,12 @@ const char *p1, *pEnd = pTagContents + cbLength;
 }
 
 
+// *ppTag gets updated with closing tag position; returns next position after closing tag
+// if NOT NULL then *ppOpenTagEnd gets next char after opening tag
+// tags starting with '<?' or '<!' have special context and are standalone
+// self-closing tags have equal *ppOpenTagEnd, *ppTag, and return value
+// This includes '<![CDATA[' which ends with ']]>' and '<!--' which ends with '-->'
+// see https://en.wikipedia.org/wiki/CDATA on CDATA
 const char *CHFindEndOfXMLSection(const char *pTagContents, int cbLength, char cEndChar, int bUseQuotes)
 {
 register const char *p1 = pTagContents;
@@ -2967,6 +3275,7 @@ const char *pE;
 
   if(!p1 || !cbLength)
   {
+    WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
     return NULL;
   }
 
@@ -3100,6 +3409,208 @@ const char *CHFindEndOfXMLTag(const char *pTagContents, int cbLength)
   return CHFindEndOfXMLSection(pTagContents, cbLength, '>', 1);
 }
 
+// *ppTag gets updated with closing tag position; returns next position after closing tag
+// if NOT NULL then *ppOpenTagEnd gets next char after opening tag
+// tags starting with '<?' or '<!' have special context and are standalone
+// self-closing tags have equal *ppOpenTagEnd, *ppTag, and return value
+// This includes '<![CDATA[' which ends with ']]>' and '<!--' which ends with '-->'
+// see https://en.wikipedia.org/wiki/CDATA on CDATA
+const char *CHFindEndingXMLTag(const char **ppTag, int cbLength, const char **ppOpenTagEnd)
+{
+const char *p1, *p2, *p3, *p4, *pE;
+char *pTagName;
+int nSpecial = 0, iNest, cbTagName;
+
+
+  if(ppOpenTagEnd)
+    *ppOpenTagEnd = NULL; // pre-assign to NULL
+
+  if(!ppTag || !*ppTag || **ppTag != '<')  // must be a valid tag
+  {
+    WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
+    return NULL;
+  }
+
+  if(cbLength < 0)
+    cbLength = strlen(*ppTag);
+
+  p1 = *ppTag;
+  pE = p1 + cbLength;
+
+
+  // Looking for special self-closing tags
+  nSpecial = CHGetSpecialXMLTagType(p1, pE);
+
+
+  if(nSpecial == Special_Question || nSpecial == Special_BANG || nSpecial == Special_CDATA)
+  {
+    p1 += 2;
+  }
+  else if(nSpecial == Special_Comment)
+  {
+    p1 += 3;
+  }
+  else // if(nSpecial == Special_NONE)
+  {
+    p1++;
+  }
+
+  while(p1 < pE && *p1 && *p1 <= ' ')
+    p1++; // skip white space
+
+  if(p1 >= pE)
+  {
+    WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
+    return NULL;
+  }
+
+  p2 = CHFindEndOfXMLSection(p1, pE - p1, '>', 1);
+
+  if(!p2 || p2 <= p1 || *p2 != '>')
+  {
+    WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL, p2=%s\n", __FUNCTION__, __LINE__, p2);
+    return NULL;
+  }
+
+  if(nSpecial == Special_Question || nSpecial == Special_Comment)
+  {
+    WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - nSpecial=%d\n", __FUNCTION__, __LINE__, nSpecial);
+    while(1)
+    {
+      const char *p2a;
+
+      if(!p2 || *p2 != '>')
+      {
+        WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
+        return NULL;
+      }
+
+      p2++;  // point past the '>'
+
+      if((nSpecial == Special_Comment && (p2 - p1) > 3 && *(p2 - 2) == '-' && *(p2 - 3) == '-')
+         || (nSpecial == Special_Question && (p2 - p1) > 2 && *(p2 - 2) == '?'))
+      {
+        break;
+      }
+
+      p2a = p2;
+      p2 = CHFindEndOfXMLSection(p2a, pE - p2a, '>', 1);
+    }
+  }
+  else
+  {
+    p2++;  // point past the '>'
+  }
+
+  if(ppOpenTagEnd)
+    *ppOpenTagEnd = p2;
+
+  if(nSpecial == Special_Question || nSpecial == Special_BANG ||
+     nSpecial == Special_CDATA || nSpecial == Special_Comment)
+  {
+    WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - special tag %d\n", __FUNCTION__, __LINE__, nSpecial);
+    return p2;  // these are all self-closing
+  }
+  else if(p2 > p1 + 2 && *(p2 - 2) == '/')   // is this a self-closing tag also, ending with '/>'?
+  {
+    WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - self-close tag\n", __FUNCTION__, __LINE__);
+    return p2;  // this tag closes itself
+  }
+
+  // grab the tag name, which ends in a non-alpha character incl. white space
+  p3 = p1;
+  while(p3 < pE &&
+        ((*p3 >= 'a' && *p3 <= 'z') || (*p3 >= 'A' && *p3 <= 'Z') || (*p3 >= '0' && *p3 <= '9')))
+  {
+    p3++;
+  }
+
+  // save as tag name
+  cbTagName = p3 - p1;
+  pTagName = WBCopyStringN(p1, cbTagName);
+
+  if(!pTagName)
+  {
+    WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
+    return NULL;
+  }
+
+  WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - tag %s found\n", __FUNCTION__, __LINE__, pTagName);
+
+  // search for a matching closing tag
+
+  p1 = p2;
+  iNest = 1;
+  while(p1 < pE)
+  {
+    p1 = CHFindNextXMLTag(p1, pE - p1, CHPARSEXML_DEFAULT);
+
+    if(p1 && p1 < pE)
+    {
+      *ppTag = p1;  // store as a return val in case this is a close tag
+      p1++;  // point 1 past the '<'
+
+      while(p1 < pE && *p1 && *p1 <= ' ')
+        p1++;
+
+      WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - looking for end tag, %s found\n", __FUNCTION__, __LINE__, p1);
+    }
+    else // if(!p1 || p1 >= pE)
+    {
+      break;
+    }
+
+    p2 = CHFindEndOfXMLSection(p1, pE - p1, '>', 1);
+    if(!p2 || p2 <= p1 || *p2 != '>')
+    {
+      WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - returning NULL\n", __FUNCTION__, __LINE__);
+      return NULL;
+    }
+
+    p2++;  // point past the '>'
+
+    p3 = p1;
+    if(*p3 == '/') // an ending tag
+      p3++;
+
+    p4 = p3; // start of tag name
+
+    while(p3 < pE &&
+          ((*p3 >= 'a' && *p3 <= 'z') || (*p3 >= 'A' && *p3 <= 'Z') || (*p3 >= '0' && *p3 <= '9')))
+    {
+      p3++;
+    }
+
+    if((p3 - p4) == cbTagName && !strncasecmp(p4, pTagName, cbTagName)) // tag matches
+    {
+      WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - matching tag %s found\n", __FUNCTION__, __LINE__, p4);
+
+      if(*p1 == '/')   // it's an ending tag
+      {
+        iNest--;
+
+        if(iNest <= 0) // end of tag block
+        {
+          WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - end of tag %s found\n", __FUNCTION__, __LINE__, pTagName);
+          free(pTagName);
+          return p2;  // 1 past the end of the tag
+        }
+      }
+      else
+      {
+        iNest++; // nested item with same name
+      }
+    }
+
+    p1 = p2;
+  }
+
+  // assume the ending tag is after the end of text and return as-is
+  free(pTagName);
+  *ppTag = pE;
+  WB_DEBUG_PRINT(DebugLevel_Medium, "%s.%d - no tag end found, returning %s\n", __FUNCTION__, __LINE__, pE);
+  return pE;
+}
 
 
 ///////////////

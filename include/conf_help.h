@@ -921,7 +921,7 @@ const char *CHFindNextXMLTag(const char *pTagContents, int cbLength, int nNestin
   *
   * \param pTagContents A pointer to the string position just past the tag name
   * \param cbLength The (maximum) length of the XML data to parse
-  * \return A pointer to the '>' at the end of the XML tag, or 'one byte past the end' if no end-of-tag found.
+  * \return A pointer to the '>' at the end of the XML tag, or 'one byte past the end' if no end-of-tag found, or NULL on error
   *
   * Generic XML tag parsing.  Parse the tag to find its end.  The returned pointer will
   * either be the end of the string, or a pointer to the ending '>'.  The end of the string is defined
@@ -948,7 +948,7 @@ const char *CHFindEndOfXMLTag(const char *pTagContents, int cbLength);
   * \param cbLength The (maximum) length of the XML data to parse
   * \param cEndChar The ASCII character that the section ends with, typically '>' ')' or ']'
   * \param bUseQuotes A flag that is non-zero to ignore content within quoted strings, zero to ignore quote marks
-  * \return A pointer to the 'cEndChar' at the end of the XML section, or 'one byte past the end' if not found.
+  * \return A pointer to the 'cEndChar' at the end of the XML section, or 'one byte past the end' if not found, or NULL on error
   *
   * Generic XML parsing.  Parse the XML to find the end of the section, which can be a tag or a block
   * of text that is delimited using '[]' or '()' or a character of your own choosing.  The returned
@@ -969,6 +969,18 @@ const char *CHFindEndOfXMLTag(const char *pTagContents, int cbLength);
 **/
 const char *CHFindEndOfXMLSection(const char *pTagContents, int cbLength, char cEndChar, int bUseQuotes);
 
+
+/** \ingroup text_xml
+  * \brief Parses XML text for the ending tag of an XML 'section'
+  *
+  * \param ppTag A pointer to a pointer to the string position for the current tag (a '<'). On exit it points to the closing tag
+  * \param cbLength The (maximum) length of the XML data to parse
+  * \param ppTokenTagEnd A pointer to a pointer to receive the position following the open tag.  May be NULL
+  * \return A pointer just past the end of the XML section, or NULL on error
+  *
+  * Header File:  conf_help.h
+**/
+const char *CHFindEndingXMLTag(const char **ppTag, int cbLength, const char **ppOpenTagEnd);
 
 // MIME type help
 
