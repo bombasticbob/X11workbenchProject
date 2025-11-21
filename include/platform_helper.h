@@ -78,8 +78,24 @@
 
 #include <stdarg.h> /* stdarg to make sure I have va_list and other important stuff */
 #include <stdint.h> /* for standard integer types like uint32_t */
+#ifdef WIN32
+#include <windows.h> // for WIN32 applications
+#ifndef MAXPATHLEN
+#define MAXPATHLEN MAX_PATH
+#endif // MAXPATHLEN
+#ifndef PATH_MAX
+#define PATH_MAX MAX_PATH
+#endif // PATH_MAX
+#ifndef MAME_MAX
+#define NAME_MAX MAX_PATH
+#endif // NAME_MAX
+#else // !WIN32
+#include <pthread.h> /* make sure this is included for POSIX */
 
-#ifndef WIN32
+#ifndef MAX_PATH // WIN32 compat
+#define MAX_PATH PATH_MAX
+#endif // MAX_PATH
+
 // X11 header files
 
 #include <X11/Xlib.h>
@@ -87,182 +103,11 @@
 #include <X11/Xmd.h>  // for 'CARD32' and other things
 #include <X11/Xatom.h> // for 'XA_CARDINAL' and other things
 
-#else // WIN32
-
-#include <windows.h> // for WIN32 applications
-
 #endif // WIN32
 
-
-
-#if defined(__GNUC__) || defined(__DOXYGEN__)
-
-// ======================================================================================
-// this section is used for doxygen documentation using the X11 definitions
-// Additionally, 'clang' compilers also define '__GNUC__' and will use this section
-
-#include <pthread.h> /* make sure this is included for POSIX */
-
-#ifdef X11WORKBENCH_PROJECT_BUILD
-
-// Globally include the output of the configure script for GNUC compiles for "the project"
-#include "X11workbenchToolkit_config.h" // the 'generated' version'
-
-#else // X11WORKBENCH_PROJECT_BUILD
-
-// This is for the installed version, a subset of the things defined by the configure output script.
-// NOTE:  this must be installed in the appropriate package directory along with platform_helper.h
-#include "X11workbenchToolkit_install_config.h"
-
-#endif // X11WORKBENCH_PROJECT_BUILD
-
-// TESTING THE CONFIGURATION - TODO:  for some, provide alternates?
-// NOTE that for '_MSC_VER' defined, certain features won't be checked
-
-// basic checks - test them all up front, then individual errors if any of these
-//                are not defined in the appropriate header files
-#if !defined( HAVE_ALARM ) || !defined( HAVE_CHOWN ) || \
-    !defined( HAVE_CLOCK_GETTIME ) || !defined( HAVE_DUP2 ) || !defined( HAVE_FORK ) || \
-    !defined( HAVE_FTRUNCATE ) || !defined( HAVE_GETCWD ) || !defined( HAVE_GETTIMEOFDAY ) || \
-    !defined( HAVE_MALLOC ) || !defined( HAVE_MBLEN ) || !defined( HAVE_MEMCHR ) || \
-    !defined( HAVE_MEMMOVE ) || !defined( HAVE_MEMSET ) || !defined( HAVE_MKDIR ) || \
-    !defined( HAVE_PRINTF ) || !defined( HAVE_REALLOC ) || \
-    !defined( HAVE_SELECT ) || !defined( HAVE_SETLOCALE ) || !defined( HAVE_STRCASECMP ) || \
-    !defined( HAVE_STRCHR ) || !defined( HAVE_STRNCASECMP ) || !defined( HAVE_STRRCHR ) || \
-    !defined( HAVE_STRSTR ) || !defined( HAVE__BOOL ) || \
-    ( !defined(_MSC_VER) && ( !defined( LSTAT_FOLLOWS_SLASHED_SYMLINK ) || !defined( HAVE_VFORK ) || \
-                              !defined( HAVE_WORKING_FORK ) || !defined( HAVE_WORKING_VFORK ) ))
-// *************************************************************
-#error
-#error configure script feature check 1 fail
-#error critical features missing
-#error
-// this next section spits out errors based on what's not defined.
-#ifndef HAVE_ALARM
-#error  HAVE_ALARM is not defined
-#endif //  HAVE_ALARM
-#ifndef HAVE_CHOWN
-#error  HAVE_CHOWN is not defined
-#endif //  HAVE_CHOWN
-#ifndef HAVE_CLOCK_GETTIME
-#error  HAVE_CLOCK_GETTIME is not defined
-#endif //  HAVE_CLOCK_GETTIME
-#ifndef HAVE_DUP2
-#error  HAVE_DUP2 is not defined
-#endif //  HAVE_DUP2
-#ifndef HAVE_FORK
-#error  HAVE_FORK is not defined
-#endif //  HAVE_FORK
-#ifndef HAVE_FTRUNCATE
-#error  HAVE_FTRUNCATE is not defined
-#endif //  HAVE_FTRUNCATE
-#ifndef HAVE_GETCWD
-#error  HAVE_GETCWD is not defined
-#endif //  HAVE_GETCWD
-#ifndef HAVE_GETTIMEOFDAY
-#error  HAVE_GETTIMEOFDAY is not defined
-#endif //  HAVE_GETTIMEOFDAY
-#ifndef HAVE_MALLOC
-#error  HAVE_MALLOC is not defined
-#endif //  HAVE_MALLOC
-#ifndef HAVE_MBLEN
-#error  HAVE_MBLEN is not defined
-#endif //  HAVE_MBLEN
-#ifndef HAVE_MEMCHR
-#error  HAVE_MEMCHR is not defined
-#endif //  HAVE_MEMCHR
-#ifndef HAVE_MEMMOVE
-#error  HAVE_MEMMOVE is not defined
-#endif //  HAVE_MEMMOVE
-#ifndef HAVE_MEMSET
-#error  HAVE_MEMSET is not defined
-#endif //  HAVE_MEMSET
-#ifndef HAVE_MKDIR
-#error  HAVE_MKDIR is not defined
-#endif //  HAVE_MKDIR
-#ifndef HAVE_PRINTF
-#error  HAVE_PRINTF is not defined
-#endif //  HAVE_PRINTF
-#ifndef HAVE_REALLOC
-#error  HAVE_REALLOC is not defined
-#endif //  HAVE_REALLOC
-#ifndef HAVE_SELECT
-#error  HAVE_SELECT is not defined
-#endif //  HAVE_SELECT
-#ifndef HAVE_SETLOCALE
-#error  HAVE_SETLOCALE is not defined
-#endif //  HAVE_SETLOCALE
-#ifndef HAVE_STRCASECMP
-#error  HAVE_STRCASECMP is not defined
-#endif //  HAVE_STRCASECMP
-#ifndef HAVE_STRCHR
-#error  HAVE_STRCHR is not defined
-#endif //  HAVE_STRCHR
-#ifndef HAVE_STRNCASECMP
-#error  HAVE_STRNCASECMP is not defined
-#endif //  HAVE_STRNCASECMP
-#ifndef HAVE_STRRCHR
-#error  HAVE_STRRCHR is not defined
-#endif //  HAVE_STRRCHR
-#ifndef HAVE_STRSTR
-#error  HAVE_STRSTR is not defined
-#endif //  HAVE_STRSTR
-#ifndef HAVE__BOOL
-#error  HAVE__BOOL is not defined
-#endif //  HAVE__BOOL
-#ifndef LSTAT_FOLLOWS_SLASHED_SYMLINK
-#error  LSTAT_FOLLOWS_SLASHED_SYMLINK is not defined
-#endif //  LSTAT_FOLLOWS_SLASHED_SYMLINK
-#ifndef HAVE_VFORK
-#error  HAVE_VFORK is not defined
-#endif //  HAVE_VFORK
-#ifndef HAVE_WORKING_FORK
-#error  HAVE_WORKING_FORK is not defined
-#endif //  HAVE_WORKING_FORK
-#ifndef HAVE_WORKING_VFORK
-#error  HAVE_WORKING_VFORK is not defined
-#endif //  HAVE_WORKING_VFORK
-#error
-// the end of that previous error section
-// *************************************************************
-#else
-// -------------------------------------------------------------
-#if !( HAVE_ALARM ) || !( HAVE_CHOWN ) || \
-    !( HAVE_CLOCK_GETTIME ) || !( HAVE_DUP2 ) || !( HAVE_FORK ) || \
-    !( HAVE_FTRUNCATE ) || !( HAVE_GETCWD ) || !( HAVE_GETTIMEOFDAY ) || \
-    !( HAVE_MALLOC ) || !( HAVE_MBLEN ) || !( HAVE_MEMCHR ) || \
-    !( HAVE_MEMMOVE ) || !( HAVE_MEMSET ) || !( HAVE_MKDIR ) || \
-    !( HAVE_PRINTF ) || !( HAVE_REALLOC ) || \
-    !( HAVE_SELECT ) || !( HAVE_SETLOCALE ) || !( HAVE_STRCASECMP ) || \
-    !( HAVE_STRCHR ) || !( HAVE_STRNCASECMP ) || !( HAVE_STRRCHR ) || \
-    !( HAVE_STRSTR ) || !( HAVE__BOOL ) || \
-    ( !defined(_MSC_VER) && ( !( LSTAT_FOLLOWS_SLASHED_SYMLINK ) || !( HAVE_VFORK ) || \
-                              !( HAVE_WORKING_FORK ) || !( HAVE_WORKING_VFORK ) ))
-#error
-#error configure script feature check 2 fail
-#error critical features missing
-#error
-
-// TODO:  individual error messages for those things 'not defined'?  It's a bit
-//        easier to see where something is defined as '0' rather than finding
-//        something that isn't there.  For now, I won't add that section, but I
-//        might do it if it becomes necessary
-
-#endif // all that stuff defined as a zero
-// -------------------------------------------------------------
-#endif // all that prior stuff
-
-#ifndef HAVE_BZERO
-  #define HAVE_BZERO 0
-#endif // !HAVE_BZERO
-
-#if !( HAVE_BZERO )
-// swap this in for 'bzero' using memset - it was checked for earlier
-  #define bzero(X,Y) memset((X),0,(Y))
-#endif
-
-
+// ======================
 // DEBUG vs RELEASE code
+// ======================
 
 #ifdef DEBUG /* explicit DEBUG build */
 #ifdef NO_DEBUG
@@ -270,7 +115,10 @@
 #endif // NO_DEBUG
 #endif // DEBUG
 
-// NOTE:  The debug code will be included when NO_DEBUG is *NOT* defined
+// NOTE:  The debug code will be included whenever NO_DEBUG is *NOT* defined
+
+
+// DOXYGEN group definitions
 
 /** \defgroup platform_definitions Definitions
   * \ingroup platform
@@ -284,13 +132,8 @@
   * \ingroup platform
 **/
 
-/** \ingroup platform_definitions
-  * \hideinitializer
-  * \brief INVALID HANDLE VALUE equivalent
-  *
-  * This definition generically refers to an INVALID HANDLE, more specifically a FILE or SOCKET handle on POSIX systems
-**/
-#define INVALID_HANDLE_VALUE ((int)-1)
+#include "configure_checker.inl" // check config and do some very basic definitions
+
 
 /** \ingroup platform_definitions
   * @{
@@ -313,61 +156,6 @@
 **/
 #define WB_STRINGIZE_INTERNAL(X) #X
 
-
-//-------------------------------------------------
-// branch optimization macros - gcc and clang only
-//-------------------------------------------------
-
-#if defined(COMPILER_SUPPORTS_BUILTIN_EXPECT) || defined(__DOXYGEN__)
-
-/** \brief optimization for code branching when condition is 'unlikely'.  use within conditionals
- **
- ** \code
-    if(WB_UNLIKELY(x == 5))
-    {
-      // branch optimized to bypass this code when condition is FALSE
-    }
- ** \endcode
-**/
-#define WB_UNLIKELY(x) (__builtin_expect (!!(x), 0))
-/** \brief optimization for code branching when condition is 'likely'.  use within conditionals
- **
- ** \code
-    if(WB_LIKELY(x == 5))
-    {
-      // branch optimized to execute this code when condition is TRUE
-    }
- ** \endcode
-**/
-#define WB_LIKELY(x) (__builtin_expect (!!(x), 1))
-
-#else // !COMPILER_SUPPORTS_BUILTIN_EXPECT
-
-#define WB_UNLIKELY(x) (x)
-#define WB_LIKELY(x) (x)
-
-#endif // COMPILER_SUPPORTS_BUILTIN_EXPECT
-
-#if defined(COMPILER_SUPPORTS_UNUSED_ATTRIBUTE) || defined(__DOXYGEN__)
-
-/** \brief marks a variable as likely to be 'unused'.  warning abatement.  Place macro directly after the variable name
- **
- ** \code
-
-    int an_unused_var WB_UNUSED = 5; // no compiler warnings if I don't actually use this variable
-
- ** \endcode
- **
- ** \b NOTE:  may also be used for function parameters.  In some cases a callback function may have unused\n
- **        parameters passed to it.  Marking them with 'WB_UNUSED' helps prevent unnecessary compiler warnings.
-**/
-#define WB_UNUSED __attribute__((unused))
-
-#else // !COMPILER_SUPPORTS_UNUSED_ATTRIBUTE
-
-#define WB_UNUSED
-
-#endif // COMPILER_SUPPORTS_UNUSED_ATTRIBUTE
 
 
 /** \brief The minimum 'internal' Atom value used by the toolkit
@@ -394,28 +182,32 @@
   * @}
 **/
 
+
+
+// BASIC TYPEDEFS
+
 /** \ingroup platform_types
   * \brief Platform abstract 32-bit integer
   *
   * This definition identifies the data type for a 32-bit integer
 **/
-typedef int WB_INT32;
+typedef int WB_INT32; /* always 32-bit for 32 or 64-bit systems */
 
 /** \ingroup platform_types
   * \brief Platform abstract unsigned 32-bit integer
   *
   * This definition identifies the data type for an unsigned 32-bit integer
 **/
-typedef unsigned int WB_UINT32;
+typedef unsigned int WB_UINT32; /* always 32-bit for 32 or 64-bit systems */
 
 
+// LONGLONG data type
 #if defined(HAVE_LONGLONG) || defined(__DOXYGEN__) /* 'configure' tests for 'long long' datatype valid in configure script */
 
 /** \ingroup platform_definitions
   * \brief defined whenever the 'WB_UINT64' data type is a 'built in' data type
 **/
 #define HAS_WB_UINT64_BUILTIN
-
 
 /** \ingroup platform_types
   * \brief Platform abstract 64-bit integer
@@ -431,12 +223,33 @@ typedef long long WB_INT64;
 **/
 typedef unsigned long long WB_UINT64;
 
+#elif defined(WIN32) // windows compilers, assume it supports __int64
+
+#define HAS_WB_UINT64_BUILTIN
+
+typedef __int64 WB_INT64;
+typedef unsigned __int64 WB_UINT64;
+
 #else // !defined HAVE_LONGLONG, unlikely (this part won't show up in doxygen either)
 
 typedef struct tagWB_INT64 { WB_UINT32 dw2; WB_INT32 dw1; } WB_INT64;    // note 'dw1' is a signed value
 typedef struct tagWB_UINT64 { WB_UINT32 dw2; WB_UINT32 dw1; } WB_UINT64;
 
-#endif // _LONGLONG
+#endif // HAVE_LONGLONG
+
+
+/** \brief Platform abstract 64-bit integer
+  *
+  * This definition identifies the data type for a 64-bit integer
+**/
+#if defined(WIN32) && _USE_32BIT_TIME_T && !defined(__DOXYGEN__)
+typedef long long WB_TIME;
+#elif __SIZEOF_LONG__ <= 4 /* 32-bit OS */ && !defined(__DOXYGEN__)
+typedef long long WB_TIME;
+#else // 64-bit and compatible to 64-bit time_t
+typedef time_t WB_TIME;
+#endif // 32-bit vs 64-bit time_t
+
 
 #ifdef __DOXYGEN__
 /** \ingroup platform_types
@@ -451,63 +264,220 @@ typedef unsigned long long WB_UINTPTR;
 #define __SIZEOF_POINTER__ 0
 #endif
 
+#if !defined(__SIZEOF_POINTER__) // TODO find a better way to deal with pointer size if this isn't defined
+#define __SIZEOF_POINTER__ 0
+#endif
+
 #if defined(__LP64__) /* TODO see what WIN32 vs WIN64 does */
 typedef WB_UINT64 WB_UINTPTR;
 #elif __SIZEOF_POINTER__ == 4 /* 4-byte pointer */
 typedef WB_UINT32 WB_UINTPTR;
-#else // assume long pointer
+#else // assume long long pointer
 typedef WB_UINT64 WB_UINTPTR;
 #endif // __LP64__
-#endif // __DOXYGEN__
 
+#endif // __DOXYGEN__ (WB_UINTPTR)
 
-/** \ingroup platform_definitions
-  * \brief Defined in 'platform_helper.h' when the compiler supports C99 initializers
-**/
-#define WB_C99_INITIALIZERS /* allow C99-style initializers */
+// ===================================
+// PLATFORM-SPECIFIC TYPE DEFINITIONS
+// ===================================
 
 /** \ingroup platform_types
-  * \brief MODULE HANDLE equivalent
+  * @{
+**/
+
+#ifdef WIN32
+
+/** \brief invalid process ID abstraction
+  * NOTE: c++ only; for C use WB_PROCESS_ID_INVALID()
+**/
+#define WB_INVALID_PROCESS_ID  pidInvalid
+
+/** \brief test for invalid process ID
+**/
+#define WB_PROCESS_ID_INVALID(X) (&(X) == &pidInvalid || \
+                                  ((X).uiProcessID == pidInvalid.uiProcessID \
+                                   && (X).hProcess == pidInvalid.hProcess \
+                                   && (X).iCachedExitCode == pidInvalid.iCachedExitCode))
+
+/** \brief 'Process ID' abstraction for Win32
+  * this structure is allocated and must be properly destroyed
+**/
+typedef struct __WB_PROCESS_ID
+{
+  UINT32 uiProcessID;
+  HANDLE hProcess; // so I can get exit code;
+  INT32 iCachedExitCode; // when process closes, store it here
+#ifdef __cplusplus
+  bool operator== (const struct __WB_PROCESS_ID &v2) const
+  {
+    return uiProcessID == v2.uiProcessID &&
+           hProcess == v2.hProcess &&
+           iCachedExitCode == v2.iCachedExitCode;
+  }
+#endif // __cplusplus
+} WB_PROCESS_ID;
+
+extern WB_PROCESS_ID pidInvalid;
+
+/** \brief file handle abstraction
+**/
+#define WB_FILE_HANDLE HANDLE
+
+/** \brief 'invalid file handle' abstraction
+**/
+#define WB_INVALID_FILE_HANDLE INVALID_HANDLE_VALUE
+
+
+/** \brief MODULE HANDLE equivalent
+  *
+  * This 'typedef' refers to a MODULE
+**/
+typedef HMODULE WB_MODULE;
+
+/** \brief THREAD HANDLE equivalent
+  *
+  * This 'typedef' refers to a THREAD
+**/
+typedef DWORD WB_THREAD;
+
+/** \brief THREADPROC equivalent
+  *
+  * This 'typedef' refers to the entry function prototype for a thread entry point
+**/
+typedef void *(*WB_THREAD_PROC)(void *pParam);
+//typedef DWORD (WINAPI *WB_THREAD_PROC)( LPVOID lpParam );
+
+/** \brief PROC ADDRESS equivalent
+  *
+  * This 'typedef' refers to a PROC ADDRESS as exported from a shared library
+**/
+typedef FARPROC WB_PROCADDRESS;
+
+/** \brief THREAD LOCAL STORAGE 'key' equivalent
+  *
+  * This 'typedef' refers to a THREAD LOCAL STORAGE key, identifying a storage slot
+**/
+typedef DWORD WB_THREAD_KEY;
+
+/** \brief CONDITION HANDLE equivalent (similar to an 'event')
+  *
+  * This 'typedef' refers to a CONDITION, a triggerable synchronization resource
+**/
+typedef WB_UINT32 WB_COND; // defined as 'WB_UINT32' because of pthread_cond problems under Linux - man pthread
+//typedef pthread_cond_t  WB_COND;
+
+/** \brief MUTEX HANDLE equivalent
+  *
+  * This 'typedef' refers to a MUTEX, a lockable synchronization object
+**/
+typedef HANDLE WB_MUTEX;
+
+/** \brief MODULE HANDLE equivalent
+  *
+  * This 'typedef' refers to a MODULE
+**/
+
+#define WB_INVALID_THREAD ((WB_THREAD)-1)
+
+#else // !WIN32 aka POSIX
+
+/** \brief process ID abstraction
+**/
+#define WB_PROCESS_ID pid_t
+
+/** \brief file handle abstraction
+**/
+#define WB_FILE_HANDLE int
+
+/** \ingroup platform_definitions
+  * \hideinitializer
+  * \brief INVALID HANDLE VALUE equivalent
+  *
+  * This definition generically refers to an INVALID HANDLE, more specifically a FILE or SOCKET handle on POSIX systems
+**/
+#define INVALID_HANDLE_VALUE ((int)-1)
+
+/** \brief 'invalid file handle' abstraction
+**/
+#define WB_INVALID_FILE_HANDLE ((WB_FILE_HANDLE)-1)
+
+/** \brief 'invalid process ID' abstraction, Win32 source compatibility
+  * NOTE: c++ only; for C use WB_PROCESS_ID_INVALID()
+**/
+#define WB_INVALID_PROCESS_ID  ((WB_PROCESS_ID)-1)
+
+/** \brief test for invalid process ID
+**/
+#define WB_PROCESS_ID_INVALID(X) ((X) == WB_INVALID_PROCESS_ID)
+
+/** \brief 'invalid socket' abstraction, Win32 source compatibility
+**/
+#define INVALID_SOCKET ((SOCKET)-1)
+
+/** \brief 'SOCKET' abstraction, Win32 source compatibility
+**/
+typedef int SOCKET;
+
+/** \brief 'close socket' abstraction, Win32 source compatibility
+**/
+#define closesocket(X) close(X) /* compatibility for Win32, call THIS to close a socket handle */
+
+
+/** \brief MODULE HANDLE equivalent
   *
   * This 'typedef' refers to a MODULE
 **/
 typedef void * WB_MODULE;
 
-/** \ingroup platform_types
-  * \brief THREAD HANDLE equivalent
+/** \brief THREAD HANDLE equivalent
   *
   * This 'typedef' refers to a THREAD
 **/
 typedef pthread_t WB_THREAD;
 
-/** \ingroup platform_types
-  * \brief PROC ADDRESS equivalent
+/** \brief THREADPRIOC equivalent
+  *
+  * This 'typedef' refers to the entry function prototype for a thread entry point
+**/
+typedef void *(*WB_THREAD_PROC)(void *pParam);
+
+/** \brief PROC ADDRESS equivalent
   *
   * This 'typedef' refers to a PROC ADDRESS as exported from a shared library
 **/
 typedef void (* WB_PROCADDRESS)(void);
 
-/** \ingroup platform_types
-  * \brief THREAD LOCAL STORAGE 'key' equivalent
+/** \brief THREAD LOCAL STORAGE 'key' equivalent
   *
   * This 'typedef' refers to a THREAD LOCAL STORAGE key, identifying a storage slot
 **/
 typedef pthread_key_t   WB_THREAD_KEY;
 
-/** \ingroup platform_types
-  * \brief CONDITION HANDLE equivalent (similar to an 'event')
+/** \brief CONDITION HANDLE equivalent (similar to an 'event')
   *
   * This 'typedef' refers to a CONDITION, a triggerable synchronization resource
 **/
 typedef WB_UINT32 WB_COND; // defined as 'WB_UINT32' because of pthread_cond problems under Linux
 //typedef pthread_cond_t  WB_COND;
 
-/** \ingroup platform_types
-  * \brief MUTEX HANDLE equivalent
+/** \brief MUTEX HANDLE equivalent
   *
   * This 'typedef' refers to a MUTEX, a lockable synchronization object
 **/
 typedef pthread_mutex_t WB_MUTEX;
+
+#define WB_INVALID_THREAD ((WB_THREAD)-1)
+
+// windows compatibility for BSTR and mbcs/unicode things
+typedef char * WB_PSTR;         ///< pointer to char string - a convenience typedef
+typedef const char * WB_PCSTR;  ///< pointer to const char string - a convenience typedef
+
+#endif // WIN32,POSIX
+
+/**
+  * @}
+**/
 
 // TODO:  sizeof(int) sizeof(long) - long is 64-bit for GNUC - MS compilers make it 32-bit
 
@@ -525,60 +495,6 @@ typedef pthread_mutex_t WB_MUTEX;
 #define __PACKED__ __attribute__((__packed__))
 
 #endif // __DOXYGEN__
-
-// end of section for clang and gcc compilers (and also doxygen definitions)
-// ======================================================================================
-
-#elif defined(_MSC_VER) /* Microsoft C/C++ compiler */
-
-// ======================================================================================
-// this section is dedicated to Microsoft compilers, which do things a bit different...
-
-// TODO:  add proper support for MS compiler
-#if _MSC_VER > 1300
-
-// TODO:  specify correct version in which C99 initializers are supported
-//        as of MSC for ".Net" 2010 it's _NOT_ supported (still!)
-//#define WB_C99_INITIALIZERS
-
-#endif // _MSC_VER > xxxx
-
-#define WB_UNLIKELY(x) (x)
-#define WB_LIKELY(x) (x)
-
-#ifndef __inline__
-#define __inline__ inline /* this assumes 'inline' is supported (MSC should support this) */
-#endif // __inline__
-
-typedef __int64 WB_INT64;
-typedef unsigned __int64 WB_UINT64;
-typedef int WB_INT32;
-typedef unsigned int WB_UINT32;
-
-// use terms similar to MS Windows Win32 API
-typedef HMODULE WB_MODULE ;     /* module handle */
-typedef HANDLE WB_THREAD;       /* thread handle - thread IDs are still 'int' types */
-typedef FARPROC WB_PROCADDRESS; // generic proc address returned from GetProcAddress()
-
-typedef DWORD WBTHREAD_KEY;     // return from 'TlsAlloc()'
-typedef HANDLE WB_COND;         // equivalent to an event handle
-typedef HANDLE WB_MUTEX;        // equivalent to a mutex handle
-
-
-// TODO:  sizeof(int) sizeof(long) - long is 32-bit for MSC
-
-// TODO:  compatibility definition file for winders
-
-#define __PACKED__ /* TODO: a definition for packing in MS-land */
-
-// end of section specific to Microsoft compilers
-// ======================================================================================
-
-#else // !defined(_MSVC_VER) && !defined(__GNUC__)
-
-#error unknown and/or unsupported compiler
-
-#endif // __GNUC__
 
 
 // put standard '#define's and typedefs here, the ones that apply to EVERYBODY
@@ -781,6 +697,24 @@ const char *GetStartupAppName(void);
 //             |___/                                                        //
 //                                                                          //
 //////////////////////////////////////////////////////////////////////////////
+
+/** \ingroup platform_functions
+  * \brief Get System Time
+  *
+  * \returns current 'UNIX time' in seconds as WB_TIME value
+  *
+  * The return value from this function is derived from the 'gettimeofday' call on POSIX systems, equivalent to 'time_t'
+  *
+  * On systems that do not natively support a 64-bit integer type, the return value will be 'time_t'
+  *
+  * Header File:  platform_helper.h
+**/
+#if defined(HAS_WB_UINT64_BUILTIN) || defined(__DOXYGEN__)
+WB_TIME WBGetSystemTime(void);
+#else // !defined(HAS_WB_UINT64_BUILTIN) && !defined(__DOXYGEN__)
+time_t WBGetSystemTime(void);
+#endif // defined(HAS_WB_UINT64_BUILTIN) || defined(__DOXYGEN__)
+
 
 
 /** \ingroup platform_functions
@@ -1785,15 +1719,6 @@ char * WBTempFile0(const char *szExt);
 // SPAWNING APPLICATIONS
 // *********************
 
-#ifdef WIN32
-#define WB_FILE_HANDLE HANDLE
-#define WB_PROCESS_ID HANDLE
-#define WB_INVALID_FILE_HANDLE INVALID_HANDLE_VALUE
-#else // !WIN32
-#define WB_FILE_HANDLE int
-#define WB_PROCESS_ID unsigned int
-#define WB_INVALID_FILE_HANDLE -1
-#endif // WIN32
 /** \ingroup process
   * \brief Run an application asynchronously
   *
@@ -1852,6 +1777,45 @@ int WBGetProcessState(WB_PROCESS_ID idProcess, WB_INT32 *pExitCode);
   * Header File:  platform_helper.h
 **/
 char * WBRunResult(const char *szAppName, ...);
+
+/** \ingroup process
+  * \brief Run an application synchronously, returning 'stdout' output in a character buffer unless return code != 0
+  *
+  * \param szAppName A const pointer to a character string containing the path to the application
+  * \returns A WBAlloc() pointer to a buffer containing the 'stdout' output from the application, or NULL on error.
+  *
+  * Use this function to run an external process and capture its output.  This function will check the
+  * error return code from the program, returning NULL if it is non-zero.
+  *
+  * Each additional parameter passed to this function is a parameter that is to be passed to the program.
+  * The final parameter in the list must be NULL, so any call to this function will need to have at
+  * least 2 parameters.
+  * On error this function returns a NULL value.  Any non-NULL value must be 'free'd by the caller using WBFree().
+  *
+  * Header File:  platform_helper.h
+**/
+char * WBRunResult2(const char *szAppName, ...);
+
+/** \ingroup process
+  * \brief Run an application synchronously, supplying an input buffer and buffer length for 'stdin', and returning 'stdout' output in a character buffer.
+  *
+  * \param pStdin A const pointer to a binary buffer containing the input for piped data.
+  * \param cbStdin An integer containing the length of the buffer pointed to by 'pStdin'
+  * \param szAppName A const pointer to a character string containing the path to the application
+  * \returns A WBAlloc() pointer to a buffer containing the 'stdout' output from the application, or NULL on error.
+  *
+  * Use this function to run an external process and capture its output.  This function will check the
+  * error return code from the program, returning NULL if it is non-zero.
+  *
+  * Each additional parameter passed to this function is a parameter that is to be passed to the program.
+  * The final parameter in the list must be NULL, so any call to this function will need to have at
+  * least 2 parameters.
+  * On error this function returns a NULL value.  Any non-NULL value must be 'free'd by the caller using WBFree().
+  *
+  * Header File:  platform_helper.h
+**/
+char * WBRunResult3(const void * pStdin, int cbStdin, const char *szAppName, ...);
+
 
 /** \ingroup process
   * \brief Run an application synchronously, supplying an input buffer for 'stdin', and returning 'stdout' output in a character buffer.

@@ -1271,7 +1271,10 @@ SIGINFO_ENTRY(SIGBUS),   //    create core image       bus error
 SIGINFO_ENTRY(SIGSEGV),  //    create core image       segmentation violation
 SIGINFO_ENTRY(SIGSYS),   //    create core image       non-existent system call invoked
 SIGINFO_ENTRY(SIGPIPE),  //    terminate process       write on a pipe with no reader
-SIGINFO_ENTRY(SIGALRM),  //    terminate process       real-time timer expired
+//
+// WBPlatformInit makes use of SIGALRM
+//SIGINFO_ENTRY(SIGALRM),  //    terminate process       real-time timer expired
+//
 SIGINFO_ENTRY(SIGTERM),  //    terminate process       software termination signal
 SIGINFO_ENTRY(SIGURG),   //    discard signal          urgent condition present on socket
 ////SIGINFO_ENTRY(SIGSTOP),  //    stop process            stop (cannot be caught or ignored)

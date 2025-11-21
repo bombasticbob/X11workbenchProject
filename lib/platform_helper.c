@@ -59,30 +59,44 @@
 #define __USE_GNU
 #endif // linux
 
+#ifdef WIN32
+#define _CRT_SECURE_NO_WARNINGS /* need POSIX compat without complaints */
+#include <Windows.h>
+#endif // WIN32
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <time.h>
 #include <memory.h>
-#ifndef WIN32
-#include <unistd.h>
+#include <math.h>
+#ifdef WIN32
+#include <io.h>
+#include <tchar.h>
+#include <process.h>
+#else // WIN32
 #include <pthread.h>
+#include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <signal.h>
-#include <time.h>
-#include <sys/time.h>
+#include <limits.h>
 #include <dlfcn.h> /* dynamic library support */
+#include <dirent.h>
+#include <fnmatch.h>
+#include <locale.h>
 #include <sys/wait.h>
-#include <sys/types.h>
-#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/param.h> // for MAXPATHLEN and PATH_MAX (also includes limits.h in some cases)
 #ifdef __FreeBSD__
 #include <sys/sysctl.h> // to use the 'sysctlXXX' APIs
 #endif // __FreeBSD__
+#endif // WIN32
+#include <sys/types.h>
+#include <sys/stat.h>
 
-#include <time.h> // clock_gettime etc.
-#include <locale.h>
-#endif // !WIN32
 
 #include "platform_helper.h" // includes X11 headers as well
 #include "window_helper.h"
@@ -198,10 +212,51 @@ void WBUsage(void)
 }
 
 
+
+static timer_t __iTimer = (timer_t)-1;
+
+static void alarm_signal_handler(int iSig)
+{
+static int nTime =0;
+
+  // millisecond timer
+
+#if 0
+  nTime++;
+  if((nTime % 100) == 0)
+  {
+    // temporary
+    XClientMessageEvent evt = {
+                                .type=ClientMessage,
+                                .serial=0,
+                                .send_event=0,
+                                .display=WBGetDefaultDisplay(),
+                                .window=None, // application
+                                .message_type=aWB_TIMER,
+                                .format=32
+                              };
+
+    evt.data.l[0] = 0x7fffffff;;
+
+    WBPostPriorityEvent(evt.window, (XEvent *)&evt);
+    nTime = 0;
+
+    WBDebugPrint("* TIMER *\n");
+  }
+#endif // 0
+
+}
+
+
+
+
 void WBPlatformOnInit(void)
 {
 char *pEnv;
-int iType;
+int i1, iType;
+struct sigevent evt;
+struct itimerspec itv;
+
 
   // NOTE:  main thread needs to do this before spawning any threads.
 
@@ -241,12 +296,48 @@ int iType;
 default_locale:
     setlocale(LC_ALL, ""); // should pick OS default when I do this
   }
+
+  // set up any signal handlers needed by X11WorkBench
+  signal(SIGALRM, alarm_signal_handler);
+
+  memset(&evt, 0, sizeof(evt));
+  evt.sigev_notify = SIGEV_SIGNAL;
+  evt.sigev_signo  = SIGALRM;
+//  evt.sigev_value  = 0;
+
+  i1 = timer_create(CLOCK_REALTIME,&evt, &__iTimer);
+
+  if(i1 < 0)
+  {
+  }
+
+  memset(&itv, 0, sizeof(itv));
+  itv.it_value.tv_sec = 0;
+  itv.it_value.tv_nsec = 1000000; // 1msec
+  itv.it_interval.tv_sec = 0;
+  itv.it_interval.tv_nsec = 1000000; // 1msec
+
+  i1 = timer_settime(__iTimer, 0, &itv, NULL);
+
+  if(i1 < 0)
+  {
+  }
 }
 
 void WBPlatformOnExit(void)
 {
 char *p1;
 
+  // stop timer if any
+  if(__iTimer != (timer_t)-1)
+  {
+    struct itimerspec itv;
+
+    memset(&itv, 0, sizeof(itv));
+    timer_settime(__iTimer, 0, &itv, NULL); // set interval to 0 shutting it off
+    timer_delete(__iTimer);
+    __iTimer = (timer_t)-1;
+  }
 
   if(pTempFileList) // delete temporary file list
   {
@@ -1026,35 +1117,187 @@ int i1, bNotYet = 1;
 //                                                                          //
 //////////////////////////////////////////////////////////////////////////////
 
+#define FOUR_HUNDRED_YEARS (400 * 365 + 24 * 4 + 1)
+static int  total_days[13]={0,31,59,90,120,151,181,212,243,273,304,334,365};
+static int  total_leap[13]={0,31,60,91,121,152,182,213,244,274,305,335,366};
+static WB_TIME epoch_time = 25568; // 1900-based date offset from epoch
+
+WB_TIME WBGetSystemTime(void)
+{
+#if defined(WIN32)
+
+#ifdef _USE_32BIT_TIME_T /* see time.h */
+#error you must not use 32-bit time_t value, use 64-bit only
+#endif // _USE_32BIT_TIME_T
+
+SYSTEMTIME st;
+int64_t l1;
+int n_years;
+long adjustment;
+
+
+   GetSystemTime(&st);
+
+    // convert to days since 1/1/1970
+
+   n_years = st.wYear - 1900;    /* # of years since 1900 */
+   adjustment = 0;
+
+   while(n_years<0)
+   {
+      n_years += 400;                       /* add 400 years */
+      adjustment -= FOUR_HUNDRED_YEARS;    /* number of days in 400 years */
+   }
+
+   while(n_years >=400)
+   {
+      n_years -= 400;
+      adjustment += FOUR_HUNDRED_YEARS;
+   }
+      /*    CALCULATE THE TOTAL NUMBER OF DAYS UP TO 1/1 THIS YEAR    */
+      /* terms:  # of days + # of "Feb/29"s - # of non-leap centuries */
+
+   l1 = 365L * n_years + ((n_years > 4)?((n_years - 1) >> 2):0)
+        + ((n_years > 100)?(1 - (n_years - 1)/ 100):0);
+
+   if(((st.wYear % 400)==0 || (st.wYear % 100)!=0) && (st.wYear % 4)==0)
+      l1 += total_leap[st.wMonth - 1];    /* month-to-date totals (leap year) */
+   else
+      l1 += total_days[st.wMonth - 1];    /* month-to-date totals */
+
+   l1 += st.wDay + adjustment; // days since 1/1/1900 (a '1')
+
+   // convert to days since epoch (1/1/1970, a '1')
+   l1 -= epoch_time;
+
+   // convert to seconds (00:00:00 AM UTC)
+   l1 *= 86400;
+
+   return (WB_TIME)l1;
+#elif __SIZEOF_LONG__ <= 4 // !WIN32, 32-bit time_t
+
+#ifndef NO_DEBUG
+#warning 32-bit time_t is only valid until 2038 - use 64-bit OS to avoid Y2K38
+#warning rewrite this to avoid Y2K38, by getting year, month, day etc. and converting like for WIN32
+#endif
+//
+// TODO - rewrite this to avoid Y2K38, by getting year, month, day etc. and converting like for WIN32
+struct timeval tv;
+
+  // 32-bit time_t - rewrite this to avoid Y2K38, by getting year, month, day etc. and converting like for WIN32
+
+  gettimeofday(&tv, NULL); // for now, just use this.
+
+  return (WB_TIME)tv.tv_sec;
+#else // 64-bit time_t, !WIN32
+struct timeval tv;
+
+  gettimeofday(&tv, NULL);
+
+  return (WB_TIME)tv.tv_sec;
+#endif // WIN32
+}
+
+
 #if defined(HAS_WB_UINT64_BUILTIN) || defined(__DOXYGEN__)
 WB_UINT64 WBGetTimeIndex(void)
 #else // !defined(HAS_WB_UINT64_BUILTIN) && !defined(__DOXYGEN__)
 WB_UINT32 WBGetTimeIndex(void)
 #endif // defined(HAS_WB_UINT64_BUILTIN) || defined(__DOXYGEN__)
 {
+#ifdef WIN32
+SYSTEMTIME st;
+int64_t l1;
+int n_years;
+long adjustment;
+
+
+   GetSystemTime(&st);
+
+    // convert to days since 1/1/1970
+
+   n_years = st.wYear - 1900;    /* # of years since 1900 */
+   adjustment = 0;
+
+   while(n_years<0)
+   {
+      n_years += 400;                       /* add 400 years */
+      adjustment -= FOUR_HUNDRED_YEARS;    /* number of days in 400 years */
+   }
+
+   while(n_years >=400)
+   {
+      n_years -= 400;
+      adjustment += FOUR_HUNDRED_YEARS;
+   }
+      /*    CALCULATE THE TOTAL NUMBER OF DAYS UP TO 1/1 THIS YEAR    */
+      /* terms:  # of days + # of "Feb/29"s - # of non-leap centuries */
+
+   l1 = 365L * n_years + ((n_years > 4)?((n_years - 1) >> 2):0)
+        + ((n_years > 100)?(1 - (n_years - 1)/ 100):0);
+
+   if(((st.wYear % 400)==0 || (st.wYear % 100)!=0) && (st.wYear % 4)==0)
+      l1 += total_leap[st.wMonth - 1];    /* month-to-date totals (leap year) */
+   else
+      l1 += total_days[st.wMonth - 1];    /* month-to-date totals */
+
+   l1 += st.wDay + adjustment; // days since 1/1/1900 (a '1')
+
+   // convert to days since epoch (1/1/1970, a '1')
+   l1 -= epoch_time;
+
+   // convert to seconds (00:00:00 AM UTC)
+   l1 *= 86400;
+
+   // adjust for UTC time
+   l1 += st.wHour * 3600L + st.wMinute * 60L + st.wSecond;
+
+   // conver to mucroseconds
+   l1 *= 1000000L;
+
+   // add milliseconds from 'st' a microseconds
+   l1 += st.wMilliseconds * 1000L;
+
+   return (WB_UINT64)l1;
+#elif __SIZEOF_LONG__ <= 4 // !WIN32, 32-bit time_t, no support for 64-bit inmteger
+#if defined(HAS_WB_UINT64_BUILTIN) || defined(__DOXYGEN__)
+//
+// TODO - rewrite this to avoid Y2K38, by getting year, month, day etc. and converting like for WIN32
+struct timeval tv;
+
+  gettimeofday(&tv, NULL); // for now, just use this.
+
+  return (WB_UINT64)tv.tv_sec * (WB_UINT64)1000000
+         + (WB_UINT64)tv.tv_usec;
+#else /// HAS_WB_UINT64_BUILTIN
+struct timeval tv;
+
+  double d1;
+  gettimeofday(&tv, NULL);
+
+  d1 = tv.tv_sec * 1000000.0;
+  d1 += tv.tv_usec;
+
+  return (WB_UINT32)floor(fmod(d1, (double)0xffffffff));
+#endif // HAS_WB_UINT64_BUILTIN
+#else // 64-bit time_t, !WIN32
 struct timeval tv;
 
   gettimeofday(&tv, NULL);
 
-#ifdef HAS_WB_UINT64_BUILTIN /* meaning that the WB_UINT64 data type is a 'built-in' */
-
   return (WB_UINT64)tv.tv_sec * (WB_UINT64)1000000
          + (WB_UINT64)tv.tv_usec;
-
-#else // WB_UINT64 is a structure typedef; just return a 32-bit value for now
-  {
-    double d1 = tv.tv_sec * 1000000.0;
-    d1 += tv.tv_usec;
-
-    return (WB_UINT32)floor(fmod(d1, (double)0xffffffff));
-    // TODO:  use floor + frac to convert to two WB_UINT32's (for now I just return the lower half)
-    // TODO:  maybe do my own long long library in this VERY UNLIKELY case?
-  }
-#endif // WB_UINT64
+#endif // WIN32
 }
 
 void WBDelay(uint32_t uiDelay)  // approximate delay for specified period (in microseconds).  may be interruptible
 {
+#ifdef WIN32
+  if(uiDelay <= 1000)
+    Sleep(1);
+  else
+    Sleep(uiDelay / 1000);
+#else // WIN32
 #ifdef HAVE_NANOSLEEP
 struct timespec tsp;
 
@@ -1068,7 +1311,6 @@ struct timespec tsp;
     tsp.tv_sec = 0; // it's assumed that this method is slightly faster
   }
 
-  tsp.tv_sec = 0;
   tsp.tv_nsec = uiDelay * 1000;  // wait for .1 msec
 
   nanosleep(&tsp, NULL);
@@ -1077,6 +1319,7 @@ struct timespec tsp;
   usleep(uiDelay);  // 100 microsecs - a POSIX alternative to 'nanosleep'
 
 #endif // HAVE_NANOSLEEP
+#endif // WIN32
 }
 
 int WBCPUCount(void)
@@ -1189,9 +1432,16 @@ static const char szWBAllocTag[]="WB_M";
 
 struct __malloc_header__
 {
-  struct __malloc_header__ *pPrev, *pNext;  ///< For a 'malloc'd block, these are both PMALLOC_FLAG
-  unsigned int iTag;                        ///< see WB_ALLOC_TAG
-  unsigned int cbSize;                      ///< size used for last malloc/realloc
+  union
+  {
+    struct
+    {
+      struct __malloc_header__ *pPrev, *pNext;  ///< For a 'malloc'd block, these are both PMALLOC_FLAG
+      unsigned int iTag;                        ///< see WB_ALLOC_TAG
+      unsigned int cbSize;                      ///< size used for last malloc/realloc
+    };
+    uint8_t reserved[32];                       ///< 32 byte (256 bit) minimum size to improve alignment
+  };
 };
 
 static struct __malloc_header__ mallocFlagMalloc; // pointers to THIS indicate "I am a
@@ -1624,7 +1874,7 @@ int iLen;
 char *WBCopyStringN(const char *pSrc, unsigned int nMaxChars)
 {
 char *pDest;
-int iLen;
+unsigned int iLen;
 const char *p1;
 
   if(!pSrc || !*pSrc)
@@ -3558,7 +3808,7 @@ int WBFileIsWriteable(const char *szFileName)
 //        to be handled separately
 int WBMkDir(const char *szFileName, int flags)
 {
-int iRval;
+int iRval = -1;
 
   if(!szFileName || !*szFileName)
   {
@@ -3566,7 +3816,11 @@ int iRval;
   }
 
 #ifdef WIN32
-#error not yet implemented
+//#error not yet implemented
+  iRval = !CreateDirectory(szFileName, NULL)   // TODO assign 'flags' for security?
+        ? 0 : GetLastError();
+
+  _chmod(szFileName, flags);  // attempt it
 #else // WIN32
 
   if(szFileName[0] == '/' && !szFileName[1])
@@ -3635,6 +3889,41 @@ no_stat:
 
     if(pRval)
     {
+#ifdef WIN32
+      int cb1 = SearchPath(NULL, szFileName, NULL, PATH_MAX, pRval,(TCHAR **)&p1);
+
+      if(cb1 > 0)
+      {
+        pRval[cb1] = 0;
+      }
+      else
+      {
+        free(pRval);
+        pRval = WBCopyString(szFileName);
+      }
+
+      if(pRval && !WBStat(pRval, NULL))
+      {
+        // this function returns non-zero if file not found
+        if(0 > WBStat(pRval, NULL))
+        {
+          if(pRval)
+          {
+            free(pRval);
+          }
+
+          goto no_stat;
+        }
+
+        return pRval; // FOUND!
+      }
+
+      if(pRval)
+      {
+        free(pRval);
+        pRval = NULL;
+      }
+#else // WIN32
       pPath = getenv("PATH"); // not malloc'd, but should not modify
       if(pPath)
       {
@@ -3742,6 +4031,7 @@ no_stat:
       }
 
       goto no_stat;
+#endif // WIN32
     }
 
     WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_File,
@@ -3774,8 +4064,12 @@ static const char szH[16]="0123456789ABCDEF";
 
 
 #ifdef WIN32
-  // TODO:  the windows code, which uses the TEMP and TMP environment variables as well as the registry
-#error windows version not implemented
+char szTemp[MAX_PATH + 1];
+
+  GetEnvironmentVariable("TEMP", szTemp, MAX_PATH);
+
+  szDir = szTemp;
+
 #else // !WIN32
 
   // On POSIX systems, first use /var/tmp and if not available, use /tmp
@@ -3837,11 +4131,18 @@ static const char szH[16]="0123456789ABCDEF";
     if(pRval)
     {
 #ifdef WIN32
-#error windows code not written yet
+      h1 = CreateFile(pRval, GENERIC_READ|GENERIC_WRITE, 0,
+                      NULL, // security descriptor - 0644 mode???
+                      CREATE_ALWAYS,
+                      /*FILE_ATTRIBUTE_TEMPORARY |*/ FILE_ATTRIBUTE_NORMAL,
+                      NULL);
 #else // !WIN32
       h1 = open(pRval, O_CREAT | O_EXCL | O_RDWR, 0644); // create file, using '644' permissions, fail if exists
+      if(h1 < 0)
+        h1 = INVALID_HANDLE_VALUE;
+#endif // !WIN32
 
-      if(h1 < 0) // error
+      if(h1 == INVALID_HANDLE_VALUE) // error
       {
         WBFree(pRval);
         pRval = NULL;
@@ -3861,14 +4162,17 @@ static const char szH[16]="0123456789ABCDEF";
       }
       else
       {
+#ifdef WIN32
+        CloseHandle(h1);
+#else  // !WIN32
         close(h1);
+#endif // !WIN32
 
         // add this file to the existing list of temp files to be destroyed
         // on exit from the program.
 
         break; // file name is valid and ready for use
       }
-#endif // !WIN32
     }
   }
 
@@ -3956,10 +4260,15 @@ WB_PROCESS_ID WBRunAsyncPipeV(WB_FILE_HANDLE hStdIn, WB_FILE_HANDLE hStdOut, WB_
 {
 const char *pArg;//, *pPath;
 char *pCur, *p1, *pAppName = NULL;
+#ifdef WIN32
+STARTUPINFO si;
+PROCESS_INFORMATION pi;
+#else // !WIN32
 char **argv;
 int i1, nItems, cbItems;
 va_list va2;
-WB_PROCESS_ID hRval;
+#endif // WIN32
+WB_PROCESS_ID hRval = WB_INVALID_PROCESS_ID;
 WB_FILE_HANDLE hIn, hOut, hErr;
 
 
@@ -3972,24 +4281,8 @@ WB_FILE_HANDLE hIn, hOut, hErr;
 
   pAppName = WBSearchPath(szAppName);
 
-//  WB_ERROR_PRINT("TEMPORARY: %s - AppName \"%s\"\n", __FUNCTION__, pAppName);
-//
-// DEBUG-ONLY code - TODO enable with debug level verbosity > ???
-//  {
-//    va_copy(va2, va);
-//    nItems = 1;
-//    while(1)
-//    {
-//      pArg = va_arg(va2, const char *);
-//      if(!pArg)
-//      {
-//        break;
-//      }
-//
-//      WB_ERROR_PRINT("TEMPORARY: %s -      Arg %d -\"%s\"\n", __FUNCTION__, nItems, pArg);
-//      nItems++;
-//    }
-//  }
+  if(!pAppName)
+    return WB_INVALID_PROCESS_ID;
 
   if(hStdIn == WB_INVALID_FILE_HANDLE) // re-dir to/from /dev/null
   {
@@ -4000,11 +4293,16 @@ WB_FILE_HANDLE hIn, hOut, hErr;
 
     if(pSD)
     {
+      SECURITY_ATTRIBUTES sa;
+
       InitializeSecurityDescriptor(pSD,SECURITY_DESCRIPTOR_REVISION);
-      pSD->bInheritHandle = TRUE; // what a pain
+
+      sa.nLength = sizeof(sa);
+      sa.lpSecurityDescriptor = pSD;
+      sa.bInheritHandle = TRUE; // what a pain
 
       hIn = CreateFile("NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                       pSD, OPEN_EXISTING, NULL, NULL);
+                       &sa, OPEN_EXISTING, 0, NULL);
       WBFree(pSD);
     }
 #endif // WIN32
@@ -4032,14 +4330,16 @@ WB_FILE_HANDLE hIn, hOut, hErr;
 
     if(pSD)
     {
+      SECURITY_ATTRIBUTES sa;
+
       InitializeSecurityDescriptor(pSD,SECURITY_DESCRIPTOR_REVISION);
-      pSD->bInheritHandle = TRUE; // what a pain
+
+      sa.nLength = sizeof(sa);
+      sa.lpSecurityDescriptor = pSD;
+      sa.bInheritHandle = TRUE; // what a pain
 
       hOut = CreateFile("NUL", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                        pSD, OPEN_EXISTING, NULL, NULL);
-
-      // ALTERNATE:  use 'SetHandleInformation(hOut, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT)'
-
+                        &sa, OPEN_EXISTING, 0, NULL);
       WBFree(pSD);
     }
 #endif // WIN32
@@ -4063,16 +4363,35 @@ WB_FILE_HANDLE hIn, hOut, hErr;
 #ifndef WIN32
     hErr = open("/dev/null", O_WRONLY, 0);
 #else // WIN32
-    SECURITY_DESCRIPTOR *pSD = (SECURITY_DESCRIPTOR *)WBAlloc(SECURITY_DESCRIPTOR_MIN_LENGTH);
-
-    if(pSD)
+#ifdef DEBUG_STDERR_TO_STDOUT
+    if(hStdOut != WB_INVALID_FILE_HANDLE)
     {
-      InitializeSecurityDescriptor(pSD,SECURITY_DESCRIPTOR_REVISION);
-      pSD->bInheritHandle = TRUE; // what a pain
+      if(!DuplicateHandle(GetCurrentProcess(), hStdOut,
+                          GetCurrentProcess(), &hErr, GENERIC_WRITE,
+                          TRUE, 0))
+      {
+        hErr = WB_INVALID_FILE_HANDLE;
+      }
+    }
+    else
+#endif // DEBUG_STDERR_TO_STDOUT
+    {
+      SECURITY_DESCRIPTOR *pSD = (SECURITY_DESCRIPTOR *)WBAlloc(SECURITY_DESCRIPTOR_MIN_LENGTH);
 
-      hErr = CreateFile("NUL", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                        pSD, OPEN_EXISTING, NULL, NULL);
-      WBFree(pSD);
+      if(pSD)
+      {
+        SECURITY_ATTRIBUTES sa;
+
+        InitializeSecurityDescriptor(pSD,SECURITY_DESCRIPTOR_REVISION);
+
+        sa.nLength = sizeof(sa);
+        sa.lpSecurityDescriptor = pSD;
+        sa.bInheritHandle = TRUE; // what a pain
+
+        hErr = CreateFile("NUL", GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                          &sa, OPEN_EXISTING, 0, NULL);
+        WBFree(pSD);
+      }
     }
 #endif // WIN32
   }
@@ -4100,15 +4419,27 @@ WB_FILE_HANDLE hIn, hOut, hErr;
 
     if(hIn != WB_INVALID_FILE_HANDLE)
     {
+#ifndef WIN32
       close(hIn);
+#else // WIN32
+      CloseHandle(hIn);
+#endif // WIN32
     }
     if(hOut != WB_INVALID_FILE_HANDLE)
     {
+#ifndef WIN32
       close(hOut);
+#else // WIN32
+      CloseHandle(hOut);
+#endif // WIN32
     }
     if(hErr != WB_INVALID_FILE_HANDLE)
     {
+#ifndef WIN32
       close(hErr);
+#else // WIN32
+      CloseHandle(hErr);
+#endif // WIN32
     }
 
     if(pAppName != szAppName)
@@ -4116,8 +4447,97 @@ WB_FILE_HANDLE hIn, hOut, hErr;
       WBFree(pAppName);
     }
 
-    return WB_INVALID_FILE_HANDLE;
+    return WB_INVALID_PROCESS_ID;
   }
+
+#ifdef WIN32
+
+  memset(&si, 0, sizeof(si));
+  memset(&pi, 0, sizeof(pi));
+
+  si.cb = sizeof(si);
+
+  si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
+  si.hStdInput = hIn;
+  si.hStdOutput = hOut;
+  si.hStdError = hErr;
+
+  // make sure it is hidden
+  si.wShowWindow = SW_HIDE;
+
+#if 1
+  // get application name from path
+
+  p1 = _tcsrchr((TCHAR *)pAppName, '\\');
+  if(p1)
+  {
+    pCur = WBCopyString(p1 + 1); // just the name
+  }
+  else
+  {
+    pCur = WBCopyString(pAppName);
+  }
+#else // 0,1
+  pCur = WBCopyString(""); // need non-null pointer
+#endif // 0
+
+  // build the command line
+
+  while(1)
+  {
+    pArg = va_arg(va, const TCHAR *);
+    if(!pArg)
+    {
+      break;
+    }
+
+    WBCatString(&pCur, _T(" "));
+
+    // if the parameter contains a space, windows requires quotes.
+    if(strchr(pArg, ' '))
+    {
+      if(strchr(pArg, '"'))
+      {
+        WBCatString(&pCur, "'");
+        WBCatString(&pCur, pArg); // caller must add quotes as needed
+        WBCatString(&pCur, "'");
+      }
+      else
+      {
+        WBCatString(&pCur, "\"");
+        WBCatString(&pCur, pArg); // caller must add quotes as needed
+        WBCatString(&pCur, "\"");
+      }
+    }
+    else
+      WBCatString(&pCur, pArg); // caller must add quotes as needed
+  }
+
+  if(CreateProcess(pAppName, pCur, NULL, NULL, TRUE, NORMAL_PRIORITY_CLASS,
+                   NULL, NULL, &si, &pi))  // it worked?
+  {
+      // wait for process to complete before continuing...
+
+//        SetCursor(LoadCursor(NULL, IDC_WAIT));
+    hRval.uiProcessID = pi.dwProcessId;
+    hRval.hProcess = pi.hProcess;
+    hRval.iCachedExitCode = -1;
+
+    WaitForInputIdle(pi.hProcess, 1000); // wait up to 1 sec to help it run
+  }
+  else
+  {
+    hRval = WB_INVALID_PROCESS_ID;
+  }
+
+  free(pCur);
+  pCur = NULL;
+
+  CloseHandle(hIn);
+  CloseHandle(hOut);
+  CloseHandle(hErr);
+
+#else // WIN32
 
   // count arguments, determine memory requirement
 
@@ -4179,8 +4599,6 @@ WB_FILE_HANDLE hIn, hOut, hErr;
 
   argv[nItems + 1] = NULL;
 
-#ifndef WIN32
-
   // now that I have a valid 'argv' I can spawn the process.
   // I will return the PID so that the caller can wait on it
 
@@ -4224,198 +4642,17 @@ WB_FILE_HANDLE hIn, hOut, hErr;
 
     _exit(-1); // should never get here, but this must be done if execve fails
   }
-//  else if(hRval < 0)
-//  {
-//    WB_ERROR_PRINT("TEMPORARY:  %s HERE I AM (2) errno=%d\n", __FUNCTION__, errno);
-//  }
-
-
-#else
-
-#error TODO write the WIN32 code for this using ShellExecuteEx or CreateProcess (example below from Setup Gizmo)
-#error and pay SPECIFIC ATTENTION to getting the handle re-direction right for the stdin/stdout/stderr so that piping works
-#error and don`t forget the registry entries that ShellExecute uses for the PATH (then again...)
-
-// SEE http://msdn.microsoft.com/en-us/library/windows/desktop/ms682499%28v=vs.85%29.aspx
-// for creating a child process with re-directed stdin/stdout/stderr
-
-//DWORD RunApplication(LPCSTR szCmdLine, LPCSTR szExecDir,
-//                     LPCSTR szAppName, LPCSTR szWindowTitle /* = NULL */)
-//{
-//  STARTUPINFO si;
-//  PROCESS_INFORMATION pi;
-//  CString csTemp;
-//
-//  CString csExecDir = szExecDir;
-//
-//  if(!csExecDir.GetLength())
-//    csExecDir = PathFromCommandLine(szCmdLine);
-//
-//  memset(&si, 0, sizeof(si));
-//  si.cb = sizeof(si);
-//
-//  si.lpTitle = (LPTSTR)szWindowTitle;
-//  si.wShowWindow = SW_SHOWNA;  // show but do not activate it!
-//  si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USEPOSITION;
-//
-//  memset(&pi, 0, sizeof(pi));
-//
-//  DWORD dwRval = 0;  // non-zero return is an error
-//
-//
-//  UINT uiFlags = CREATE_NEW_PROCESS_GROUP | CREATE_DEFAULT_ERROR_MODE;
-//
-//  if(GetVersion() & 0x80000000)  // WIN '9x
-//  {
-//    uiFlags |= CREATE_NEW_CONSOLE;
-//  }
-//  else
-//  {
-//    uiFlags |= CREATE_SEPARATE_WOW_VDM;
-//  }
-//
-// NOTE:  assign si.hStdError, si.hStdInput, si.hStdOutput and si.dwFlags |= STARTF_USESTDHANDLES
-//        in the STARTUPINFO structure in order to re-direct I/O.  Also the 'inherit' flag must
-//        be TRUE (not FALSE as in the example below) for this to work
-//
-// TODO:  determine correct environment using 'ShellExecute' registry parameters
-//
-//  if(!CreateProcess(NULL, (LPSTR)szCmdLine, NULL, NULL, FALSE,
-//                    uiFlags | NORMAL_PRIORITY_CLASS,
-//                    NULL, szExecDir, &si, &pi))
-//  {
-//    if(pi.hThread)
-//      CloseHandle(pi.hThread);
-//
-//    if(pi.hProcess)
-//      CloseHandle(pi.hProcess);
-//
-//    DWORD dwErr = GetLastError();
-//    csTemp.Format(" - error %08xH (%d)", dwErr, dwErr);
-//
-//    AfxMessageBox("Unable to start "
-//                  + (CString)szAppName
-//                  + csTemp);
-//
-//    dwRval = 0xffffffff;
-//  }
-//  else
-//  {
-//    // TODO:  do I check an 'abandon me' flag and loop?
-//    // TODO:  do I check for a 'WM_QUIT' message?
-//
-//    while(1)
-//    {
-//      DWORD dwWait = ::WaitForSingleObject(pi.hProcess, 500);  // 1/2 sec wait
-//
-//      if(dwWait == WAIT_OBJECT_0)
-//        break;
-//
-//      if(dwWait != WAIT_TIMEOUT)
-//      {
-//        AfxMessageBox("Process wait failed on " + (CString)szAppName);
-//
-//        dwRval = 0xffffffff;
-//        break;
-//      }
-//
-//      Sleep(50);
-//
-//      MSG msg;
-//      PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE);  // help 16 bit apps maybe?
-//    }
-//
-//    DWORD dwExit = 0;
-//    if(!dwRval && !GetExitCodeProcess(pi.hProcess, &dwExit))
-//    {
-//      dwRval = 0xffffffff;
-//
-//      dwExit= GetLastError();
-//      csTemp.Format("%ld (%08xH)", dwExit, dwExit);
-//
-//      AfxMessageBox("Unable to get return code from "
-//                    + (CString)szAppName
-//                    + ", error code " + csTemp);
-//    }
-//    else if(dwExit != 0)
-//    {
-//      CString cs1;
-//      cs1.Format("%d", dwExit);
-//
-//      AfxMessageBox("'" + (CString)szAppName + "' exits with error code " + cs1,
-//                    MB_OK | MB_ICONHAND | MB_SETFOREGROUND);
-//
-//      dwRval = dwExit;
-//    }
-//  }
-//
-//  if(pi.hThread)
-//    CloseHandle(pi.hThread);
-//
-//  if(pi.hProcess)
-//    CloseHandle(pi.hProcess);
-//
-//  Sleep(500);  // this helps Win98 systems "not hang"
-//
-//  return(dwRval);
-//}
-//
-// ** SECONDARY EXAMPLE USING ShellExecuteEx() **
-//
-//  SHELLEXECUTEINFO sei;
-//  memset(&sei, 0, sizeof(sei));
-//  sei.cbSize = sizeof(sei);
-//  sei.fMask = SEE_MASK_FLAG_NO_UI |  SEE_MASK_NOCLOSEPROCESS;
-//  sei.lpFile = csEXE;
-//  sei.lpParameters = csParm;
-//  sei.nShow = SW_SHOWMAXIMIZED;
-//
-//  if(!ShellExecuteEx(&sei))
-//  {
-//    AfxMessageBox("Unable to execute 'MAKECAB' command",
-//                  MB_OK | MB_ICONHAND | MB_SETFOREGROUND);
-//    return(FALSE);  // failed
-//  }
-//  else
-//  {
-//    // wait for process to complete
-//    wait.Restore();  // just in case
-//
-//    WaitForSingleObject(sei.hProcess, INFINITE);
-//
-//    DWORD dwExitCode;
-//    if(!GetExitCodeProcess(sei.hProcess, &dwExitCode))
-//    {
-//      AfxMessageBox("WARNING:  cannot get exit code from 'MAKECAB'",
-//                    MB_OK | MB_ICONHAND | MB_SETFOREGROUND);
-//      bWasExeError = TRUE;
-//    }
-//    else if(dwExitCode == STILL_ACTIVE)
-//    {
-//      AfxMessageBox("WARNING:  'MAKECAB' process did not terminate",
-//                    MB_OK | MB_ICONHAND | MB_SETFOREGROUND);
-//      bWasExeError = TRUE;
-//    }
-//    else if(dwExitCode)
-//    {
-//      CString cs1;
-//      cs1.Format("%d", dwExitCode);
-//
-//      AfxMessageBox("'MAKECAB' exits with error code " + cs1,
-//                    MB_OK | MB_ICONHAND | MB_SETFOREGROUND);
-//      bWasExeError = TRUE;
-//    }
-//  }
-
-#endif // WIN32
 
   // once I've forked, I don't have to worry about copied memory or shared memory
   // and it's safe to free the allocated 'argv' array.
 
   WBFree(argv);
+
   close(hIn);
   close(hOut);
   close(hErr);
+
+#endif // WIN32
 
   if(pAppName != szAppName)
   {
@@ -4439,7 +4676,7 @@ va_list va;
 
   va_end(va);
 
-  if(idRval == WB_INVALID_FILE_HANDLE)
+  if(WB_PROCESS_ID_INVALID(idRval))
   {
     WB_ERROR_PRINT("Unable to run '%s'\n", szAppName);
   }
@@ -4470,13 +4707,19 @@ va_list va;
 #define WBRUNRESULT_BUFFER_MINSIZE 65536
 #define WBRUNRESULT_BYTES_TO_READ 256
 
-static char * WBRunResultInternal(WB_FILE_HANDLE hStdIn, const char *szAppName, va_list va)
+static char * WBRunResultInternal(WB_FILE_HANDLE hStdIn, WB_INT32 *pExitCode, const char *szAppName, va_list va)
 {
 WB_PROCESS_ID idRval;
+#ifdef WIN32
+DWORD cb1;
+#endif // WIN32
 WB_FILE_HANDLE hP[2]; // [0] is read end, [1] is write end
 char *p1, *p2, *pRval;
-int i1, i2, iStat, iRunning;
-unsigned int cbBuf;
+int i2, iRunning;
+#ifndef WIN32
+int i1, iStat;
+#endif // WIN32
+/*unsigned*/ int cbBuf;
 
 
   cbBuf = WBRUNRESULT_BUFFER_MINSIZE;
@@ -4484,21 +4727,20 @@ unsigned int cbBuf;
 
   if(!pRval)
   {
-//    WB_ERROR_PRINT("TEMPORARY:  %s HERE I AM (1) WBAlloc fail %d\n", __FUNCTION__, cbBuf);
     return NULL;
   }
 
   // use WBRunAsyncPipeV to create a process, with all stdout piped to a char * buffer capture
   // stdin and stderr still piped to/from /dev/null
 
-  // create an anonymous pipe.  pH[0] is the INPUT pipe, pH[1] is the OUTPUT pipe
+  // create an anonymous pipe.  hP[0] is the INPUT pipe, hP[1] is the OUTPUT pipe
   // this is important in windows.  for POSIX it doesn't really matter which one you use,
   // but by convention [0] will be input, [1] will be output
 
   hP[0] = hP[1] = WB_INVALID_FILE_HANDLE;
 
 #ifdef WIN32 /* the WINDOWS way */
-  if(!CreatePipe(&(pH[0]), &(pH[1]), NULL, 0))
+  if(!CreatePipe(&(hP[0]), &(hP[1]), NULL, 0))
 #else // !WIN32 (everybody else)
   if(0 > pipe(hP))
 #endif // WIN32
@@ -4508,23 +4750,34 @@ unsigned int cbBuf;
     return NULL;
   }
 
+#ifdef WIN32 /* the WINDOWS way */
+  SetHandleInformation(hP[1], HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+#endif // WIN32
 
   idRval = WBRunAsyncPipeV(hStdIn, hP[1], // the 'write' end is passed as stdout
                            WB_INVALID_FILE_HANDLE, szAppName, va);
 
-  if(idRval == WB_INVALID_FILE_HANDLE)
+  if(WB_PROCESS_ID_INVALID(idRval))
   {
 //    WB_ERROR_PRINT("TEMPORARY:  %s failed to run \"%s\" errno=%d\n", __FUNCTION__, szAppName, errno);
 
+#ifdef WIN32 /* the WINDOWS way */
+    CloseHandle(hP[0]);
+    CloseHandle(hP[1]);
+#else // !WIN32 (everybody else)
     close(hP[0]);
     close(hP[1]);
+#endif // WIN32
 
     return NULL;
   }
 
+#ifndef WIN32
   close(hP[1]); // by convention, this will 'widow' the read end of the pipe once the process is done with it
+  hP[1] = INVALID_HANDLE_VALUE;
 
   fcntl(hP[0], F_SETFL, O_NONBLOCK); // set non-blocking I/O
+#endif // WIN32
 
   // so long as the process is alive, read data from the pipe and stuff it into the output buffer
   // (the buffer will need to be reallocated periodically if it fills up)
@@ -4559,6 +4812,74 @@ unsigned int cbBuf;
     }
 
     // if no data available I'll return immediately
+#ifdef WIN32 /* the Windows way */
+    cb1 = 0;
+
+    if(!PeekNamedPipe(hP[0], NULL, 0, NULL, &cb1, NULL))
+    {
+      DWORD dwErr;
+check_pipe_no_data_avail:
+
+      dwErr = GetLastError();
+
+      if(!iRunning)
+      {
+        break; // assume end of file, process ended, bail out now
+      }
+
+      if(dwErr == ERROR_MORE_DATA || dwErr == ERROR_PIPE_BUSY || dwErr == ERROR_IO_PENDING
+         || dwErr == ERROR_NO_MORE_ITEMS/* EAGAIN */ )
+      {
+        Sleep(10); // wait 1/2 msec
+      }
+      else
+      {
+        break; // an error of some kind, so bail out [pipe closed?]
+      }
+    }
+    else if(!cb1)
+    {
+      if(!iRunning)
+        break; // end of file
+    }
+    else if(!ReadFile(hP[0], p1, i2, &cb1, NULL))
+    {
+      goto check_pipe_no_data_avail;
+    }
+    else if(!cb1)  // this just might be an error
+    {
+      if(!iRunning)
+        break; // end of file
+    }
+    else
+    {
+      p1 += cb1; // point past the # of bytes I just read in
+      *p1 = 0; // by convention [to make sure the string is ALWAYS terminated with a 0-byte]
+    }
+
+    if(iRunning) // only if "still running"
+    {
+      // for waitpid(), if WNOHANG is specified and there are no stopped, continued or exited children, 0 is returned
+
+      if(WBGetProcessState(idRval, pExitCode) <= 0) // ended or error
+      {
+        iRunning = 0; // my flag that it's not running
+      }
+
+      Sleep(10); // so I don't 'spin' and IO completes at end of process
+    }
+  }
+
+  // always kill the process at this point (in case there was an error)
+
+  Sleep(10); // wait 10 msec - prevents certain problems
+
+  if(hP[1] != INVALID_HANDLE_VALUE)
+    CloseHandle(hP[1]); // done with the pipes - close them now
+  if(hP[0] != INVALID_HANDLE_VALUE)
+    CloseHandle(hP[0]);
+
+#else // !WIN32 - everybody else
 
     i1 = read(hP[0], p1, i2);
 
@@ -4595,25 +4916,6 @@ unsigned int cbBuf;
 
     if(iRunning) // only if "still running"
     {
-#ifdef WIN32 /* the windows way */
-      DWORD dwExitCode;
-
-      if(::WaitForSingleObject(idRval, 5) != WAIT_TIMEOUT)
-      {
-        if(!GetExitCodeProcess(hProcess, &dwExitCode) ||
-           dwExitCode != STILL_ACTIVE)
-        {
-          iRunning = 0; // my flag that it's not running
-
-          Sleep(5);
-          break;
-        }
-        else // if(dwExitCode == STILL_ACTIVE)
-        {
-          Sleep(1); // lose time slice, continue loop
-        }
-      }
-#else // !WIN32 (everybody else)
       // for waitpid(), if WNOHANG is specified and there are no stopped, continued or exited children, 0 is returned
 
       if(waitpid(idRval, &iStat, WNOHANG) && // note this might return non-zero for stopped or continued processes
@@ -4626,7 +4928,6 @@ unsigned int cbBuf;
       {
         WBDelay(500); // so I don't 'spin'
       }
-#endif // WIN32
     }
   }
 
@@ -4637,6 +4938,8 @@ unsigned int cbBuf;
 
   close(hP[0]); // done with the pipe - close it now
 
+#endif // WIN32
+
 //  WB_ERROR_PRINT("TEMPORARY:  %s HERE I AM (4) pRval=%p *pRval=%c\n", __FUNCTION__, pRval, (char)(pRval ? *pRval : 0));
 
   return pRval;
@@ -4644,31 +4947,63 @@ unsigned int cbBuf;
 
 int WBGetProcessState(WB_PROCESS_ID idProcess, WB_INT32 *pExitCode)
 {
-#ifdef WIN32 /* the windows way */
-  DWORD dwExitCode;
+#ifdef WIN32
+  int iRval = -1;
+  HANDLE hProcess = idProcess.hProcess; //OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, idProcess);
+  DWORD dwWait, dwTemp = -1;
 
-  if(::WaitForSingleObject(idRval, 5) != WAIT_TIMEOUT)
+  if(pExitCode)
+    *pExitCode = -1;;
+
+  if(hProcess == INVALID_HANDLE_VALUE)
   {
-    if(!GetExitCodeProcess(hProcess, &dwExitCode) ||
-       dwExitCode != STILL_ACTIVE)
-    {
-      if(pExitCode)
-      {
-        *pExitCode = (WB_INT32)dwExitCode;
-      }
+    if(idProcess.uiProcessID != 0) // for now this indicates valid.  process 0 is inaccessible
+      return idProcess.iCachedExitCode; // return cached value
 
-      return 0; //
-    }
+    return -1;
   }
 
-  return 1; // still running
-#else // !WIN32 (everybody else)
+  dwWait = WaitForMultipleObjects(1, &hProcess, FALSE, 10);
+
+  if(dwWait == WAIT_TIMEOUT)
+  {
+    iRval = 1; // still running
+  }
+  else if(dwWait == WAIT_OBJECT_0) // process has stopped
+  {
+    iRval = 0;
+  }
+  else // if(dwWait == WAIT_ABANDONED_0)
+  {
+    iRval = -1;  // like 'quit' baby, quit!
+  }
+
+  if(!iRval)
+  {
+    if(GetExitCodeProcess(hProcess, &dwTemp))
+    {
+      if(pExitCode)
+        *pExitCode = dwTemp;
+      idProcess.iCachedExitCode = dwTemp;
+    }
+    else
+    {
+      iRval = -1; // oops
+    }
+
+    CloseHandle(idProcess.hProcess); // clean up
+    idProcess.hProcess = INVALID_HANDLE_VALUE; //  because I closed it
+  }
+
+//  CloseHandle(hProcess);
+  return iRval;
+
+#else // WIN32
   int iStat, iRval;
 
   // for waitpid(), if WNOHANG is specified and there are no stopped, continued or exited children, 0 is returned
 
   iStat = 0;
-
   iRval = waitpid(idProcess, &iStat, WNOHANG); // note this might return non-zero for stopped or continued processes
 
   if(iRval > 0 && (iRval == (int)idProcess || (int)idProcess == -1 || (int)idProcess == 0))
@@ -4704,11 +5039,284 @@ va_list va;
 
   va_start(va, szAppName);
 
-  pRval = WBRunResultInternal(WB_INVALID_FILE_HANDLE, szAppName, va);
+  pRval = WBRunResultInternal(WB_INVALID_FILE_HANDLE, NULL, szAppName, va);
 
   va_end(va);
 
   return pRval;
+}
+
+char *WBRunResult2(const char *szAppName, ...)
+{
+char *pRval;
+int32_t nExitCode;
+va_list va;
+
+
+  va_start(va, szAppName);
+
+  pRval = WBRunResultInternal(INVALID_HANDLE_VALUE, &nExitCode, szAppName, va);
+
+  if(pRval && nExitCode)
+  {
+//    fprintf(stderr, "%s - %s ended with error code %d\n", __FUNCTION__, szAppName, nExitCode);
+//    fflush(stderr);
+
+    free(pRval);
+    pRval = NULL;
+  }
+
+  va_end(va);
+
+  return pRval;
+}
+
+#ifdef WIN32
+struct __RunResult3_worker_thread_params
+{
+  volatile HANDLE hStdin[2];  // pipe for STDIN
+  const void * pStdin;
+  int cbStdin;
+  volatile HANDLE hThread;
+  volatile unsigned int dwThreadID;
+  volatile int bStateFlag; // 0 = not running, 1 = running, -1 force stop
+};
+
+static unsigned int __stdcall __RunResult3_worker_thread(void *pData)
+{
+int i2;
+const BYTE *p1;
+DWORD cb1, cbData;
+HANDLE hTemp;
+struct __RunResult3_worker_thread_params *pParams = (struct __RunResult3_worker_thread_params *)pData;
+
+  // so long as the process is alive, write data to the pipe
+#define RUNRESULT3_BUFFER_LENGTH 256
+  pParams->bStateFlag = 1; // indicates I'm running
+
+  p1 = (const BYTE *)pParams->pStdin;
+  cbData = pParams->cbStdin;
+
+  while(cbData && pParams->dwThreadID)
+  {
+    cb1 = 0;
+     // if buffer empty, fill it
+#if 0
+    if(!PeekNamedPipe(pParams->hStdin[0], NULL, 0, NULL, &cb1, NULL))
+    {
+      goto check_pipe_io_error;
+    }
+    else if(cb1 > RUNRESULT3_BUFFER_LENGTH / 2)
+    {
+      Sleep(20);
+    }
+    else
+#endif // 0
+    {
+      i2 = RUNRESULT3_BUFFER_LENGTH - cb1; // available write space
+      if(i2 > (int)cbData)
+        i2 = cbData;
+
+      if(!WriteFile(pParams->hStdin[1], p1, i2, &cb1, NULL))
+      {
+        DWORD dwErr;
+#if 0
+check_pipe_io_error:
+#endif // 0
+
+        dwErr = GetLastError();
+
+        if(dwErr == ERROR_MORE_DATA || dwErr == ERROR_PIPE_BUSY || dwErr == ERROR_IO_PENDING
+           || dwErr == ERROR_NO_MORE_ITEMS/* EAGAIN */ )
+        {
+          Sleep(10); // wait 1/2 msec
+        }
+        else
+        {
+          break; // an error of some kind, so bail out [pipe closed?]
+        }
+      }
+      else if(!cb1)  // this just might be an error
+      {
+        // TODO: anything?
+        Sleep(50);
+      }
+      else
+      {
+        p1 += cb1; // point past the # of bytes I just read in
+        cbData -= cb1;
+      }
+    }
+  }
+
+  Sleep(10); // wait 10 msec
+
+  // close my end of the pipe
+  hTemp = pParams->hStdin[1];
+  pParams->hStdin[1] = INVALID_HANDLE_VALUE;
+  CloseHandle(hTemp);
+
+  hTemp = pParams->hStdin[0];
+  pParams->hStdin[0] = INVALID_HANDLE_VALUE;
+  CloseHandle(hTemp);
+
+  // mark as 'exited'
+  pParams->bStateFlag = -1; // indicates I'm ending
+  _endthreadex(0);
+  return 0;
+}
+#endif // WIN32
+
+
+char *RunResult3(const void *pStdin, int cbStdin, const char *szAppName, ...) // windows-specific
+{
+#ifdef WIN32
+char *pRval;
+INT32 nExitCode;
+va_list va;
+struct __RunResult3_worker_thread_params xParams = {{INVALID_HANDLE_VALUE,INVALID_HANDLE_VALUE},
+                                                    NULL, 0, INVALID_HANDLE_VALUE, 0, 0 };
+
+
+  va_start(va, szAppName);
+
+  // create a pipe and worker thread for stdin using pStdin and cbStdin
+
+  if(!CreatePipe((HANDLE *)&(xParams.hStdin[0]), (HANDLE *)&(xParams.hStdin[1]), NULL, 0))
+  {
+//    WB_ERROR_PRINT("TEMPORARY:  %s HERE I AM (2)\n", __FUNCTION__);
+    return NULL;
+  }
+
+  SetHandleInformation(xParams.hStdin[0], HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+
+  // start worker thread
+  xParams.hThread = (HANDLE)_beginthreadex(NULL, 65536, __RunResult3_worker_thread,
+                                           &xParams, 0,//CREATE_SUSPENDED,
+                                           (unsigned int *)&xParams.dwThreadID);
+
+  if(xParams.hThread == INVALID_HANDLE_VALUE)
+  {
+//    WB_ERROR_PRINT("* ERROR * - unable to create thread, %d (%x) (a)\n",
+//                   GetLastError(), GetLastError());
+    goto error_exit;
+  }
+
+  xParams.pStdin = pStdin;
+  xParams.cbStdin = cbStdin;
+
+  //ResumeThread(xParams.hThread);
+
+  pRval = WBRunResultInternal(xParams.hStdin[0], &nExitCode, szAppName, va);
+
+  // wait for worker thread close
+
+  if(pRval && nExitCode)
+  {
+#ifdef _DEBUG
+    {
+      char tbuf[1024];
+      _sntprintf(tbuf, sizeof(tbuf), "%s ended with error code %d\n", szAppName, nExitCode);
+#ifdef __cplusplus
+      ::MessageBox
+#else // __cplusplus
+      MessageBox
+#endif // __cplusplus
+        (NULL, tbuf, "** EXTERNAL APPLICATION ERROR **", MB_OK |  MB_ICONERROR);
+      OutputDebugString(pRval);
+    }
+#endif _DEBUG
+
+    free(pRval);
+    pRval = NULL;
+  }
+
+  va_end(va);
+
+error_exit:
+
+  xParams.dwThreadID = 0; // tells thread to exit
+
+  if(xParams.hThread != INVALID_HANDLE_VALUE)
+  {
+    while(xParams.bStateFlag > 0)
+      Sleep(10); // wait for it to end
+
+    CloseHandle(xParams.hThread);
+  }
+
+  if(xParams.hStdin[1] != INVALID_HANDLE_VALUE)
+    CloseHandle(xParams.hStdin[1]);
+
+  if(xParams.hStdin[0] != INVALID_HANDLE_VALUE)
+    CloseHandle(xParams.hStdin[0]);
+
+  return pRval;
+
+#else // WIN32
+
+char *pRval, *pTemp = NULL;
+va_list va;
+WB_FILE_HANDLE hIn = WB_INVALID_FILE_HANDLE;
+
+
+  va_start(va, szAppName);
+
+  if(pStdin && cbStdin > 0)
+  {
+    unsigned int nLen = cbStdin;
+    const unsigned char *szStdInBuf = (const unsigned char *)pStdin;
+
+    pTemp = WBTempFile0(".tmp");
+
+    if(!pTemp)
+    {
+//      WB_ERROR_PRINT("TEMPORARY:  %s HERE I AM (1)\n", __FUNCTION__);
+
+      va_end(va);
+      return NULL;
+    }
+
+    hIn = open(pTemp, O_RDWR, 0);
+
+    if(hIn < 0)
+    {
+bad_file:
+      unlink(pTemp);
+      WBFree(pTemp);
+
+//      WB_ERROR_PRINT("TEMPORARY:  %s HERE I AM (2)\n", __FUNCTION__);
+
+      va_end(va);
+      return NULL;
+    }
+
+    if(write(hIn, szStdInBuf, nLen) != (ssize_t)nLen)
+    {
+      close(hIn);
+      goto bad_file;
+    }
+
+    lseek(hIn, 0, SEEK_SET); // rewind file
+
+//    WB_ERROR_PRINT("TEMPORARY:  %s HERE I AM (3) temp file \"%s\"\n", __FUNCTION__, pTemp);
+  }
+
+  pRval = WBRunResultInternal(hIn, NULL, szAppName, va);
+
+  va_end(va);
+
+  if(pTemp)
+  {
+    close(hIn);
+    unlink(pTemp);
+
+    WBFree(pTemp);
+  }
+
+  return pRval;
+
+#endif // WIN32
 }
 
 
@@ -4717,6 +5325,9 @@ char *WBRunResultWithInput(const char *szStdInBuf, const char *szAppName, ...)
 {
 char *pRval, *pTemp = NULL;
 va_list va;
+#ifdef WIN32
+DWORD cb1;
+#endif // WIN32
 WB_FILE_HANDLE hIn = WB_INVALID_FILE_HANDLE;
 
 
@@ -4724,9 +5335,6 @@ WB_FILE_HANDLE hIn = WB_INVALID_FILE_HANDLE;
 
   if(szStdInBuf && *szStdInBuf)
   {
-#ifdef WIN32
-    DWORD dw1;
-#endif // WIN32
     unsigned int nLen = strlen(szStdInBuf);
 
     pTemp = WBTempFile0(".tmp");
@@ -4740,15 +5348,13 @@ WB_FILE_HANDLE hIn = WB_INVALID_FILE_HANDLE;
     }
 
 #ifdef WIN32
-    hIn = CreateFile(pTemp, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                     NULL, OPEN_EXISTING, NULL, NULL);
-
-    if(hIn == WB_INVALID_FILE_HANDLE)
+    hIn = CreateFile(pTemp, GENERIC_READ|GENERIC_WRITE,0,NULL,
+                     OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);
 #else // WIN32
     hIn = open(pTemp, O_RDWR, 0);
+#endif // WIN32
 
     if(hIn < 0)
-#endif // WIN32
     {
 bad_file:
 #ifdef WIN32
@@ -4764,37 +5370,40 @@ bad_file:
       return NULL;
     }
 
+    if(
 #ifdef WIN32
-    if(!WriteFile(hIn, szStdInBuf, nLen, &dw1, NULL)
-       || dw1 != nLen)
-    {
-      CloseHandle(hIn);
-      goto bad_file;
-    }
-
-    SetFilePointer(hIn, 0, NULL, FILE_BEGIN); // rewind file
+       !WriteFile(hIn, szStdInBuf, nLen, &cb1,NULL)
+        || cb1 != nLen
 #else // WIN32
-    if(write(hIn, szStdInBuf, nLen) != nLen)
+       write(hIn, szStdInBuf, nLen) != (ssize_t)nLen
+#endif // WIN32
+       )
     {
+#ifdef WIN32
+      CloseHandle(hIn);
+#else // WIN32
       close(hIn);
+#endif // WIN32
       goto bad_file;
     }
 
+#ifdef WIN32
+    SetFilePointer(hIn, 0, NULL, FILE_BEGIN);
+#else // WIN32
     lseek(hIn, 0, SEEK_SET); // rewind file
 #endif // WIN32
 
 //    WB_ERROR_PRINT("TEMPORARY:  %s HERE I AM (3) temp file \"%s\"\n", __FUNCTION__, pTemp);
   }
 
-  pRval = WBRunResultInternal(hIn, szAppName, va);
+  pRval = WBRunResultInternal(hIn, NULL, szAppName, va);
 
   va_end(va);
 
   if(pTemp)
   {
 #ifdef WIN32
-    CloseHandle(hIn);
-    DeleteFile(pTemp);
+      DeleteFile(pTemp);
 #else // WIN32
     close(hIn);
     unlink(pTemp);
@@ -4818,57 +5427,62 @@ bad_file:
 //                                                                                      //
 //////////////////////////////////////////////////////////////////////////////////////////
 
+
+WB_MODULE WBLoadLibrary(const char * szModuleName)
+{
 #ifdef WIN32
-
-WB_MODULE WBLoadLibrary(const char * szModuleName)
-{
-  return((WB_MODULE)LoadLibrary(szModuleName));
-}
-
-void WBFreeLibrary(WB_MODULE hModule)
-{
-  FreeLibrary(hModule);
-}
-
-WB_PROCADDRESS WBGetProcAddress(WB_MODULE hModule, const char *szProcName)
-{
-  return((WB_PROCADDRESS)GetProcAddress(hModule, szProcName));
-}
-
-void * WBGetDataAddress(WB_MODULE hModule, const char *szDataName)
-{
-  return((void *)GetProcAddress(hModule, szDataName));
-}
-
-#else  // POSIX
-
-WB_MODULE WBLoadLibrary(const char * szModuleName)
-{
+  return LoadLibrary(szModuleName);
+#else // !WIN32 aka POSIX
+#ifndef NO_SHARED_LIB_SUPPORT
   return((WB_MODULE)dlopen(szModuleName, RTLD_LAZY | RTLD_LOCAL));
+#else  // NO_SHARED_LIB_SUPPORT
+  return NULL;
+#endif // NO_SHARED_LIB_SUPPORT
+#endif // WIN3,POSIX
 }
 
 void WBFreeLibrary(WB_MODULE hModule)
 {
+#ifdef WIN32
+  FreeLibrary(hModule);
+#else // !WIN32 aka POSIX
+#ifndef NO_SHARED_LIB_SUPPORT
   dlclose(hModule);
+#endif // NO_SHARED_LIB_SUPPORT
+#endif // WIN32,POSIX
 }
 
 WB_PROCADDRESS WBGetProcAddress(WB_MODULE hModule, const char *szProcName)
 {
+#ifdef WIN32
+  return GetProcAddress(hModule, szProcName);
+#else // !WIN32 aka POSIX
+#ifndef NO_SHARED_LIB_SUPPORT
 // freebsd has the 'dlfunc' API, which is basically 'dlsym' cast to a function pointer
 #ifdef __FreeBSD__
   return((WB_PROCADDRESS)dlfunc(hModule, szProcName));
 #else // other POSIX systems - TODO, check for 'dlfunc' instead of the OS
   return((WB_PROCADDRESS)dlsym(hModule, szProcName));
 #endif // 'dlfunc' check
+#else  // NO_SHARED_LIB_SUPPORT
+  return NULL;
+#endif // NO_SHARED_LIB_SUPPORT
+#endif // WIN32,POSIX
 }
 
 void * WBGetDataAddress(WB_MODULE hModule, const char *szDataName)
 {
+#ifdef WIN32
+  return (void *)GetProcAddress(hModule, szDataName);
+#else // !WIN32 aka POSIX
+#ifndef NO_SHARED_LIB_SUPPORT
   return((void *)dlsym(hModule, szDataName));
+#else  // NO_SHARED_LIB_SUPPORT
+  return NULL;
+#endif // NO_SHARED_LIB_SUPPORT
+#endif // WIN32,POSIX
 }
 
-
-#endif // POSIX, WIN32
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                          //
@@ -4882,149 +5496,110 @@ void * WBGetDataAddress(WB_MODULE hModule, const char *szDataName)
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 
-
 WB_THREAD_KEY WBThreadAllocLocal(void)
 {
-WB_THREAD_KEY keyRval;
 #ifdef WIN32
-#else  // WIN23
+  return TlsAlloc();
+#else // !WIN32 aka POSIX
+WB_THREAD_KEY keyRval;
   if(!pthread_key_create(&keyRval, NULL))
   {
     return keyRval;
   }
 
   return (WB_THREAD_KEY)INVALID_HANDLE_VALUE;
-#endif // WIN32
+#endif // WIN32,POSIX
 }
 
 void WBThreadFreeLocal(WB_THREAD_KEY keyVal)
 {
 #ifdef WIN32
-#else  // WIN23
+  TlsFree(keyVal);
+#else // !WIN32 aka POSIX
   pthread_key_delete(keyVal); // TODO:  check return?
-#endif // WIN32
+#endif // WIN32,POSIX
 }
 
 void * WBThreadGetLocal(WB_THREAD_KEY keyVal)
 {
 #ifdef WIN32
-#else  // WIN23
+  return TlsGetValue(keyVal);
+#else // !WIN32 aka POSIX
   return pthread_getspecific(keyVal);
-#endif // WIN32
+#endif // WIN32,POSIX
 }
 
 void WBThreadSetLocal(WB_THREAD_KEY keyVal, void *pValue)
 {
 #ifdef WIN32
-#else  // WIN23
+  TlsSetValue(keyVal, pValue);
+#else // !WIN32 aka POSIX
   pthread_setspecific(keyVal, pValue);
-#endif // WIN32
+#endif // WIN32,POSIX
 }
 
 WB_THREAD WBThreadGetCurrent(void)
 {
 #ifdef WIN32
-#else  // WIN23
+  return GetCurrentThreadId();
+#else // !WIN32 aka POSIX
   return pthread_self();
-#endif // WIN32
+#endif // WIN32,POSIX
 }
 
 
-#if 0 /* this code reserved for future use - implement it or remove it */
-
 #ifdef WIN32
-
-// special WIN32 version of it
-
-#else // WIN32
-
-// call my own thread proc that calls the user thread proc
-// which lets me set some stuff up.  this will require a locked
-// set of buffers for that purpose.  This sets them up.
-
-WB_THREAD_PARM
+struct WB_THREAD_PROC_PARAM
 {
-  WB_THREAD_PARM *pNext;
-
-  void *(*function)(void *);
+  WB_THREAD_PROC pFunction;
   void *pParam;
+  volatile HANDLE hThread; // becomes NULL as a flag
 };
 
-
-volatile unsigned int dwThreadParmSpinLock = 0; // spinlock on THIS using WBInterlockedExchange
-
-WB_THREAD_PARM aTP[16] =
+DWORD WINAPI W32ThreadCaller(void *pParam0)
 {
-  { &(aTP[1]), NULL, 0 }, // this initializer creates a 'chain'
-  { &(aTP[2]), NULL, 0 },
-  { &(aTP[3]), NULL, 0 },
-  { &(aTP[4]), NULL, 0 },
-  { &(aTP[5]), NULL, 0 },
-  { &(aTP[6]), NULL, 0 },
-  { &(aTP[7]), NULL, 0 },
-  { &(aTP[8]), NULL, 0 },
-  { &(aTP[9]), NULL, 0 },
-  { &(aTP[19]), NULL, 0 },
-  { &(aTP[11]), NULL, 0 },
-  { &(aTP[12]), NULL, 0 },
-  { &(aTP[13]), NULL, 0 },
-  { &(aTP[14]), NULL, 0 },
-  { &(aTP[15]), NULL, 0 },
-  { NULL, NULL, 0 }
-};
+WB_THREAD_PROC pFunction;
+void *pParam;
+HANDLE hThread; // handle to me
+struct WB_THREAD_PROC_PARAM *pP = (struct WB_THREAD_PROC_PARAM *)pParam0;
+DWORD dwRval;
 
-WB_THREAD_PARM *pTPHead = &(aTP[0]); // the head of the 'free' list
+  pFunction = pP->pFunction;
+  pParam = pP->pParam;
+  hThread = pP->hThread;
 
-static void *WBInternalThreadProc(void *pParam)
-{
-void *pRval = NULL;
-WB_THREAD_PARM *pParm = (WB_THREAD_PARM *)pParam;
-void *(*function2)(void *);
-void *pParam2;
+  pP->hThread = NULL; // flag to creator
 
+  dwRval = (DWORD)pFunction(pParam);  // do the thread
 
-  if(!pParam)
-  {
-    return NULL;
-  }
+  CloseHandle(hThread);
 
-  function2 = pParm->function;
-  pParam2 = pParm->pParam;
-
-  // do a spinlock, rather than owning a global mutex
-  while(WBInterlockedExchange(&dwThreadParmSpinLock, 1))
-  {
-    WBDelay(100);
-  }
-
-  // spin lock ok, mess with aTP
-
-  pParm->pNext = pTPHead; // place this entry at the beginning of the free list
-  pTPHead = pParm;
-
-  WBInterlockedExchange(&dwThreadParmSpinLock, 0); // un-spin-lock
-
-  if(function2)
-  {
-    signal(SIGTSTP,SIG_IGN); // thread ignores the signal
-
-    pRval = function2(pParam2);
-  }
-
-  return pRval;
+  return dwRval;
 }
+#endif // WIN32
 
-#endif // 0
-
-#endif // !WIN32
-
-
-
-WB_THREAD WBThreadCreate(void *(*function)(void *), void *pParam)
+WB_THREAD WBThreadCreate(WB_THREAD_PROC function, void *pParam)
 {
+  WB_THREAD thrdRval = WB_INVALID_THREAD;
 #ifdef WIN32
-#else  // WIN23
-  WB_THREAD thrdRval = (WB_THREAD)INVALID_HANDLE_VALUE;
+  struct WB_THREAD_PROC_PARAM pp;
+  pp.pFunction = function;
+  pp.pParam = pParam;
+
+  // CreateThread returns a handle
+  // consider calling _beginthreadex and using a wrapper to call _endthreadex
+  pp.hThread = CreateThread(NULL, 0, W32ThreadCaller, &pp, CREATE_SUSPENDED, &thrdRval);
+
+  if(pp.hThread) // returns NULL on error
+  {
+    ResumeThread(pp.hThread);  // thread proc wrapper closes it
+
+    while(pp.hThread) // assigned 0 when safe for this function to return
+      Sleep(0); // this should happen quickly
+
+    return thrdRval;
+  }
+#else // !WIN32 aka POSIX
 
   // TODO:  call my own thread startup proc, passing a struct that contains
   //        'function' and 'pParam' as the param.  use a linked list of
@@ -5035,15 +5610,27 @@ WB_THREAD WBThreadCreate(void *(*function)(void *), void *pParam)
   {
     return thrdRval;
   }
+#endif // WIN32,POSIX
 
-  return (WB_THREAD)INVALID_HANDLE_VALUE;
-#endif // WIN32
+  return WB_INVALID_THREAD;
 }
 
 void *WBThreadWait(WB_THREAD hThread)        // closes hThread, returns exit code, waits for thread to terminate (blocks)
 {
 #ifdef WIN32
-#else  // WIN23
+  HANDLE hT = OpenThread(READ_CONTROL|SYNCHRONIZE,FALSE,hThread);
+  if(hT)
+  {
+    DWORD dwR;
+    WaitForSingleObject(hT, INFINITE);
+
+    GetExitCodeThread(hT, &dwR);
+    CloseHandle(hT);
+    return (void *)dwR;
+  }
+
+  return NULL;
+#else // !WIN32 aka POSIX
 void *pRval = NULL;
 
   if(pthread_join(hThread, &pRval))
@@ -5053,27 +5640,30 @@ void *pRval = NULL;
   }
 
   return pRval;
-#endif // WIN32
+#endif // WIN32,POSIX
 }
 
 int WBThreadRunning(WB_THREAD hThread)        // >0 if thread is running, <0 error - use 'pthread_kill(thread,0)' which returns ESRCH if terminated i.e. 'PS_DEAD'
 {
+int iR = -1;
 #ifdef WIN32
-  DWORD dwRval = WaitForSingleObject(hThread, 0);
-  if(dwRval == WAIT_OBJECT_0) // still running?
+  // use 'WaitForSingleObject with 0 timeout
+  HANDLE hT = OpenThread(READ_CONTROL|SYNCHRONIZE,FALSE,hThread);
+  if(hT)
   {
-    return 0; // nope the thread terminated
+    DWORD dwR = WaitForSingleObject(hT, 0);
+    if(dwR == WAIT_TIMEOUT)
+      iR = 1;
+    else if(dwR == WAIT_OBJECT_0)
+      iR = 0;
+    else
+      iR = -1;
+
+    CloseHandle(hT);
   }
-  else if(dwRval == WAIT_TIMEOUT)
-  {
-    return 1; // still running
-  }
-  else
-  {
-    return -1; // an error
-  }
-#else  // WIN23
-  int iR = pthread_kill(hThread,0);
+  return iR;
+#else // !WIN32 aka POSIX
+  iR = pthread_kill(hThread,0);
 
   if(!iR)
   {
@@ -5086,24 +5676,23 @@ int WBThreadRunning(WB_THREAD hThread)        // >0 if thread is running, <0 err
   }
 
   return -1;
-#endif // WIN32
+#endif // WIN32,POSIX
 }
 
 void WBThreadExit(void *pRval)
 {
 #ifdef WIN32
-#else  // WIN23
+#else // !WIN32 aka POSIX
   pthread_exit(pRval);
-#endif // WIN32
+#endif // WIN32,POSIX
 }
 
 void WBThreadClose(WB_THREAD hThread)
 {
 #ifdef WIN32
-  CloseHandle(hThread);
-#else  // WIN23
+#else // !WIN32 aka POSIX
   pthread_detach(hThread);
-#endif // WIN32
+#endif // WIN32,POSIX
 }
 
 

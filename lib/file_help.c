@@ -567,85 +567,139 @@ void FBReplaceLineInFileBuf(file_help_buf_t **ppBuf, long lLineNum, const char *
 
 
 // FILE SYSTEM INDEPENDENT FILE AND DIRECTORY UTILITIES
-// UNIX/LINUX versions - TODO windows versions?
+// These are primarikly UNIX/LINUX versions - TODO:  finish the windows portions
+
+#define CHAR_MODE_BUFFSIZE 1048576
 
 size_t WBReadFileIntoBuffer(const char *szFileName, char **ppBuf)
 {
-off_t cbLen;
+off_t cbLen = (off_t)-1;
 size_t cbF;
 int cb1, iChunk;
 char *pBuf;
-int iFile;
+int iFile, bCharMode = 0;
 
+
+  // if the file cannot be "seek"d I use char mode but limit to 1Mb
+  // this lets me read /proc files easily
 
   if(!ppBuf)
   {
     return (size_t)-1;
   }
 
-  iFile = open(szFileName, O_RDONLY); // open read only (assume no locking for now)
+#ifndef WIN32
+  if(!szFileName || !*szFileName) // use stdin
+    iFile = STDIN_FILENO; // fcntl(STDIN_FILENO,  F_DUPFD, 0);  // dup stdin handle so I can close it later
+  else
+#endif // WIN32
+    iFile = open(szFileName, O_RDONLY); // open read only (assume no locking for now)
 
   if(iFile < 0)
   {
     return (size_t)-1;
   }
 
-  // how long is my file?
 
-  cbLen = (unsigned long)lseek(iFile, 0, SEEK_END); // location of end of file
 
-  if(cbLen == (off_t)-1)
+#ifndef WIN32
+  if(!szFileName || !*szFileName) // use stdin
   {
-    *ppBuf = NULL; // make sure
+    cbLen = (off_t)CHAR_MODE_BUFFSIZE;
+    bCharMode = 1;
   }
   else
+#endif // WIN32
   {
-    lseek(iFile, 0, SEEK_SET); // back to beginning of file
+    // how long is my file?
 
-    *ppBuf = pBuf = WBAlloc(cbLen + 1);
+    cbLen = (unsigned long)lseek(iFile, 0, SEEK_END); // location of end of file
 
-    if(!pBuf)
+    if(cbLen == (off_t)-1)
     {
-      cbLen = (off_t)-1; // to mark 'error'
+      *ppBuf = NULL; // make sure
+
+      if(errno == EINVAL) // char mode file like /proc var?
+      {
+        cbLen = (off_t)CHAR_MODE_BUFFSIZE;
+        bCharMode = 1;
+      }
     }
     else
     {
-      cbF = cbLen;
+      lseek(iFile, 0, SEEK_SET); // back to beginning of file
+    }
+  }
 
-      while(cbF > 0)
+  *ppBuf = pBuf = WBAlloc(cbLen + 1);
+
+  if(!pBuf)
+  {
+    cbLen = (off_t)-1; // to mark 'error'
+  }
+  else if(cbLen >= 0)
+  {
+    *pBuf = 0;
+    cbF = cbLen;
+
+    if(bCharMode)
+      cbLen = 0;
+
+    while(cbF > 0)
+    {
+      if(bCharMode)
+      {
+        iChunk = 16;
+      }
+      else
       {
         iChunk = 1048576; // 1MByte at a time
+      }
 
-        if(iChunk > cbF)
+      if((size_t)iChunk > cbF)
+      {
+        iChunk = (int)cbF;
+      }
+
+      cb1 = read(iFile, pBuf, iChunk);
+
+      if(cb1 == -1)
+      {
+        if(errno == EAGAIN) // allow this
         {
-          iChunk = (int)cbF;
+          WBDelay(100);
+          continue; // for now just do this
         }
 
-        cb1 = read(iFile, pBuf, iChunk);
+        cbLen = -1;
+        break;
+      }
+      else if(!cb1) // EOF
+      {
+        break;  // done
+      }
 
-        if(cb1 == -1)
-        {
-          if(errno == EAGAIN) // allow this
-          {
-            WBDelay(100);
-            continue; // for now just do this
-          }
+      if(cb1 != iChunk) // did not read enough bytes
+      {
+        iChunk = cb1; // for now
+      }
 
-          cbLen = -1;
-          break;
-        }
-        else if(cb1 != iChunk) // did not read enough bytes
-        {
-          iChunk = cb1; // for now
-        }
+      cbF -= iChunk;
+      pBuf += iChunk;
+      *pBuf = 0;  // I allocated an extra byte for this
 
-        cbF -= iChunk;
-        pBuf += iChunk;
+      if(bCharMode)
+      {
+        cbLen += iChunk;  // reported length in char mode
       }
     }
   }
 
-  close(iFile);
+
+#ifndef WIN32
+  if(iFile != STDIN_FILENO)
+#endif // WIN32
+    close(iFile);
 
   return (size_t) cbLen;
 }
