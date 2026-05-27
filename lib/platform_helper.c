@@ -4060,7 +4060,7 @@ union
   WB_UINT64 ullTime;
   unsigned short sA[4];
 } uX;
-static const char szH[16]="0123456789ABCDEF";
+static const char szH[17]="0123456789ABCDEF";
 
 
 #ifdef WIN32
@@ -4179,18 +4179,6 @@ char szTemp[MAX_PATH + 1];
   return pRval;
 }
 
-char * WBTempFile(const char *szExt)
-{
-char *pRval = WBTempFile0(szExt);
-
-  if(pRval)
-  {
-    __add_to_temp_file_list(pRval);
-  }
-
-  return pRval;
-}
-
 static void __add_to_temp_file_list(const char *szFile)
 {
 int i1 = strlen(szFile);
@@ -4231,6 +4219,18 @@ char *pTemp;
 
   *(pTempFileListEnd++) = 0;
   *pTempFileListEnd = 0; // always end with 2 0-bytes, point to 2nd one
+}
+
+char * WBTempFile(const char *szExt)
+{
+char *pRval = WBTempFile0(szExt);
+
+  if(pRval)
+  {
+    __add_to_temp_file_list(pRval);
+  }
+
+  return pRval;
 }
 
 
@@ -4302,7 +4302,7 @@ WB_FILE_HANDLE hIn, hOut, hErr;
       sa.bInheritHandle = TRUE; // what a pain
 
       hIn = CreateFile("NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                       &sa, OPEN_EXISTING, 0, NULL);
+                       &sa, OPEN_EXISTING, NULL, NULL);
       WBFree(pSD);
     }
 #endif // WIN32
@@ -5192,7 +5192,7 @@ struct __RunResult3_worker_thread_params xParams = {{INVALID_HANDLE_VALUE,INVALI
 
   // start worker thread
   xParams.hThread = (HANDLE)_beginthreadex(NULL, 65536, __RunResult3_worker_thread,
-                                           &xParams, 0,//CREATE_SUSPENDED,
+                                           &xParams, CREATE_SUSPENDED,
                                            (unsigned int *)&xParams.dwThreadID);
 
   if(xParams.hThread == INVALID_HANDLE_VALUE)
@@ -5205,7 +5205,10 @@ struct __RunResult3_worker_thread_params xParams = {{INVALID_HANDLE_VALUE,INVALI
   xParams.pStdin = pStdin;
   xParams.cbStdin = cbStdin;
 
-  //ResumeThread(xParams.hThread);
+  ResumeThread(xParams.hThread);
+
+  while(xParams.dwThreadID && xParams.bStateFlag == 0)
+    Sleep(10); // wait for it to begin (avoid race condition if program does not start)
 
   pRval = WBRunResultInternal(xParams.hStdin[0], &nExitCode, szAppName, va);
 
