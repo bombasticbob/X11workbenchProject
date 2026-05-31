@@ -13,6 +13,33 @@ will build properly.
 However, it does not (yet) function as in the project description.  Not yet,
 anyway.
 
+(update 5/31/2026 - a year after the last update, yeah...)
+
+In order to teach myself how to properly use AI in developing a project, I have
+taken on the task of using GROK to assist me in completing this long-protracted
+project.  I am assigning myself specific tasks to use Grok for so I can understand
+how to most efficiently use Grok's capabilities while maintaining a "supervisory"
+role on what it generates, making changes as needed to improve it.
+
+Over the next week or so (likely) I plan on making MAJOR updates so I can find the
+best way to use Grok as a "team of junior developers".  Flat out "Vibe coding"
+already shows signs of problems, from code bloat to outright mistakes and
+misinterpretation of intent.
+
+The most recent updates are for WIN32 compayibility code.  Once I've established
+a proof of concept with windows i can docus on finishing the functionality and
+implementing all of the dialog box controls, thus making this (finally) a useful
+application and toolkit.  I expect 10:1 or better productivity boost once I
+get the process right.
+
+The future is AI; however, you must learn to MANAGE it, otherwise you end up
+with a world filled with even CRAPPIER CODE than what "Teh Intarwebs" has brought
+us, with overly-bloated projects, 2D FLATSO interfaces, JavaScript **HELL**, and
+the 'Rust' programming lingo developed solely to compensate for a lot of it
+(but NOT solve the basic problem).
+
+
+
 (update 5/16/2025 - not abandoned, just on hold)
 
 This project has traditionally been hosted at:

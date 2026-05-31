@@ -5464,7 +5464,7 @@ WB_PROCADDRESS WBGetProcAddress(WB_MODULE hModule, const char *szProcName)
 // freebsd has the 'dlfunc' API, which is basically 'dlsym' cast to a function pointer
 #ifdef __FreeBSD__
   return((WB_PROCADDRESS)dlfunc(hModule, szProcName));
-#else // other POSIX systems - TODO, check for 'dlfunc' instead of the OS
+#else // other POSIX systems - TODO, check for 'dlfunc'/'dlsym' for this particular OS
   return((WB_PROCADDRESS)dlsym(hModule, szProcName));
 #endif // 'dlfunc' check
 #else  // NO_SHARED_LIB_SUPPORT
@@ -5778,7 +5778,7 @@ void WBCondFree(WB_COND *pCond)
 #else  // WIN23
   if(pCond)
   {
-//    pthread_cond_destroy(pCond);
+//    pthread_cond_destroy(pCond);  // not using pthread version
 
     // because of problems under Windows, this will be defined as 'unsigned int'
     // and I'll use the increment/decrement interlock functions and wait loops to
@@ -5868,23 +5868,6 @@ int WBCondSignal(WB_COND *pCond)
 int WBCondWait(WB_COND *pCond, int nTimeout)
 {
 int iRval = -1;
-//#ifdef WIN32
-//#else  // WIN23
-//WB_MUTEX xMtx;
-//
-//  if(WBMutexCreate(&xMtx)) // needed by call to pthread_cond_timedwait
-//  {
-//    return -1; // wait fail
-//  }
-//
-//  WBMutexLock(&xMtx, 0); // should lock immediately as I just created it
-//
-//  iRval = WBCondWaitMutex(pCond, &xMtx, nTimeout);
-//
-//  WBMutexUnlock(&xMtx);
-//  WBMutexFree(&xMtx);
-//
-//  return iRval;
 
   if(!pCond)
   {
@@ -5940,58 +5923,12 @@ int iRval = -1;
 
 int WBCondWaitMutex(WB_COND *pCond, WB_MUTEX *pMtx, int nTimeout)
 {
-int iRval = -1;
-#ifdef WIN32
-#else  // WIN23
-
-//  WB_ERROR_PRINT("TEMPORARY: %s - here I am\n", __FUNCTION__);
+int iRval;
+//#ifdef WIN32
+//#else  // WIN23
 
   if(!pCond || !pMtx)
-  {
-    WB_ERROR_PRINT("ERROR: %s - returns -1 (NULL pCond)\n", __FUNCTION__);
-
     return -1;
-  }
-
-//  if(nTimeout >= 0)
-//  {
-//    struct timespec ts;
-//
-//    clock_gettime(CLOCK_REALTIME, &ts);
-//
-//    ts.tv_sec += nTimeout / 1000000;
-//    ts.tv_nsec += (nTimeout % 1000000) * 1000L;
-//
-//    if(ts.tv_nsec > 1000000000L)
-//    {
-//      ts.tv_sec++;
-//      ts.tv_nsec -= 1000000000L;
-//    }
-//
-//    iRval = pthread_cond_timedwait(pCond, pMtx, &ts);
-//  }
-//  else
-//  {
-//    iRval = pthread_cond_wait(pCond, pMtx);  // 'infinite wait' version
-//  }
-//
-//  if(iRval)
-//  {
-//    // make sure mutex is owned - some indication is that on timeout that
-//    // pthread_cond_timedwait may NOT re-own the mutex!  or same on error...?
-//
-//    WBMutexUnlock(pMtx); // in case it IS locked
-//    WBMutexLock(pMtx, -1); // then re-lock it again [bug workaround]
-//
-//    if(nTimeout >= 0 && iRval == ETIMEDOUT) // timeout
-//    {
-//      return 1; // indicate 'timeout' but not error
-//    }
-//    else
-//    {
-//      return -1;
-//    }
-//  }
 
   WBMutexUnlock(pMtx);
 
@@ -5999,7 +5936,7 @@ int iRval = -1;
 
   WBMutexLock(pMtx, -1); // this is a safe way of replicating the behavior [wait infinitely on mutex]
 
-#endif // WIN32
+//#endif // WIN32
 
   return iRval;
 }
@@ -6056,6 +5993,7 @@ unsigned int iRval;
   pthread_rwlock_unlock(&xInterlockedRWLock);
 
   return iRval;
+#endif // WIN32
 }
 
 unsigned int WBInterlockedRead(volatile unsigned int *pValue)
@@ -6125,6 +6063,5 @@ char *WBGetPrinterList(void)
   return NULL; // for now
 }
 
-#endif // WIN32,POSIX
 
 

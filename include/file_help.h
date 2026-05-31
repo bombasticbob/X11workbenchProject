@@ -447,6 +447,21 @@ file_help_buf_t *pFB;
 }
 
 
+#ifdef WIN32
+/** \ingroup file_help_io
+  * \brief convert a string into a WBAlloc()'d bufer of UTF-16 wide characters for Win33 compatibility
+  *
+  * \param szFileName A const pointer to a UTF-8 string, usually containing a file name
+  * \returns a WBAlloc()'d buffer containint the UTF-16 translation of the string, or NULL on error
+  *  NON-null returned pointers must be free'd by the caller via 'WBFree()'
+  *
+  * Use this function to convert MBCS (UTF-8) strings, specifically file names (and related) into
+  * UTF-16 (wide character) unicode, compatile with "Wide Character" APIs in WIN32.
+  *
+  * header file:  file_help.h
+**/
+wchar_t *WBWideChar16FromMBCS(const char *szFileName)
+#endif // WIN32
 
 /** \ingroup file_help_io
   * \brief read a file's contents into a buffer, returning the length of the buffer

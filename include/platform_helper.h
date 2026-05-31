@@ -509,16 +509,6 @@ typedef const char * WB_PCSTR;  ///< pointer to const char string - a convenienc
   * @}
 **/
 
-/** \ingroup platform_types
-  * @{
-**/
-
-typedef char * WB_PSTR;         ///< pointer to char string - a convenience typedef
-typedef const char * WB_PCSTR;  ///< pointer to const char string - a convenience typedef
-
-/**
-  * @}
-**/
 
 
 

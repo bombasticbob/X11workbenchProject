@@ -61,6 +61,15 @@
 #include <sys/stat.h>
 #include <sys/param.h> // for MAXPATHLEN and PATH_MAX (also includes limits.h in some cases)
 
+#ifdef WIN32
+  // Win32-specific includes and definitions (only used when WIN32 is defined)
+  #include <windows.h>
+  #include <shlwapi.h>   // Path functions
+  #include <direct.h>    // for _getcwd (Unix version uses getcwd)
+#else
+  // additional POSIX-only includes go here
+#endif
+
 #include "file_help.h"
 #include "draw_text.h" // for string utilities, mostly
 #include "window_helper.h" // for debug stuff
@@ -569,7 +578,31 @@ void FBReplaceLineInFileBuf(file_help_buf_t **ppBuf, long lLineNum, const char *
 // FILE SYSTEM INDEPENDENT FILE AND DIRECTORY UTILITIES
 // These are primarikly UNIX/LINUX versions - TODO:  finish the windows portions
 
+
 #define CHAR_MODE_BUFFSIZE 1048576
+
+#ifdef WIN32
+// Unicode helper for WIN32 file utilities - use wide char versions for WIN32
+wchar_t *WBWideChar16FromMBCS(const char *szFileName)
+{
+wchar_t *wszFileName;
+int iLen;
+
+  // WIN32: Use UTF-16 / wide-char APIs for full Unicode support.
+  iLen = MultiByteToWideChar(CP_UTF8, 0, szFileName, -1, NULL, 0);
+  if(iLen <= 0)
+    return NULL;
+
+  wszFileName = (wchar_t *)WBAlloc((iLen + 1)* sizeof(wchar_t));
+  if(wszFileName)
+  {
+    MultiByteToWideChar(CP_UTF8, 0, szFileName, -1, wszFileName, iLen);
+  }
+
+  return wszFileName;
+}
+#endif // WIN32
+
 
 size_t WBReadFileIntoBuffer(const char *szFileName, char **ppBuf)
 {
@@ -588,31 +621,43 @@ int iFile, bCharMode = 0;
     return (size_t)-1;
   }
 
-#ifndef WIN32
+#ifdef WIN32
+  if(!szFileName || !*szFileName)
+    return (size_t)-1;
+  else
+  {
+    wchar_t *wszFileName = WBWideChar16FromMBCS(szFileName);
+    if(!wszFileName)
+      return -1;
+
+    iFile = _wopen(wszFileName, O_RDONLY | O_BINARY);  // BINARY for text files on Win32
+
+    WBFree(wszFileName);
+  }
+#else
   if(!szFileName || !*szFileName) // use stdin
     iFile = STDIN_FILENO; // fcntl(STDIN_FILENO,  F_DUPFD, 0);  // dup stdin handle so I can close it later
   else
-#endif // WIN32
     iFile = open(szFileName, O_RDONLY); // open read only (assume no locking for now)
+#endif // WIN32
 
   if(iFile < 0)
   {
     return (size_t)-1;
   }
 
-
-
-#ifndef WIN32
+#ifdef WIN32
+  // On Win32, files can always be seeked (no /proc-style char mode needed)
+  cbLen = (off_t)_filelengthi64(iFile);
+#else
   if(!szFileName || !*szFileName) // use stdin
   {
     cbLen = (off_t)CHAR_MODE_BUFFSIZE;
     bCharMode = 1;
   }
   else
-#endif // WIN32
   {
     // how long is my file?
-
     cbLen = (unsigned long)lseek(iFile, 0, SEEK_END); // location of end of file
 
     if(cbLen == (off_t)-1)
@@ -630,6 +675,7 @@ int iFile, bCharMode = 0;
       lseek(iFile, 0, SEEK_SET); // back to beginning of file
     }
   }
+#endif // WIN32
 
   *ppBuf = pBuf = WBAlloc(cbLen + 1);
 
@@ -695,7 +741,6 @@ int iFile, bCharMode = 0;
     }
   }
 
-
 #ifndef WIN32
   if(iFile != STDIN_FILENO)
 #endif // WIN32
@@ -709,12 +754,25 @@ int WBWriteFileFromBuffer(const char *szFileName, const char *pBuf, size_t cbBuf
 int iFile, iRval, iChunk;
 
 
-  if(!pBuf)
+  if(!szFileName || !*szFileName || !pBuf)
   {
     return -1;
   }
+#ifdef WIN32
+  {
+    wchar_t *wszFileName = WBWideChar16FromMBCS(szFileName);
+    if(!wszFileName)
+      return -1;
 
+    iFile = _wopen(wszFileName,
+                   O_CREAT | O_TRUNC | O_RDWR | O_BINARY,  // BINARY for text files on Win32
+                   0666);
+
+    WBFree(wszFileName);
+  }
+#else
   iFile = open(szFileName, O_CREAT | O_TRUNC | O_RDWR, 0666);  // always create with mode '666' (umask should apply)
+#endif // WIN32
 
   if(iFile < 0)
   {
@@ -804,22 +862,37 @@ int i1;
 
   if(pRval)
   {
+#ifdef WIN32
+    if(!_getcwd(pRval, MAXPATHLEN))
+    {
+      WBFree(pRval);
+      pRval = NULL;
+    }
+#else
     if(!getcwd(pRval, MAXPATHLEN))
     {
       WBFree(pRval);
       pRval = NULL;
     }
+#endif // WIN32
   }
 
   // this function will always return something that ends in '/' (except on error)
+  // or '\' for WIN32
 
   if(pRval)
   {
+#ifdef WIN32
+    const char cSlash = '\\';
+#else // WIN32
+    const char cSlash = '/';
+#endif // WIN32
+
     i1 = strlen(pRval);
 
-    if(i1 > 0 && pRval[i1 - 1] != '/')
+    if(i1 > 0 && pRval[i1 - 1] != cSlash)
     {
-      pRval[i1] = '/';
+      pRval[i1] = cSlash;
       pRval[i1 + 1] = 0;
     }
   }
@@ -832,16 +905,20 @@ int WBIsDirectory(const char *szFileName)
 int bRval = 0;
 
 #ifdef WIN32
-WIN32_FIND_DATA fd;
-HANDLE hFF;
+wchar_t *wszName;
+DWORD dwAttrs;
 
-  hFF = FindFirstFile(szFileName, &fd);
+  wszName = WBWideChar16FromMBCS(szFileName);
+  if(!wszName)
+    return 0;
 
-  if(hFF != INVALID_HANDLE_VALUE)
+  dwAttrs = GetFileAttributesW(wszName);
+  if(dwAttrs != INVALID_FILE_ATTRIBUTES)
   {
-    bRval = (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
-    FindClose(hFF);
+    bRval = (dwAttrs & FILE_ATTRIBUTE_DIRECTORY) ? 1 : 0;
   }
+
+  WBFree(wszName);
 
 #else // WIN32
 struct stat sF;
@@ -858,6 +935,16 @@ char *WBGetCanonicalPath(const char *szFileName)
 {
 char *pTemp, *p1, *p2, *p3, *p4, *pRval = NULL;
 struct stat sF;
+#ifdef WIN32
+const char cSlash = '\\';
+#else // WIN32
+const char cSlash = '/';
+#endif // WIN32
+char szSlash[2];
+
+
+  szSlash[0] = cSlash;
+  szSlash[1] = 0;
 
   pTemp = WBCopyString(szFileName);
 
@@ -871,11 +958,11 @@ struct stat sF;
   p1 = pTemp;
   while(*p1 && p1[1])
   {
-    if(*p1 == '/' && p1[1] == '/')
+    if(*p1 == cSlash && p1[1] == cSlash)
     {
       memmove(p1, p1 + 1, strlen(p1 + 1) + 1);
     }
-    else if(*p1 == '/' && p1[1] == '.' && p1[2] == '/')
+    else if(*p1 == cSlash && p1[1] == '.' && p1[2] == cSlash)
     {
       memmove(p1, p1 + 2, strlen(p1 + 2) + 1);
     }
@@ -887,6 +974,7 @@ struct stat sF;
 
   // step 2:  resolve each portion of the path, deal with '~' '.' '..', build new path.
 
+#ifndef WIN32
   if(*pTemp == '~' && (pTemp[1] == '/' || !pTemp[1])) // first look for '~' at the beginning (only allowed there)
   {
     p1 = getenv("HOME");
@@ -923,11 +1011,12 @@ struct stat sF;
       pTemp = p3;
     }
   }
+#endif // WIN32
 
   p1 = pTemp;
   while(*p1)
   {
-    p2 = strchr(p1, '/');
+    p2 = strchr(p1, cSlash);
     if(!p2)
     {
       if(*p1 == '.') // check for ending in '.' or '..' and add a '/' so I can handle it correctly
@@ -935,11 +1024,12 @@ struct stat sF;
         if((p1[1] == '.' && !p1[2]) || !p1[1])
         {
           p2 = pTemp; // temporary
-          WBCatString(&pTemp, "/");
+          WBCatString(&pTemp, szSlash);
 
           p1 = (p1 - p2) + pTemp; // restore relative pointer
 
-          WB_ERROR_PRINT("TEMPORARY:  %s  %s\n", p1, pTemp);
+          WB_ERROR_PRINT("TEMPORARY:  %s:%d  %s  %s\n",
+                         __FUNCTION__, __LINE__, p1, pTemp);
 
           continue; // let's do this again, properly
         }
@@ -962,7 +1052,7 @@ struct stat sF;
     }
     else if(p2 == p1)
     {
-      pRval = WBCopyString("/");
+      pRval = WBCopyString(szSlash);
     }
     else
     {
@@ -990,7 +1080,7 @@ struct stat sF;
         p3 = pRval + strlen(pRval) - 1; // NOTE:  pRval ends in '/' and I want the one BEFORE that
         while(p3 > pRval)
         {
-          if(*(p3 - 1) == '/')
+          if(*(p3 - 1) == cSlash)
           {
             *p3 = 0;
             break;
@@ -1022,6 +1112,7 @@ struct stat sF;
         break;
       }
 
+#ifndef WIN32
       // see if this is a symbolic link.  exclude testing '/'
 
       p3 = pRval + strlen(pRval) - 1;
@@ -1116,19 +1207,21 @@ struct stat sF;
           }
         }
       }
+#endif // WIN32
     }
 
     p1 = p2 + 1;
   }
 
+#ifndef WIN32
   // if the resulting path is a symbolic link, fix it
   if(pRval)
   {
     p1 = pRval + strlen(pRval) - 1;
 
-    if(p1 > pRval && *p1 != '/') // does not end in a slash, so it should be a file...
+    if(p1 > pRval && *p1 != cSlash) // does not end in a slash, so it should be a file...
     {
-      while(p1 > pRval && *(p1 - 1) != '/')
+      while(p1 > pRval && *(p1 - 1) != cSlash)
       {
         p1--;
       }
@@ -1137,7 +1230,7 @@ struct stat sF;
       {
         if(S_ISDIR(sF.st_mode)) // an actual directory - end with a '/'
         {
-          WBCatString(&pRval, "/"); // add ending '/'
+          WBCatString(&pRval, szSlash); // add ending '/'
         }
         else if(S_ISLNK(sF.st_mode)) // symlink
         {
@@ -1167,7 +1260,7 @@ struct stat sF;
             else
             {
               p4[iLen] = 0; // assume < MAXPATHLEN for now...
-              if(p4[0] == '/') // it's an absolute path
+              if(p4[0] == cSlash) // it's an absolute path
               {
                 WBFree(pRval); // new path for old
                 pRval = p4;
@@ -1175,7 +1268,7 @@ struct stat sF;
               else
               {
                 p3 = pRval + strlen(pRval); // I won't be ending in '/' for this part so don't subtract 1
-                while(p3 > pRval && *(p3 - 1) != '/') // scan back for the '/' in symlink's original path
+                while(p3 > pRval && *(p3 - 1) != cSlash) // scan back for the '/' in symlink's original path
                 {
                   p3--;
                 }
@@ -1187,7 +1280,7 @@ struct stat sF;
 
               if(pRval && WBIsDirectory(pRval)) // is the result a directory?
               {
-                WBCatString(&pRval, "/");
+                WBCatString(&pRval, szSlash);
               }
 
               if(pRval)
@@ -1203,6 +1296,7 @@ struct stat sF;
       }
     }
   }
+#endif // WIN32
 
   if(pTemp)
   {
@@ -1224,7 +1318,7 @@ typedef struct __DIRLIST__
 {
   const char *szPath, *szNameSpec;
 #ifdef WIN32 // also true for WIN64
-  WIN32_FIND_DATA fd;
+  WIN32_FIND_DATAW fd;   // Win32: use wide-char version (UTF-16)
   HANDLE hFF;
 #else // !WIN32
   DIR *hD;
@@ -1244,7 +1338,9 @@ DIRLIST *pRval;
 char *p1, *p2;
 int iLen, nMaxLen, cbRval;
 char *pBuf;
-
+#ifdef WIN32
+wchar_t *wszName;
+#endif // WIN32
 
   if(!szDirSpec || !*szDirSpec)
   {
@@ -1382,7 +1478,15 @@ char *pBuf;
     p1 = (char *)(pRval + 1);
 
 #ifdef WIN32
-    pRval->hFF = FindFirstFile(p2, &(pRval->fd))
+    wszName = WBWideChar16FromMBCS(p2);
+    if(!wszName)
+    {
+      WB_ERROR_PRINT("ERROR - %s - Unable to allocate memory for filename spec\n", __FUNCTION__);
+      return NULL;
+    }
+
+    pRval->hFF = FindFirstFile(W(wszSpec, &(pRval->fd))
+    WBFree(wszSpec);
     if(pRval->hFF == INVALID_HANDLE_VALUE)
     {
       WBFree(pBuf);
@@ -1446,16 +1550,55 @@ void WBDestroyDirectoryList(void *pDirectoryList)
 int WBNextDirectoryEntry(void *pDirectoryList, char *szNameReturn,
                          int cbNameReturn, unsigned long *pdwModeAttrReturn)
 {
+char *pBuf;
+int cbBuf;
+DIRLIST *pDL = (DIRLIST *)pDirectoryList;
+
 #ifdef WIN32
+  WIN32_FIND_DATAW *pD = &(pDL->fd);
+  struct stat sF;
+  DWORD dwAttrs;
+
+  // Win32: use wide-char version for FindNextFileW to support Unicode paths.
+  if(pD->cFileName[0] == 0)
+  {
+    return 1;  // EOF
+  }
+
+  cbBuf = WideCharToMultiByte(CP_UTF8, 0, pD->cFileName, -1, NULL, 0, NULL, NULL);
+  if(cbBuf > 0)
+  {
+    pBuf = (char *)WBAlloc(cbBuf + sizeod(wchar_t));
+    if(pBuf)
+    {
+      WideCharToMultiByte(CP_UTF8, 0, pD->cFileName, -1, szBuf, iLenA, NULL, NULL);
+      if(szNameReturn && cbNameReturn > 0)
+      {
+        strlcpy(szNameReturn, pBuf, cbNameReturn);
+      }
+      WBFree(pBuf);
+
+      if(pdwModeAttrReturn)
+      {
+        *pdwModeAttrReturn = (pD->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? 1 : 0;
+      }
+
+      // advance to next entry
+      if(FindNextFileW(pDL->hFF, &(pDL->fd)))
+        return 0;
+
+      pDL->fd.cFileName[0] = 0;
+      return 1; // EOF
+    }
+  }
+
+  return -1;  // error
+
 #else  // WIN32
+char *p1;
+int iRval = 1;  // default 'EOF'
 struct dirent *pD;
 struct stat sF;
-#endif // WIN32
-char *p1, *pBuf;
-int cbBuf;
-//static char *p2; // temporary
-int iRval = 1;  // default 'EOF'
-DIRLIST *pDL = (DIRLIST *)pDirectoryList;
 
 
   if(!pDirectoryList)
@@ -1479,13 +1622,6 @@ DIRLIST *pDL = (DIRLIST *)pDirectoryList;
     *(p1++) = '/';  // for now assume this
     *p1 = 0;  // by convention
   }
-
-#ifdef WIN32
-
-  // for WIN32, copy 'previous' data first, then 'FindNextFile'.  On EOF mark
-  // as EOF so that next call will detect it.
-
-#else // !WIN32
 
   if(pDL->hD)
   {
@@ -1703,7 +1839,6 @@ unsigned long long tNewVal;
 #else  // defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
 unsigned long tNewVal;
 #endif // defined(HAVE_LONGLONG) || defined(__DOXYGEN__)
-
 
   tNewVal = WBGetFileModDateTime(szFileName);
 
