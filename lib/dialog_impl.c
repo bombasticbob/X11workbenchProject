@@ -2615,7 +2615,7 @@ int iX, iY, iTimeStart, iTimeEnd;
       // 1 / relative Luma on gleam, 0 to 255
       iGleamLum = 256 * abs((int)(pData->iW * 2L * iTemp / iDelta - pData->iW)) / pData->iW;
 
-      iGleamLum = 255 - (iGleamLum * iGleamLum) / 384; // relative gleam, 64 to 255
+      iGleamLum = 255 - (iGleamLum * iGleamLum) / 273; // relative gleam, 16 to 255
 
 //      fprintf(stderr, "(%d,%d,%d,%d,%d),", iX, pData->iW, iGleamLum, iTemp, iDelta);
 //      fflush(stderr);

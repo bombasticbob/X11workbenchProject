@@ -354,21 +354,28 @@ find_url_opener:
                   if(!memcmp(p4 + 1, szTerm, strlen(szTerm)) &&
                      !memcmp(p4 + 1 + strlen(szTerm), "</a>", 4)) // ending tag
                   {
+//                    WB_ERROR_PRINT("TEMPORARY:  found \"%s\"\n", szTerm);
                     p3 = CHParseXMLTagContents(p2, p4 - p2);
                     if(p3)
                     {
                       // now that I have the tag, grab the 'href' member
                       for(p2=p3; *p2; p2 += strlen(p2) + 1)
                       {
-                        if(!strncmp(p2, "href=", 5))
+//                        WB_ERROR_PRINT("TEMPORARY:  tag \"%s\"\n", p2);
+                        if(!strncmp(p2, "href\t", 5))
                         {
                           strlcpy(szDoxyTag, "file://", sizeof(szDoxyTag));
                           strlcat(szDoxyTag, szDocFilePath, sizeof(szDoxyTag)); // the path only at this point
                           strlcat(szDoxyTag, p2 + 5, sizeof(szDoxyTag)); // the 'href' text
+//                          WB_ERROR_PRINT("TEMPORARY:  found \"%s\" \"%s\"\n", szTerm, p2 + 5);
                           break;
                         }
                       }
 
+                      if(!szDoxyTag[0])
+                      {
+                        WB_ERROR_PRINT("TEMPORARY:  found \"%s\" but no href - \"%s\"\n", szTerm, p3);
+                      }
                       WBFree(p3);
                       if(szDoxyTag[0])
                       {
