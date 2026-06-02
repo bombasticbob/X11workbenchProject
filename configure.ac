@@ -74,11 +74,12 @@ fi
 # --enable-libXpm (default is NOT to link to libXpm)
 # --enable-libXft (default is to link to libXft)
 # --enable-libXext (default is to link to libXext)
+# --enable-warnall (default is warnings NOT aggressive)
 # --enable-fatalwarn (default is warnings NOT fatal)
 
 
 AC_ARG_ENABLE(release,
-              [  --enable-release        CUSTOM - Turn off all debugging for release version],
+              [  --enable-release        CUSTOM - Turn off all debugging for release version.  implies --enable-warnall=YES],
               [case "${enableval}" in
                yes) release=true ; AC_MSG_RESULT([CONFIGURE INFORMATION:  building a RELEASE version]) ;;
                no)  release=false ;;
@@ -122,6 +123,15 @@ AC_ARG_ENABLE(libXext,
                esac],
               [libXext=true])
 
+AC_ARG_ENABLE(warnall,
+              [  --enable-warnall        CUSTOM - allow aggressive warnings],
+              [case "${enableval}" in
+               yes)  warnall=true ; AC_MSG_RESULT([CONFIGURE INFORMATION:  Aggressive warnings are now enabled]) ;;
+               no)   warnall=false ;;
+               *) AC_MSG_ERROR(bad value ${enableval} for --enable-warnall) ;;
+               esac],
+              [warnall=false])
+
 AC_ARG_ENABLE(fatalwarn,
               [  --enable-fatalwarn      CUSTOM - cause warnings to be treated as errors],
               [case "${enableval}" in
@@ -134,6 +144,7 @@ AC_ARG_ENABLE(fatalwarn,
 
 AM_CONDITIONAL(NO_DEBUG, test x$release = xtrue)
 AM_CONDITIONAL(NO_OPT, test x$noopt = xtrue)
+AM_CONDITIONAL(WARN_ALL, test x$warnall = xtrue)
 AM_CONDITIONAL(FATAL_WARN, test x$fatalwarn = xtrue)
 
 

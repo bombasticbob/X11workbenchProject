@@ -112,6 +112,10 @@
 #endif // HAVE_MALLOC_USABLE_SIZE
 
 
+#define WB_POINTER_HASH_INITIAL_SIZE 512 /* initial size of pointer hash table for event messages */
+#define WB_HASH_JAM_PREVENTER_SIZE 8192  /* size of hash aging table */
+
+
 static char *pTempFileList = NULL, *pTempFileListEnd = NULL;
 unsigned long cbTempFileList; // size of pointer
 
@@ -2292,10 +2296,19 @@ typedef struct __pointer_hash__
   WB_UINT32 dwRefCount; // reference count (deleted on '0')
 } POINTER_HASH;
 
+typedef struct __hash__aging__entry__
+{
+  WB_UINT32 uiHash;     // 32-bit pointer hash value, must be zero for 'free' entry
+  WB_UINT32 dwTick;     // millis count when I last created/referenced this hash
+} HASH_AGING_ENTRY;
+
 static POINTER_HASH *pPointerHashes = NULL; // WBAlloc'd array
 static int nPointerHash = 0, nMaxPointerHash = 0; // for now, simple array
 
-static WB_UINT32 uiPointerHashSpinlock = 0;
+static HASH_AGING_ENTRY *pHashAgingTable = NULL;
+static int nHashAgingHead = 0, nHashAgingTail = 0;
+
+static volatile WB_UINT32 uiPointerHashSpinlock = 0;
 
 static void WBFreePointerHashes(void)
 {
@@ -2305,33 +2318,83 @@ static void WBFreePointerHashes(void)
     pPointerHashes = NULL;
   }
 
+  if(pHashAgingTable)
+  {
+    WBFree(pHashAgingTable);
+    pHashAgingTable = NULL;
+  }
+
   nPointerHash = 0;
   nMaxPointerHash = 0;
 
+  nHashAgingHead = 0;
+  nHashAgingTail = 0;
+
   uiPointerHashSpinlock = 0;
+}
+
+// only call when uiPointerHashSpinlock owned
+static void __AddPointerHashToAgingTable(WB_UINT32 uiHash, WB_UINT32 dwTick)
+{
+  if(!pHashAgingTable)
+    return;
+
+//  while(WBInterlockedExchange(&uiPointerHashSpinlock, 1))
+//  {
+//    WBDelay(100);  // 100 microseconds
+//  }
+
+  if(((nHashAgingTail + 1) % WB_HASH_JAM_PREVENTER_SIZE)
+     == nHashAgingHead)
+  {
+    nHashAgingHead = (nHashAgingHead + 1) % WB_HASH_JAM_PREVENTER_SIZE;
+  }
+
+  pHashAgingTable[nHashAgingTail].uiHash = uiHash;
+  pHashAgingTable[nHashAgingTail].dwTick = dwTick;
+
+  nHashAgingTail = (nHashAgingTail + 1) % WB_HASH_JAM_PREVENTER_SIZE;
+
+//  WBInterlockedExchange(&uiPointerHashSpinlock, 0);
+}
+
+// only call when uiPointerHashSpinlock owned
+static int __IsPointerHashInAgingTable(WB_UINT32 uiHash, WB_UINT32 dwTick)
+{
+int i1, iRval = 0;
+
+  if(!pHashAgingTable)
+    return 0;
+
+//  while(WBInterlockedExchange(&uiPointerHashSpinlock, 1))
+//  {
+//    WBDelay(100);  // 100 microseconds
+//  }
+
+  for(i1 = nHashAgingHead; i1 != nHashAgingTail;  // wrap around with head/tail pointer
+      i1 = (i1 + 1) % WB_HASH_JAM_PREVENTER_SIZE)
+  {
+    if(i1 == nHashAgingHead && (dwTick - pHashAgingTable[i1].dwTick) >= WB_HASH_JAM_PREVENTER_TIMEOUT)
+    {
+      nHashAgingHead++;
+    }
+    else if(pHashAgingTable[i1].uiHash == uiHash)
+    {
+      iRval = 1;
+      break;
+    }
+  }
+
+//  WBInterlockedExchange(&uiPointerHashSpinlock, 0);
+  return iRval;
 }
 
 WB_UINT32 WBCreatePointerHash(void *pPointer)
 {
 int i1, iFreeIndex;
 WB_UINT32 uiRval = 0;
-WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros / 1024
+WB_UINT32 dw1, dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros / 1024
 
-
-#warning TODO:  prevent hash-jamming attacks from external processes posting tainted events
-
-  // TODO:  consider keeping a list of already-used hashes that time out over a longer
-  //        period of time.  This would prevent "hash jamming" from easily working, from
-  //        a malicious process posting X11 messages to a window that's known to accept
-  //        events with a hashed pointer in them.  Event sniffing could reveal a previously
-  //        used hash that should not be re-used under any circumstance.  Hash re-use could
-  //        then potentially be detected.
-
-  // TODO:  consider a validation data type associated with a particular hash, which the
-  //        event-receiving function could use to validate the type of data being hashed,
-  //        in the case that hash-jamming is being used, to at least prevent "the wrong data"
-  //        from being accessed by the event receiver, or specifically a page fault from
-  //        exceeding the bounds of "the wrong data".
 
   if(!pPointer)
   {
@@ -2345,19 +2408,30 @@ WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros
 
   if(!pPointerHashes)
   {
-    nMaxPointerHash = 512;   // initial size (make it a '#define' ?)
+    nMaxPointerHash = WB_POINTER_HASH_INITIAL_SIZE;   // initial size
     pPointerHashes = (POINTER_HASH *)WBAlloc(nMaxPointerHash * sizeof(*pPointerHashes));
-
-    if(!pPointerHashes)
-    {
-      goto return_point;
-    }
 
     nPointerHash = 0;
   }
+
+  if(!pHashAgingTable)
+  {
+    pHashAgingTable = (HASH_AGING_ENTRY *)WBAlloc(sizeof(*pHashAgingTable)
+                                                  * (WB_HASH_JAM_PREVENTER_SIZE + 1));
+
+    nHashAgingHead = 0;
+    nHashAgingTail = 0;
+  }
+
+  if(!pPointerHashes || !pHashAgingTable)
+  {
+    goto return_point;
+  }
   else if(nPointerHash >= nMaxPointerHash)
   {
-    void *pTemp = WBReAlloc(pPointerHashes, (nMaxPointerHash + 256) * sizeof(*pPointerHashes));
+    void *pTemp = WBReAlloc(pPointerHashes,
+                            (nMaxPointerHash + WB_POINTER_HASH_INITIAL_SIZE / 2)
+                            * sizeof(*pPointerHashes));
 
     if(!pTemp)
     {
@@ -2379,9 +2453,13 @@ WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros
       {
         WB_ERROR_PRINT("ERROR:  %s - matching 'pPointer' %p for multiple hash entries\n", __FUNCTION__, pPointer);
       }
-      else // NOTE:  if this entry WAS too old, I'll still re-use it and reset the tick
+      else // NOTE:  if this entry is too old, I won't re-use it - otherwise I reset the tick
       {
         uiRval = pPointerHashes[i1].uiHash;
+
+        if((dwTick - pPointerHashes[i1].dwTick) > WB_SECURE_HASH_TIMEOUT) // too old?
+          goto aged_entry_timeout;
+
         pPointerHashes[i1].dwTick = dwTick; // new timestamp
         pPointerHashes[i1].dwRefCount++; // increase ref count
 
@@ -2398,6 +2476,7 @@ WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros
     }
     else if((dwTick - pPointerHashes[i1].dwTick) > WB_SECURE_HASH_TIMEOUT) // auto cleanup part
     {
+aged_entry_timeout:
       // checking for timeout, and erasing things if timed out
 
 //      WB_ERROR_PRINT("TEMPORARY:  %s - deleting 'aged' entry, timeout = %u\n", __FUNCTION__,
@@ -2407,6 +2486,8 @@ WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros
 //                     pPointerHashes[i1].dwRefCount, pPointerHashes[i1].pValue);
 
       // too old - erase it, freeing up the location
+
+      __AddPointerHashToAgingTable(pPointerHashes[i1].uiHash, dwTick);
 
       pPointerHashes[i1].uiHash = 0; // also needed to mark it 'free'
       pPointerHashes[i1].dwTick = 0;
@@ -2437,13 +2518,15 @@ WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros
   pPointerHashes[iFreeIndex].dwTick = dwTick;
   pPointerHashes[iFreeIndex].dwRefCount = 1;
 
-  // see if there's a 'crash' between two identical hashes
+  // calculate a hash and ee if there's a 'crash' between two identical hashes
   // it's not likely, but it IS possible.  So test for it.
+
+  dw1 = dwTick;
 
   while(1) /* we assume it will bust out eventually */
   {
-    uiRval = ((WB_UINT32)((WB_UINT64)pPointer) ^ dwTick) & 0xffffffff;
-    // NOTE:  this should, in theory, work within a very short time
+    uiRval = ((WB_UINT32)((WB_UINT64)pPointer) ^ (dw1 * 31)) & 0xffffffff;
+    // NOTE:  this should, in theory, work within a very short time, giving good randomness
 
     if(uiRval) // can't allow a zero (this should be RARE, if ever at all)
     {
@@ -2455,14 +2538,15 @@ WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros
         }
       }
 
-      if(i1 >= nPointerHash) // no matching entry found
+      if(i1 >= nPointerHash &&                         // no matching entry found
+         !__IsPointerHashInAgingTable(uiRval, dwTick)) // check aging table
       {
         break;
       }
     }
 
-    dwTick -= 113; // decrement it by a prime number so I can test for it
-                   // being there again, but with a different hash value
+    dw1 -= 113; // decrement it by a prime number so I can test for it
+                // being there again, but with a different hash value
   }
 
   pPointerHashes[iFreeIndex].uiHash = uiRval; // save this value where the free index resides
@@ -2518,6 +2602,7 @@ WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros
 
       // erase it, freeing up the location
 erase_it:
+      __AddPointerHashToAgingTable(pPointerHashes[i1].uiHash, dwTick);
 
       pPointerHashes[i1].uiHash = 0; // this zero, together with 'pValue == NULL' means it's "free"
       pPointerHashes[i1].dwTick = 0;
@@ -2584,6 +2669,8 @@ WB_UINT32 dwTick = (WB_UINT32)(WBGetTimeIndex() >> 10); // fast 'millis', micros
       // erase it, freeing up the location (hash will be zero)
 
 erase_it:
+      __AddPointerHashToAgingTable(pPointerHashes[i1].uiHash, dwTick);
+
       pPointerHashes[i1].uiHash = 0; // this zero, together with 'pValue == NULL' means it's "free"
       pPointerHashes[i1].dwTick = 0;
       pPointerHashes[i1].pValue = NULL; // thus marking it 'free'

@@ -2066,7 +2066,7 @@ static const char szUTF8[]=".UTF-8";
 //                                                                          //
 //////////////////////////////////////////////////////////////////////////////
 
-static void WBDumpFontStruct(const XFontStruct *pFont)
+void WBDumpFontStruct(const XFontStruct *pFont)
 {
 int i1;
 
@@ -2139,7 +2139,7 @@ int i1;
                 pFont->descent);
 }
 
-static void WBDumpMatchingFontNames(Display *pDisplay, const char *szFontName)
+void WBDumpMatchingFontNames(Display *pDisplay, const char *szFontName)
 {
 char **ppNames;
 int i1, iCount;
@@ -2168,7 +2168,7 @@ XFontStruct *pFSInfo;
   }
 }
 
-static void WBDumpFontSet(Display *pDisplay, XFontSet fontSet)
+void WBDumpFontSet(Display *pDisplay, XFontSet fontSet)
 {
 XFontStruct **ppFontStruct = NULL;
 char **ppFontNames = NULL;

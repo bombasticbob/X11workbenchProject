@@ -2098,6 +2098,7 @@ static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
 
 #define SPLASH_FRAMERATE 30 /* make this configurable? */
 #define SPLASH_TIME 1500 /* milliseconds */
+#define SPLASH_FONT_SIZE 13
 
 void DLGSplashScreen(char *aXPM[], const char *szCopyright, unsigned long clrText)
 {
@@ -2156,7 +2157,7 @@ unsigned int ai1[3];
   data.clrWhite = WhitePixel(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
   data.iW = xattr.width;
   data.iH = xattr.height;
-  data.pFont = NULL;  // must do this
+//  data.pFont = NULL;  // must do this
   data.nGleam = 0;
   data.pImage = NULL;
   data.pImageData = NULL;
@@ -2168,6 +2169,22 @@ unsigned int ai1[3];
   xswa.background_pixel = data.clrWhite;
   xswa.colormap = DefaultColormap(WBGetDefaultDisplay(), DefaultScreen(WBGetDefaultDisplay()));
   xswa.bit_gravity = CenterGravity;
+
+  data.pFont = WBLoadFont(WBGetDefaultDisplay(), WBGetDefaultFontName(), SPLASH_FONT_SIZE, 0);
+
+  if(!data.pFont)
+  {
+    data.pFont = WBLoadFont(WBGetDefaultDisplay(), "*", SPLASH_FONT_SIZE,
+                            WBFontFlag_PITCH_FIXED | WBFontFlag_STYLE_SANS);
+
+    if(!data.pFont)
+    {
+      data.pFont = WBLoadFont(WBGetDefaultDisplay(), "*", SPLASH_FONT_SIZE, 0);
+    }
+
+    // if it fails use the default
+  }
+
 
   wID = WBCreateWindow(WBGetDefaultDisplay(), None,//DefaultRootWindow(WBGetDefaultDisplay()),
                        splash_callback, "Splash",
@@ -2583,7 +2600,7 @@ int iX, iY, iTimeStart, iTimeEnd;
     else if(pData->nIter * 1000 >= iTimeStart && pData->nIter * 1000 <= iTimeEnd)
     {
       int iDelta = iTimeEnd - iTimeStart + 1;
-      int iTemp;
+      int iTemp, iGleamLum;
       XImage *pI; // the image I'll be manipulating
 
       iTemp = pData->nIter * 1000L - iTimeStart;
@@ -2594,6 +2611,14 @@ int iX, iY, iTimeStart, iTimeEnd;
       iY = 2 * (pData->iH * iTemp / iDelta + pData->iH / (2 * iDelta) / 1000); // y pos of left
 
       // will draw the line from 0,iY to iX,0
+
+      // 1 / relative Luma on gleam, 0 to 255
+      iGleamLum = 256 * abs((int)(pData->iW * 2L * iTemp / iDelta - pData->iW)) / pData->iW;
+
+      iGleamLum = 255 - (iGleamLum * iGleamLum) / 384; // relative gleam, 64 to 255
+
+//      fprintf(stderr, "(%d,%d,%d,%d,%d),", iX, pData->iW, iGleamLum, iTemp, iDelta);
+//      fflush(stderr);
 
       if(!pData->pImage)
       {
@@ -2687,6 +2712,7 @@ int iX, iY, iTimeStart, iTimeEnd;
                                &iY, &iU, &iV);
 
                   iL = aLuma[abs(iW)]; // the 'Luma' constant, 0-255 (with 255 = 'white')
+                  iL = iL * iGleamLum / 256;
 
                   // new pixel luma will be:  luma * (1 + iL / 128) (maxed at 255)
                   // if new luma is > 255, reduce iU and iV (delta from 128) by the 'factor'

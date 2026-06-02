@@ -98,6 +98,18 @@ endif
 
 else
 
+if WARN_ALL
+
+  AM_CFLAGS += -Wall
+
+endif
+
+if FATAL_WARN
+
+  AM_CFLAGS += -Werror
+
+endif
+
   AM_CFLAGS += $(EXTRA_WARN_FLAGS) -Wimplicit-int \
    -Wimplicit-function-declaration -Wmissing-braces \
    -Wnonnull -Wparentheses -Wreturn-type \

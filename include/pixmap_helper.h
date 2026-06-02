@@ -77,7 +77,9 @@ extern "C" {
 #define ID_ICON_BEAR      116
 #define ID_ICON_BARNEY    117
 #define ID_ICON_APP       118 /* 36x36 application icon */
-#define ID_ICON_LAST      118 /* must alter this if new items added */
+#define ID_ICON_FOLDER    119
+#define ID_ICON_DOCUMENT  120
+#define ID_ICON_LAST      120 /* must alter this if new items added */
 
 
 /** \ingroup pixmap

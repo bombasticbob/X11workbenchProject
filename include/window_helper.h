@@ -149,14 +149,6 @@ extern "C" {
 **/
 #define WB_WAIT_CURSOR XC_watch /*XC_clock*/
 /** \ingroup wbdefaults
-  * \brief The default X11 font name (currently "fixed")
-**/
-#define WB_DEFAULT_FONT    "fixed"
-/** \ingroup wbdefaults
-  * \brief The default X11 font size (currently 13)
-**/
-#define WB_DEFAULT_FONT_SIZE 13 /* override via settings */
-/** \ingroup wbdefaults
   * \brief The 'window data' array size (currently 4 void pointers)
 **/
 #define WINDOW_DATA_SIZE 4 /* size of a 'void *' array that stores per-window data */

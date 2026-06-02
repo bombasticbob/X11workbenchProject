@@ -849,7 +849,6 @@ int bStandardColormap = 0; // flag that says 'cmapDefault' is initialized
 XStandardColormap cmapDefault; // a copy of teh XStandardColormap for the Colormap for the default display
 
 
-
 /**********************************************************************/
 /*                                                                    */
 /*  module-specific globals and structures related to event queuing   */
@@ -1193,20 +1192,21 @@ unsigned long long ullTick;
    * Load the font to use.  See Sections 10.2 & 6.5.1 of the X11 docs
    */
 
-  pDefaultFont = WBLoadFont(pDisplay, WB_DEFAULT_FONT, WB_DEFAULT_FONT_SIZE, 0);
+  pDefaultFont = WBLoadFont(pDisplay, WBGetDefaultFontName(), WBGetDefaultFontSize(), 0);
 
   if(!pDefaultFont)
   {
-    pDefaultFont = WBLoadFont(pDisplay, "*", WB_DEFAULT_FONT_SIZE,
+    pDefaultFont = WBLoadFont(pDisplay, "*", WBGetDefaultFontSize(),
                               WBFontFlag_PITCH_FIXED | WBFontFlag_STYLE_SANS);
 
     if(!pDefaultFont)
     {
-      pDefaultFont = WBLoadFont(pDisplay, "*", WB_DEFAULT_FONT_SIZE, 0);
+      pDefaultFont = WBLoadFont(pDisplay, "*", WBGetDefaultFontSize(), 0);
 
       if(!pDefaultFont)
       {
-        WB_ERROR_PRINT("%s - NO DEFAULT FONT, returning 0\n", __FUNCTION__);
+        WB_ERROR_PRINT("%s - NO DEFAULT FONT, returning 0 - %s %d\n",
+                       __FUNCTION__, WBGetDefaultFontName(), WBGetDefaultFontSize());
         return 0;
       }
     }

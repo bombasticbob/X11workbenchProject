@@ -503,7 +503,8 @@ typedef const char * WB_PCSTR;  ///< pointer to const char string - a convenienc
   * @{
 **/
 
-#define WB_SECURE_HASH_TIMEOUT 60000 /**< 'secure hash' maximum lifetime, in milliseconds **/
+#define WB_SECURE_HASH_TIMEOUT 60000         /**< 'secure hash' maximum lifetime, in milliseconds **/
+#define WB_HASH_JAM_PREVENTER_TIMEOUT 300000 /**< 'secure hash' jam preventer maximum aging lifetime, in milliseconds **/
 
 /**
   * @}

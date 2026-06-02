@@ -79,6 +79,14 @@ extern "C" {
 typedef struct s_WB_EXTENT WB_EXTENT; // forward reference on WB_EXTENT structure for WBTextExtent()
 #endif // _WINDOW_HELPER_H_INCLUDED_
 
+/** \ingroup wbdefaults
+  * \brief The default X11 font name (currently "fixed")
+**/
+#define WB_DEFAULT_FONT    "fixed"
+/** \ingroup wbdefaults
+  * \brief The default X11 font size (currently 13)
+**/
+#define WB_DEFAULT_FONT_SIZE 14 /* override via settings */
 
 /** \ingroup font
   * @{
@@ -226,19 +234,19 @@ typedef struct WBFontInfo
 /** \ingroup debug
   * \brief debug function to dump font struct members
 **/
-static void WBDumpFontStruct(const XFontStruct *pFont);
+void WBDumpFontStruct(const XFontStruct *pFont);
 
 
 /** \ingroup debug
   * \brief debug function to dump matching font names
 **/
-static void WBDumpMatchingFontNames(Display *pDisplay, const char *szFontName);
+void WBDumpMatchingFontNames(Display *pDisplay, const char *szFontName);
 
 
 /** \ingroup debug
   * \brief debug function to dump font set members
 **/
-static void WBDumpFontSet(Display *pDisplay, XFontSet fontSet);
+void WBDumpFontSet(Display *pDisplay, XFontSet fontSet);
 #endif // NO_DEBUG
 
 
@@ -252,6 +260,44 @@ void __internal_font_helper_init(void);
   * \brief un-initialization for font helper - call once at end of program (WBExit() does this for you)
 **/
 void __internal_font_helper_exit(void);
+
+
+/** \ingroup font
+  * \brief Get default font name from a static buffer
+  *
+  * \return A const pointer to the default font name
+  *
+  * \sa WBGetDefaultFontSize(), WBSetDefaultFontName(), WBSetDefaultFontSize()
+**/
+const char *WBGetDefaultFontName(void);
+
+/** \ingroup font
+  * \brief assign the new default font name
+  *
+  * \param szFontName A const pointer to the new default font name
+  *
+  * \sa WBGetDefaultFontName(), GetDefaultFontSize(), WBSetDefaultFontSize()
+**/
+void WBSetDefaultFontName(const char *szFontName);
+
+/** \ingroup font
+  * \brief Get default font name from a static buffer
+  *
+  * \return A const pointer to the default font name
+  *
+  * \sa WBGetDefaultFontName(), WBSetDefaultFontName(), WBSetDefaultFontSize()
+**/
+int WBGetDefaultFontSize(void);
+
+/** \ingroup font
+  * \brief assign the new default font name
+  *
+  * \param szFontName A const pointer to the new default font name
+  *
+  * \sa WBGetDefaultFontName(), WBSetDefaultFontName, GetDefaultFontSize()
+**/
+void WBSetDefaultFontSize(int nFontSize);
+
 
 
 /** \ingroup font

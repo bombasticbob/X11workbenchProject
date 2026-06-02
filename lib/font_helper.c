@@ -59,6 +59,7 @@
 #include <memory.h>
 #include <string.h>
 #include <strings.h>
+#include <limits.h>
 #include <signal.h>
 #include <time.h>
 #include <X11/cursorfont.h>
@@ -162,6 +163,31 @@ int WBFontEnableAntiAlias(void)
 void WBFontSetEnableAntiAlias(int bEnable)
 {
   bDisableAntiAlias = bEnable ? 1 : 0;
+}
+
+char szDefaultFontName[PATH_MAX * 2] = WB_DEFAULT_FONT; // allow global scope for now
+int nDefaultFontSize = WB_DEFAULT_FONT_SIZE; // allow global scope for now
+
+const char *WBGetDefaultFontName(void)
+{
+  return szDefaultFontName;
+}
+
+void WBSetDefaultFontName(const char *szFontName)
+{
+  memset(szDefaultFontName, 0, sizeof(szDefaultFontName));
+  strncpy(szDefaultFontName, szFontName, sizeof(szDefaultFontName) - 1);
+  // TODO:  tell windows to update their fonts?
+}
+
+int WBGetDefaultFontSize(void)
+{
+  return nDefaultFontSize;
+}
+
+void WBSetDefaultFontSize(int nFontSize)
+{
+  nDefaultFontSize = nFontSize;
 }
 
 

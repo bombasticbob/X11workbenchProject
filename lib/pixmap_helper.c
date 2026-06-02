@@ -80,6 +80,8 @@
 #include "icon_warn.xpm"
 #include "icon_what.xpm"
 #include "icon_splat.xpm"
+#include "icon_folder.xpm"
+#include "icon_document.xpm"
 
 // other pixmaps (some not entirely work safe)
 #include "icon_bang.xpm"
@@ -902,6 +904,11 @@ char **pData = NULL;
     case ID_ICON_BARNEY:  // this is a joke.  really.
       pData = icon_barney_xpm;
       break;
+    case ID_ICON_FOLDER:
+      pData = icon_folder_xpm;
+      break;
+    case ID_ICON_DOCUMENT:
+      pData = icon_document_xpm;
   }
 
   return pData;
