@@ -334,6 +334,7 @@ find_url_opener:
             // If you cannot upgrade Doxygen, and this API does not work with your
             // generated documentation, consider downloading the pre-built documentation.
 
+//            if(NULL != (p2 = strstr(szLineBuf, "class=\"code hl_function\"")))  // possibly newer doxygen
             if(NULL != (p2 = strstr(szLineBuf, "class=\"el\"")))
             {
               while(p2 > szLineBuf && *p2 != '<') // search for start of tag
@@ -352,7 +353,8 @@ find_url_opener:
                   // the search term will be the 'anchor' term.
 
                   if(!memcmp(p4 + 1, szTerm, strlen(szTerm)) &&
-                     !memcmp(p4 + 1 + strlen(szTerm), "</a>", 4)) // ending tag
+                     (!memcmp(p4 + 1 + strlen(szTerm), "</a>", 4) ||  // ending tag
+                      !memcmp(p4 + 1 + strlen(szTerm), "()</a>", 6))) // '()' and ending tag
                   {
 //                    WB_ERROR_PRINT("TEMPORARY:  found \"%s\"\n", szTerm);
                     p3 = CHParseXMLTagContents(p2, p4 - p2);
@@ -386,56 +388,6 @@ find_url_opener:
                 }
               }
             }
-
-#if 0 /* this is the OLD way - new method uses '<a class="el" href="">' tags */
-            if(strstr(szLineBuf, "doxytag"))
-            {
-              p2 = strstr(szLineBuf, szTerm);
-
-              if(p2 && p2 > szLineBuf + 10 && *(p2 - 1) == ':' && *(p2 - 2) == ':' &&
-                 (p2[strlen(szTerm)] == '"' || p2[strlen(szTerm)] == '\'')) // must be followed by a quote mark
-              {
-                // grab the entire XML tag
-                while(p2 > szLineBuf && (*p2 != '<' || p2[1] != '!' || p2[2] != '-' || p2[3] != '-'))
-                {
-                  p2--;
-                }
-
-                if(*p2 == '<' && p2[1] == '!' && p2[2] == '-' && p2[3] == '-') // doxytag comment block
-                {
-                  p4 = CHFindEndOfXMLTag(p2 + 4, -1); // point past the '<!--' first, then find the end
-
-                  if(*p4 == '>')
-                  {
-                    p3 = CHParseXMLTagContents(p2 + 4, p4 - (p2 + 4));
-                    if(p3)
-                    {
-                      // now that I have the tag, grab the 'ref' member
-                      for(p2=p3; *p2; p2 += strlen(p2) + 1)
-                      {
-                        if(!strncmp(p2, "ref=", 4))
-                        {
-                          strlcpy(szDoxyTag, "file://", sizeof(szDoxyTag));
-                          strlcat(szDoxyTag, szDocFilePath, sizeof(szDoxyTag));
-                          strlcat(szDoxyTag, "#", sizeof(szDoxyTag));
-                          strlcat(szDoxyTag, p2 + 4, sizeof(szDoxyTag));
-                          break;
-                        }
-                      }
-
-                      WBFree(p3);
-                      if(szDoxyTag[0])
-                      {
-                        break;
-                      }
-// TODO:  with this much nesting, consider writing utility functions
-//        to do some of it and make the code more readable
-                    }
-                  }
-                }
-              }
-            }
-#endif // 0
           }
 
           fclose(pTemp);
