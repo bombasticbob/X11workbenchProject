@@ -77,6 +77,13 @@ extern "C" {
 
 #ifndef _WINDOW_HELPER_H_INCLUDED_
 typedef struct s_WB_EXTENT WB_EXTENT; // forward reference on WB_EXTENT structure for WBTextExtent()
+
+#ifdef WIN32
+typedef HANDLE WB_DISPLAY;
+#else // WIN32
+typedef Display * WB_DISPLAY; // forward reference on WB_DISPLAY
+#endif // WIN32
+
 #endif // _WINDOW_HELPER_H_INCLUDED_
 
 /** \ingroup wbdefaults
@@ -240,13 +247,13 @@ void WBDumpFontStruct(const XFontStruct *pFont);
 /** \ingroup debug
   * \brief debug function to dump matching font names
 **/
-void WBDumpMatchingFontNames(Display *pDisplay, const char *szFontName);
+void WBDumpMatchingFontNames(WB_DISPLAY pDisplay, const char *szFontName);
 
 
 /** \ingroup debug
   * \brief debug function to dump font set members
 **/
-void WBDumpFontSet(Display *pDisplay, XFontSet fontSet);
+void WBDumpFontSet(WB_DISPLAY pDisplay, XFontSet fontSet);
 #endif // NO_DEBUG
 
 
@@ -338,7 +345,7 @@ void WBFontSetEnableAntiAlias(int bEnable);
   * Header File:  font_helper.h
   *
 **/
-void WBFreeFont(Display *pDisplay, WB_FONT pFont);
+void WBFreeFont(WB_DISPLAY pDisplay, WB_FONT pFont);
 
 /** \ingroup font
   * \brief make a copy of an existing font (best when assigning to a window)
@@ -354,7 +361,7 @@ void WBFreeFont(Display *pDisplay, WB_FONT pFont);
   * Header File:  font_helper.h
   *
 **/
-WB_FONT WBCopyFont(Display *pDisplay, WB_FONTC pFont);
+WB_FONT WBCopyFont(WB_DISPLAY pDisplay, WB_FONTC pFont);
 
 /** \ingroup font
   * \brief load and modify a font according to the specified size and flags
@@ -378,7 +385,7 @@ WB_FONT WBCopyFont(Display *pDisplay, WB_FONTC pFont);
   * Header File:  font_helper.h
   *
 **/
-WB_FONT WBCopyModifyFont(Display *pDisplay, WB_FONTC pOriginal,
+WB_FONT WBCopyModifyFont(WB_DISPLAY pDisplay, WB_FONTC pOriginal,
                          int iFontSize, int iFlags);
 
 /** \ingroup font
@@ -403,7 +410,7 @@ WB_FONT WBCopyModifyFont(Display *pDisplay, WB_FONTC pOriginal,
   * Header File:  font_helper.h
   *
 **/
-WB_FONT WBLoadFont(Display *pDisplay, const char *szFontName,
+WB_FONT WBLoadFont(WB_DISPLAY pDisplay, const char *szFontName,
                    int iFontSize, int iFlags);
 
 /** \ingroup font
@@ -630,7 +637,7 @@ enum WBFontFlags
   * Header File:  font_helper.h
   *
 **/
-XFontStruct *WBLoadFontX(Display *pDisplay, const char *szFontName,
+XFontStruct *WBLoadFontX(WB_DISPLAY pDisplay, const char *szFontName,
                          int iFontSize, int iFlags);
 
 /** \ingroup font_legacy
@@ -670,7 +677,7 @@ XFontStruct *WBCopyFontX(XFontStruct *pFont);
   * Header File:  font_helper.h
   *
 **/
-XFontStruct *WBLoadModifyFontX(Display *pDisplay, const XFontStruct *pOriginal,
+XFontStruct *WBLoadModifyFontX(WB_DISPLAY pDisplay, const XFontStruct *pOriginal,
                                int iFontSize, int iFlags);
 
 /** \ingroup font_legacy
@@ -695,7 +702,7 @@ XFontStruct *WBLoadModifyFontX(Display *pDisplay, const XFontStruct *pOriginal,
   * Header File:  font_helper.h
   *
 **/
-XFontSet WBCopyModifyFontSet(Display *pDisplay, XFontSet fsOrig, int iFontSize, int iFlags);
+XFontSet WBCopyModifyFontSet(WB_DISPLAY pDisplay, XFontSet fsOrig, int iFontSize, int iFlags);
 
 
 /** \ingroup font_legacy
@@ -708,7 +715,7 @@ XFontSet WBCopyModifyFontSet(Display *pDisplay, XFontSet fsOrig, int iFontSize, 
   * Use this function to query an XFontStruct about its average character width.
   *
 **/
-int WBFontAvgCharWidthX(Display *pDisplay, const XFontStruct *pFont);
+int WBFontAvgCharWidthX(WB_DISPLAY pDisplay, const XFontStruct *pFont);
 
 
 /** \ingroup font_legacy
@@ -722,7 +729,7 @@ int WBFontAvgCharWidthX(Display *pDisplay, const XFontStruct *pFont);
   * typically be derived from all of the individual fonts in the font set.
   *
 **/
-int WBFontSetDescent(Display *pDisplay, XFontSet fontSet);
+int WBFontSetDescent(WB_DISPLAY pDisplay, XFontSet fontSet);
 
 
 /** \ingroup font_legacy
@@ -736,7 +743,7 @@ int WBFontSetDescent(Display *pDisplay, XFontSet fontSet);
   * typically be derived from all of the individual fonts in the font set.
   *
 **/
-int WBFontSetAscent(Display *pDisplay, XFontSet fontSet);
+int WBFontSetAscent(WB_DISPLAY pDisplay, XFontSet fontSet);
 
 
 /** \ingroup font_legacy
@@ -749,7 +756,7 @@ int WBFontSetAscent(Display *pDisplay, XFontSet fontSet);
   * Use this function to query an XFontSet about its maximum height.
   *
 **/
-int WBFontSetHeight(Display *pDisplay, XFontSet fontSet);
+int WBFontSetHeight(WB_DISPLAY pDisplay, XFontSet fontSet);
 
 
 /** \ingroup font_legacy
@@ -763,7 +770,7 @@ int WBFontSetHeight(Display *pDisplay, XFontSet fontSet);
   * typically be derived from all of the individual fonts in the font set.
   *
 **/
-int WBFontSetAvgCharWidth(Display *pDisplay, XFontSet fontSet);
+int WBFontSetAvgCharWidth(WB_DISPLAY pDisplay, XFontSet fontSet);
 
 
 /** \ingroup font_legacy
@@ -777,7 +784,7 @@ int WBFontSetAvgCharWidth(Display *pDisplay, XFontSet fontSet);
   * typically be derived from all of the individual fonts in the font set.
   *
 **/
-XCharStruct WBFontSetMaxBounds(Display *pDisplay, XFontSet fontSet);
+XCharStruct WBFontSetMaxBounds(WB_DISPLAY pDisplay, XFontSet fontSet);
 
 
 /** \ingroup font_legacy
@@ -796,7 +803,7 @@ XCharStruct WBFontSetMaxBounds(Display *pDisplay, XFontSet fontSet);
   * Header File:  font_helper.h
   *
 **/
-XFontSet WBFontSetFromFont(Display *pDisplay, const XFontStruct *pFont);
+XFontSet WBFontSetFromFont(WB_DISPLAY pDisplay, const XFontStruct *pFont);
 
 
 /** \ingroup font_legacy
@@ -812,7 +819,7 @@ XFontSet WBFontSetFromFont(Display *pDisplay, const XFontStruct *pFont);
   * Header File:  font_helper.h
   *
 **/
-XFontStruct * WBFontFromFontSet(Display *pDisplay, XFontSet fontSet);
+XFontStruct * WBFontFromFontSet(WB_DISPLAY pDisplay, XFontSet fontSet);
 
 
 /** \ingroup font_legacy
@@ -835,7 +842,7 @@ XFontStruct * WBFontFromFontSet(Display *pDisplay, XFontSet fontSet);
   * Header File:  font_helper.h
   *
 **/
-XFontSet WBFontSetFromFontSingle(Display *pDisplay, const XFontStruct *pFont);
+XFontSet WBFontSetFromFontSingle(WB_DISPLAY pDisplay, const XFontStruct *pFont);
 
 
 /** \ingroup font_legacy

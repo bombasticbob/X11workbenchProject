@@ -103,13 +103,13 @@ FW_MENU_HANDLER_END
 
 
 
-static int ChildFrameDoPointerEvent(XClientMessageEvent *pEvent, Display *pDisplay,
+static int ChildFrameDoPointerEvent(XClientMessageEvent *pEvent, WB_DISPLAY pDisplay,
                                     Window wID, WBChildFrame *pC, WBChildFrameUI *pUI);
 
-static int ChildFrameDoScrollEvent(XClientMessageEvent *pEvent, Display *pDisplay,
+static int ChildFrameDoScrollEvent(XClientMessageEvent *pEvent, WB_DISPLAY pDisplay,
                                    Window wID, WBChildFrame *pC, WBChildFrameUI *pUI);
 
-static int ChildFrameDoCharEvent(XClientMessageEvent *pEvent, Display *pDisplay,
+static int ChildFrameDoCharEvent(XClientMessageEvent *pEvent, WB_DISPLAY pDisplay,
                                  Window wID, WBChildFrame *pC, WBChildFrameUI *pUI);
 
 static WBChildFrame *pChildFrames = NULL;  // pointer to linked list of 'Child Frame' windows
@@ -121,7 +121,7 @@ int FWInitChildFrame(WBChildFrame *pChildFrame, WBFrameWindow *pOwner, WB_FONTC 
 {
 WBChildFrame *pC;
 XSetWindowAttributes xswa;  /* Temporary Set Window Attribute struct */
-Display *pDisplay = WBGetDefaultDisplay();
+WB_DISPLAY pDisplay = WBGetDefaultDisplay();
 int iRval = -1;
 
 
@@ -332,7 +332,7 @@ int FWInitChildFrame2(WBChildFrame *pChildFrame, WBChildFrame *pOwner, WB_FONTC 
 {
 WBChildFrame *pC;
 XSetWindowAttributes xswa;  /* Temporary Set Window Attribute struct */
-Display *pDisplay = WBGetDefaultDisplay();
+WB_DISPLAY pDisplay = WBGetDefaultDisplay();
 int iRval = -1;
 
 
@@ -877,7 +877,7 @@ void FWSetChildFrameExtent(WBChildFrame *pChildFrame, int iXExtent, int iYExtent
 static void InternalChildFrameRecalcGeom(WBChildFrame *pChildFrame, int bResize)
 {
 WBFrameWindow *pOwner;
-Display *pDisplay;
+WB_DISPLAY pDisplay;
 int iL, iT, iW, iH;
 int nL, nL2, nC, nC2;
 
@@ -1080,7 +1080,7 @@ void FWChildFrameRecalcLayout(WBChildFrame *pChildFrame)
 
   if(pChildFrame->pUserCallback)
   {
-    Display *pDisplay;
+    WB_DISPLAY pDisplay;
     XClientMessageEvent evt;
 
     pDisplay = WBGetWindowDisplay(pChildFrame->wID);
@@ -1125,7 +1125,7 @@ void FWChildFrameStatusChanged(WBChildFrame *pChildFrame)
 
 int FWChildFrameQueryClose(WBChildFrame *pChildFrame)
 {
-Display *pDisplay;
+WB_DISPLAY pDisplay;
 XClientMessageEvent evt;
 
 
@@ -1162,7 +1162,7 @@ int FWChildFrameEvent(Window wID, XEvent *pEvent)
 int iRval = 0;
 WBChildFrame *pC;
 WBFrameWindow *pFW;
-Display *pDisplay;
+WB_DISPLAY pDisplay;
 #ifndef NO_DEBUG
 char tbuf[32]; // for keyboard input
 int nChar = sizeof(tbuf);
@@ -1485,7 +1485,7 @@ int nChar = sizeof(tbuf);
 }
 
 
-static int ChildFrameDoPointerEvent(XClientMessageEvent *pEvent, Display *pDisplay,
+static int ChildFrameDoPointerEvent(XClientMessageEvent *pEvent, WB_DISPLAY pDisplay,
                                     Window wID, WBChildFrame *pC, WBChildFrameUI *pUI)
 {
 int iACS;
@@ -1628,7 +1628,7 @@ int iButtonMask;
   return 0; // must indicate 'did not handle' if I get here
 }
 
-static int ChildFrameDoScrollEvent(XClientMessageEvent *pEvent, Display *pDisplay,
+static int ChildFrameDoScrollEvent(XClientMessageEvent *pEvent, WB_DISPLAY pDisplay,
                                    Window wID, WBChildFrame *pC, WBChildFrameUI *pUI)
 {
   if(pEvent->data.l[0] == WB_SCROLL_VERTICAL)
@@ -1826,7 +1826,7 @@ static int ChildFrameDoScrollEvent(XClientMessageEvent *pEvent, Display *pDispla
 }
 
 
-static int ChildFrameDoCharEvent(XClientMessageEvent *pEvent, Display *pDisplay,
+static int ChildFrameDoCharEvent(XClientMessageEvent *pEvent, WB_DISPLAY pDisplay,
                                  Window wID, WBChildFrame *pC, WBChildFrameUI *pUI)
 {
 int iKey, iACS, nChar;
@@ -2766,7 +2766,7 @@ Window wID;
 WBChildFrame *pChildFrame;
 WBFrameWindow *pFrame;
 WBMenuPopupWindow *pPopup;
-Display *pDisplay;
+WB_DISPLAY pDisplay;
 
   // pMenu essentially belongs to the frame window.  determine which tab has focus
   // THEN, determine if there's a clipboard owner, and enable if so.  Disable if there

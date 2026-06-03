@@ -193,7 +193,7 @@ static void __internal_cursor_bottom(TEXT_OBJECT *pThis);
 static void __internal_scroll_vertical(TEXT_OBJECT *pThis, int nRows);
 static void __internal_scroll_horizontal(TEXT_OBJECT *pThis, int nCols);
 
-static void __internal_do_expose(TEXT_OBJECT *pThis, Display *pDisplay, Window wID,
+static void __internal_do_expose(TEXT_OBJECT *pThis, WB_DISPLAY pDisplay, Window wID,
                                  WBGC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
                                  WB_FONTC pFont);
 static void __internal_cursor_blink(TEXT_OBJECT *pThis, int bHasFocus);
@@ -5508,7 +5508,7 @@ TEXT_BUFFER *pBuf;
 
 
 #if 0
-static XFontSet __attribute__((noinline)) __internal_verify_get_fontset(Display *pDisplay, XFontSet rFontSet, WBGC gc)
+static XFontSet __attribute__((noinline)) __internal_verify_get_fontset(WB_DISPLAY pDisplay, XFontSet rFontSet, WBGC gc)
 {
 XFontSet fSet;
 
@@ -5582,7 +5582,7 @@ char **ppNames = NULL;
 }
 #endif // 0
 
-static void __internal_do_expose(TEXT_OBJECT *pThis, Display *pDisplay, Window wID,
+static void __internal_do_expose(TEXT_OBJECT *pThis, WB_DISPLAY pDisplay, Window wID,
                                  WBGC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
                                  WB_FONTC pFont)
 {

@@ -707,7 +707,7 @@ struct s_text_object_vtable
     *
     * See Also: WBTextObjectSetColorContextCallback()
   **/
-  void (* do_expose)(TEXT_OBJECT *pThis, Display *pDisplay, Window wID,
+  void (* do_expose)(TEXT_OBJECT *pThis, WB_DISPLAY pDisplay, Window wID,
                      WBGC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
                      WB_FONTC pFont);
 
@@ -848,7 +848,7 @@ struct s_text_object_vtable
 
     // handling expose events for the text area
 
-    void (* do_expose)(const TEXT_OBJECT *pThis, Display *pDisplay, Window wID,
+    void (* do_expose)(const TEXT_OBJECT *pThis, WB_DISPLAY pDisplay, Window wID,
                        WBGC gc, const WB_GEOM *pPaintGeom, const WB_GEOM *pViewGeom,
                        WB_FONTC pFont);
 

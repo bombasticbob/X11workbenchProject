@@ -167,7 +167,7 @@ void PXM_OnExit(void);
 /** \ingroup pixmap
   * \brief create temporary XStandardColormap from a Colormap
   *
-  * \param pDisplay The Display * associated with the color map (or NULL for default)
+  * \param pDisplay The WB_DISPLAY associated with the color map (or NULL for default)
   * \param colormap The Colormap value (NOTE:  it must be of the same type as the default colormap for the associated Display)
   * \returns A pointer to an internal (static) XStandardColormap structure.  This value should not be cached.
   *
@@ -178,7 +178,7 @@ void PXM_OnExit(void);
   * This is a convenience function for things like PXM_PixelToRGB() and PXM_RGBToPixel(), where you may
   * have a Colormap but you need an XStandardColormap.
 **/
-static __inline__ XStandardColormap *PXM_StandardColormapFromColormap(Display *pDisplay, Colormap colormap)
+static __inline__ XStandardColormap *PXM_StandardColormapFromColormap(WB_DISPLAY pDisplay, Colormap colormap)
 {
 extern XStandardColormap PXM_StandardColormapFromColormap_rval; // declare extern rather than static, for single mem spot
 
@@ -426,7 +426,7 @@ Pixmap PXM_LoadPixmap(char *ppXPM[], XPM_ATTRIBUTES *pAttr, Pixmap *pMask /* = N
   *
   * Header File:  pixmap_helper.h
 **/
-Pixmap PXM_ImageToPixmap(Display *pDisplay, Drawable dw, XImage *pImage,
+Pixmap PXM_ImageToPixmap(WB_DISPLAY pDisplay, Drawable dw, XImage *pImage,
                          unsigned long clrFGPixel, unsigned long clrBGPixel);
 
 
@@ -449,7 +449,7 @@ Pixmap PXM_ImageToPixmap(Display *pDisplay, Drawable dw, XImage *pImage,
   *
   * Header File:  pixmap_helper.h
 **/
-Pixmap PXM_ImageToPixmap0(Display *pDisplay, Drawable dw, XImage *pImage);
+Pixmap PXM_ImageToPixmap0(WB_DISPLAY pDisplay, Drawable dw, XImage *pImage);
 
 
 
@@ -470,7 +470,7 @@ Pixmap PXM_ImageToPixmap0(Display *pDisplay, Drawable dw, XImage *pImage);
   *
   * Header File:  pixmap_helper.h
 **/
-XImage *PXM_PixmapToImage(Display *pDisplay, Pixmap pxImage);
+XImage *PXM_PixmapToImage(WB_DISPLAY pDisplay, Pixmap pxImage);
 
 
 ///////////////////////////////////////////////////////////////
@@ -499,7 +499,7 @@ XImage *PXM_PixmapToImage(Display *pDisplay, Pixmap pxImage);
   *
 **/
 
-Pixmap PXM_CreatePixmap(Display *pDisplay, Drawable dw, unsigned int width,
+Pixmap PXM_CreatePixmap(WB_DISPLAY pDisplay, Drawable dw, unsigned int width,
                         unsigned int height, unsigned int depth);
 
 /** \ingroup pixmap
@@ -515,7 +515,7 @@ Pixmap PXM_CreatePixmap(Display *pDisplay, Drawable dw, unsigned int width,
   *
 **/
 
-int PXM_FreePixmap(Display *pDisplay, Pixmap pxImage);
+int PXM_FreePixmap(WB_DISPLAY pDisplay, Pixmap pxImage);
 
 
 /** \ingroup pixmap
@@ -533,7 +533,7 @@ int PXM_FreePixmap(Display *pDisplay, Pixmap pxImage);
   *
 **/
 
-Pixmap PXM_CopyPixmap(Display *pDisplay, Drawable dw, Pixmap pxImage);
+Pixmap PXM_CopyPixmap(WB_DISPLAY pDisplay, Drawable dw, Pixmap pxImage);
 
 
 
@@ -560,7 +560,7 @@ Pixmap PXM_CopyPixmap(Display *pDisplay, Drawable dw, Pixmap pxImage);
   *
   * Header File:  pixmap_helper.h
 **/
-int WBXShmQueryExtension(Display *pDisplay);
+int WBXShmQueryExtension(WB_DISPLAY pDisplay);
 
 #else // !X11WORKBENCH_TOOLKIT_HAVE_XSHM_EXTENSION
 
@@ -599,7 +599,7 @@ int WBXShmQueryExtension(Display *pDisplay);
   *
   * Header File:  pixmap_helper.h
 **/
-int WBXPutImage(Display *pDisplay, Drawable dw, WBGC gc, XImage *pImage,
+int WBXPutImage(WB_DISPLAY pDisplay, Drawable dw, WBGC gc, XImage *pImage,
                 int src_x, int src_y, int dest_x, int dest_y,
                 unsigned int width, unsigned int height);
 
@@ -624,7 +624,7 @@ int WBXPutImage(Display *pDisplay, Drawable dw, WBGC gc, XImage *pImage,
   *
   * Header File:  pixmap_helper.h
 **/
-XImage *WBXGetImage(Display *pDisplay, Drawable dw,
+XImage *WBXGetImage(WB_DISPLAY pDisplay, Drawable dw,
                     int x, int y, unsigned int width, unsigned int height,
                     unsigned long plane_mask, int format);
 
@@ -655,7 +655,7 @@ int WBXDestroyImage(XImage *pImage);
   *
   * Header File:  pixmap_helper.h
 **/
-XImage * WBXCopyImage(Display *pDisplay, XImage *pImage);
+XImage * WBXCopyImage(WB_DISPLAY pDisplay, XImage *pImage);
 
 
 
@@ -1036,7 +1036,7 @@ static __inline__ unsigned long PXM_GetImageDataLength(XImage *pImage)
   *
   * Header File:  pixmap_helper.h
 **/
-void WBSimpleAntiAliasPixmap(Display *pDisplay, const XStandardColormap *pMap, Pixmap pxImage,
+void WBSimpleAntiAliasPixmap(WB_DISPLAY pDisplay, const XStandardColormap *pMap, Pixmap pxImage,
                              unsigned long lPixel, WB_GEOM *pGeom);
 
 /** \ingroup pixmap

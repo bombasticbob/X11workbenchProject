@@ -366,7 +366,7 @@ int WBScrollBarEvent(Window wID, XEvent *pEvent, WB_SCROLLINFO *pScrollInfo);
   *
   * Header File:  window_dressing.h
 **/
-void WBPaintVScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable wID,
+void WBPaintVScrollBar(WB_SCROLLINFO *pScrollInfo, WB_DISPLAY pDisplay, Drawable wID,
                        WBGC gc, WB_GEOM *pgeomClient);
 
 /** \ingroup window_dressing
@@ -382,7 +382,7 @@ void WBPaintVScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable w
   *
   * Header File:  window_dressing.h
 **/
-void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable wID,
+void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, WB_DISPLAY pDisplay, Drawable wID,
                        WBGC gc, WB_GEOM *pgeomClient);
 
 // borders and '3D' rectangle/polygon art
@@ -400,7 +400,7 @@ void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable w
   *
   * Header File:  window_dressing.h
 **/
-void WBDrawBorderRect(Display *pDisplay, Drawable wID, WBGC gc,
+void WBDrawBorderRect(WB_DISPLAY pDisplay, Drawable wID, WBGC gc,
                       WB_GEOM *pgeomBorder, unsigned long lBorderColor);
 
 /** \ingroup window_dressing
@@ -417,7 +417,7 @@ void WBDrawBorderRect(Display *pDisplay, Drawable wID, WBGC gc,
   *
   * Header File:  window_dressing.h
 **/
-void WBDraw3DBorderRect(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomBorder,
+void WBDraw3DBorderRect(WB_DISPLAY pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomBorder,
                         unsigned long lBorderColor1, unsigned long lBorderColor2);
 
 /** \ingroup window_dressing
@@ -433,7 +433,7 @@ void WBDraw3DBorderRect(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeom
   *
   * Header File:  window_dressing.h
 **/
-void WBDrawBorderElipse(Display *pDisplay, Drawable wID, WBGC gc,
+void WBDrawBorderElipse(WB_DISPLAY pDisplay, Drawable wID, WBGC gc,
                         WB_GEOM *pgeomBorder, unsigned long lBorderColor);
 
 /** \ingroup window_dressing
@@ -450,7 +450,7 @@ void WBDrawBorderElipse(Display *pDisplay, Drawable wID, WBGC gc,
   *
   * Header File:  window_dressing.h
 **/
-void WBDraw3DBorderElipse(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomBorder,
+void WBDraw3DBorderElipse(WB_DISPLAY pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomBorder,
                           unsigned long lBorderColor1, unsigned long lBorderColor2);
 
 /** \ingroup window_dressing
@@ -466,7 +466,7 @@ void WBDraw3DBorderElipse(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pge
   *
   * Header File:  window_dressing.h
 **/
-void WBDrawDashedRect(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor);
+void WBDrawDashedRect(WB_DISPLAY pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor);
 
 
 /** \ingroup window_dressing
@@ -482,7 +482,7 @@ void WBDrawDashedRect(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRe
   *
   * Header File:  window_dressing.h
 **/
-void WBDrawLeftArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor);
+void WBDrawLeftArrow(WB_DISPLAY pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor);
 
 /** \ingroup window_dressing
   * \brief Draw a right arrow in a window within a specified geometry
@@ -497,7 +497,7 @@ void WBDrawLeftArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRec
   *
   * Header File:  window_dressing.h
 **/
-void WBDrawRightArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor);
+void WBDrawRightArrow(WB_DISPLAY pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor);
 
 /** \ingroup window_dressing
   * \brief Draw an up arrow in a window within a specified geometry
@@ -512,7 +512,7 @@ void WBDrawRightArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRe
   *
   * Header File:  window_dressing.h
 **/
-void WBDrawUpArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor);
+void WBDrawUpArrow(WB_DISPLAY pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor);
 
 /** \ingroup window_dressing
   * \brief Draw a down arrow in a window within a specified geometry
@@ -527,7 +527,7 @@ void WBDrawUpArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect,
   *
   * Header File:  window_dressing.h
 **/
-void WBDrawDownArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor);
+void WBDrawDownArrow(WB_DISPLAY pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor);
 
 
 /** \ingroup window_dressing
@@ -561,7 +561,7 @@ void WBDrawDownArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRec
   *
   * Header File:  window_dressing.h
 **/
-void WBDraw3DBorderTab(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomOutline,
+void WBDraw3DBorderTab(WB_DISPLAY pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomOutline,
                        int fFocus, unsigned long lFGColor, unsigned long lBGColor,
                        unsigned long lBorderColor1, unsigned long lBorderColor2,
                        unsigned long lHighlightColor,

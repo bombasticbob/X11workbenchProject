@@ -121,7 +121,7 @@
 //     All functions matching regular expression "WBInit\b":
 //
 //     File window_helper.c:
-//     Display *WBInit(const char *);
+//     WB_DISPLAY WBInit(const char *);
 //
 //
 // info functions
@@ -137,9 +137,9 @@
 //
 //     File font_helper.c:
 //     XFontStruct *WBCopyFont(XFontStruct *);
-//     XFontSet WBCopyModifyFontSet(Display *, XFontSet, int, int);
+//     XFontSet WBCopyModifyFontSet(WB_DISPLAY , XFontSet, int, int);
 //     void WBDumpFontInfo(const char *);
-//     int WBFontAvgCharWidth(Display *, const XFontStruct *);
+//     int WBFontAvgCharWidth(WB_DISPLAY , const XFontStruct *);
 //     ...
 //
 //     etc.

@@ -56,6 +56,15 @@
 #include "platform_helper.h" // always make sure, I need some definitions from here
 #endif // __DOXYGEN__ /* exclude these so I don't mess up the docs */
 
+#ifndef _WINDOW_HELPER_H_INCLUDED_
+#ifdef WIN32
+typedef HANDLE WB_DISPLAY;
+#else // WIN32
+typedef Display * WB_DISPLAY; // forward reference on WB_DISPLAY
+#endif // WIN32
+#endif // _WINDOW_HELPER_H_INCLUDED_
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -247,7 +256,7 @@ void WBDebugDump(const char *szTitle, void *pData, int cbData); // dump binary d
   *
   * Header File:  debug_helper.h
 **/
-void WBDebugDumpGC(Display *pDisplay, WBGC hGC);
+void WBDebugDumpGC(WB_DISPLAY pDisplay, WBGC hGC);
 
 /** \ingroup debug
   * \brief dumps contents of a region

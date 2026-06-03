@@ -172,7 +172,7 @@ static int GetWBDialogControlStructSize(Atom aClass)
 int DLGControlDefaultCallback(Window wID, XEvent *pEvent)
 {
 #ifndef NO_DEBUG
-  Display *pDisplay = WBGetWindowDisplay(wID);
+  WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
 #endif // NO_DEBUG
   WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
   int iRval;
@@ -661,9 +661,9 @@ static void old_alloc_control_colors(WBDialogControl *pDialogControl,
 #undef LOAD_COLOR
 
 
-static Display *dialog_control_get_display(WBDialogControl *pDialogControl)
+static WB_DISPLAY dialog_control_get_display(WBDialogControl *pDialogControl)
 {
-Display *pRval = NULL;
+WB_DISPLAY pRval = NULL;
 
   if(pDialogControl && pDialogControl->pOwner)
   {
@@ -683,7 +683,7 @@ static Window standard_do_create_control(WBDialogControl *pDialogControl,
                                          const char *szClassName, const char *szTitle, WBWinEvent pCallback)
 {
   XSetWindowAttributes xswa;  /* Temporary Set Window Attribute struct */
-  Display *pDisplay = dialog_control_get_display(pDialogControl);
+  WB_DISPLAY pDisplay = dialog_control_get_display(pDialogControl);
 
   bzero(&xswa, sizeof(xswa));
 
@@ -738,7 +738,7 @@ IMPLEMENT_CREATE_CONTROL(FRAME_CONTROL)
 {
 BEGIN_CREATE_CONTROL(FRAME_CONTROL);
 
-  Display *pDisplay = dialog_control_get_display(pDialogControl);
+  WB_DISPLAY pDisplay = dialog_control_get_display(pDialogControl);
   int iBorderWidth = 1;
 
   pDialogControl->ulFlags &= ~STATIC_TYPEMASK;
@@ -797,7 +797,7 @@ IMPLEMENT_CREATE_CONTROL(TEXT_CONTROL)
 {
 BEGIN_CREATE_CONTROL(TEXT_CONTROL);
 
-  Display *pDisplay = dialog_control_get_display(pDialogControl);
+  WB_DISPLAY pDisplay = dialog_control_get_display(pDialogControl);
   int iBorderWidth = 1;
 
   pDialogControl->ulFlags &= ~STATIC_TYPEMASK;
@@ -859,7 +859,7 @@ IMPLEMENT_CREATE_CONTROL(ICON_CONTROL)
 {
 BEGIN_CREATE_CONTROL(ICON_CONTROL);
 
-  Display *pDisplay = dialog_control_get_display(pDialogControl);
+  WB_DISPLAY pDisplay = dialog_control_get_display(pDialogControl);
   int iBorderWidth = 1;
 
   pDialogControl->ulFlags &= ~STATIC_TYPEMASK;
@@ -925,7 +925,7 @@ IMPLEMENT_CREATE_CONTROL(IMAGE_CONTROL)
 {
 BEGIN_CREATE_CONTROL(IMAGE_CONTROL);
 
-  Display *pDisplay = dialog_control_get_display(pDialogControl);
+  WB_DISPLAY pDisplay = dialog_control_get_display(pDialogControl);
   int iBorderWidth = 1;
 
   pDialogControl->ulFlags &= ~STATIC_TYPEMASK;
@@ -990,7 +990,7 @@ IMPLEMENT_CREATE_CONTROL(EDIT_CONTROL)
 BEGIN_CREATE_CONTROL(EDIT_CONTROL);
 
   WBEditControl *pPrivate = (WBEditControl *)pDialogControl;
-  Display *pDisplay = dialog_control_get_display(pDialogControl);
+  WB_DISPLAY pDisplay = dialog_control_get_display(pDialogControl);
 
 //  pDialogControl->ulFlags &= ~EDIT_TYPEMASK;
 //  pDialogControl->ulFlags |= EDIT_Frame;
@@ -1076,7 +1076,7 @@ BEGIN_CREATE_CONTROL(PUSHBUTTON_CONTROL);
 WB_FONT pBold;
 
 
-  Display *pDisplay = dialog_control_get_display(pDialogControl);
+  WB_DISPLAY pDisplay = dialog_control_get_display(pDialogControl);
 
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_PushButton;
@@ -1142,7 +1142,7 @@ BEGIN_CREATE_CONTROL(DEFPUSHBUTTON_CONTROL);
 WB_FONT pBold;
 
 
-  Display *pDisplay = dialog_control_get_display(pDialogControl);
+  WB_DISPLAY pDisplay = dialog_control_get_display(pDialogControl);
 
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_DefPushButton;
@@ -1209,7 +1209,7 @@ BEGIN_CREATE_CONTROL(CANCELBUTTON_CONTROL);
 WB_FONT pBold;
 
 
-  Display *pDisplay = dialog_control_get_display(pDialogControl);
+  WB_DISPLAY pDisplay = dialog_control_get_display(pDialogControl);
 
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_CancelButton;
@@ -1272,7 +1272,7 @@ IMPLEMENT_CREATE_CONTROL(RADIOBUTTON_CONTROL)
 {
 BEGIN_CREATE_CONTROL(RADIOBUTTON_CONTROL);
 
-  Display *pDisplay = dialog_control_get_display(pDialogControl);
+  WB_DISPLAY pDisplay = dialog_control_get_display(pDialogControl);
 
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_RadioButton;
@@ -1322,7 +1322,7 @@ IMPLEMENT_CREATE_CONTROL(FIRSTRADIOBUTTON_CONTROL)
 {
 BEGIN_CREATE_CONTROL(FIRSTRADIOBUTTON_CONTROL);
 
-  Display *pDisplay = dialog_control_get_display(pDialogControl);
+  WB_DISPLAY pDisplay = dialog_control_get_display(pDialogControl);
 
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_FirstRadioButton;
@@ -1373,7 +1373,7 @@ IMPLEMENT_CREATE_CONTROL(CHECKBUTTON_CONTROL)
 BEGIN_CREATE_CONTROL(CHECKBUTTON_CONTROL);
 
 
-  Display *pDisplay = dialog_control_get_display(pDialogControl);
+  WB_DISPLAY pDisplay = dialog_control_get_display(pDialogControl);
 
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_CheckButton;
@@ -1423,7 +1423,7 @@ IMPLEMENT_CREATE_CONTROL(TRISTATEBUTTON_CONTROL)
 {
 BEGIN_CREATE_CONTROL(TRISTATEBUTTON_CONTROL);
 
-  Display *pDisplay = dialog_control_get_display(pDialogControl);
+  WB_DISPLAY pDisplay = dialog_control_get_display(pDialogControl);
 
   pDialogControl->ulFlags &= ~BUTTON_TYPEMASK;
   pDialogControl->ulFlags |= BUTTON_TriStateButton;
@@ -1515,7 +1515,7 @@ IMPLEMENT_CREATE_CONTROL(LIST_CONTROL)
 {
 BEGIN_CREATE_CONTROL(LIST_CONTROL);
 
-  Display *pDisplay = dialog_control_get_display(pDialogControl);
+  WB_DISPLAY pDisplay = dialog_control_get_display(pDialogControl);
 
   pDialogControl->ulFlags |= CONTROL_SupportListInfo;
 
@@ -1582,7 +1582,7 @@ BEGIN_CREATE_CONTROL(LIST_CONTROL);
 
 static int combo_callback(Window wID, XEvent *pEvent)
 {
-//  Display *pDisplay = WBGetWindowDisplay(wID);
+//  WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
   WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
 
 
@@ -1628,7 +1628,7 @@ IMPLEMENT_CREATE_CONTROL(COMBO_CONTROL)
 BEGIN_CREATE_CONTROL(COMBO_CONTROL);
 
   WBComboControl *pPrivate = (WBComboControl *)pDialogControl;
-  Display *pDisplay = dialog_control_get_display(pDialogControl);
+  WB_DISPLAY pDisplay = dialog_control_get_display(pDialogControl);
 
   pDialogControl->ulFlags |= CONTROL_SupportListInfo;
 
@@ -1704,7 +1704,7 @@ IMPLEMENT_CREATE_CONTROL(TREE_CONTROL)
 {
 BEGIN_CREATE_CONTROL(TREE_CONTROL);
 
-  Display *pDisplay = dialog_control_get_display(pDialogControl);
+  WB_DISPLAY pDisplay = dialog_control_get_display(pDialogControl);
 
   pDialogControl->ulFlags |= CONTROL_SupportListInfo;
 
@@ -1912,12 +1912,12 @@ BEGIN_CREATE_CONTROL(TAB_CONTROL);
 
 // callbacks
 
-static int StaticDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
+static int StaticDoExposeEvent(XExposeEvent *pEvent, WB_DISPLAY pDisplay,
                                Window wID, WBDialogControl *pSelf);
 
 static int static_callback(Window wID, XEvent *pEvent)
 {
-  Display *pDisplay = WBGetWindowDisplay(wID);
+  WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
   WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
 
   if(pDialogControl && pEvent->type == Expose)
@@ -2064,18 +2064,18 @@ static int static_callback(Window wID, XEvent *pEvent)
 }
 
 
-static int EditDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
+static int EditDoExposeEvent(XExposeEvent *pEvent, WB_DISPLAY pDisplay,
                              Window wID, WBDialogControl *pSelf);
-static int EditDoCharEvent(XClientMessageEvent *pEvent, Display *pDisplay,
+static int EditDoCharEvent(XClientMessageEvent *pEvent, WB_DISPLAY pDisplay,
                            Window wID, WBDialogControl *pSelf);
-static int EditDoPointerEvent(XClientMessageEvent *pEvent, Display *pDisplay,
+static int EditDoPointerEvent(XClientMessageEvent *pEvent, WB_DISPLAY pDisplay,
                               Window wID, WBDialogControl *pSelf);
 
 static int edit_callback(Window wID, XEvent *pEvent)
 {
   int iRval = 0;
   Atom aNotification = None;
-  Display *pDisplay = WBGetWindowDisplay(wID);
+  WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
   WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
   WBEditControl *pPrivate = (WBEditControl *)pDialogControl;
 //  char tbuf[32];
@@ -2229,13 +2229,13 @@ static int edit_callback(Window wID, XEvent *pEvent)
 }
 
 
-static int PushButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
+static int PushButtonDoExposeEvent(XExposeEvent *pEvent, WB_DISPLAY pDisplay,
                                    Window wID, WBDialogControl *pSelf);  // these are different
-static int ButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
+static int ButtonDoExposeEvent(XExposeEvent *pEvent, WB_DISPLAY pDisplay,
                                Window wID, WBDialogControl *pSelf);
 static void ManageRadioButtonGroupSelectState(WBDialogControl *pDialogControl);
 
-static int ButtonHandleCheckEvent(Display *pDisplay, Window wID, WBDialogControl *pDialogControl, int iType, int iCheck)
+static int ButtonHandleCheckEvent(WB_DISPLAY pDisplay, Window wID, WBDialogControl *pDialogControl, int iType, int iCheck)
 {
   // for now, I use the type indicated by 'ulFlags' in case I have a control
   // of a different class that behaves as one of these kinds of buttons
@@ -2291,7 +2291,7 @@ static int ButtonHandleCheckEvent(Display *pDisplay, Window wID, WBDialogControl
 
 static int button_callback(Window wID, XEvent *pEvent)
 {
-Display *pDisplay = WBGetWindowDisplay(wID);
+WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
 WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
 int iType;
 
@@ -2710,10 +2710,10 @@ int iType = pDialogControl->ulFlags & BUTTON_TYPEMASK;  // TODO: use the class o
 
 
 
-static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
+static int ListDoExposeEvent(XExposeEvent *pEvent, WB_DISPLAY pDisplay,
                              Window wID, WBDialogControl *pSelf);
 
-static int ListDoCharEvent(XClientMessageEvent *pEvent, Display *pDisplay,
+static int ListDoCharEvent(XClientMessageEvent *pEvent, WB_DISPLAY pDisplay,
                            Window wID, WBDialogControl *pSelf);
 
 static int ListGetItemIndexFromXY(LISTINFO *pListInfo, int iX, int iY)
@@ -2769,7 +2769,7 @@ static int list_callback(Window wID, XEvent *pEvent)
 {
   int i1, iRval = 0;
   Atom aNotification = None;
-  Display *pDisplay = WBGetWindowDisplay(wID);
+  WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
   WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
 //  char tbuf[32];
 //  int nChar = sizeof(tbuf);
@@ -3275,7 +3275,7 @@ scroll_sanity: // placed here for convenience
 
 static int file_list_callback(Window wID, XEvent *pEvent)
 {
-//Display *pDisplay = WBGetWindowDisplay(wID);
+//WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
 WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
 char *p1;
 const char *p2;
@@ -3427,7 +3427,7 @@ static int tree_callback(Window wID, XEvent *pEvent)
 {
   int iRval = 0;
   Atom aNotification = None;
-  Display *pDisplay = WBGetWindowDisplay(wID);
+  WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
   WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
 //  char tbuf[32];
 //  int nChar = sizeof(tbuf);
@@ -3499,7 +3499,7 @@ static int tree_callback(Window wID, XEvent *pEvent)
 
 static int path_tree_callback(Window wID, XEvent *pEvent)
 {
-//Display *pDisplay = WBGetWindowDisplay(wID);
+//WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
 WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
 char *p1;
 void *pV;
@@ -3601,7 +3601,7 @@ char tbuf[NAME_MAX + 4];
 
 // NOTE:  returns non-zero if text changes
 
-static int EditDoCharEvent(XClientMessageEvent *pEvent, Display *pDisplay,
+static int EditDoCharEvent(XClientMessageEvent *pEvent, WB_DISPLAY pDisplay,
                            Window wID, WBDialogControl *pSelf)
 {
 WBEditControl *pPrivate = (WBEditControl *)pSelf;
@@ -4321,7 +4321,7 @@ WB_RECT rctTemp;
   return iRval;
 }
 
-static int EditDoPointerEvent(XClientMessageEvent *pEvent, Display *pDisplay,
+static int EditDoPointerEvent(XClientMessageEvent *pEvent, WB_DISPLAY pDisplay,
                               Window wID, WBDialogControl *pSelf)
 {
 WBEditControl *pPrivate = (WBEditControl *)pSelf;
@@ -4416,7 +4416,7 @@ WB_RECT rct;
 }
 
 
-static int ListDoCharEvent(XClientMessageEvent *pEvent, Display *pDisplay,
+static int ListDoCharEvent(XClientMessageEvent *pEvent, WB_DISPLAY pDisplay,
                            Window wID, WBDialogControl *pSelf)
 {
 int iRval = 0, iACS, iKey, nChar;//, iLen;
@@ -4561,7 +4561,7 @@ int iRval = 0, iACS, iKey, nChar;//, iLen;
 //*************
 
 
-static int StaticDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
+static int StaticDoExposeEvent(XExposeEvent *pEvent, WB_DISPLAY pDisplay,
                                Window wID, WBDialogControl *pSelf)
 {
 //int iHPos;
@@ -4765,7 +4765,7 @@ WB_GEOM geomPaint, geomBorder;
 }
 
 
-static int EditDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
+static int EditDoExposeEvent(XExposeEvent *pEvent, WB_DISPLAY pDisplay,
                              Window wID, WBDialogControl *pSelf)
 {
 WBEditControl *pPrivate = (WBEditControl *)pSelf;
@@ -4938,7 +4938,7 @@ WB_GEOM geomPaint, geomBorder;
 }
 
 
-static int ButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
+static int ButtonDoExposeEvent(XExposeEvent *pEvent, WB_DISPLAY pDisplay,
                                Window wID, WBDialogControl *pSelf)
 {
 int iType;
@@ -5270,7 +5270,7 @@ WB_RECT rctText;
 }
 
 
-static int PushButtonDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
+static int PushButtonDoExposeEvent(XExposeEvent *pEvent, WB_DISPLAY pDisplay,
                                    Window wID, WBDialogControl *pSelf)
 {
 int i2, iHPos;
@@ -5403,7 +5403,7 @@ WB_GEOM geomPaint, geomBorder;
 }
 
 
-static int ListDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
+static int ListDoExposeEvent(XExposeEvent *pEvent, WB_DISPLAY pDisplay,
                              Window wID, WBDialogControl *pSelf)
 {
 int i1, iVScrollWidth, iHScrollHeight;
@@ -5657,7 +5657,7 @@ static void FileListControlDisplayProc(WBDialogControl *pList, void *pData, int 
 int iHPos;
 XCharStruct xBounds;
 Window wID = pList->wID;
-Display *pDisplay = WBGetWindowDisplay(wID);
+WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
 
 
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,

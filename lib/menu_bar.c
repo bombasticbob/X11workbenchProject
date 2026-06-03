@@ -100,7 +100,7 @@ int MBMenuParentEvent(Window wIDMenu, XEvent *pEvent);  // callback for parent w
 int MBMenuWinEvent(Window wID, XEvent *pEvent);  // callback for menu events
 
 // message handlers
-static int MenuBarDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu, Display *pDisplay,
+static int MenuBarDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu, WB_DISPLAY pDisplay,
                                 Window wID, WBMenuBarWindow *pSelf);
 
 
@@ -345,7 +345,7 @@ WBMenuBarWindow *MBCreateMenuBarWindow(Window wIDParent, const char *pszResource
 //                                       int iX, int iY, int *piWidth, int *piHeight,
                                        int iFlags)
 {
-  Display *pDisplay;
+  WB_DISPLAY pDisplay;
   WBMenuBarWindow *pRval = NULL;
   unsigned long fg, bg, bd;   /* Pixel values */
   XSetWindowAttributes xswa;  /* Temporary Set Window Attribute struct */
@@ -562,7 +562,7 @@ WBMenu *pMenu;
 // this next callback is assigned via WBRegisterMenuCallback
 int MBMenuParentEvent(Window wIDMenu, XEvent *pEvent)
 {
-  Display *pDisplay = WBGetWindowDisplay(wIDMenu);
+  WB_DISPLAY pDisplay = WBGetWindowDisplay(wIDMenu);
   WBMenuBarWindow *pSelf = MBGetMenuBarWindowStruct(wIDMenu);
 
   if(!pSelf)
@@ -590,7 +590,7 @@ int MBMenuParentEvent(Window wIDMenu, XEvent *pEvent)
   return 0;  // not handled
 }
 
-static void MBMenuHandleMenuItem(Display *pDisplay, WBMenuBarWindow *pSelf, WBMenu *pMenu, WBMenuItem *pItem)
+static void MBMenuHandleMenuItem(WB_DISPLAY pDisplay, WBMenuBarWindow *pSelf, WBMenu *pMenu, WBMenuItem *pItem)
 {
 Window wID = pSelf->wSelf;
 
@@ -645,7 +645,7 @@ Window wID = pSelf->wSelf;
 }
 
 #if 0 /* currently not used, reserved, consider removing it if not needed */
-static int MBMenuHandleMenuItemUI(Display *pDisplay, WBMenuBarWindow *pSelf, WBMenu *pMenu, WBMenuItem *pItem)
+static int MBMenuHandleMenuItemUI(WB_DISPLAY pDisplay, WBMenuBarWindow *pSelf, WBMenu *pMenu, WBMenuItem *pItem)
 {
   XClientMessageEvent evt;
   int iRval;
@@ -681,7 +681,7 @@ static int MBMenuHandleMenuItemUI(Display *pDisplay, WBMenuBarWindow *pSelf, WBM
 // this next callback is assigned via WBRegisterWindowCallback
 int MBMenuWinEvent(Window wID, XEvent *pEvent)
 {
-Display *pDisplay = WBGetWindowDisplay(wID);
+WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
 WBMenuBarWindow *pSelf = MBGetMenuBarWindowStruct(wID);
 WBMenu *pMenu = pSelf ? pSelf->pMenu : NULL;
 WBMenuItem *pItem;
@@ -1173,7 +1173,7 @@ try_select_next:
 }
 
 
-static int MenuBarDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu, Display *pDisplay,
+static int MenuBarDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu, WB_DISPLAY pDisplay,
                                 Window wID, WBMenuBarWindow *pSelf)
 {
   int i1, i2, iHPos, iVPos;

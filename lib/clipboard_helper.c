@@ -141,7 +141,7 @@ static void * ClipboardThreadProc(void *);
 
 // WBInitClipboardSystem
 // return ZERO if clipboard system is initialized properly
-int WBInitClipboardSystem(Display *pDisplay, const char *szDisplayName)
+int WBInitClipboardSystem(WB_DISPLAY pDisplay, const char *szDisplayName)
 {
 int iRval;
 #ifndef NO_DEBUG
@@ -169,7 +169,7 @@ unsigned long long ullTick;
 
 static char *pGlobalDisplayNameForClipboardInit = NULL;
 
-int __StartInitClipboardSystem(Display *pDisplay, const char *szDisplayName)
+int __StartInitClipboardSystem(WB_DISPLAY pDisplay, const char *szDisplayName)
 {
   // for debugging purposes, keep track of how long it takes
 
@@ -228,7 +228,7 @@ int __StartInitClipboardSystem(Display *pDisplay, const char *szDisplayName)
 }
 
 
-int __FinishInitClipboardSystem(Display *pDisplay, const char *szDisplayName)
+int __FinishInitClipboardSystem(WB_DISPLAY pDisplay, const char *szDisplayName)
 {
 int iDelayPeriod = MIN_EVENT_LOOP_SLEEP_PERIOD;
 
@@ -270,7 +270,7 @@ int iDelayPeriod = MIN_EVENT_LOOP_SLEEP_PERIOD;
 }
 
 
-void WBExitClipboardSystem(Display *pDisplay)
+void WBExitClipboardSystem(WB_DISPLAY pDisplay)
 {
   if(pDisplay && pDisplay != WBGetDefaultDisplay())
   {
@@ -341,7 +341,7 @@ void WBExitClipboardSystem(Display *pDisplay)
 
 #if 0 /* uncomment this if I need the functionality; otherwise, consider removing it */
 // event check 'predicate' proc for selection events
-static Bool __ClipboardThreadEventPredicate(Display *pDisplay, XEvent *pEvent, XPointer arg)
+static Bool __ClipboardThreadEventPredicate(WB_DISPLAY pDisplay, XEvent *pEvent, XPointer arg)
 {
   if(pEvent &&
      (pEvent->type == SelectionNotify ||
@@ -442,7 +442,7 @@ void * ClipboardThreadProc(void *pParam)
 unsigned long long ullTick;
 int iLen, iFactor, iDelayPeriod;
 const char *pDisplayName = (const char *)pParam;
-Display *pDisplay = NULL;
+WB_DISPLAY pDisplay = NULL;
 volatile CLIPBOARD_TASK *pT;
 CLIPBOARD_TASK *pT2, *pT3;
 CLIPBOARD_TASK *pRunList = NULL; // what I'm running at the moment
@@ -1839,21 +1839,21 @@ exit_point:
 
 
 
-void * WBGetClipboardData(Display *pDisplay, Atom *paType, int *piFormat, unsigned long *pnData)
+void * WBGetClipboardData(WB_DISPLAY pDisplay, Atom *paType, int *piFormat, unsigned long *pnData)
 {
   // TODO:  find better way than using 'None' for the 'aSelection' parameter in order to get "that behavior"
 
   return WBGetSelectionData(pDisplay, None, paType, piFormat, pnData);
 }
 
-int WBSetClipboardData(Display *pDisplay, Atom aType, int iFormat, const void *pData, unsigned long nData)
+int WBSetClipboardData(WB_DISPLAY pDisplay, Atom aType, int iFormat, const void *pData, unsigned long nData)
 {
   // TODO:  find better way than using 'None' for the 'aSelection' parameter in order to get "that behavior"
 
   return WBSetSelectionData(pDisplay, None, aType, iFormat, pData, nData);
 }
 
-void * WBGetSelectionData(Display *pDisplay, Atom aSelection, Atom *paType, int *piFormat, unsigned long *pnData)
+void * WBGetSelectionData(WB_DISPLAY pDisplay, Atom aSelection, Atom *paType, int *piFormat, unsigned long *pnData)
 {
 void *pRval = NULL;
 volatile CLIPBOARD_TASK *pT, *pTask;
@@ -2058,7 +2058,7 @@ exit_point0:
   return pRval; // for now (similar to an error return)
 }
 
-int WBSetSelectionData(Display *pDisplay, Atom aSelection, Atom aType, int iFormat, const void *pData, unsigned long nData)
+int WBSetSelectionData(WB_DISPLAY pDisplay, Atom aSelection, Atom aType, int iFormat, const void *pData, unsigned long nData)
 {
 int iRval = -1;
 volatile CLIPBOARD_TASK *pT, *pTask;

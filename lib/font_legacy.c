@@ -90,7 +90,7 @@ static XFontStruct *WBGetDefaultFontStruct()
 }
 
 
-static XFontSet WBGetDefaultFontSet(Display *pDisplay)
+static XFontSet WBGetDefaultFontSet(WB_DISPLAY pDisplay)
 {
   WB_FONTC pFont = WBGetDefaultFont();
 
@@ -770,7 +770,7 @@ static void InternalBuildFontString(const char *szFontName, int iSize, int iFlag
 }
 
 
-XFontStruct *WBLoadFontX(Display *pDisplay, const char *szFontName,
+XFontStruct *WBLoadFontX(WB_DISPLAY pDisplay, const char *szFontName,
                          int iFontSize, int iFlags)
 {
 XFontStruct *pRval=NULL, *pFSInfo=NULL;
@@ -910,7 +910,7 @@ char tbuf[512], tbuf2[512], tbuf3[512];
   return pRval;
 }
 
-int WBFontAvgCharWidthX(Display *pDisplay, const XFontStruct *pFont)
+int WBFontAvgCharWidthX(WB_DISPLAY pDisplay, const XFontStruct *pFont)
 {
 unsigned long lName, lPoints;
 char *pName = NULL;
@@ -1011,7 +1011,7 @@ int iRval = 0;
   return iRval;
 }
 
-int WBFontSetDescent(Display *pDisplay, XFontSet fontSet)
+int WBFontSetDescent(WB_DISPLAY pDisplay, XFontSet fontSet)
 {
 XFontStruct **ppFontStruct = NULL;
 char **ppFontNames = NULL;
@@ -1053,7 +1053,7 @@ int i1, i2, iN, iMax;
   return iMax;
 }
 
-int WBFontSetAscent(Display *pDisplay, XFontSet fontSet)
+int WBFontSetAscent(WB_DISPLAY pDisplay, XFontSet fontSet)
 {
 XFontStruct **ppFontStruct = NULL;
 char **ppFontNames = NULL;
@@ -1095,7 +1095,7 @@ int i1, i2, iN, iMax;
   return iMax;
 }
 
-int WBFontSetHeight(Display *pDisplay, XFontSet fontSet)
+int WBFontSetHeight(WB_DISPLAY pDisplay, XFontSet fontSet)
 {
 XFontStruct **ppFontStruct = NULL;
 char **ppFontNames = NULL;
@@ -1144,7 +1144,7 @@ int i1, i2, iN, iMaxD, iMaxH;
   return iMaxD + iMaxH;
 }
 
-int WBFontSetAvgCharWidth(Display *pDisplay, XFontSet fontSet)
+int WBFontSetAvgCharWidth(WB_DISPLAY pDisplay, XFontSet fontSet)
 {
 XFontStruct **ppFontStruct = NULL;
 char **ppFontNames = NULL;
@@ -1204,7 +1204,7 @@ int i1, i2, iN, iTotal, iMax, iCount;
   return iTotal;
 }
 
-XCharStruct WBFontSetMaxBounds(Display *pDisplay, XFontSet fontSet)
+XCharStruct WBFontSetMaxBounds(WB_DISPLAY pDisplay, XFontSet fontSet)
 {
 XCharStruct rVal;
 XFontStruct **ppFontStruct = NULL;
@@ -1267,7 +1267,7 @@ int i1, iN, iMax;
   return rVal;
 }
 
-XFontStruct *WBLoadModifyFontX(Display *pDisplay, const XFontStruct *pOriginal,
+XFontStruct *WBLoadModifyFontX(WB_DISPLAY pDisplay, const XFontStruct *pOriginal,
                                int iFontSize, int iFlags)
 {
 unsigned long lName;
@@ -1357,7 +1357,7 @@ XFontStruct *pRval;
   return pRval;  // the NEW font!
 }
 
-XFontSet WBCopyModifyFontSet(Display *pDisplay, XFontSet fsOrig, int iFontSize, int iFlags)
+XFontSet WBCopyModifyFontSet(WB_DISPLAY pDisplay, XFontSet fsOrig, int iFontSize, int iFlags)
 {
 XFontSet fsRval = None;
 char *p1, *pLocale, *pName, *pDef = NULL;
@@ -1529,7 +1529,7 @@ char tbuf[512];
 
 #ifdef USE_FONT_LIST_FOR_FONT_SET
 
-static char * InternalGetMatchingFontNameList(Display *pDisplay, const char *szFontName)
+static char * InternalGetMatchingFontNameList(WB_DISPLAY pDisplay, const char *szFontName)
 {
 char *pRval, *p1;
 char **ppNames;
@@ -1577,7 +1577,7 @@ XFontStruct *pFSInfo;
 #endif // USE_FONT_LIST_FOR_FONT_SET
 
 
-XFontSet WBFontSetFromFont(Display *pDisplay, const XFontStruct *pFont)
+XFontSet WBFontSetFromFont(WB_DISPLAY pDisplay, const XFontStruct *pFont)
 {
 unsigned long lName;
 char *pName = NULL, *pDef = NULL;
@@ -1736,7 +1736,7 @@ static const char szISO[]="-ISO8859-";
 }
 
 
-XFontSet WBFontSetFromFontSingle(Display *pDisplay, const XFontStruct *pFont)
+XFontSet WBFontSetFromFontSingle(WB_DISPLAY pDisplay, const XFontStruct *pFont)
 {
 unsigned long lName;
 char *pName = NULL, *pDef = NULL;
@@ -1843,7 +1843,7 @@ char *p1, *pLocale;
 }
 
 
-XFontStruct * WBFontFromFontSet(Display *pDisplay, XFontSet fontSet)
+XFontStruct * WBFontFromFontSet(WB_DISPLAY pDisplay, XFontSet fontSet)
 {
 XFontStruct **ppFontStruct = NULL;
 char **ppFontNames = NULL;
@@ -2139,7 +2139,7 @@ int i1;
                 pFont->descent);
 }
 
-void WBDumpMatchingFontNames(Display *pDisplay, const char *szFontName)
+void WBDumpMatchingFontNames(WB_DISPLAY pDisplay, const char *szFontName)
 {
 char **ppNames;
 int i1, iCount;
@@ -2168,7 +2168,7 @@ XFontStruct *pFSInfo;
   }
 }
 
-void WBDumpFontSet(Display *pDisplay, XFontSet fontSet)
+void WBDumpFontSet(WB_DISPLAY pDisplay, XFontSet fontSet)
 {
 XFontStruct **ppFontStruct = NULL;
 char **ppFontNames = NULL;

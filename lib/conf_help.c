@@ -200,7 +200,7 @@ void CHOnExit(void)
 // OLD version - uses XResourceManagerSring and XScreenResourceString (deprecated)
 // this version typically won't return anything useful any more.
 
-int CHGetResourceString_Old(Display *pDisplay, const char *szIdentifier, char *szData, int cbData)
+int CHGetResourceString_Old(WB_DISPLAY pDisplay, const char *szIdentifier, char *szData, int cbData)
 {
 char *pData;
 Screen *pScreen;
@@ -214,8 +214,8 @@ int iRval = -1, iLen;
     return -1;
   }
 
-  pScreen = XDefaultScreenOfDisplay((Display *)pDisplay);
-          // was (Screen *)XDefaultScreen((Display *)pDisplay);
+  pScreen = XDefaultScreenOfDisplay((WB_DISPLAY )pDisplay);
+          // was (Screen *)XDefaultScreen((WB_DISPLAY )pDisplay);
 
   if(pScreen)
   {
@@ -228,7 +228,7 @@ int iRval = -1, iLen;
 
   if(!pData)
   {
-    pData = XResourceManagerString((Display *)pDisplay);
+    pData = XResourceManagerString((WB_DISPLAY )pDisplay);
   }
 
   if(!pData)
@@ -471,7 +471,7 @@ int iLen;
 }
 
 
-int CHGetResourceString(Display *pDisplay, const char *szIdentifier, char *szData, int cbData)
+int CHGetResourceString(WB_DISPLAY pDisplay, const char *szIdentifier, char *szData, int cbData)
 {
 int iRval = -1;//, iFormat;
 
@@ -601,7 +601,7 @@ int iRval = -1;//, iFormat;
   return iRval;
 }
 
-int CHGetResourceInt(Display *pDisplay, const char *szIdentifier)
+int CHGetResourceInt(WB_DISPLAY pDisplay, const char *szIdentifier)
 {
   int iLen;
   char tbuf[64];
@@ -1759,12 +1759,12 @@ typedef struct __XSETTINGS_DATA_STRING__
 } __attribute__((__packed__)) XSETTINGS_DATA_STRING;
 
 
-const CHXSettings * CHGetXSettings(Display *pDisplay)
+const CHXSettings * CHGetXSettings(WB_DISPLAY pDisplay)
 {
   return pXSettings;  // for now, just do this (if NULL do I call CHSettingsRefresh ?)
 }
 
-const CHXSetting * CHGetXSetting(Display *pDisplay, const char *szSettingName)
+const CHXSetting * CHGetXSetting(WB_DISPLAY pDisplay, const char *szSettingName)
 {
 int i1, nSettings;
 // if it's Gtk/ColorScheme and the scheme is empty, return a dummied-up one
@@ -1816,7 +1816,7 @@ static CHXSetting defcolorscheme =
   return NULL;
 }
 
-void CHSettingsRefresh(Display *pDisplay)
+void CHSettingsRefresh(WB_DISPLAY pDisplay)
 {
 // TODO:  implement an XSETTINGS (gnome-settings-manager) 'collection' object and query it
 // NOTE:  so far gnome-settings-manager doesn't provide anything really useful except the theme name
@@ -2220,7 +2220,7 @@ static void __settings_cleanup(void)
 #define DEFAULT_CURSOR_BLINK_TIME 1200 /* msec */
 
 
-int CHGetDoubleClickTime(Display *pDisplay)
+int CHGetDoubleClickTime(WB_DISPLAY pDisplay)
 {
 static int iFirstTime = 1, iRval = DEFAULT_DOUBLE_CLICK_TIME;
 static unsigned int uiSerial;
@@ -2259,7 +2259,7 @@ const CHXSetting *pXS;
   return iRval;
 }
 
-int CHGetDoubleClickDistance(Display *pDisplay)
+int CHGetDoubleClickDistance(WB_DISPLAY pDisplay)
 {
 static int iFirstTime = 1, iRval = DEFAULT_DOUBLE_CLICK_DISTANCE;
 static unsigned int uiSerial;
@@ -2298,7 +2298,7 @@ const CHXSetting *pXS;
   return iRval;
 }
 
-int CHGetDragThreshold(Display *pDisplay)
+int CHGetDragThreshold(WB_DISPLAY pDisplay)
 {
 static int iFirstTime = 1, iRval = DEFAULT_DRAG_THRESHOLD;
 static unsigned int uiSerial;
@@ -2337,7 +2337,7 @@ const CHXSetting *pXS;
   return iRval;
 }
 
-int CHGetCursorBlink(Display *pDisplay)
+int CHGetCursorBlink(WB_DISPLAY pDisplay)
 {
 static int iFirstTime = 1, iRval = DEFAULT_CURSOR_BLINK;
 static unsigned int uiSerial;
@@ -2376,7 +2376,7 @@ const CHXSetting *pXS;
   return iRval;
 }
 
-int CHGetCursorBlinkTime(Display *pDisplay)
+int CHGetCursorBlinkTime(WB_DISPLAY pDisplay)
 {
 static int iFirstTime = 1, iRval = DEFAULT_CURSOR_BLINK_TIME;
 static unsigned int uiSerial;
@@ -3844,7 +3844,7 @@ int i1, cbTemp;
 #define LOAD_COLOR0(X,Y) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) > 0) {  }
 #define LOAD_COLOR(X,Y,Z) if(CHGetResourceString(WBGetDefaultDisplay(), X, Y, sizeof(Y)) <= 0){ WB_WARN_PRINT("%s - WARNING:  can't find color %s, using default value %s\n", __FUNCTION__, X, Z); strlcpy(Y,Z,sizeof(Y)); }
 
-const char *CHGetBorderColor(Display *pDisplay)
+const char *CHGetBorderColor(WB_DISPLAY pDisplay)
 {
 static char szRval[256];
 
@@ -3853,7 +3853,7 @@ static char szRval[256];
   return szRval;
 }
 
-const char *CHGetStaticBackgroundColor(Display *pDisplay)
+const char *CHGetStaticBackgroundColor(WB_DISPLAY pDisplay)
 {
 static char szRval[256];
 
@@ -3864,7 +3864,7 @@ static char szRval[256];
   return szRval;
 }
 
-const char *CHGetToolTipBackgroundColor(Display *pDisplay)
+const char *CHGetToolTipBackgroundColor(WB_DISPLAY pDisplay)
 {
 static char szRval[256];
 
@@ -3873,7 +3873,7 @@ static char szRval[256];
   return szRval;
 }
 
-const char *CHGetDialogBackgroundColor(Display *pDisplay)
+const char *CHGetDialogBackgroundColor(WB_DISPLAY pDisplay)
 {
 static char szRval[256];
 
@@ -3888,7 +3888,7 @@ static char szRval[256];
   return szRval;
 }
 
-const char *CHGetActiveBackgroundColor(Display *pDisplay)
+const char *CHGetActiveBackgroundColor(WB_DISPLAY pDisplay)
 {
 static char szRval[256];
 
@@ -3901,12 +3901,12 @@ static char szRval[256];
   return szRval;
 }
 
-const char *CHGetDisabledBackgroundColor(Display *pDisplay)
+const char *CHGetDisabledBackgroundColor(WB_DISPLAY pDisplay)
 {
   return CHGetStaticBackgroundColor(pDisplay); // for now
 }
 
-const char *CHGetBackgroundColor(Display *pDisplay)
+const char *CHGetBackgroundColor(WB_DISPLAY pDisplay)
 {
 static char szRval[256];
 
@@ -3917,7 +3917,7 @@ static char szRval[256];
   return szRval;
 }
 
-const char *CHGetDialogTextColor(Display *pDisplay)
+const char *CHGetDialogTextColor(WB_DISPLAY pDisplay)
 {
 static char szRval[256];
 
@@ -3931,7 +3931,7 @@ static char szRval[256];
   return szRval;
 }
 
-const char *CHGetActiveTextColor(Display *pDisplay)
+const char *CHGetActiveTextColor(WB_DISPLAY pDisplay)
 {
 static char szRval[256];
 
@@ -3943,7 +3943,7 @@ static char szRval[256];
   return szRval;
 }
 
-const char *CHGetDisabledTextColor(Display *pDisplay)
+const char *CHGetDisabledTextColor(WB_DISPLAY pDisplay)
 {
 //static char szRval[256];
 //
@@ -3955,7 +3955,7 @@ const char *CHGetDisabledTextColor(Display *pDisplay)
   return "#808080"; // for now
 }
 
-const char *CHGetToolTipTextColor(Display *pDisplay)
+const char *CHGetToolTipTextColor(WB_DISPLAY pDisplay)
 {
 static char szRval[256];
 
@@ -3964,7 +3964,7 @@ static char szRval[256];
   return szRval;
 }
 
-const char *CHGetTextColor(Display *pDisplay)
+const char *CHGetTextColor(WB_DISPLAY pDisplay)
 {
 static char szRval[256];
 
@@ -3974,7 +3974,7 @@ static char szRval[256];
   return szRval;
 }
 
-const char *CHGetHighlightForegroundColor(Display *pDisplay)
+const char *CHGetHighlightForegroundColor(WB_DISPLAY pDisplay)
 {
 static char szRval[256];
 
@@ -3990,7 +3990,7 @@ static char szRval[256];
   return szRval;
 }
 
-const char *CHGetHighlightBackgroundColor(Display *pDisplay)
+const char *CHGetHighlightBackgroundColor(WB_DISPLAY pDisplay)
 {
 static char szRval[256];
 

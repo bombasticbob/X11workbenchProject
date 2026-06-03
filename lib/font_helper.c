@@ -191,7 +191,7 @@ void WBSetDefaultFontSize(int nFontSize)
 }
 
 
-WB_FONT WBCopyFont(Display *pDisplay, WB_FONTC pOldFont)
+WB_FONT WBCopyFont(WB_DISPLAY pDisplay, WB_FONTC pOldFont)
 {
 WB_FONT pRval;
 
@@ -273,7 +273,7 @@ bad_font:
   return pRval;
 }
 
-void WBFreeFont(Display *pDisplay, WB_FONT pFont)
+void WBFreeFont(WB_DISPLAY pDisplay, WB_FONT pFont)
 {
   if(!pDisplay)
   {
@@ -314,7 +314,7 @@ void WBFreeFont(Display *pDisplay, WB_FONT pFont)
 }
 
 
-WB_FONT WBLoadFont(Display *pDisplay, const char *szFontName,
+WB_FONT WBLoadFont(WB_DISPLAY pDisplay, const char *szFontName,
                    int iFontSize, int iFlags)
 {
 WB_FONT pRval;
@@ -369,7 +369,7 @@ WB_FONT pRval;
 int WBFontAvgCharWidth(WB_FONTC pFont0)
 {
 int iRval = 0;
-Display *pDisplay;
+WB_DISPLAY pDisplay;
 WB_FONT pFont = (WB_FONT)pFont0;
 
 
@@ -420,7 +420,7 @@ WB_FONT pFont = (WB_FONT)pFont0;
 int WBFontMaxCharWidth(WB_FONTC pFont0)
 {
 int iRval = 0;
-Display *pDisplay;
+WB_DISPLAY pDisplay;
 WB_FONT pFont = (WB_FONT)pFont0;
 
 
@@ -469,7 +469,7 @@ WB_FONT pFont = (WB_FONT)pFont0;
 int WBFontDescent(WB_FONTC pFont0)
 {
 int iRval = 0;
-Display *pDisplay;
+WB_DISPLAY pDisplay;
 WB_FONT pFont = (WB_FONT)pFont0;
 
 
@@ -521,7 +521,7 @@ WB_FONT pFont = (WB_FONT)pFont0;
 int WBFontAscent(WB_FONTC pFont0)
 {
 int iRval = 0;
-Display *pDisplay;
+WB_DISPLAY pDisplay;
 WB_FONT pFont = (WB_FONT)pFont0;
 
 
@@ -572,7 +572,7 @@ WB_FONT pFont = (WB_FONT)pFont0;
 int WBFontHeight(WB_FONTC pFont0)
 {
 int iRval = 0;
-Display *pDisplay;
+WB_DISPLAY pDisplay;
 WB_FONT pFont = (WB_FONT)pFont0;
 
 
@@ -618,7 +618,7 @@ WB_FONT pFont = (WB_FONT)pFont0;
 XCharStruct WBFontMaxBounds(WB_FONTC pFont0)
 {
 XCharStruct rVal;
-Display *pDisplay;
+WB_DISPLAY pDisplay;
 WB_FONT pFont = (WB_FONT)pFont0;
 
 
@@ -683,7 +683,7 @@ WB_FONT pFont = (WB_FONT)pFont0;
   return rVal;
 }
 
-WB_FONT WBCopyModifyFont(Display *pDisplay, WB_FONTC pOriginal,
+WB_FONT WBCopyModifyFont(WB_DISPLAY pDisplay, WB_FONTC pOriginal,
                          int iFontSize, int iFlags)
 {
 WB_FONT pRval = NULL;

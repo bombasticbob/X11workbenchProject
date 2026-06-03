@@ -91,14 +91,14 @@
   * This function is used internally and should not be invoked.  It is declared 'static' and not visible outside of
   * the file it's defined in.
 **/
-static int InternalCalcIdealBounds(Display *pDisplay, WB_FONTC pFont, DT_WORDS *pWords, int iTabWidth, unsigned int iTabOrigin,
+static int InternalCalcIdealBounds(WB_DISPLAY pDisplay, WB_FONTC pFont, DT_WORDS *pWords, int iTabWidth, unsigned int iTabOrigin,
                                    const WB_RECT *prcSource, WB_RECT *prcDest, int iAlignment, int iStartLine, int iEndLine);
 
 
 static void InternalDebugDumpWords(DT_WORDS *pWords); ///< \brief internal debug function to dump 'DT_WORDS' 'words' object
 
 
-static void __internalDoAntiAlias(Display *pDisplay, Drawable dw, WBGC gc, int iX, int iY, int iWidth, int iHeight);
+static void __internalDoAntiAlias(WB_DISPLAY pDisplay, Drawable dw, WBGC gc, int iX, int iY, int iWidth, int iHeight);
 
 
 // *******************
@@ -108,7 +108,7 @@ static void __internalDoAntiAlias(Display *pDisplay, Drawable dw, WBGC gc, int i
 // abstracting the 'draw text' process
 // NOTE:  this is like WBDrawString but you specify a font without assigning it to the WBGC
 
-void DTDrawString(Display *pDisplay, Drawable drawable, WB_FONTC pFont,
+void DTDrawString(WB_DISPLAY pDisplay, Drawable drawable, WB_FONTC pFont,
                   WBGC gc, int x, int y, const char *pString, int nLength)
 {
 char tbuf[1024];
@@ -274,7 +274,7 @@ use_the_stack_buffer:
 
 // determine ideal font size from desired text and geometry
 
-WB_FONT DTCalcIdealFont(Display *pDisplay, WB_FONTC pRefFont, const char *szText, WB_GEOM *geomBounds)
+WB_FONT DTCalcIdealFont(WB_DISPLAY pDisplay, WB_FONTC pRefFont, const char *szText, WB_GEOM *geomBounds)
 {
   if(!pRefFont)
   {
@@ -362,7 +362,7 @@ DT_WORDS *pRval = *ppWords;
 // However the focus of THIS project is "only implement what is necessary" (and forget the rest).
 
 
-DT_WORDS * DTGetWordsFromText(Display *pDisplay, WB_FONTC pFont, const char *szText, int iAlignment)
+DT_WORDS * DTGetWordsFromText(WB_DISPLAY pDisplay, WB_FONTC pFont, const char *szText, int iAlignment)
 {
   const char *p1, *p2;
 
@@ -576,7 +576,7 @@ DT_WORDS * DTGetWordsFromText(Display *pDisplay, WB_FONTC pFont, const char *szT
   return pRval;
 }
 
-int DTCalcIdealBounds(Display *pDisplay, WB_FONTC pFont, const char *szText, int iTabWidth, unsigned int iTabOrigin,
+int DTCalcIdealBounds(WB_DISPLAY pDisplay, WB_FONTC pFont, const char *szText, int iTabWidth, unsigned int iTabOrigin,
                       const WB_RECT *prcSource, WB_RECT *prcDest, int iAlignment)
 {
 int iRval;
@@ -685,7 +685,7 @@ DT_WORD *pW;
 //  * iEndLine A zero-based index for the last line on which to start calculating things (-1 for 'all')
 //  * zero if the text will fit within prcSource, -1 error, or 1 to indicate that prcDest is larger than prcSource
 
-static int InternalCalcIdealBounds(Display *pDisplay, WB_FONTC pFont, DT_WORDS *pWords, int iTabWidth, unsigned int iTabOrigin,
+static int InternalCalcIdealBounds(WB_DISPLAY pDisplay, WB_FONTC pFont, DT_WORDS *pWords, int iTabWidth, unsigned int iTabOrigin,
                                    const WB_RECT *prcSource, WB_RECT *prcDest, int iAlignment, int iStartLine, int iEndLine)
 {
 int iFontWidth, iFontHeight, iFontAscent, iFontDescent, iLineSpacing;  // average font width/height and line spacing
@@ -1353,7 +1353,7 @@ will_not_fit:
 //WB_DEFINE_PROFILE(anti_alias4);
 //WB_DEFINE_PROFILE(anti_alias5);
 
-static void __internalDoAntiAlias(Display *pDisplay, Drawable dw, WBGC gc, int iX, int iY, int iWidth, int iHeight)
+static void __internalDoAntiAlias(WB_DISPLAY pDisplay, Drawable dw, WBGC gc, int iX, int iY, int iWidth, int iHeight)
 {
 XStandardColormap map;
 XImage *pImage;
@@ -1528,14 +1528,14 @@ the_end:
 }
 
 
-void DTDrawSingleLineText(WB_FONTC pFont, const char *szText, Display *pDisplay, WBGC gc, Drawable dw,
+void DTDrawSingleLineText(WB_FONTC pFont, const char *szText, WB_DISPLAY pDisplay, WBGC gc, Drawable dw,
                           int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment)
 {
   DTDrawMultiLineText(pFont, szText, pDisplay, gc, dw, iTabWidth, iTabOrigin, prcBounds,
                       iAlignment | DTAlignment_SINGLELINE | DTAlignment_NO_WORD_WRAP);
 }
 
-void DTDrawMultiLineText(WB_FONTC pFont, const char *szText, Display *pDisplay, WBGC gc, Drawable dw,
+void DTDrawMultiLineText(WB_FONTC pFont, const char *szText, WB_DISPLAY pDisplay, WBGC gc, Drawable dw,
                          int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment)
 {
 int i1, i2, i3, iH, iH2, iFontDescent; //, iW2, iFontWidth, iFontHeight;
@@ -1742,7 +1742,7 @@ XCharStruct xMaxBounds;
 //        (so perhaps these should be deprecated?)
 
 
-void DTPreRender(Display *pDisplay, WB_FONTC pFont, DT_WORDS *pWords, int iTabWidth, int iTabOrigin,
+void DTPreRender(WB_DISPLAY pDisplay, WB_FONTC pFont, DT_WORDS *pWords, int iTabWidth, int iTabOrigin,
                  WB_RECT *prcBounds, int iAlignment, int iStartLine, int iEndLine)
 {
 WB_RECT rcDest;
@@ -1788,7 +1788,7 @@ WB_RECT rcDest;
   // TODO:  implement
 }
 
-void DTRender(Display *pDisplay, WB_FONTC pFont, const DT_WORDS *pWords, WBGC gc, Drawable dw,
+void DTRender(WB_DISPLAY pDisplay, WB_FONTC pFont, const DT_WORDS *pWords, WBGC gc, Drawable dw,
               int iHScrollBy, int iVScrollBy, const WB_RECT *prcBounds, const WB_RECT *prcViewport, int iAlignment)
 {
   // TODO:  implement

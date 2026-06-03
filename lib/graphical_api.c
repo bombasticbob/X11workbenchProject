@@ -88,7 +88,7 @@
 static XImage *__internalGetClipImage(WBGC hGC)
 {
 XImage *pRval = NULL;
-Display *display = hGC->display;
+WB_DISPLAY display = hGC->display;
 const XGCValues *pGCValues = &(hGC->values);
 
 
@@ -121,7 +121,7 @@ const XGCValues *pGCValues = &(hGC->values);
 
 
 
-int WBDrawPoint(Display *display, Drawable d, WBGC gc, int x, int y)
+int WBDrawPoint(WB_DISPLAY display, Drawable d, WBGC gc, int x, int y)
 {
 int iRval;
 
@@ -157,7 +157,7 @@ XImage *pImage;
 }
 
 
-int WBDrawPoints(Display *display, Drawable d, WBGC gc, XPoint *points,
+int WBDrawPoints(WB_DISPLAY display, Drawable d, WBGC gc, XPoint *points,
                  int npoints, int mode)
 {
 int iRval;
@@ -194,7 +194,7 @@ XImage *pImage;
 }
 
 
-int WBDrawLine(Display *display, Drawable d, WBGC gc,
+int WBDrawLine(WB_DISPLAY display, Drawable d, WBGC gc,
                int x1, int y1, int x2, int y2)
 {
 int iRval;
@@ -231,7 +231,7 @@ XImage *pImage;
 }
 
 
-int WBDrawLines(Display *display, Drawable d, WBGC gc, XPoint *points,
+int WBDrawLines(WB_DISPLAY display, Drawable d, WBGC gc, XPoint *points,
                 int npoints, int mode)
 {
 int iRval;
@@ -268,7 +268,7 @@ XImage *pImage;
 }
 
 
-int WBDrawRectangle(Display *display, Drawable d, WBGC gc, int x, int y,
+int WBDrawRectangle(WB_DISPLAY display, Drawable d, WBGC gc, int x, int y,
                     unsigned int width, unsigned int height)
 {
 int iRval;
@@ -305,7 +305,7 @@ XImage *pImage;
 }
 
 
-int WBFillRectangle(Display *display, Drawable d, WBGC gc, int x, int y,
+int WBFillRectangle(WB_DISPLAY display, Drawable d, WBGC gc, int x, int y,
                     unsigned int width, unsigned int height)
 {
 int iRval;
@@ -342,7 +342,7 @@ XImage *pImage;
 }
 
 
-int WBDrawArc(Display *display, Drawable d, WBGC gc, int x, int y,
+int WBDrawArc(WB_DISPLAY display, Drawable d, WBGC gc, int x, int y,
               unsigned int width, unsigned int height,
               int angle1, int angle2)
 {
@@ -380,7 +380,7 @@ XImage *pImage;
 }
 
 
-int WBFillArc(Display *display, Drawable d, WBGC gc, int x, int y,
+int WBFillArc(WB_DISPLAY display, Drawable d, WBGC gc, int x, int y,
               unsigned int width, unsigned int height,
               int angle1, int angle2)
 {
@@ -418,7 +418,7 @@ XImage *pImage;
 }
 
 
-int WBFillPolygon(Display *display, Drawable d, WBGC gc, XPoint *points,
+int WBFillPolygon(WB_DISPLAY display, Drawable d, WBGC gc, XPoint *points,
                   int npoints, int shape, int mode)
 {
 int iRval;
@@ -455,7 +455,7 @@ XImage *pImage;
 }
 
 
-int WBDrawString(Display *display, Drawable d, WBGC gc, int x, int y,
+int WBDrawString(WB_DISPLAY display, Drawable d, WBGC gc, int x, int y,
                  const char *string, int length)
 {
 int iRval = 0;
@@ -562,7 +562,7 @@ XImage *pImage;
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-WBGC WBCreateGC(Display *pDisplay, Drawable dw, unsigned long valuemask,
+WBGC WBCreateGC(WB_DISPLAY pDisplay, Drawable dw, unsigned long valuemask,
                 const XGCValues *values)
 {
 WBGC pRval;
@@ -1159,7 +1159,7 @@ int iRet;
   return iRet;
 }
 
-WBGC WBCopyDrawableGC(Display *pDisplay, Drawable dw, WBGC hGCOrig)
+WBGC WBCopyDrawableGC(WB_DISPLAY pDisplay, Drawable dw, WBGC hGCOrig)
 {
 WBGC pRval;
 int iRet;
@@ -1311,7 +1311,7 @@ WB_FONTC WBQueryGCFont(WBGC gc)
   return gc->pFont; // just return the value as-is (as WB_FONTC)
 }
 
-WB_FONT WBGetGCFont(Display *pDisplay, WBGC gc)
+WB_FONT WBGetGCFont(WB_DISPLAY pDisplay, WBGC gc)
 {
 //XFontStruct *pF, *pRval;
 
@@ -1370,7 +1370,7 @@ WB_FONT WBGetGCFont(Display *pDisplay, WBGC gc)
 #endif // 0
 }
 
-//XFontSet WBGetGCFontSet(Display *pDisplay, WBGC gc)
+//XFontSet WBGetGCFontSet(WB_DISPLAY pDisplay, WBGC gc)
 //{
 //#warning implement this
 //
@@ -1433,7 +1433,7 @@ int iRet;
   return iRet;
 }
 
-int WBSetClipMask(WBGC hGC, Pixmap pixmap)
+int WBSetClipMask(WBGC hGC, WB_PIXMAP pixmap)
 {
 int iRet;
 

@@ -280,7 +280,7 @@ WBEditWindow *WBCreateEditWindow(WBFrameWindow *pOwner, WB_FONT pFont,
                                  int fFlags)
 {
 WBEditWindow *pRval;
-Display *pDisplay;
+WB_DISPLAY pDisplay;
 int iRet;
 
 
@@ -698,7 +698,7 @@ int FWEditWindowEvent(Window wID, XEvent *pEvent)
 WBEditWindow *pE;
 WBGC gc;
 WB_GEOM geom;//, geom2;
-Display *pDisplay = WBGetWindowDisplay(wID);
+WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
 
 
   pE = WBEditWindowFromWindowID(wID);

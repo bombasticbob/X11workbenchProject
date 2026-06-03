@@ -200,7 +200,7 @@ static void __internal_destroy_frame_window(FRAME_WINDOW *pTemp)
 int i1;
 Window wIDMenu;
 WBMenuBarWindow *pMB;
-Display *pDisplay;
+WB_DISPLAY pDisplay;
 
 
   pDisplay = WBGetWindowDisplay(pTemp->wbFW.wID);
@@ -310,7 +310,7 @@ void WBFrameWindowExit()
 
 static void InternalCheckFWAtoms(void)
 {
-Display *pDisplay = WBGetDefaultDisplay();
+WB_DISPLAY pDisplay = WBGetDefaultDisplay();
 
 
   if(aTAB_MESSAGE == None)
@@ -510,7 +510,7 @@ WBFrameWindow *FWCreateFrameWindow(const char *szTitle, int idIcon, const char *
                                    WBWinEvent pUserCallback, int iFlags)
 {
   FRAME_WINDOW *pNew;
-  Display *pDisplay;
+  WB_DISPLAY pDisplay;
   XSetWindowAttributes xswa;  /* Temporary Set Window Attribute struct */
   XSizeHints  xsh;            /* Size hints for window manager */
   XWMHints xwmh;
@@ -1649,7 +1649,7 @@ void FWSetFocusWindowIndex(WBFrameWindow *pFW, int iIndex)
 FRAME_WINDOW *pFrameWindow;
 WBChildFrame *pC;
 int i1;
-Display *pDisplay = WBGetWindowDisplay(pFW->wID);
+WB_DISPLAY pDisplay = WBGetWindowDisplay(pFW->wID);
 Window wMB;
 WBMenuBarWindow *pMBW;
 
@@ -2067,7 +2067,7 @@ static void Internal_CalcTabGeom(FRAME_WINDOW *pFrameWindow, int iIndex, WB_GEOM
 static int Internal_Tab_Bar_Event(FRAME_WINDOW *pFrameWindow, XEvent *pEvent)
 {
 WB_RECT rctLeft, rctRight, rctNew, rctTemp;
-Display *pDisplay = WBGetWindowDisplay(pFrameWindow->wbFW.wID);
+WB_DISPLAY pDisplay = WBGetWindowDisplay(pFrameWindow->wbFW.wID);
 XClientMessageEvent evt;
 int i1;
 
@@ -2383,7 +2383,7 @@ WBGC gc0;
   }
   else
   {
-    Display *pDisplay = WBGetWindowDisplay(pFrameWindow->wbFW.wID);
+    WB_DISPLAY pDisplay = WBGetWindowDisplay(pFrameWindow->wbFW.wID);
     Drawable dw;
     WB_GEOM geom, g2;
     WBGC gc;
@@ -2763,7 +2763,7 @@ const char *pszStatus;
   else
   {
     WB_FONT pFont = pFrameWindow->pFont;
-    Display *pDisplay = WBGetWindowDisplay(pFrameWindow->wbFW.wID);
+    WB_DISPLAY pDisplay = WBGetWindowDisplay(pFrameWindow->wbFW.wID);
     XPoint xpt[3];
 
     // fill the rectangle with the background color
@@ -3185,7 +3185,7 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
         // ALSO - I can get this on a window MOVE without a resize...
 
         {
-          Display *pDisplay;
+          WB_DISPLAY pDisplay;
           XClientMessageEvent evt;
 
           pDisplay = WBGetWindowDisplay(wID);
@@ -3559,7 +3559,7 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
 //      WBDebugDumpEvent(pEvent);
       if(pEvent->xclient.data.l[0] == NEW_TAB_MESSAGE)
       {
-        Display *pDisplay;
+        WB_DISPLAY pDisplay;
         XClientMessageEvent evt;
 
         pDisplay = WBGetWindowDisplay(wID);
@@ -3675,7 +3675,7 @@ int FWDefaultCallback(Window wID, XEvent *pEvent)
          pEvent->xclient.message_type == aQUERY_CLOSE)
       {
         int i1;
-        Display *pDisplay = WBGetWindowDisplay(wID);
+        WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
 
         // note that 'Query Close' would have been processed already with an "ok to close" result
         // SO, check contained windows, and then destroy everything except the window itself

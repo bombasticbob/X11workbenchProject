@@ -238,7 +238,7 @@ typedef struct tagDT_WORDS
   *
   * Header File:  draw_text.h
 **/
-void DTDrawString(Display *pDisplay, Drawable drawable, WB_FONTC pFont,
+void DTDrawString(WB_DISPLAY pDisplay, Drawable drawable, WB_FONTC pFont,
                   WBGC gc, int x, int y, const char *pString, int nLength);
 
 
@@ -270,7 +270,7 @@ void DTDrawString(Display *pDisplay, Drawable drawable, WB_FONTC pFont,
   *
   * Header File:  draw_text.h
 **/
-WB_FONT DTCalcIdealFont(Display *pDisplay, WB_FONTC pFont, const char *szText, WB_GEOM *geomBounds);
+WB_FONT DTCalcIdealFont(WB_DISPLAY pDisplay, WB_FONTC pFont, const char *szText, WB_GEOM *geomBounds);
 
 
 /** \ingroup draw_text
@@ -327,7 +327,7 @@ int DTCalcIdealBounds0(XFontStruct *pFont, const char *szText, int iTabWidth, un
   *
   * Header File:  draw_text.h
 **/
-int DTCalcIdealBounds(Display *pDisplay, WB_FONTC pFont, const char *szText, int iTabWidth, unsigned int iTabOrigin,
+int DTCalcIdealBounds(WB_DISPLAY pDisplay, WB_FONTC pFont, const char *szText, int iTabWidth, unsigned int iTabOrigin,
                       const WB_RECT *prcSource, WB_RECT *prcDest, int iAlignment);
 
 /** \ingroup draw_text
@@ -352,7 +352,7 @@ int DTCalcIdealBounds(Display *pDisplay, WB_FONTC pFont, const char *szText, int
   *
   * Header File:  draw_text.h
 **/
-void DTDrawSingleLineText(WB_FONTC pFontt, const char *szText, Display *pDisplay, WBGC gc, Drawable dw,
+void DTDrawSingleLineText(WB_FONTC pFontt, const char *szText, WB_DISPLAY pDisplay, WBGC gc, Drawable dw,
                           int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment);
 
 /** \ingroup draw_text
@@ -375,7 +375,7 @@ void DTDrawSingleLineText(WB_FONTC pFontt, const char *szText, Display *pDisplay
   *
   * Header File:  draw_text.h
 **/
-void DTDrawMultiLineText(WB_FONTC pFont, const char *szText, Display *pDisplay, WBGC gc, Drawable dw,
+void DTDrawMultiLineText(WB_FONTC pFont, const char *szText, WB_DISPLAY pDisplay, WBGC gc, Drawable dw,
                          int iTabWidth, int iTabOrigin, const WB_RECT *prcBounds, int iAlignment);
 
 
@@ -396,7 +396,7 @@ void DTDrawMultiLineText(WB_FONTC pFont, const char *szText, Display *pDisplay, 
   *
   * Header File:  draw_text.h
 **/
-DT_WORDS * DTGetWordsFromText(Display *pDisplay, WB_FONTC pFont, const char *szText, int iAlignment);
+DT_WORDS * DTGetWordsFromText(WB_DISPLAY pDisplay, WB_FONTC pFont, const char *szText, int iAlignment);
 
 /** \ingroup draw_text
   * \brief Pre-render a 'DT_WORDS' structure for subsequent display
@@ -423,7 +423,7 @@ DT_WORDS * DTGetWordsFromText(Display *pDisplay, WB_FONTC pFont, const char *szT
   *
   * Header File:  draw_text.h
 **/
-void DTPreRender(Display *pDisplay, WB_FONTC pFont, DT_WORDS *pWords, int iTabWidth, int iTabOrigin,
+void DTPreRender(WB_DISPLAY pDisplay, WB_FONTC pFont, DT_WORDS *pWords, int iTabWidth, int iTabOrigin,
                  WB_RECT *prcBounds, int iAlignment, int iStartLine, int iEndLine);
 
 /** \ingroup draw_text
@@ -445,7 +445,7 @@ void DTPreRender(Display *pDisplay, WB_FONTC pFont, DT_WORDS *pWords, int iTabWi
   *
   * Header File:  draw_text.h
 **/
-void DTRender(Display *pDisplay, WB_FONTC pFont, const DT_WORDS *pWords, WBGC gc, Drawable dw,
+void DTRender(WB_DISPLAY pDisplay, WB_FONTC pFont, const DT_WORDS *pWords, WBGC gc, Drawable dw,
               int iHScrollBy, int iVScrollBy, const WB_RECT *prcBounds, const WB_RECT *prcViewport, int iAlignment);
 
 #ifdef __cplusplus

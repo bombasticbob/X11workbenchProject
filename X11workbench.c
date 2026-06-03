@@ -178,7 +178,7 @@ int iRval = 1;
 
 // static global variables that (may) need to be exposed via 'get' functions
 
-static Display       *pX11Display = NULL;            /* X server connection */
+static WB_DISPLAY     pX11Display = NULL;            /* X server connection */
 static WBFrameWindow *pMainFrame = NULL;
 static XColor         clrGreen;
 
@@ -197,7 +197,7 @@ WBFrameWindow *GetFrameWindow()
   return pMainFrame;
 }
 
-Display *GetX11Display()
+WB_DISPLAY GetX11Display()
 {
   return pX11Display;
 }

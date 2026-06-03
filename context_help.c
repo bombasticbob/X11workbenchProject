@@ -449,7 +449,9 @@ find_url_opener:
   {
     WB_WARN_PRINT("%s - TEMPORARY - spawn \"%s\" \"%s\"\n",
                    __FUNCTION__, szHelpBrowser, szDoxyTag);
-    hProcess = WBRunAsync(szHelpBrowser, szDoxyTag, NULL);
+    hProcess = WBRunAsync(szHelpBrowser, "--new-window", szDoxyTag, NULL);
+    if(hProcess == WB_INVALID_FILE_HANDLE)
+      hProcess = WBRunAsync(szHelpBrowser, szDoxyTag, NULL); // without --new-window
 
     // TODO:  does '--new-instance' work properly?
 
@@ -534,9 +536,11 @@ fail_to_run_man2html:
 
   // p2 contains the ".html" temp file name
 
-  hProcess = WBRunAsync(szHelpBrowser, p2, NULL);
+  hProcess = WBRunAsync(szHelpBrowser, "--new-window", p2, NULL);
+  if(hProcess == WB_INVALID_FILE_HANDLE)
+    hProcess = WBRunAsync(szHelpBrowser, p2, NULL);
 
-  // TODO:  does '--new-instance' work properly?
+  // TODO:  does '--new-instance' or  '--new-window' work properly?
 
 
   WBFree(p2);

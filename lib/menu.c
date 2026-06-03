@@ -1412,7 +1412,7 @@ WBMenuItem *pItem;
   {
     XClientMessageEvent evt;
     Window wIDBar, wIDOwner;
-    Display *pDisplay;
+    WB_DISPLAY pDisplay;
 
     if(!iIsPopup)
     {

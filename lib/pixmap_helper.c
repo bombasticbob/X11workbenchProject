@@ -1143,7 +1143,7 @@ XPM_ATTRIBUTES xattr;
   return(pixRval);
 }
 
-Pixmap PXM_ImageToPixmap(Display *pDisplay, Drawable dw, XImage *pImage,
+Pixmap PXM_ImageToPixmap(WB_DISPLAY pDisplay, Drawable dw, XImage *pImage,
                          unsigned long clrFGPixel, unsigned long clrBGPixel)
 {
 Pixmap pxRval;
@@ -1215,7 +1215,7 @@ int iW, iH;
 }
 
 
-Pixmap PXM_ImageToPixmap0(Display *pDisplay, Drawable dw, XImage *pImage)
+Pixmap PXM_ImageToPixmap0(WB_DISPLAY pDisplay, Drawable dw, XImage *pImage)
 {
   if(!pDisplay)
   {
@@ -1228,7 +1228,7 @@ Pixmap PXM_ImageToPixmap0(Display *pDisplay, Drawable dw, XImage *pImage)
 }
 
 
-XImage *PXM_PixmapToImage(Display *pDisplay, Pixmap pxImage)
+XImage *PXM_PixmapToImage(WB_DISPLAY pDisplay, Pixmap pxImage)
 {
 XImage *pRval;
 Window winRoot; // not used, still needed?
@@ -1269,7 +1269,7 @@ unsigned int uiDepth = 0;
   return pRval;
 }
 
-Pixmap PXM_CopyPixmap(Display *pDisplay, Drawable dw, Pixmap pxSource)
+Pixmap PXM_CopyPixmap(WB_DISPLAY pDisplay, Drawable dw, Pixmap pxSource)
 {
 XGCValues gcv;
 Window winRoot;
@@ -1348,7 +1348,7 @@ unsigned int uiDepth = 0;
   return pxRval;
 }
 
-void WBSimpleAntiAliasPixmap(Display *pDisplay, const XStandardColormap *pMap, Pixmap pxImage, unsigned long lPixel, WB_GEOM *pGeom)
+void WBSimpleAntiAliasPixmap(WB_DISPLAY pDisplay, const XStandardColormap *pMap, Pixmap pxImage, unsigned long lPixel, WB_GEOM *pGeom)
 {
 WB_GEOM geom;
 XImage *pImage = NULL;
@@ -1578,13 +1578,13 @@ XColor clr;
 
 
 #if defined(X11WORKBENCH_TOOLKIT_HAVE_XSHM_EXTENSION) || defined(__DOXYGEN__)
-int WBXShmQueryExtension(Display *pDisplay)
+int WBXShmQueryExtension(WB_DISPLAY pDisplay)
 {
   return XShmQueryExtension(pDisplay) ? 1 : 0;
 }
 #endif // defined(X11WORKBENCH_TOOLKIT_HAVE_XSHM_EXTENSION) || defined(__DOXYGEN__)
 
-int WBXPutImage(Display *pDisplay, Drawable dw, WBGC gc, XImage *pImage,
+int WBXPutImage(WB_DISPLAY pDisplay, Drawable dw, WBGC gc, XImage *pImage,
                 int src_x, int src_y, int dest_x, int dest_y,
                 unsigned int width, unsigned int height)
 {
@@ -1600,7 +1600,7 @@ int iRval;
   //       If both of these is NOT the case, then I use XPutImage() to avoid issues
 
 //Bool XShmPutImage(
-//            Display *display;
+//            WB_DISPLAY display;
 //            Drawable d;
 //            GC gc;
 //            XImage *image;
@@ -1611,7 +1611,7 @@ int iRval;
   return iRval;
 }
 
-XImage *WBXGetImage(Display *pDisplay, Drawable dw,
+XImage *WBXGetImage(WB_DISPLAY pDisplay, Drawable dw,
                     int x, int y, unsigned int width, unsigned int height,
                     unsigned long plane_mask, int format)
 {
@@ -1713,7 +1713,7 @@ int iRval;
   return iRval;
 }
 
-XImage * WBXCopyImage(Display *pDisplay, XImage *pImage)
+XImage * WBXCopyImage(WB_DISPLAY pDisplay, XImage *pImage)
 {
 XImage *pRval;
 
@@ -2114,7 +2114,7 @@ int WBXFillPolygon(XImage *pImage, WBGC hGC,
 int WBXDrawString(XImage *pImage, WB_FONTC pFont, WBGC hGC,
                   int x, int y, const char *string, int length)
 {
-//Display *pDisplay = WBGetDefaultDisplay(); // in case I need one
+//WB_DISPLAY pDisplay = WBGetDefaultDisplay(); // in case I need one
 
 
 

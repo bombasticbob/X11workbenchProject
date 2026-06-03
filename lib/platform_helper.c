@@ -2784,7 +2784,7 @@ static unsigned int nInternalAtoms = 0, nMaxInternalAtoms = 0;
 #define INITIAL_INTERNAL_ATOM_SIZE 4096
 #define INITIAL_INTERNAL_ATOM_STRING_SIZE 262144
 
-Atom WBGetAtom(Display *pDisplay, const char *szAtomName)
+Atom WBGetAtom(WB_DISPLAY pDisplay, const char *szAtomName)
 {
 Atom aRval;
 //char *p1;
@@ -2913,7 +2913,7 @@ exit_point:
 //  aRval = XInternAtom(pDisplay, szAtomName, False); // temporarily, just do this
 }
 
-Atom WBLookupAtom(Display *pDisplay, const char *szAtomName)
+Atom WBLookupAtom(WB_DISPLAY pDisplay, const char *szAtomName)
 {
 Atom aRval;
 unsigned int i1;
@@ -2972,7 +2972,7 @@ unsigned int i1;
   return aRval; // regardless
 }
 
-char *WBGetAtomName(Display *pDisplay, Atom aAtom)
+char *WBGetAtomName(WB_DISPLAY pDisplay, Atom aAtom)
 {
 char *pRval, *pTemp;
 unsigned int nAtom;
@@ -3604,7 +3604,7 @@ char tbuf[256];
 
 
 // function body - TODO:  move to pixmap_helper.c instead?
-int MyLoadPixmapFromData(Display *pDisplay, Window wID, char *aData[],
+int MyLoadPixmapFromData(WB_DISPLAY pDisplay, Window wID, char *aData[],
                          Pixmap *pPixmap, Pixmap *pMask, XPM_ATTRIBUTES *pAttr)
 {
 int iW, iH;

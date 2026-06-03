@@ -563,7 +563,7 @@ const char *WBDialogControlGetCaption(WBDialogControl *pCtrl)
 
 void WBDialogControlSetPixmap(WBDialogControl *pCtrl, Pixmap pixmap)
 {
-Display *pDisplay = NULL;
+WB_DISPLAY pDisplay = NULL;
 
   if(!pCtrl ||
      (pCtrl->aClass != aICON_CONTROL && pCtrl->aClass != aIMAGE_CONTROL
@@ -647,7 +647,7 @@ Pixmap WBDialogControlGetPixmap(WBDialogControl *pCtrl)
 
 void WBDialogControlSetIconPixmap(WBDialogControl *pCtrl, Pixmap pixmap, Pixmap pixmap2)
 {
-Display *pDisplay = NULL;
+WB_DISPLAY pDisplay = NULL;
 
   if(!pCtrl ||
      (pCtrl->aClass != aICON_CONTROL && pCtrl->aClass != aIMAGE_CONTROL
@@ -1757,7 +1757,7 @@ void DLGCDefaultListControlDisplayProc(WBDialogControl *pList, void *pData, int 
 {
 int iHPos;
 Window wID = pList->wID;
-Display *pDisplay = WBGetWindowDisplay(wID);
+WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
 
 
   WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,

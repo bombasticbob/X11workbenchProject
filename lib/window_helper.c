@@ -135,7 +135,7 @@ int i_xcall_line = 0;
 //XFontStruct *pDefaultFont = NULL;  // default font
 //XFontSet fontsetDefault = None;    // default font set, derived from default font
 WB_FONT pDefaultFont = NULL;
-Display *pDefaultDisplay = NULL;
+WB_DISPLAY pDefaultDisplay = NULL;
 
 int iStartupMinMax = 0; // main window open min/max/normal flag
 
@@ -953,20 +953,20 @@ static __inline__ _WINDOW_ENTRY_ *Debug_WBGetWindowEntry(Window wID, const char 
 #endif // NO_DEBUG
 
 static void __WBInitEvent();
-static int __WBAddEvent(Display *pDisp, Window wID, XEvent *pEvent);
-static void __WBDelWindowPaintEvents(Display *pDisp, Window wID);
-static void __WBDelWindowEvents(Display *pDisp, Window wID);
-static int __WBInsertPriorityEvent(Display *pDisp, Window wID, XEvent *pEvent);
-static int __WBNextPaintEvent(Display *pDisp, XEvent *pEvent, Window wID);
-static int __WBNextDisplayEvent(Display *pDisp, XEvent *pEvent);
+static int __WBAddEvent(WB_DISPLAY pDisp, Window wID, XEvent *pEvent);
+static void __WBDelWindowPaintEvents(WB_DISPLAY pDisp, Window wID);
+static void __WBDelWindowEvents(WB_DISPLAY pDisp, Window wID);
+static int __WBInsertPriorityEvent(WB_DISPLAY pDisp, Window wID, XEvent *pEvent);
+static int __WBNextPaintEvent(WB_DISPLAY pDisp, XEvent *pEvent, Window wID);
+static int __WBNextDisplayEvent(WB_DISPLAY pDisp, XEvent *pEvent);
 static void WBInternalProcessExposeEvent(XExposeEvent *pEvent);
 static int __internal_alloc_WMHints(_WINDOW_ENTRY_ *pEntry);
-static Window __internal_GetParent(Display *pDisplay, Window wID, Window *pwRoot);
+static Window __internal_GetParent(WB_DISPLAY pDisplay, Window wID, Window *pwRoot);
 static const char * __internal_event_type_string(int iEventType);
-static int __InternalCheckGetEvent(Display *pDisplay, XEvent *pEvent, Window wIDModal);
-static void DeletAllTimersForWindow(Display *pDisplay, Window wID);
+static int __InternalCheckGetEvent(WB_DISPLAY pDisplay, XEvent *pEvent, Window wIDModal);
+static void DeletAllTimersForWindow(WB_DISPLAY pDisplay, Window wID);
 
-void __InternalDestroyWindow(Display *pDisp, Window wID, _WINDOW_ENTRY_ *pEntry);
+void __InternalDestroyWindow(WB_DISPLAY pDisp, Window wID, _WINDOW_ENTRY_ *pEntry);
 
 
 /********************************************************************************/
@@ -976,9 +976,9 @@ void __InternalDestroyWindow(Display *pDisp, Window wID, _WINDOW_ENTRY_ *pEntry)
 /********************************************************************************/
 
 static int disable_imagecache = 0;
-static int (*pOldDisplayIOErrorHandler)(Display *) = NULL;
-static int WBXIOErrorHandler(Display *pDisp);
-static int WBXErrorHandler(Display *pDisplay, XErrorEvent *pError);
+static int (*pOldDisplayIOErrorHandler)(WB_DISPLAY ) = NULL;
+static int WBXIOErrorHandler(WB_DISPLAY pDisp);
+static int WBXErrorHandler(WB_DISPLAY pDisplay, XErrorEvent *pError);
 static int hBogus[3];  // 'bogus' handles 0-2
 
 static WB_GEOM geomStartup
@@ -1038,10 +1038,10 @@ void __internal_disable_imagecache(void)
 // MAIN WINDOW INITIALIZATION FUNCTION - call this after WBParseStandardArguments() to be
 // fully compliant with X11 command line standards.
 
-Display *WBInit(const char *szDisplayName) // NOTE:  this is 'single instance' only...
+WB_DISPLAY WBInit(const char *szDisplayName) // NOTE:  this is 'single instance' only...
 {
 int i1;
-Display *pRval;
+WB_DISPLAY pRval;
 
 #ifndef WIN32
   signal(SIGCHLD, SIG_IGN); // make sure that 'SIGCHLD' signals are *IGNORED* - this is important
@@ -1147,7 +1147,7 @@ Display *pRval;
   return pRval;
 }
 
-static int WBXIOErrorHandler(Display *pDisp)
+static int WBXIOErrorHandler(WB_DISPLAY pDisp)
 {
   WB_DEBUG_PRINT(DebugLevel_ERROR | DebugSubSystem_Application,
                  "I/O error occurred, setting 'bQuitFlag'\n");
@@ -1161,7 +1161,7 @@ static int WBXIOErrorHandler(Display *pDisp)
 }
 
 
-int WBInitDisplay(Display *pDisplay)
+int WBInitDisplay(WB_DISPLAY pDisplay)
 {
 unsigned long long ullTick;
 
@@ -1401,7 +1401,7 @@ WB_FONTC WBGetDefaultFont(void)
 //  return(pDefaultFont);
 //}
 
-//XFontSet WBGetDefaultFontSet(Display *pDisplay)
+//XFontSet WBGetDefaultFontSet(WB_DISPLAY pDisplay)
 //{
 //extern XFontSet fontsetDefault; // TODO:  per-display font sets?
 //
@@ -1430,7 +1430,7 @@ Window WBGetHiddenHelperWindow(void)
   return wWBFakeWindow;
 }
 
-void __InternalDestroyWindow(Display *pDisp, Window wID, _WINDOW_ENTRY_ *pEntry)
+void __InternalDestroyWindow(WB_DISPLAY pDisp, Window wID, _WINDOW_ENTRY_ *pEntry)
 {
   Window wIDTemp;
   Atom aNCW;
@@ -1667,7 +1667,7 @@ int i1;
   // for each remaining window in my list, destroy it
   for(i1=WINDOW_ENTRY_ARRAY_MAX - 1; i1 >= 0; i1--)
   {
-    Display *pDisp = sWBHashEntries[i1].pDisplay;
+    WB_DISPLAY pDisp = sWBHashEntries[i1].pDisplay;
     Window wID = sWBHashEntries[i1].wID;
 
     if(!wID || wID == WINDOW_ENTRY_UNUSED)
@@ -1758,9 +1758,9 @@ int GetStartupMinMax(void)
 }
 
 
-Display *WBThreadInitDisplay(void)
+WB_DISPLAY WBThreadInitDisplay(void)
 {
-Display *pDisplay;
+WB_DISPLAY pDisplay;
 
   if(!szDefaultDisplayName[0]) // no display has been opened yet
   {
@@ -1784,7 +1784,7 @@ Display *pDisplay;
   return pDisplay;
 }
 
-void WBThreadFreeDisplay(Display *pThreadDisplay)
+void WBThreadFreeDisplay(WB_DISPLAY pThreadDisplay)
 {
   if(pThreadDisplay)
   {
@@ -1807,7 +1807,7 @@ void WBInitWindowAttributes(XSetWindowAttributes *pXSWA, unsigned long lBorderPi
   pXSWA->bit_gravity = iBitGravity;
 }
 
-void WBInitSizeHints(XSizeHints *pSH, Display *pDisplay, int iMinHeight, int iMinWidth)
+void WBInitSizeHints(XSizeHints *pSH, WB_DISPLAY pDisplay, int iMinHeight, int iMinWidth)
 {
   WB_GEOM geomStartup;
 
@@ -2034,7 +2034,7 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
       if(!WBIsChildWindow(wID, event.xany.window))
       {
-        Display *pDisplay = pEntry->pDisplay ? pEntry->pDisplay : pDefaultDisplay;
+        WB_DISPLAY pDisplay = pEntry->pDisplay ? pEntry->pDisplay : pDefaultDisplay;
 
 //        fprintf(stderr, "** TEMPORARY:  window %08xH 'FocusIn' in modal loop for %08xH\n",
 //                (unsigned int)event.xany.window, (unsigned int)wID);
@@ -2188,7 +2188,7 @@ void WBSetInputFocus(Window wID)  // set input focus to specific window (revert 
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
   Window wIDCurrent;
   int iRevert;
-  Display *pDisp = pEntry ? pEntry->pDisplay : pDefaultDisplay;
+  WB_DISPLAY pDisp = pEntry ? pEntry->pDisplay : pDefaultDisplay;
 
   BEGIN_XCALL_DEBUG_WRAPPER
   XGetInputFocus(pDisp, &wIDCurrent, &iRevert);
@@ -2239,7 +2239,7 @@ void WBSetInputFocus(Window wID)  // set input focus to specific window (revert 
 void WBDestroyWindow(Window wID)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
-  Display *pDisplay = pEntry ? pEntry->pDisplay : pDefaultDisplay;
+  WB_DISPLAY pDisplay = pEntry ? pEntry->pDisplay : pDefaultDisplay;
   XEvent event;
 
   if(pEntry && WB_IS_WINDOW_DESTROYED(*pEntry)) // recursive or extra call
@@ -2583,7 +2583,7 @@ _WINDOW_ENTRY_ *pRval = NULL;
 
 static void __WindowEntryRestoreDefaultResources(int iIndex)
 {
-  Display *pDisp = pDefaultDisplay;
+  WB_DISPLAY pDisp = pDefaultDisplay;
 
   if(sWBHashEntries[iIndex].pDisplay)
   {
@@ -2756,7 +2756,7 @@ static struct timeval tvLastTime = {0,0};
   }
 }
 
-Window WBCreateWindow(Display *pDisplay, Window wIDParent,
+Window WBCreateWindow(WB_DISPLAY pDisplay, Window wIDParent,
                       WBWinEvent pProc, const char *szClass,
                       int iX, int iY, int iWidth, int iHeight, int iBorder, int iIO,
                       WB_UINT64 iFlags, XSetWindowAttributes *pXSWA)
@@ -2859,7 +2859,7 @@ void WBSetWMProperties(Window wID, const char *szTitle, XSizeHints *pNormalHints
                        XWMHints *pWMHints, XClassHint *pClassHints)
 {
 _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
-Display *pDisplay = pEntry ? pEntry->pDisplay : pDefaultDisplay;
+WB_DISPLAY pDisplay = pEntry ? pEntry->pDisplay : pDefaultDisplay;
 XTextProperty xTextProp;
 //  XSetStandardProperties(pDisplay, pNew->wbFW.wID, szTitle, szTitle, None,
 //                         NULL, 0, NULL); // argv, argc, &xsh);
@@ -3000,7 +3000,7 @@ XTextProperty xTextProp;
     END_XCALL_DEBUG_WRAPPER
   }
 
-//  void XSetWMProperties(Display *display, Window w,
+//  void XSetWMProperties(WB_DISPLAY display, Window w,
 //              XTextProperty *window_name, XTextProperty *icon_name,
 //              char **argv, int argc,
 //              XSizeHints *normal_hints, XWMHints *wm_hints,
@@ -3010,7 +3010,7 @@ XTextProperty xTextProp;
 void WBSetWindowTitle(Window wID, const char *szTitle)
 {
 _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
-Display *pDisplay = pEntry ? pEntry->pDisplay : pDefaultDisplay;
+WB_DISPLAY pDisplay = pEntry ? pEntry->pDisplay : pDefaultDisplay;
 Atom a1, a2;
 
 
@@ -3159,7 +3159,7 @@ void WBSetWMProtocols(Window wID, Atom aProperty, ...)
 va_list va, va2;
 Atom *pTemp, aArg;
 int i1, nItems;
-Display *pDisplay;
+WB_DISPLAY pDisplay;
 Atom aTemp[32]; // temp storage, in case I need "something"
 _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
@@ -3350,7 +3350,7 @@ _WINDOW_ENTRY_ *pEntry;
 //static TIMER_ENTRY *pTimerEntryActive = NULL, *pTimerEntryFree = NULL;
 //  // pointers for two linked lists.  entries must be in either 'active' or 'free' list.
 
-int CreateTimer(Display *pDisplay, Window wID, unsigned long lInterval, long lID, int iPeriodic)
+int CreateTimer(WB_DISPLAY pDisplay, Window wID, unsigned long lInterval, long lID, int iPeriodic)
 {
 int i1;
 TIMER_ENTRY *pCur;
@@ -3447,7 +3447,7 @@ static void __DeleteTimer(TIMER_ENTRY *pPrev, TIMER_ENTRY *pEntry)
   }
 }
 
-void DeleteTimer(Display *pDisplay, Window wID, long lID)
+void DeleteTimer(WB_DISPLAY pDisplay, Window wID, long lID)
 {
 TIMER_ENTRY *pCur, *pPrev;
 
@@ -3469,7 +3469,7 @@ TIMER_ENTRY *pCur, *pPrev;
   }
 }
 
-static void DeletAllTimersForWindow(Display *pDisplay, Window wID)
+static void DeletAllTimersForWindow(WB_DISPLAY pDisplay, Window wID)
 {
 TIMER_ENTRY *pCur, *pPrev, *pNext;
 
@@ -3496,7 +3496,7 @@ TIMER_ENTRY *pCur, *pPrev, *pNext;
   }
 }
 
-static int __CheckTimers(Display *pDisplay, XEvent *pEvent)
+static int __CheckTimers(WB_DISPLAY pDisplay, XEvent *pEvent)
 {
 TIMER_ENTRY *pCur, *pPrev;
 WB_UINT64 lTime = WBGetTimeIndex();
@@ -3617,7 +3617,7 @@ static void __DeleteDelayedEvent(DELAYED_EVENT_ENTRY *pPrev, DELAYED_EVENT_ENTRY
   }
 }
 
-static int __attribute__((noinline)) __CheckDelayedEvents(Display *pDisplay, XEvent *pEvent)
+static int __attribute__((noinline)) __CheckDelayedEvents(WB_DISPLAY pDisplay, XEvent *pEvent)
 {
 DELAYED_EVENT_ENTRY *pCur, *pPrev;
 WB_UINT64 lTime = WBGetTimeIndex();
@@ -3670,7 +3670,7 @@ WB_UINT64 lTime = WBGetTimeIndex();
 /*                                                                    */
 /**********************************************************************/
 
-static Bool __WBCheckIfEventPredicate(Display *pDisplay, XEvent *pEvent, XPointer arg)
+static Bool __WBCheckIfEventPredicate(WB_DISPLAY pDisplay, XEvent *pEvent, XPointer arg)
 {
   if(pEvent && pEvent->type != Expose)
   {
@@ -3682,7 +3682,7 @@ static Bool __WBCheckIfEventPredicate(Display *pDisplay, XEvent *pEvent, XPointe
   }
 }
 
-static Bool __WBCheckIfEventPredicate0(Display *pDisplay, XEvent *pEvent, XPointer arg)
+static Bool __WBCheckIfEventPredicate0(WB_DISPLAY pDisplay, XEvent *pEvent, XPointer arg)
 {
   if(pEvent &&
      (pEvent->type == SelectionNotify ||
@@ -3728,12 +3728,12 @@ WB_UINT64 qwTick = WBGetTimeIndex();
   return tmDefaultDisplay + (qwTick - qwDefaultDisplayTick) / 1000;
 }
 
-int WBCheckGetEvent(Display *pDisplay, XEvent *pEvent)
+int WBCheckGetEvent(WB_DISPLAY pDisplay, XEvent *pEvent)
 {
   return __InternalCheckGetEvent(pDisplay, pEvent, None);  // no modal window implies "do certain things differently"
 }
 
-void WBWaitForEvent(Display *pDisplay)
+void WBWaitForEvent(WB_DISPLAY pDisplay)
 {
 int iTemp, iSleepPeriod;
 
@@ -3809,7 +3809,7 @@ int iTemp, iSleepPeriod;
 // "internal" version that allows me to do things different for modal loops
 // it prioritizes events based on what type they are, to make UI response 'snappier'
 
-int __InternalCheckGetEvent(Display *pDisplay, XEvent *pEvent, Window wIDModal)
+int __InternalCheckGetEvent(WB_DISPLAY pDisplay, XEvent *pEvent, Window wIDModal)
 {
 int iRval = 0, iQueued;
 int iFirstTime = 1;
@@ -4576,7 +4576,7 @@ XEvent evtTemp;
     Window wIDFrom = (Window)pEvent->xclient.data.l[1]; // window inadvertently getting focus
     Window wIDRoot = None;
     _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
-    Display *pDisplay;
+    WB_DISPLAY pDisplay;
 
     if(pEntry && pEntry->pDisplay && pEvent->xany.display &&
        pEvent->xany.display != pEntry->pDisplay)
@@ -4918,7 +4918,7 @@ int WBDefault(Window wID, XEvent *pEvent)
 {
   int i1;
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
-  Display *pDisplay = pEvent->xany.display ? pEvent->xany.display
+  WB_DISPLAY pDisplay = pEvent->xany.display ? pEvent->xany.display
                     : pEntry ? pEntry->pDisplay : pDefaultDisplay;
 
 
@@ -5338,7 +5338,7 @@ XEvent xevt;
 }
 
 
-void WBMouseCancel(Display *pDisplay, Window wID)
+void WBMouseCancel(WB_DISPLAY pDisplay, Window wID)
 {
 XClientMessageEvent evt;
 int iX, iY;
@@ -5424,7 +5424,7 @@ int iX, iY;
 
 
 
-int WBMapWindow(Display *pDisplay, Window wID)
+int WBMapWindow(WB_DISPLAY pDisplay, Window wID)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
   int iRval, iSetFocus = 0;
@@ -5468,7 +5468,7 @@ int WBMapWindow(Display *pDisplay, Window wID)
   return iRval;
 }
 
-int WBMapRaised(Display *pDisplay, Window wID)
+int WBMapRaised(WB_DISPLAY pDisplay, Window wID)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
@@ -5511,7 +5511,7 @@ int WBMapRaised(Display *pDisplay, Window wID)
   return iRval;
 }
 
-int WBUnmapWindow(Display *pDisplay, Window wID)
+int WBUnmapWindow(WB_DISPLAY pDisplay, Window wID)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
   int iRval;
@@ -5536,7 +5536,7 @@ int WBUnmapWindow(Display *pDisplay, Window wID)
 }
 
 
-int WBIsMapped(Display *pDisplay, Window wID)
+int WBIsMapped(WB_DISPLAY pDisplay, Window wID)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
@@ -5550,7 +5550,7 @@ int WBIsMapped(Display *pDisplay, Window wID)
   return 0;
 }
 
-int WBIsValid(Display *pDisplay, Window wID)
+int WBIsValid(WB_DISPLAY pDisplay, Window wID)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
@@ -5599,7 +5599,7 @@ static int __internal_alloc_WMHints(_WINDOW_ENTRY_ *pEntry)
   return -1;
 }
 
-Display * WBGetWindowDisplay(Window wID)
+WB_DISPLAY  WBGetWindowDisplay(Window wID)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
@@ -5614,7 +5614,7 @@ Display * WBGetWindowDisplay(Window wID)
 void WBSetWindowIcon(Window wID, int idIcon)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
-  Display *pDisp = pEntry ? pEntry->pDisplay : pDefaultDisplay;
+  WB_DISPLAY pDisp = pEntry ? pEntry->pDisplay : pDefaultDisplay;
 
   if(pEntry)
   {
@@ -5920,7 +5920,7 @@ unsigned long WBGetGCBGColor(WBGC gc)
 }
 
 
-void WBDefaultStandardColormap(Display *pDisplay, XStandardColormap *pMap)
+void WBDefaultStandardColormap(WB_DISPLAY pDisplay, XStandardColormap *pMap)
 {
 XStandardColormap *pMaps = NULL;
 XStandardColormap cmap;
@@ -6290,7 +6290,7 @@ void *WBGetWindowData(Window wID, int iIndex)
 static void __InternalSetWindowCursor(Window wID, int idCursor)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
-  Display *pDisplay = pEntry ? pEntry->pDisplay : pDefaultDisplay;
+  WB_DISPLAY pDisplay = pEntry ? pEntry->pDisplay : pDefaultDisplay;
   Cursor curNew = idCursor != -1 ? XCreateFontCursor(pDisplay, idCursor) : None;
   XColor clrF, clrB;
 
@@ -6534,7 +6534,7 @@ void WBGetWindowGeom0(Window wID, WB_GEOM *pGeom)  // absolute window geometry (
 void WBGetWindowGeom(Window wID, WB_GEOM *pGeom)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
-  Display *pDisp = pEntry ? pEntry->pDisplay : pDefaultDisplay;
+  WB_DISPLAY pDisp = pEntry ? pEntry->pDisplay : pDefaultDisplay;
   Window winRoot = None;
   unsigned int uiDepth = 0;
 
@@ -6639,7 +6639,7 @@ void WBGetWindowGeom(Window wID, WB_GEOM *pGeom)
 void WBGetWindowGeom2(Window wID, WB_GEOM *pGeom)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
-  Display *pDisp = pEntry ? pEntry->pDisplay : pDefaultDisplay;
+  WB_DISPLAY pDisp = pEntry ? pEntry->pDisplay : pDefaultDisplay;
   Window winRoot = 0, wParent;
   unsigned int uiDepth = 0;
   WB_GEOM geom;
@@ -6971,7 +6971,7 @@ int bKeySym = 0;
 
 // parent-child relationships
 
-static Window __internal_GetParent(Display *pDisplay, Window wID, Window *pwRoot)
+static Window __internal_GetParent(WB_DISPLAY pDisplay, Window wID, Window *pwRoot)
 {
 Window wIDRoot = 0, wIDParent = 0;
 Window *pwIDChildren = NULL;
@@ -6996,7 +6996,7 @@ unsigned int nChildren = 0;
 Window WBGetParentWindow(Window wID)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
-  Display *pDisplay = pEntry ? pEntry->pDisplay : pDefaultDisplay;
+  WB_DISPLAY pDisplay = pEntry ? pEntry->pDisplay : pDefaultDisplay;
   Window wIDRoot = 0, wIDParent = 0;
   Window *pwIDChildren = NULL;
   unsigned int nChildren = 0;
@@ -7031,7 +7031,7 @@ void WBSetParentWindow(Window wID, Window wIDParent)
 int WBReparentWindow(Window wID, Window wIDParent, int iX, int iY)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
-  Display *pDisplay = pDefaultDisplay;
+  WB_DISPLAY pDisplay = pDefaultDisplay;
   int iRval;
 
   if(pEntry)
@@ -7053,7 +7053,7 @@ int WBIsChildWindow(Window wIDParent, Window wIDChild)
 {
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wIDParent);
   _WINDOW_ENTRY_ *pEntry2 = WBGetWindowEntry(wIDChild);
-  Display *pDisplay = pDefaultDisplay;
+  WB_DISPLAY pDisplay = pDefaultDisplay;
   Window wIDRoot = 0, wIDP = 0;
   Window *pwIDChildren = NULL;
   int iRval = 0;
@@ -7118,7 +7118,7 @@ int WBIsChildWindow(Window wIDParent, Window wIDChild)
 
 #if 0
   _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wIDChild);
-  Display *pDisplay = pDefaultDisplay;
+  WB_DISPLAY pDisplay = pDefaultDisplay;
   Window wIDRoot = 0, wIDP = 0;
   Window *pwIDChildren = NULL;
   unsigned int i1, nChildren = 0;
@@ -8011,7 +8011,7 @@ void WBClearWindow(Window wID, WBGC gc)
 {
 unsigned long clrFG, clrBG;
 _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
-Display *pDisplay;
+WB_DISPLAY pDisplay;
 XRectangle xrct;
 
 
@@ -8148,7 +8148,7 @@ void WBEndPaint(Window wID, WBGC gc)
 /**********************************************************************/
 
 // POOBAH
-XImage *WBGetWindowImage(Display *pDisplay, Window wID)
+XImage *WBGetWindowImage(WB_DISPLAY pDisplay, Window wID)
 {
 _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
@@ -8202,7 +8202,7 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 }
 
 
-int WBAssignWindowImage(Display *pDisplay, Window wID, XImage *pImage)
+int WBAssignWindowImage(WB_DISPLAY pDisplay, Window wID, XImage *pImage)
 {
 _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
@@ -8217,7 +8217,7 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 }
 
 
-int WBCopyIntoWindowImage(Display *pDisplay, Window wID, XImage *pSrcImage,
+int WBCopyIntoWindowImage(WB_DISPLAY pDisplay, Window wID, XImage *pSrcImage,
                           int xSrc, int ySrc, int width, int height,
                           int xOffs, int yOffs)
 {
@@ -8235,7 +8235,7 @@ _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 }
 
 
-void WBUpdateWindowWithImage(Display *pDisplay, Window wID)
+void WBUpdateWindowWithImage(WB_DISPLAY pDisplay, Window wID)
 {
 _WINDOW_ENTRY_ *pEntry = WBGetWindowEntry(wID);
 
@@ -8347,7 +8347,7 @@ static void __WBInitEvent()
 }
 
 
-static int __WBAddEvent(Display *pDisp, Window wID, XEvent *pEvent)
+static int __WBAddEvent(WB_DISPLAY pDisp, Window wID, XEvent *pEvent)
 {
   int iEvent = -1;
   // TODO:  synchronization objects?
@@ -8401,7 +8401,7 @@ static int __WBAddEvent(Display *pDisp, Window wID, XEvent *pEvent)
   return 0; // success
 }
 
-static void __WBDelWindowPaintEvents(Display *pDisp, Window wID)
+static void __WBDelWindowPaintEvents(WB_DISPLAY pDisp, Window wID)
 {
   int iEvent, iPrev, iTemp;
   XEvent event;
@@ -8457,7 +8457,7 @@ static void __WBDelWindowPaintEvents(Display *pDisp, Window wID)
     ;
 }
 
-static void __WBDelWindowEvents(Display *pDisp, Window wID)
+static void __WBDelWindowEvents(WB_DISPLAY pDisp, Window wID)
 {
   int iEvent, iPrev, iTemp;
   XEvent event;
@@ -8562,7 +8562,7 @@ static void __WBDelWindowEvents(Display *pDisp, Window wID)
 //    ;
 }
 
-static int __WBInsertPriorityEvent(Display *pDisp, Window wID, XEvent *pEvent)
+static int __WBInsertPriorityEvent(WB_DISPLAY pDisp, Window wID, XEvent *pEvent)
 {
   int iEvent = -1;
   // TODO:  synchronization objects?
@@ -8608,7 +8608,7 @@ static int __WBInsertPriorityEvent(Display *pDisp, Window wID, XEvent *pEvent)
   return 0;
 }
 
-static int __WBNextPaintEvent(Display *pDisp, XEvent *pEvent, Window wID)
+static int __WBNextPaintEvent(WB_DISPLAY pDisp, XEvent *pEvent, Window wID)
 {
   int iRval = iWBPaintEvent, iPrev = -1;
 
@@ -8667,7 +8667,7 @@ static int __WBNextPaintEvent(Display *pDisp, XEvent *pEvent, Window wID)
 }
 
 
-static int __WBNextDisplayEvent(Display *pDisp, XEvent *pEvent)
+static int __WBNextDisplayEvent(WB_DISPLAY pDisp, XEvent *pEvent)
 {
   int iRval = iWBQueuedEvent, iPrev = -1;
 
@@ -8737,7 +8737,7 @@ static void WBInternalProcessExposeEvent(XExposeEvent *pEvent)
 {
 int iEvent;
 Window wID;
-Display *pDisp;
+WB_DISPLAY pDisp;
 WB_GEOM geom;
 
 
@@ -8875,7 +8875,7 @@ WB_GEOM geom;
 
 // event queue functions
 
-int WBNextEvent(Display *pDisplay, XEvent *pEvent)
+int WBNextEvent(WB_DISPLAY pDisplay, XEvent *pEvent)
 {
   return __WBNextDisplayEvent(pDisplay, pEvent);
 }
@@ -8916,7 +8916,7 @@ int WBPostPriorityEvent(Window wID, XEvent *pEvent)
 
 int WBPostAppEvent(XEvent *pEvent)
 {
-  Display *pDisp = pDefaultDisplay;
+  WB_DISPLAY pDisp = pDefaultDisplay;
 
 //  pEvent->xany.window = 0;  // make sure
   if(pEvent->xany.display)
@@ -8927,7 +8927,7 @@ int WBPostAppEvent(XEvent *pEvent)
   return __WBAddEvent(pDisp, 0, pEvent);
 }
 
-void WBPostDelayedSetFocusAppEvent(Display *pDisplay, Window wID, Window wIDFrom, unsigned int iDelay)
+void WBPostDelayedSetFocusAppEvent(WB_DISPLAY pDisplay, Window wID, Window wIDFrom, unsigned int iDelay)
 {
 XClientMessageEvent evtClient;
 
@@ -9242,7 +9242,7 @@ static const char * __internal_event_type_string(int iEventType)
 }
 
 
-void WBDebugDumpGC(Display *pDisplay, WBGC hGC)
+void WBDebugDumpGC(WB_DISPLAY pDisplay, WBGC hGC)
 {
 XGCValues xgcv;
 
@@ -9454,7 +9454,7 @@ int iW, iH;
 //
 // ****************************************************
 
-static int WBXErrorHandler(Display *pDisplay, XErrorEvent *pError)
+static int WBXErrorHandler(WB_DISPLAY pDisplay, XErrorEvent *pError)
 {
 char tbuf[512];
 int i1;
@@ -9658,7 +9658,7 @@ const WB_ERROR_INFO * WBGetLastError(void)
 
 #if !defined(__DOXYGEN__) && !defined(__GNUC__) && !defined(_MSVC_VER)
 
-Display * WBGetDefaultDisplay(void)
+WB_DISPLAY  WBGetDefaultDisplay(void)
 {
   return pDefaultDisplay;
 }

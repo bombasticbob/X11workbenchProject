@@ -395,7 +395,7 @@ WBEditWindow *pRval;
 // CALLBACK FUNCTIONS
 ///////////////////////
 
-extern void TestFunc(Display *pDisplay, WBGC gc, Window wID, int iX, int iY);
+extern void TestFunc(WB_DISPLAY pDisplay, WBGC gc, Window wID, int iX, int iY);
 
 static int MyWindowCallback(Window wID, XEvent *pEvent)
 {

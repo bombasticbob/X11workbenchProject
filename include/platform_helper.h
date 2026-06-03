@@ -105,6 +105,16 @@
 
 #endif // WIN32
 
+// forward declarations
+#ifndef _WINDOW_HELPER_H_INCLUDED_
+#ifdef WIN32
+typedef HANDLE WB_DISPLAY;
+#else // WIN32
+typedef Display * WB_DISPLAY; // forward reference on WB_DISPLAY
+#endif // WIN32
+#endif // _WINDOW_HELPER_H_INCLUDED_
+
+
 // ======================
 // DEBUG vs RELEASE code
 // ======================
@@ -1205,7 +1215,7 @@ typedef struct tagXPM_ATTRIBUTES
   *
   * Header File:  platform_helper.h
 **/
-int MyLoadPixmapFromData(Display *pDisplay, Window wID, char *aData[],
+int MyLoadPixmapFromData(WB_DISPLAY pDisplay, Window wID, char *aData[],
                          Pixmap *pPixmap, Pixmap *pMask, XPM_ATTRIBUTES *pAttr);
 
 /** \ingroup pixmap
@@ -1511,7 +1521,7 @@ void * WBGetPointerFromHash(WB_UINT32 uiHash);
   *
   * Header File:  platform_helper.h
 **/
-Atom WBGetAtom(Display *pDisplay, const char *szAtomName);
+Atom WBGetAtom(WB_DISPLAY pDisplay, const char *szAtomName);
 
 /** \ingroup platform_functions
   * \brief Lookup (but do not allocate) an internal (or X11) Atom for a named string
@@ -1540,7 +1550,7 @@ Atom WBGetAtom(Display *pDisplay, const char *szAtomName);
   *
   * Header File:  platform_helper.h
 **/
-Atom WBLookupAtom(Display *pDisplay, const char *szAtomName);
+Atom WBLookupAtom(WB_DISPLAY pDisplay, const char *szAtomName);
 
 /** \ingroup platform_functions
   * \brief Lookup and/or allocate an internal Atom for a named string
@@ -1562,7 +1572,7 @@ Atom WBLookupAtom(Display *pDisplay, const char *szAtomName);
   *
   * Header File:  platform_helper.h
 **/
-char * WBGetAtomName(Display *pDisplay, Atom aAtom);
+char * WBGetAtomName(WB_DISPLAY pDisplay, Atom aAtom);
 
 
 

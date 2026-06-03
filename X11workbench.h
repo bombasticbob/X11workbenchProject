@@ -123,7 +123,7 @@ typedef struct tagWB_FRAME_WINDOW WBFrameWindow; // see frame_window.h [TODO:  r
 extern int nCPU; // number of CPUs detected
 
 WBFrameWindow *GetFrameWindow();
-Display *GetX11Display();
+WB_DISPLAY GetX11Display();
 Window GetFrameWindowID(); // get the frame window's window ID (for dialog boxen and such)
 const char * GetKnownFileTypes();
 

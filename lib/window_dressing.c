@@ -300,7 +300,7 @@ void WBSetHScrollPos(WB_SCROLLINFO *pSI, int iPos)
 
 static int InternalNotifySelf(Window wID, Atom aNotify, long lData0, long lData1, long lData2, long lData3, long lData4)
 {
-Display *pDisplay = WBGetWindowDisplay(wID);
+WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
 
   XClientMessageEvent evt = {
                               .type=ClientMessage,
@@ -1332,7 +1332,7 @@ int iRval, iX, iY, iDirection, iPosition;
 
 // this assumes WB_SCROLLINFO is valid.  To make it so, call WBUpdateScrollBarGeometry() or similar
 
-void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable wID,
+void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, WB_DISPLAY pDisplay, Drawable wID,
                        WBGC gc, WB_GEOM *pgeomClient)
 {
   CheckInitScrollColors();
@@ -1400,7 +1400,7 @@ void WBPaintHScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable w
 
 // NOTE:  this assumes WB_SCROLLINFO is valid.  To make it so, call WBUpdateScrollBarGeometry() or similar
 
-void WBPaintVScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable wID,
+void WBPaintVScrollBar(WB_SCROLLINFO *pScrollInfo, WB_DISPLAY pDisplay, Drawable wID,
                        WBGC gc, WB_GEOM *pgeomClient)
 {
   CheckInitScrollColors();
@@ -1479,7 +1479,7 @@ void WBPaintVScrollBar(WB_SCROLLINFO *pScrollInfo, Display *pDisplay, Drawable w
 //                                                                                                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void WBDrawBorderRect(Display *pDisplay, Drawable wID, WBGC gc,
+void WBDrawBorderRect(WB_DISPLAY pDisplay, Drawable wID, WBGC gc,
                       WB_GEOM *pgeomBorder, unsigned long lBorderColor)
 {
 XPoint xpt[5];
@@ -1514,7 +1514,7 @@ XPoint xpt[5];
   WBDrawLines(pDisplay, wID, gc, xpt, 5, CoordModeOrigin);
 }
 
-void WBDraw3DBorderRect(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomBorder,
+void WBDraw3DBorderRect(WB_DISPLAY pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomBorder,
                         unsigned long lBorderColor1, unsigned long lBorderColor2)
 {
 XPoint xpt[4];
@@ -1602,7 +1602,7 @@ int iR, iG, iB;
 
 }
 
-void WBDrawBorderElipse(Display *pDisplay, Drawable wID, WBGC gc,
+void WBDrawBorderElipse(WB_DISPLAY pDisplay, Drawable wID, WBGC gc,
                         WB_GEOM *pgeomBorder, unsigned long lBorderColor)
 {
   if(!pgeomBorder || !pDisplay || wID == None || gc == None)
@@ -1618,7 +1618,7 @@ void WBDrawBorderElipse(Display *pDisplay, Drawable wID, WBGC gc,
             0, 360 * 64); // draw a full circle within the geom bounds
 }
 
-void WBDraw3DBorderElipse(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomBorder,
+void WBDraw3DBorderElipse(WB_DISPLAY pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomBorder,
                           unsigned long lBorderColor1, unsigned long lBorderColor2)
 {
   if(!pgeomBorder || !pDisplay || wID == None || gc == None)
@@ -1657,7 +1657,7 @@ void WBDraw3DBorderElipse(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pge
 ////            225 * 64, 45 * 64); // lower half-circle
 }
 
-void WBDrawDashedRect(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor)
+void WBDrawDashedRect(WB_DISPLAY pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor)
 {
 static const char dash_list[4]={1,2,2,1};
 WBGC gc2;
@@ -1681,7 +1681,7 @@ WBGC gc2;
   }
 }
 
-void WBDrawLeftArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor)
+void WBDrawLeftArrow(WB_DISPLAY pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor)
 {
 XPoint xpt[5];
 long lBG, lFG;
@@ -1711,7 +1711,7 @@ long lBG, lFG;
   WBSetBackground(gc, lBG); // restore color context
 }
 
-void WBDrawUpArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor)
+void WBDrawUpArrow(WB_DISPLAY pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor)
 {
 XPoint xpt[5];
 long lBG, lFG;
@@ -1740,7 +1740,7 @@ long lBG, lFG;
   WBSetBackground(gc, lBG); // restore color context
 }
 
-void WBDrawRightArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor)
+void WBDrawRightArrow(WB_DISPLAY pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor)
 {
 XPoint xpt[5];
 long lBG, lFG;
@@ -1770,7 +1770,7 @@ long lBG, lFG;
   WBSetBackground(gc, lBG); // restore color context
 }
 
-void WBDrawDownArrow(Display *pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor)
+void WBDrawDownArrow(WB_DISPLAY pDisplay, Drawable wID, WBGC gc, WB_GEOM *pgeomRect, unsigned long lColor)
 {
 XPoint xpt[5];
 long lBG, lFG;
@@ -1799,7 +1799,7 @@ long lBG, lFG;
   WBSetBackground(gc, lBG); // restore color context
 }
 
-void WBDraw3DBorderTab(Display *pDisplay, Drawable dw, WBGC gc, WB_GEOM *pgeomOutline,
+void WBDraw3DBorderTab(WB_DISPLAY pDisplay, Drawable dw, WBGC gc, WB_GEOM *pgeomOutline,
                        int fFocus, unsigned long lFGColor, unsigned long lBGColor,
                        unsigned long lBorderColor1, unsigned long lBorderColor2,
                        unsigned long lHighlightColor,

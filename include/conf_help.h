@@ -81,6 +81,15 @@
 
 #include "platform_helper.h" /* this also includes the X11 headers */
 
+#ifndef _WINDOW_HELPER_H_INCLUDED_
+#ifdef WIN32
+typedef HANDLE WB_DISPLAY;
+#else // WIN32
+typedef Display * WB_DISPLAY; // forward reference on WB_DISPLAY
+#endif // WIN32
+#endif // _WINDOW_HELPER_H_INCLUDED_
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -193,7 +202,7 @@ int CHGetArgC(void);
   *
   * Header File:  conf_help.h
 **/
-int CHGetResourceString(Display *pDisplay,const char *szIdentifier, char *szData, int cbData);
+int CHGetResourceString(WB_DISPLAY pDisplay,const char *szIdentifier, char *szData, int cbData);
 
 /** \ingroup desktop_settings
   * \brief Queryies desktop resource integer values (from strings) (may become deprecated)
@@ -207,7 +216,7 @@ int CHGetResourceString(Display *pDisplay,const char *szIdentifier, char *szData
   *
   * Header File:  conf_help.h
 **/
-int CHGetResourceInt(Display *pDisplay,const char *szIdentifier);
+int CHGetResourceInt(WB_DISPLAY pDisplay,const char *szIdentifier);
 
 
 
@@ -340,7 +349,7 @@ int CHWriteConfFileInt(void * hFile, const char *szSection, const char *szIdenti
   *
   * Header File:  conf_help.h
 **/
-void CHSettingsRefresh(Display *pDisplay);  // call this to re-read and re-build XSettings info
+void CHSettingsRefresh(WB_DISPLAY pDisplay);  // call this to re-read and re-build XSettings info
 
 // X11 settings collection
 
@@ -453,7 +462,7 @@ typedef struct tagCHXSetting
 
   typedef struct tagCHXSettings
   {
-    Display *pDisplay;      // identifies which display it belongs to (reserved)
+    WB_DISPLAY pDisplay;    // identifies which display it belongs to (reserved)
     int nSettings;          // the total number of settings in aData
     unsigned int uiSerial;  // serial number from last XSETTINGS query
     CHXSetting aData[1];    // An array of 'nSettings' \ref CHXSetting structures.  Binary and string data directly follows the array.
@@ -464,7 +473,7 @@ typedef struct tagCHXSetting
 **/
 typedef struct tagCHXSettings
 {
-  Display *pDisplay;      ///< identifies which display it belongs to (reserved)
+  WB_DISPLAY pDisplay;    ///< identifies which display it belongs to (reserved)
   int nSettings;          ///< the total number of settings in aData
   unsigned int uiSerial;  ///< serial number from last XSETTINGS query
   CHXSetting aData[1];    ///< An array of 'nSettings' \ref CHXSetting structures.  Binary and string data directly follows the array.
@@ -480,7 +489,7 @@ typedef struct tagCHXSettings
   *
   * Header File:  conf_help.h
 **/
-const CHXSettings * CHGetXSettings(Display *pDisplay);
+const CHXSettings * CHGetXSettings(WB_DISPLAY pDisplay);
 
 /** \ingroup desktop_settings
   * \brief returns a pointer to a specific X setting entry by name
@@ -493,7 +502,7 @@ const CHXSettings * CHGetXSettings(Display *pDisplay);
   *
   * Header File:  conf_help.h
 **/
-const CHXSetting * CHGetXSetting(Display *pDisplay, const char *szSettingName);
+const CHXSetting * CHGetXSetting(WB_DISPLAY pDisplay, const char *szSettingName);
 
 
 /** \ingroup desktop_settings
@@ -506,7 +515,7 @@ const CHXSetting * CHGetXSetting(Display *pDisplay, const char *szSettingName);
   *
   * Header File:  conf_help.h
 **/
-int CHGetDoubleClickTime(Display *pDisplay);
+int CHGetDoubleClickTime(WB_DISPLAY pDisplay);
 
 /** \ingroup desktop_settings
   * \brief returns default double click distance (from X settings)
@@ -518,7 +527,7 @@ int CHGetDoubleClickTime(Display *pDisplay);
   *
   * Header File:  conf_help.h
 **/
-int CHGetDoubleClickDistance(Display *pDisplay);
+int CHGetDoubleClickDistance(WB_DISPLAY pDisplay);
 
 /** \ingroup desktop_settings
   * \brief returns default drag threshold (from X settings)
@@ -530,7 +539,7 @@ int CHGetDoubleClickDistance(Display *pDisplay);
   *
   * Header File:  conf_help.h
 **/
-int CHGetDragThreshold(Display *pDisplay);
+int CHGetDragThreshold(WB_DISPLAY pDisplay);
 
 /** \ingroup desktop_settings
   * \brief returns default cursor blink 'enable' flag (from X settings)
@@ -542,7 +551,7 @@ int CHGetDragThreshold(Display *pDisplay);
   *
   * Header File:  conf_help.h
 **/
-int CHGetCursorBlink(Display *pDisplay);
+int CHGetCursorBlink(WB_DISPLAY pDisplay);
 
 /** \ingroup desktop_settings
   * \brief returns default cursor blink time (from X settings)
@@ -554,7 +563,7 @@ int CHGetCursorBlink(Display *pDisplay);
   *
   * Header File:  conf_help.h
 **/
-int CHGetCursorBlinkTime(Display *pDisplay);
+int CHGetCursorBlinkTime(WB_DISPLAY pDisplay);
 
 
 ////////////////////////////////////
@@ -576,7 +585,7 @@ int CHGetCursorBlinkTime(Display *pDisplay);
   *
   * Header File:  conf_help.h
 **/
-const char *CHGetBorderColor(Display *pDisplay);
+const char *CHGetBorderColor(WB_DISPLAY pDisplay);
 
 /** \ingroup desktop_settings
   * \brief returns background color for static elements
@@ -589,7 +598,7 @@ const char *CHGetBorderColor(Display *pDisplay);
   *
   * Header File:  conf_help.h
 **/
-const char *CHGetStaticBackgroundColor(Display *pDisplay);
+const char *CHGetStaticBackgroundColor(WB_DISPLAY pDisplay);
 
 /** \ingroup desktop_settings
   * \brief returns background color for 'tool tips'
@@ -601,7 +610,7 @@ const char *CHGetStaticBackgroundColor(Display *pDisplay);
   *
   * Header File:  conf_help.h
 **/
-const char *CHGetToolTipBackgroundColor(Display *pDisplay);
+const char *CHGetToolTipBackgroundColor(WB_DISPLAY pDisplay);
 
 /** \ingroup desktop_settings
   * \brief returns background color for dialog frame elements
@@ -614,7 +623,7 @@ const char *CHGetToolTipBackgroundColor(Display *pDisplay);
   *
   * Header File:  conf_help.h
 **/
-const char *CHGetDialogBackgroundColor(Display *pDisplay);
+const char *CHGetDialogBackgroundColor(WB_DISPLAY pDisplay);
 
 /** \ingroup desktop_settings
   * \brief returns background color for active elements
@@ -627,7 +636,7 @@ const char *CHGetDialogBackgroundColor(Display *pDisplay);
   *
   * Header File:  conf_help.h
 **/
-const char *CHGetActiveBackgroundColor(Display *pDisplay);
+const char *CHGetActiveBackgroundColor(WB_DISPLAY pDisplay);
 
 /** \ingroup desktop_settings
   * \brief returns background color for disabled (greyed) elements
@@ -640,7 +649,7 @@ const char *CHGetActiveBackgroundColor(Display *pDisplay);
   *
   * Header File:  conf_help.h
 **/
-const char *CHGetDisabledBackgroundColor(Display *pDisplay);
+const char *CHGetDisabledBackgroundColor(WB_DISPLAY pDisplay);
 
 /** \ingroup desktop_settings
   * \brief returns background color for non-static elements
@@ -653,7 +662,7 @@ const char *CHGetDisabledBackgroundColor(Display *pDisplay);
   *
   * Header File:  conf_help.h
 **/
-const char *CHGetBackgroundColor(Display *pDisplay);
+const char *CHGetBackgroundColor(WB_DISPLAY pDisplay);
 
 /** \ingroup desktop_settings
   * \brief returns text color for dialog frame elements
@@ -666,7 +675,7 @@ const char *CHGetBackgroundColor(Display *pDisplay);
   *
   * Header File:  conf_help.h
 **/
-const char *CHGetDialogTextColor(Display *pDisplay);
+const char *CHGetDialogTextColor(WB_DISPLAY pDisplay);
 
 /** \ingroup desktop_settings
   * \brief returns 'active' text color
@@ -679,7 +688,7 @@ const char *CHGetDialogTextColor(Display *pDisplay);
   *
   * Header File:  conf_help.h
 **/
-const char *CHGetActiveTextColor(Display *pDisplay);
+const char *CHGetActiveTextColor(WB_DISPLAY pDisplay);
 
 /** \ingroup desktop_settings
   * \brief returns 'disabled' (greyed) text color
@@ -692,7 +701,7 @@ const char *CHGetActiveTextColor(Display *pDisplay);
   *
   * Header File:  conf_help.h
 **/
-const char *CHGetDisabledTextColor(Display *pDisplay);
+const char *CHGetDisabledTextColor(WB_DISPLAY pDisplay);
 
 /** \ingroup desktop_settings
   * \brief returns text color for 'tool tips'
@@ -704,7 +713,7 @@ const char *CHGetDisabledTextColor(Display *pDisplay);
   *
   * Header File:  conf_help.h
 **/
-const char *CHGetToolTipTextColor(Display *pDisplay);
+const char *CHGetToolTipTextColor(WB_DISPLAY pDisplay);
 
 /** \ingroup desktop_settings
   * \brief returns text color
@@ -717,7 +726,7 @@ const char *CHGetToolTipTextColor(Display *pDisplay);
   *
   * Header File:  conf_help.h
 **/
-const char *CHGetTextColor(Display *pDisplay);
+const char *CHGetTextColor(WB_DISPLAY pDisplay);
 
 /** \ingroup desktop_settings
   * \brief returns highlight foreground color
@@ -730,7 +739,7 @@ const char *CHGetTextColor(Display *pDisplay);
   *
   * Header File:  conf_help.h
 **/
-const char *CHGetHighlightForegroundColor(Display *pDisplay);
+const char *CHGetHighlightForegroundColor(WB_DISPLAY pDisplay);
 
 /** \ingroup desktop_settings
   * \brief returns highlight background color
@@ -743,7 +752,7 @@ const char *CHGetHighlightForegroundColor(Display *pDisplay);
   *
   * Header File:  conf_help.h
 **/
-const char *CHGetHighlightBackgroundColor(Display *pDisplay);
+const char *CHGetHighlightBackgroundColor(WB_DISPLAY pDisplay);
 
 
 

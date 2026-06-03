@@ -1689,7 +1689,7 @@ int DLGScrollBarHandler(Window wID, WBDialogControl *pCtrl, XEvent *pEvent);
 static __inline__ void DLGNotifyOwner(WBDialogControl *pDialogControl, Atom aNotify,
                                       long lData0, long lData1, long lData2, long lData3, long lData4)
 {
-Display *pDisplay = WBGetWindowDisplay(pDialogControl->wID);
+WB_DISPLAY pDisplay = WBGetWindowDisplay(pDialogControl->wID);
 
   if(pDialogControl->pOwner)
   {
@@ -1743,7 +1743,7 @@ Display *pDisplay = WBGetWindowDisplay(pDialogControl->wID);
 static __inline__ void DLGNotifySelf(WBDialogControl *pDialogControl, Atom aNotify,
                                      long lData0, long lData1, long lData2, long lData3, long lData4)
 {
-Display *pDisplay = WBGetWindowDisplay(pDialogControl->wID);
+WB_DISPLAY pDisplay = WBGetWindowDisplay(pDialogControl->wID);
 
   XClientMessageEvent evt = {
                               .type=ClientMessage,
@@ -1779,7 +1779,7 @@ Display *pDisplay = WBGetWindowDisplay(pDialogControl->wID);
 static __inline__ void DLGNotifyOwnerAsync(WBDialogControl *pDialogControl, Atom aNotify,
                                            long lData0, long lData1, long lData2, long lData3, long lData4)
 {
-Display *pDisplay = WBGetWindowDisplay(pDialogControl->wID);
+WB_DISPLAY pDisplay = WBGetWindowDisplay(pDialogControl->wID);
 
   if(pDialogControl->pOwner)
   {
@@ -1823,7 +1823,7 @@ Display *pDisplay = WBGetWindowDisplay(pDialogControl->wID);
 static __inline__ void DLGNotifySelfAsync(WBDialogControl *pDialogControl, Atom aNotify,
                                           long lData0, long lData1, long lData2, long lData3, long lData4)
 {
-Display *pDisplay = WBGetWindowDisplay(pDialogControl->wID);
+WB_DISPLAY pDisplay = WBGetWindowDisplay(pDialogControl->wID);
 
   XClientMessageEvent evt = {
                               .type=ClientMessage,

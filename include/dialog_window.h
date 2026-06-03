@@ -640,7 +640,7 @@ Window DLGGetPrevDialogControl(WBDialogWindow *pDialog, Window idControl);  // c
 static __inline__ void DLGNotifyDlg(WBDialogWindow *pDLG, Atom aNotify,
                                     long lData0, long lData1, long lData2, long lData3, long lData4)
 {
-Display *pDisplay = WBGetWindowDisplay(pDLG->wID);
+WB_DISPLAY pDisplay = WBGetWindowDisplay(pDLG->wID);
 
   XClientMessageEvent evt = {
                               .type=ClientMessage,
@@ -675,7 +675,7 @@ Display *pDisplay = WBGetWindowDisplay(pDLG->wID);
 static __inline__ void DLGNotifyDlgAsync(WBDialogWindow *pDLG, Atom aNotify,
                                          long lData0, long lData1, long lData2, long lData3, long lData4)
 {
-Display *pDisplay = WBGetWindowDisplay(pDLG->wID);
+WB_DISPLAY pDisplay = WBGetWindowDisplay(pDLG->wID);
 
   XClientMessageEvent evt = {
                               .type=ClientMessage,
@@ -894,7 +894,7 @@ int DLGColorDialog(Window wIDOwner, XStandardColormap *pColorMap, XColor *pColor
   * See Also:  WBCopyModifyFontSet(), WBFontFromFontSet()
   *
 **/
-WB_FONT DLGFontDialog(Display *pDisplay, Window wIDOwner, WB_FONTC pDefault);
+WB_FONT DLGFontDialog(WB_DISPLAY pDisplay, Window wIDOwner, WB_FONTC pDefault);
 
 
 /** \ingroup dialog_api_functions

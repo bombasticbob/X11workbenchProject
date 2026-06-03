@@ -199,7 +199,7 @@ static WBMenuItem * __GetCurrentSelection(WBMenuPopupWindow *pSelf, WBMenu *pMen
 WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDBar, Window wIDOwner, WBMenu *pMenu,
                                            int iX, int iY, int iFlags)
 {
-  Display *pDisplay = WBGetWindowDisplay(wIDBar);
+  WB_DISPLAY pDisplay = WBGetWindowDisplay(wIDBar);
   WB_FONTC pFS, pDefaultMenuFont = MBGetDefaultMenuFont();
   WBMenuPopupWindow *pRval = NULL;
   unsigned long fg, bg, bd;   /* Pixel values */
@@ -493,7 +493,7 @@ void MBDestroyMenuPopupWindow(WBMenuPopupWindow *pMenuPopupWindow)
 }
 
 
-static int MBMenuPopupHandleMenuItemUI(Display *pDisplay, WBMenuPopupWindow *pSelf, WBMenu *pMenu, WBMenuItem *pItem)
+static int MBMenuPopupHandleMenuItemUI(WB_DISPLAY pDisplay, WBMenuPopupWindow *pSelf, WBMenu *pMenu, WBMenuItem *pItem)
 {
 XClientMessageEvent evt;
 int iRval;
@@ -538,7 +538,7 @@ int iRval;
 
 // NOTE:  this function will NOT invoke the handler because it sends a MENU_UI_COMMAND before posting the handler event
 
-static void MBMenuPopupHandleMenuItem(Display *pDisplay, Window wID, WBMenuPopupWindow *pSelf, WBMenu *pMenu, WBMenuItem *pItem)
+static void MBMenuPopupHandleMenuItem(WB_DISPLAY pDisplay, Window wID, WBMenuPopupWindow *pSelf, WBMenu *pMenu, WBMenuItem *pItem)
 {
   if(pItem->iAction & WBMENU_POPUP_HIGH_BIT)
   {
@@ -595,7 +595,7 @@ static void MBMenuPopupHandleMenuItem(Display *pDisplay, Window wID, WBMenuPopup
 }
 
 static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
-                                  Display *pDisplay, Window wID,
+                                  WB_DISPLAY pDisplay, Window wID,
                                   WBMenuPopupWindow *pSelf)
 {
   int i1, /* i2, */ iHPos, iVPos, iHeight;
@@ -1017,7 +1017,7 @@ XClientMessageEvent evt;
 // this next callback is assigned via WBRegisterWindowCallback
 static int MBMenuPopupEvent(Window wID, XEvent *pEvent)
 {
-  Display *pDisplay = WBGetWindowDisplay(wID);
+  WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
   WBMenuPopupWindow *pSelf = MBGetMenuPopupWindowStruct(wID);
   WBMenuItem *pItem;
   WBMenu *pMenu = pSelf ? pSelf->pMenu : NULL;

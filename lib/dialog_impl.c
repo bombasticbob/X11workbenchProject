@@ -644,7 +644,7 @@ static int FileDialogCallback(Window wID, XEvent *pEvent)
 {
 WBDialogWindow *pDlg = DLGGetDialogWindowStruct(wID);
 struct _FILE_DIALOG_ *pUserData = (struct _FILE_DIALOG_ *)(pDlg ? pDlg->pUserData : NULL);
-//Display *pDisplay = WBGetWindowDisplay(wID);
+//WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
 char *p1, *p2;
 
 
@@ -1235,7 +1235,7 @@ static void ColorDialogDumpData(const char *szCaption, struct _COLOR_DIALOG_ *pD
   WBDebugPrint("**********************************************************************\n");
 }
 
-static XImage * CreateLumaSaturationImage(Display *pDisplay, XStandardColormap *pSCM, int nChroma)
+static XImage * CreateLumaSaturationImage(WB_DISPLAY pDisplay, XStandardColormap *pSCM, int nChroma)
 {
 int iR, iG, iB, iSat, iLum;
 XImage *pImage;
@@ -1282,7 +1282,7 @@ XImage *pImage;
   return pImage;
 }
 
-static XImage * CreateChromaImage(Display *pDisplay, XStandardColormap *pSCM)
+static XImage * CreateChromaImage(WB_DISPLAY pDisplay, XStandardColormap *pSCM)
 {
 int iR, iG, iB, iChroma, iRow;
 XImage *pImage;
@@ -1316,7 +1316,7 @@ XImage *pImage;
   return pImage;
 }
 
-static void ColorDialogImagesFromData(Display *pDisplay, WBDialogControl *pctrlLumaSat,
+static void ColorDialogImagesFromData(WB_DISPLAY pDisplay, WBDialogControl *pctrlLumaSat,
                                       WBDialogControl *pctrlChroma, struct _COLOR_DIALOG_ *pUserData)
 {
 //  int iXLumaSat, iYLumaSat, iXChroma, iOldXLS, iOldYLS, iOldXC;
@@ -1427,7 +1427,7 @@ int iRval;
   return iRval;
 }
 
-static void ColorDialogAssignColorboxPixmap(Display *pDisplay, WBDialogControl *pCtrl, unsigned long lPixel)
+static void ColorDialogAssignColorboxPixmap(WB_DISPLAY pDisplay, WBDialogControl *pCtrl, unsigned long lPixel)
 {
 WBGC gc;
 Pixmap pxTemp;
@@ -1494,11 +1494,11 @@ int iH = COLORBOX_PIXMAP_HEIGHT;
   WBFreeGC(gc);
 }
 
-static void ColorDialogAssignLumaSatPixmap(Display *pDisplay, WBDialogControl *pCtrl, int iS, int iV)
+static void ColorDialogAssignLumaSatPixmap(WB_DISPLAY pDisplay, WBDialogControl *pCtrl, int iS, int iV)
 {
 }
 
-static void ColorDialogAssignChromaPixmap(Display *pDisplay, WBDialogControl *pCtrl, int iH)
+static void ColorDialogAssignChromaPixmap(WB_DISPLAY pDisplay, WBDialogControl *pCtrl, int iH)
 {
 }
 
@@ -1542,10 +1542,10 @@ unsigned long lPixel;
 
 static int ColorDialogCallback(Window wID, XEvent *pEvent)
 {
-Display *pDisplay = WBGetWindowDisplay(wID);
+WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
 WBDialogWindow *pDlg = DLGGetDialogWindowStruct(wID);
 struct _COLOR_DIALOG_ *pUserData = (struct _COLOR_DIALOG_ *)(pDlg ? pDlg->pUserData : NULL);
-//Display *pDisplay = WBGetWindowDisplay(wID);
+//WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
 
 
   if(!pDlg || !pUserData)
@@ -1965,7 +1965,7 @@ static const char szColorDialogRes[]=
 
   "END_DIALOG\n";
 WBDialogWindow *pDlg;
-Display *pDisplay;
+WB_DISPLAY pDisplay;
 struct _COLOR_DIALOG_ data;
 int iX, iY, iRval = IDCANCEL; // default return is 'cancel'
 Window wIDDlg;
@@ -2057,7 +2057,7 @@ WB_GEOM geomParent;
 //////////////
 
 
-WB_FONT DLGFontDialog(Display *pDisplay, Window wIDOwner, WB_FONTC pDefault)
+WB_FONT DLGFontDialog(WB_DISPLAY pDisplay, Window wIDOwner, WB_FONTC pDefault)
 {
   return None;
 }
@@ -2093,7 +2093,7 @@ typedef struct _SPLASH_
 } SPLASH;
 
 static int splash_callback(Window wID, XEvent *pEvent);
-static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
+static int SplashDoExposeEvent(XExposeEvent *pEvent, WB_DISPLAY pDisplay,
                                Window wID, struct _SPLASH_ *pData);
 
 #define SPLASH_FRAMERATE 30 /* make this configurable? */
@@ -2282,7 +2282,7 @@ unsigned int ai1[3];
 
 static int splash_callback(Window wID, XEvent *pEvent)
 {
-Display *pDisplay = WBGetWindowDisplay(wID);
+WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
 struct _SPLASH_ *pData = (struct _SPLASH_ *)WBGetWindowData(wID, 0);
 
 
@@ -2333,7 +2333,7 @@ struct _SPLASH_ *pData = (struct _SPLASH_ *)WBGetWindowData(wID, 0);
   return 0;  // not handled
 }
 
-static int SplashDoExposeEvent(XExposeEvent *pEvent, Display *pDisplay,
+static int SplashDoExposeEvent(XExposeEvent *pEvent, WB_DISPLAY pDisplay,
                                Window wID, struct _SPLASH_ *pData)
 {
 WB_FONT pFont;

@@ -262,7 +262,7 @@ WBDialogWindow *DLGCreateDialogWindow(Window wIDOwner, const char *szTitle, cons
                                       WBWinEvent pUserCallback, int iFlags, void *pUserData)
 {
   DIALOG_WINDOW *pNew = WBAlloc(sizeof(DIALOG_WINDOW));
-  Display *pDisplay = WBGetDefaultDisplay();
+  WB_DISPLAY pDisplay = WBGetDefaultDisplay();
   XSetWindowAttributes xswa;  /* Temporary Set Window Attribute struct */
   XSizeHints  xsh;            /* Size hints for window manager */
   XWMHints xwmh;
@@ -625,7 +625,7 @@ void DLGSetUserCallback(WBDialogWindow *pDialogWindow, WBWinEvent pCallBack)
 
 int DLGDefaultCallback(Window wID, XEvent *pEvent)
 {
-  Display *pDisplay = WBGetWindowDisplay(wID);
+  WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
   DIALOG_WINDOW *pDialogWindow = (DIALOG_WINDOW *)DLGGetDialogWindowStruct(wID);
   int i1, i2, iRval;
 //  Window wIDMenu;
@@ -1179,7 +1179,7 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
         if(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_HAS_FOCUS)
         {
           Window wIDCtrl = pDialogWindow->pwContents[i1].wID;
-          Display *pDisplay = WBGetWindowDisplay(wIDCtrl);
+          WB_DISPLAY pDisplay = WBGetWindowDisplay(wIDCtrl);
           int iCtrlID = pDialogWindow->pwContents[i1].iID;
 
           if(WBIsValid(pDisplay, wIDCtrl))
@@ -1242,7 +1242,7 @@ int DLGDefaultCallback(Window wID, XEvent *pEvent)
              !(pDialogWindow->pwContents[i1].iFlags & WBDialogEntry_DISABLED))
           {
             Window wIDCtrl = pDialogWindow->pwContents[i1].wID;
-            Display *pDisplay = WBGetWindowDisplay(wIDCtrl);
+            WB_DISPLAY pDisplay = WBGetWindowDisplay(wIDCtrl);
             int iCtrlID = pDialogWindow->pwContents[i1].iID;
 
             if(WBIsValid(pDisplay, wIDCtrl))
@@ -1489,7 +1489,7 @@ KeySym ks;
 int iACSMask = ShiftMask | ControlMask | Mod1Mask;
 int i1, iCurFocus, iCanHaveFocus = 0, iNoEnter = 0, iNoEsc = 0, iNoTab = 0;
 WBDialogEntry *pFocusEntry = NULL, *pDefaultEntry = NULL, *pCancelEntry = NULL;
-Display *pDisplay = WBGetWindowDisplay(pDLG->wID);
+WB_DISPLAY pDisplay = WBGetWindowDisplay(pDLG->wID);
 
 
   iACSMask &= ((XKeyEvent *)pEvent)->state;

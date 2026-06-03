@@ -101,6 +101,16 @@
   * \ingroup core_struct
 **/
 
+#ifdef WIN32
+/** \defgroup win32_gdi_compat Win32 'compatibility' definitions for GDI
+  * \ingroup wcore
+  *
+  * The following functions, data types, and macro definitions are related
+  * to win32 compatibility with the X11 implementation of this library.
+  *
+**/
+#endif // WIN32
+
 
 /** \headerfile <>
 **/
@@ -118,11 +128,19 @@
 #define WINDOW_HELPER_H_INCLUDED
 
 
-#ifndef WIN32
+#ifdef WIN32
+
+#include <windows.h> /* in case it was not yet included */
+
+#else // WIN32
+
+// see if the compiler supports marking certain warnings as errors
+
 #ifdef COMPILER_HAS_PRAGMA_FOR_INCOMPATIBLE_POINTER_TYPES
 // the 'incompatible pointer types' is now an error (not all gcc supports this)
 #pragma GCC diagnostic error "-Wincompatible-pointer-types"
 #endif // COMPILER_HAS_PRAGMA_FOR_INCOMPATIBLE_POINTER_TYPES
+
 #endif // !WIN32
 
 
@@ -243,6 +261,16 @@ typedef int (* WBAppEvent)(XEvent *pEvent);
 ////////////////////////////////////////////////////////////////////////////////////////////
 
 
+#ifdef WIN32
+/** \typedef WBGC
+  * \ingroup win32_gdi_compat
+  * \brief internal wrapper struct for GC for GDI
+  *
+  * A compatibility typedef representing a device context
+**/
+  typedef HDC WBGC;
+
+#else // WIN32
 /** \struct s_WBGC
   * \ingroup core_struct_str
   * \copydoc WBGC
@@ -399,6 +427,18 @@ typedef struct s_WBGC
   XImage *stip_image; ///< cached XImage for the GC, for 'stipple'
 } * WBGC;
 
+#endif // WIN32
+
+#ifdef WIN32
+/** \typedef WB_POINT
+  * \ingroup win32_gdi_compat
+  * \brief internal wrapper struct for POINT,POINTL for GDI
+  *
+  * A compatibility typedef representing a point
+**/
+  typedef POINT WB_POINT;
+
+#else // WIN32
 /** \struct s_WB_POINT
   * \ingroup core_struct_str
   * \copydoc WB_POINT
@@ -439,10 +479,68 @@ typedef struct s_WB_POINT
   int y;   ///< the 'y' value of the point.  can be negative.
 } WB_POINT;
 
+#endif // WIN32
+
 /** \struct s_WB_EXTENT
   * \ingroup core_struct_str
   * \copydoc WB_EXTENT
 **/
+#ifdef WIN32
+/** \typedef WB_EXTENT
+  * \ingroup win32_gdi_compat
+  * \brief internal wrapper struct for SIZE structure in GDI
+  *
+  * A compatibility struct representing a size.  This library has
+  * elements 'height' and 'width' that are identical to WIN32 'cx' and 'cy'.
+  * This structure and the corresponding type cast macro allow the members
+  * to be alias'd easily by WIN32 API functions
+  *
+  * \code
+
+  typedef struct s_WB_EXTENT
+  {
+    union
+    {
+      unsigned long width;   // the 'width' value of the extent.
+      long cx;               // corresponding WIN32 cx member
+    };
+    union
+    {
+      unsigned long height;  // the 'height' value of the extent.
+      long cy;               // corresponding WIN32 cy member
+    };
+  } WB_EXTENT;
+
+  * \endcode
+  *
+**/
+typedef struct s_WB_EXTENT
+{
+  union
+  {
+    unsigned long width;   ///< the 'width' value of the extent.
+    long cx;               ///< corresponding WIN32 cx member
+  };
+  union
+  {
+    unsigned long height;  ///< the 'height' value of the extent.
+    long cy;               ///< corresponding WIN32 cy member
+  };
+} WB_EXTENT;
+
+/** \typedef WB_EXTENT_FROM_SIZE
+  * \ingroup win32_gdi_compat
+  * \brief type cast to WB_EXTENT from SIZE
+**/
+#define WB_EXTENT_FROM_SIZE(X) (*((WB_EXTENT *)(void *)&(X)))
+
+/** \typedef WB_EXTENT_TO_SIZE
+  * \ingroup win32_gdi_compat
+  * \brief type cast from WB_EXTENT to SIZE
+**/
+#define WB_EXTENT_TO_SIZE(X) (*((SIZE *)(void *)&(X)))
+
+#else // WIN32
 /** \typedef WB_EXTENT
   * \ingroup core_struct
   * \brief internal wrapper struct for 'extent' definition
@@ -468,6 +566,19 @@ typedef struct s_WB_EXTENT
   unsigned int height;  ///< the 'height' value of the extent.
 } WB_EXTENT;
 
+#endif // WIN32
+
+
+#ifdef WIN32
+/** \typedef WB_RECT
+  * \ingroup win32_gdi_compat
+  * \brief internal wrapper struct for RECT, TECTL for GDI
+  *
+  * A compatibility typedef representing a rectangle
+**/
+  typedef RECT WB_RECT;
+
+#else // WIN32
 /** \struct s_WB_RECT
   * \ingroup core_struct_str
   * \copydoc WB_RECT
@@ -511,6 +622,8 @@ typedef struct s_WB_RECT
   int bottom; /**< Y coordinate for rectangle lower right corner */
 } WB_RECT;
 
+#endif // WIN32
+
 /** \struct s_WB_GEOM
   * \ingroup core_struct_str
   * \copydoc WB_GEOM
@@ -541,7 +654,7 @@ typedef struct s_WB_RECT
   *
   * \code
 
-  Status XGetGeometry(Display *display, Drawable d, Window *root_return,
+  Status XGetGeometry(WB_DISPLAY display, Drawable d, Window *root_return,
                       int *x_return, int *y_return,
                       unsigned int *width_return, unsigned int *height_return,
                       unsigned int *border_return, unsigned int *depth_return);
@@ -557,6 +670,26 @@ typedef struct s_WB_GEOM
   unsigned int height; /**< height of geometry */
   unsigned int border; /**< border width of geometry */
 } WB_GEOM;
+
+#ifdef WIN32
+/** \typedef WB_PIXMAP
+  * \ingroup win32_gdi_compat
+  * \brief internal wrapper struct for GDI
+  *
+  * A compatibility typedef representing a Pixmap
+**/
+  typedef HBITMAP WB_PIXMAP;
+
+#else // WIN32
+/** \typedef WB_PIXMAP
+  * \ingroup core
+  * \brief internal wrapper struct for Pixmap for X11 to GDI compatibility
+  *
+  * A compatibility typedef representing a Pixmap
+**/
+  typedef Pixmap WB_PIXMAP;
+
+#endif // WIN32
 
 
 
@@ -576,6 +709,26 @@ typedef struct s_WB_GEOM
 // window-specific initialization
 /////////////////////////////////
 
+#ifdef WIN32
+/** \typedef WB_DISPLAY
+  * \ingroup win32_gdi_compat
+  * \brief internal wrapper struct for GDI
+  *
+  * A compatibility typedef representing a Display
+**/
+  typedef HANDLE WB_DISPLAY;
+
+#else // WIN32
+/** \typedef WB_DISPLAY
+  * \ingroup startup
+  * \brief internal wrapper struct for Display for X11 to GDI compatibility
+  *
+  * A compatibility typedef representing a Display
+**/
+  typedef Display * WB_DISPLAY;
+
+#endif // WIN32
+
 /** \ingroup startup
   * \brief initializes default objects for the specified Display (required)
   *
@@ -590,7 +743,7 @@ typedef struct s_WB_GEOM
   *
   * Header File:  window_helper.h
 **/
-Display *WBInit(const char *szDisplayName);
+WB_DISPLAY WBInit(const char *szDisplayName);
 
 /** \ingroup startup
   * \brief initializes default objects for the specified Display
@@ -608,7 +761,7 @@ Display *WBInit(const char *szDisplayName);
   *
   * Header File:  window_helper.h
 **/
-int WBInitDisplay(Display *pDisplay);
+int WBInitDisplay(WB_DISPLAY pDisplay);
 
 /** \ingroup startup
   * \brief initializes clipboard sub-system
@@ -628,21 +781,21 @@ int WBInitDisplay(Display *pDisplay);
   *
   * Header File:  window_helper.h
 **/
-int WBInitClipboardSystem(Display *pDisplay, const char *szDisplayName);
+int WBInitClipboardSystem(WB_DISPLAY pDisplay, const char *szDisplayName);
 
 /** \ingroup startup_internal
   * \brief initializes clipboard sub-system
   *
   * first half of 'WBInitClipboardSystem()
 **/
-int __StartInitClipboardSystem(Display *pDisplay, const char *szDisplayName);
+int __StartInitClipboardSystem(WB_DISPLAY pDisplay, const char *szDisplayName);
 
 /** \ingroup startup_internal
   * \brief initializes clipboard sub-system
   *
   * final half of 'WBInitClipboardSystem()
 **/
-int __FinishInitClipboardSystem(Display *pDisplay, const char *szDisplayName);
+int __FinishInitClipboardSystem(WB_DISPLAY pDisplay, const char *szDisplayName);
 
 
 /** \ingroup startup
@@ -663,7 +816,7 @@ void WBExit(void);
   *
   * Header File:  window_helper.h
 **/
-void WBExitClipboardSystem(Display *pDisplay);
+void WBExitClipboardSystem(WB_DISPLAY pDisplay);
 
 /** \ingroup startup
   * \brief initializes default Display for a thread (must call WBInit() first)
@@ -676,7 +829,7 @@ void WBExitClipboardSystem(Display *pDisplay);
   *
   * Header File:  window_helper.h
 **/
-Display *WBThreadInitDisplay(void);
+WB_DISPLAY WBThreadInitDisplay(void);
 
 /** \ingroup startup
   * \brief un-initializes a Display for a thread that was allocated by WBThreadInitDisplay()
@@ -688,7 +841,7 @@ Display *WBThreadInitDisplay(void);
   *
   * Header File:  window_helper.h
 **/
-void WBThreadFreeDisplay(Display *pThreadDisplay);
+void WBThreadFreeDisplay(WB_DISPLAY pThreadDisplay);
 
 
 /** \ingroup startup
@@ -732,7 +885,7 @@ int GetStartupMinMax(void);
   * Header File:  window_helper.h
 **/
 #if defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
-static __inline__ Colormap WBDefaultColormap(Display *pDisplay)
+static __inline__ Colormap WBDefaultColormap(WB_DISPLAY pDisplay)
 {
   return DefaultColormap(pDisplay, DefaultScreen(pDisplay));
 }
@@ -778,7 +931,7 @@ void WBInitWindowAttributes(XSetWindowAttributes *pXSWA, unsigned long lBorderPi
   *
   * Header File:  window_helper.h
 **/
-void WBInitSizeHints(XSizeHints *pSH, Display *pDisplay, int iMinHeight, int iMinWidth);
+void WBInitSizeHints(XSizeHints *pSH, WB_DISPLAY pDisplay, int iMinHeight, int iMinWidth);
 
 
 
@@ -803,13 +956,13 @@ void WBInitSizeHints(XSizeHints *pSH, Display *pDisplay, int iMinHeight, int iMi
   * Header File:  window_helper.h
 **/
 #if defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
-static __inline__ Display * WBGetDefaultDisplay(void)
+static __inline__ WB_DISPLAY WBGetDefaultDisplay(void)
 {
-  extern Display *pDefaultDisplay;
+  extern WB_DISPLAY pDefaultDisplay;
   return pDefaultDisplay;
 }
 #else // defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
-Display *WBGetDefaultDisplay();
+WB_DISPLAY WBGetDefaultDisplay();
 #endif // defined(__DOXYGEN__) || defined(__GNUC__) || defined(_MSVC_VER)
 
 /** \ingroup wbdefaults
@@ -1106,7 +1259,7 @@ enum WBCreateWindow_flags
   *
   * Header File:  window_helper.h
 **/
-Window WBCreateWindow(Display *pDisplay, Window wIDParent,
+Window WBCreateWindow(WB_DISPLAY pDisplay, Window wIDParent,
                       WBWinEvent pProc, const char *szClass,
                       int iX, int iY, int iWidth, int iHeight, int iBorder, int iIO,
                       WB_UINT64 iFlags, XSetWindowAttributes *pXSWA);
@@ -1323,7 +1476,7 @@ void WBSetInputFocus(Window wID);
   *
   * Header File:  window_helper.h
 **/
-Display * WBGetWindowDisplay(Window wID);
+WB_DISPLAY  WBGetWindowDisplay(Window wID);
 
 /** \ingroup wcore
   * \brief assigns an icon resource (by ID) to a window
@@ -1540,7 +1693,7 @@ unsigned long WBGetWindowBGColor(Window wID);
   *
   * Header File:  window_helper.h
 **/
-void WBDefaultStandardColormap(Display *pDisplay, XStandardColormap *pMap);
+void WBDefaultStandardColormap(WB_DISPLAY pDisplay, XStandardColormap *pMap);
 
 /** \ingroup wcore
   * \brief Assignes the window's class name pointer
@@ -2038,7 +2191,7 @@ void WBRemoveMenuWindow(Window wID, Window wIDMenu);
   *
   * Header File:  window_helper.h
 **/
-int WBIsValid(Display *pDisplay, Window wID);
+int WBIsValid(WB_DISPLAY pDisplay, Window wID);
 
 
 
@@ -2115,7 +2268,7 @@ Time WBGetLastEventTime(void);
   *
   * Header File:  window_helper.h
 **/
-int WBCheckGetEvent(Display *pDisplay, XEvent *pEvent);
+int WBCheckGetEvent(WB_DISPLAY pDisplay, XEvent *pEvent);
 
 /** \ingroup events
   * \brief Wait for an event, blocking indefinitely
@@ -2130,7 +2283,7 @@ int WBCheckGetEvent(Display *pDisplay, XEvent *pEvent);
   *
   * Header File:  window_helper.h
 **/
-void WBWaitForEvent(Display *pDisplay);
+void WBWaitForEvent(WB_DISPLAY pDisplay);
 
 
 /** \ingroup events
@@ -2244,12 +2397,12 @@ void WBEndModal(Window wID, int iReturn);
   *
   * Header File:  window_helper.h
 **/
-int WBNextEvent(Display *pDisplay, XEvent *pEvent);
+int WBNextEvent(WB_DISPLAY pDisplay, XEvent *pEvent);
 
 /** \ingroup events
   * \brief Places a copy of the specified event at the end of the regular (internal) event queue
   *
-  * \param wID The Window ID of the event to be posted.  The default 'Display *' will be used
+  * \param wID The Window ID of the event to be posted.  The default 'WB_DISPLAY' will be used
   * \param pEvent A pointer to an XEvent structure containing the event info
   * \return A non-zero value on error, or zero if successful
   *
@@ -2267,7 +2420,7 @@ int WBPostEvent(Window wID, XEvent *pEvent);
 /** \ingroup events
   * \brief Places a copy of the specified event at the end of the priority (internal) event queue
   *
-  * \param wID The Window ID of the event to be posted.  The default 'Display *' will be used
+  * \param wID The Window ID of the event to be posted.  The default 'WB_DISPLAY' will be used
   * \param pEvent A pointer to an XEvent structure containing the event info
   * \return A non-zero value on error, or zero if successful
   *
@@ -2328,7 +2481,7 @@ int WBPostAppEvent(XEvent *pEvent);
   *
   * Header File:  window_helper.h
 **/
-void WBPostDelayedSetFocusAppEvent(Display *pDisplay, Window wID, Window wIDFrom, unsigned int nDelay);
+void WBPostDelayedSetFocusAppEvent(WB_DISPLAY pDisplay, Window wID, Window wIDFrom, unsigned int nDelay);
 
 /** \ingroup events
   * \brief low-level event processing, internal handling of Expose events
@@ -2378,7 +2531,7 @@ void WBProcessExposeEvent(XExposeEvent *pEvent);  // paint optimization
   *
   * Header File:  window_helper.h
 **/
-void WBMouseCancel(Display *pDisplay, Window wID);
+void WBMouseCancel(WB_DISPLAY pDisplay, Window wID);
 
 
 
@@ -2409,7 +2562,7 @@ void WBMouseCancel(Display *pDisplay, Window wID);
   *
   * Header File:  window_helper.h
 **/
-void * WBGetClipboardData(Display *pDisplay, Atom *paType, int *piFormat, unsigned long *pnData);
+void * WBGetClipboardData(WB_DISPLAY pDisplay, Atom *paType, int *piFormat, unsigned long *pnData);
 
 /** \ingroup clipboard
   * \brief Get clipboard data of requested type
@@ -2426,7 +2579,7 @@ void * WBGetClipboardData(Display *pDisplay, Atom *paType, int *piFormat, unsign
   *
   * Header File:  window_helper.h
 **/
-int WBSetClipboardData(Display *pDisplay, Atom aType, int iFormat, const void *pData, unsigned long nData);
+int WBSetClipboardData(WB_DISPLAY pDisplay, Atom aType, int iFormat, const void *pData, unsigned long nData);
 
 
 // lower level functions for 'Selections'
@@ -2449,7 +2602,7 @@ int WBSetClipboardData(Display *pDisplay, Atom aType, int iFormat, const void *p
   *
   * Header File:  window_helper.h
 **/
-void * WBGetSelectionData(Display *pDisplay, Atom aSelection, Atom *paType, int *piFormat, unsigned long *pnData);
+void * WBGetSelectionData(WB_DISPLAY pDisplay, Atom aSelection, Atom *paType, int *piFormat, unsigned long *pnData);
 
 
 /** \ingroup clipboard
@@ -2468,7 +2621,7 @@ void * WBGetSelectionData(Display *pDisplay, Atom aSelection, Atom *paType, int 
   *
   * Header File:  window_helper.h
 **/
-int WBSetSelectionData(Display *pDisplay, Atom aSelection, Atom aType, int iFormat, const void *pData, unsigned long nData);
+int WBSetSelectionData(WB_DISPLAY pDisplay, Atom aSelection, Atom aType, int iFormat, const void *pData, unsigned long nData);
 
 
 
@@ -2494,7 +2647,7 @@ int WBSetSelectionData(Display *pDisplay, Atom aSelection, Atom aType, int iForm
   *
   * Header File:  window_helper.h
 **/
-int WBMapWindow(Display *pDisplay, Window wID);
+int WBMapWindow(WB_DISPLAY pDisplay, Window wID);
 /** \ingroup expose
   * \brief wrapper for XMapRaised, makes window visible and moves to top
   *
@@ -2507,7 +2660,7 @@ int WBMapWindow(Display *pDisplay, Window wID);
   *
   * Header File:  window_helper.h
 **/
-int WBMapRaised(Display *pDisplay, Window wID);
+int WBMapRaised(WB_DISPLAY pDisplay, Window wID);
 /** \ingroup expose
   * \brief wrapper for XUnmapWindow, makes window invisible without destroying it
   *
@@ -2520,7 +2673,7 @@ int WBMapRaised(Display *pDisplay, Window wID);
   *
   * Header File:  window_helper.h
 **/
-int WBUnmapWindow(Display *pDisplay, Window wID);
+int WBUnmapWindow(WB_DISPLAY pDisplay, Window wID);
 
 /** \ingroup expose
   * \brief Returns non-zero if window has been mapped; zero otherwise
@@ -2536,7 +2689,7 @@ int WBUnmapWindow(Display *pDisplay, Window wID);
   *
   * Header File:  window_helper.h
 **/
-int WBIsMapped(Display *pDisplay, Window wID);  // non-zero if mapped, zero otherwise
+int WBIsMapped(WB_DISPLAY pDisplay, Window wID);  // non-zero if mapped, zero otherwise
   // NOTE:  this only works for windows that have been registered with a callback
 
 
@@ -2869,7 +3022,7 @@ void WBValidateRect(Window wID, WB_RECT *pRCT);
   *
   * Header File:  window_helper.h
 **/
-WBGC WBCreateGC(Display *pDisplay, Drawable dw, unsigned long valuemask,
+WBGC WBCreateGC(WB_DISPLAY pDisplay, Drawable dw, unsigned long valuemask,
                 const XGCValues *values);
 
 /** \ingroup graphics
@@ -2980,7 +3133,7 @@ WB_FONTC WBQueryGCFont(WBGC gc);
   *
   * \sa \ref WBQueryGCFont()
 **/
-WB_FONT WBGetGCFont(Display *pDisplay, WBGC gc);
+WB_FONT WBGetGCFont(WB_DISPLAY pDisplay, WBGC gc);
 
 /** \ingroup graphics
   * \brief makes a copy of a WBGC, a more sensible wrapper for XCopyGC()
@@ -3017,7 +3170,7 @@ int WBCopyGC2(WBGC hGCOrig, unsigned long valuemask, WBGC hGCDest);
   *
   * Header File:  window_helper.h
 **/
-WBGC WBCopyDrawableGC(Display *pDisplay, Drawable dw, WBGC hGCOrig);
+WBGC WBCopyDrawableGC(WB_DISPLAY pDisplay, Drawable dw, WBGC hGCOrig);
 
 /** \ingroup graphics
   * \brief Free resources for a WBGC, wrapper for XFreeGC()
@@ -3085,7 +3238,7 @@ int WBSetClipOrigin(WBGC hGC, int clip_x_origin, int clip_y_origin);
   *
   * Header File:  window_helper.h
 **/
-int WBSetClipMask(WBGC hGC, Pixmap pixmap);
+int WBSetClipMask(WBGC hGC, WB_PIXMAP pixmap);
 
 /** \ingroup graphics
   * \brief Set the 'function' for the WBGC, a wrapper for XSetFunction()
@@ -3269,7 +3422,7 @@ int WBSetDashes(WBGC hGC, int dash_offset, const char dash_list[], int n);
   *
   * \sa WBBeginPaint() WBEndPaint()
 **/
-XImage *WBGetWindowImage(Display *pDisplay, Window wID);
+XImage *WBGetWindowImage(WB_DISPLAY pDisplay, Window wID);
 
 /** \ingroup expose
   * \brief Assign an XImage for the entire window
@@ -3291,7 +3444,7 @@ XImage *WBGetWindowImage(Display *pDisplay, Window wID);
   *
   * \sa WBBeginPaint() WBEndPaint()
 **/
-int WBAssignWindowImage(Display *pDisplay, Window wID, XImage *pImage);
+int WBAssignWindowImage(WB_DISPLAY pDisplay, Window wID, XImage *pImage);
 
 /** \ingroup expose
   * \brief Copy an XImage into the cached XImage for the entire window
@@ -3319,7 +3472,7 @@ int WBAssignWindowImage(Display *pDisplay, Window wID, XImage *pImage);
   *
   * \sa WBBeginPaint() WBEndPaint()
 **/
-int WBCopyIntoWindowImage(Display *pDisplay, Window wID, XImage *pSrcImage,
+int WBCopyIntoWindowImage(WB_DISPLAY pDisplay, Window wID, XImage *pSrcImage,
                           int xSrc, int ySrc, int width, int height,
                           int xOffs, int yOffs);
 
@@ -3339,7 +3492,7 @@ int WBCopyIntoWindowImage(Display *pDisplay, Window wID, XImage *pSrcImage,
   *
   * \sa WBBeginPaint() WBEndPaint()
 **/
-void WBUpdateWindowWithImage(Display *pDisplay, Window wID);
+void WBUpdateWindowWithImage(WB_DISPLAY pDisplay, Window wID);
 
 
 
@@ -3373,7 +3526,7 @@ void WBUpdateWindowWithImage(Display *pDisplay, Window wID);
   *
 **/
 
-int WBDrawPoint(Display *display, Drawable d, WBGC gc, int x, int y);
+int WBDrawPoint(WB_DISPLAY display, Drawable d, WBGC gc, int x, int y);
 
 
 /** \ingroup expose
@@ -3394,7 +3547,7 @@ int WBDrawPoint(Display *display, Drawable d, WBGC gc, int x, int y);
   *
 **/
 
-int WBDrawPoints(Display *display, Drawable d, WBGC gc, XPoint *points,
+int WBDrawPoints(WB_DISPLAY display, Drawable d, WBGC gc, XPoint *points,
                  int npoints, int mode);
 
 
@@ -3417,7 +3570,7 @@ int WBDrawPoints(Display *display, Drawable d, WBGC gc, XPoint *points,
   *
 **/
 
-int WBDrawLine(Display *display, Drawable d, WBGC gc,
+int WBDrawLine(WB_DISPLAY display, Drawable d, WBGC gc,
                int x1, int y1, int x2, int y2);
 
 
@@ -3439,7 +3592,7 @@ int WBDrawLine(Display *display, Drawable d, WBGC gc,
   *
 **/
 
-int WBDrawLines(Display *display, Drawable d, WBGC gc, XPoint *points,
+int WBDrawLines(WB_DISPLAY display, Drawable d, WBGC gc, XPoint *points,
                 int npoints, int mode);
 
 
@@ -3462,7 +3615,7 @@ int WBDrawLines(Display *display, Drawable d, WBGC gc, XPoint *points,
   *
 **/
 
-int WBDrawRectangle(Display *display, Drawable d, WBGC gc, int x, int y,
+int WBDrawRectangle(WB_DISPLAY display, Drawable d, WBGC gc, int x, int y,
                     unsigned int width, unsigned int height);
 
 
@@ -3485,7 +3638,7 @@ int WBDrawRectangle(Display *display, Drawable d, WBGC gc, int x, int y,
   *
 **/
 
-int WBFillRectangle(Display *display, Drawable d, WBGC gc, int x, int y,
+int WBFillRectangle(WB_DISPLAY display, Drawable d, WBGC gc, int x, int y,
                     unsigned int width, unsigned int height);
 
 
@@ -3510,7 +3663,7 @@ int WBFillRectangle(Display *display, Drawable d, WBGC gc, int x, int y,
   *
 **/
 
-int WBDrawArc(Display *display, Drawable d, WBGC gc, int x, int y,
+int WBDrawArc(WB_DISPLAY display, Drawable d, WBGC gc, int x, int y,
               unsigned int width, unsigned int height,
               int angle1, int angle2);
 
@@ -3536,7 +3689,7 @@ int WBDrawArc(Display *display, Drawable d, WBGC gc, int x, int y,
   *
 **/
 
-int WBFillArc(Display *display, Drawable d, WBGC gc, int x, int y,
+int WBFillArc(WB_DISPLAY display, Drawable d, WBGC gc, int x, int y,
               unsigned int width, unsigned int height,
               int angle1, int angle2);
 
@@ -3560,7 +3713,7 @@ int WBFillArc(Display *display, Drawable d, WBGC gc, int x, int y,
   *
 **/
 
-int WBFillPolygon(Display *display, Drawable d, WBGC gc, XPoint *points,
+int WBFillPolygon(WB_DISPLAY display, Drawable d, WBGC gc, XPoint *points,
                   int npoints, int shape, int mode);
 
 
@@ -3583,7 +3736,7 @@ int WBFillPolygon(Display *display, Drawable d, WBGC gc, XPoint *points,
   * Header File:  draw_text.h
 **/
 
-int WBDrawString(Display *display, Drawable d, WBGC gc, int x, int y,
+int WBDrawString(WB_DISPLAY display, Drawable d, WBGC gc, int x, int y,
                  const char *string, int length);
 
 
@@ -3614,7 +3767,7 @@ int WBDrawString(Display *display, Drawable d, WBGC gc, int x, int y,
   *
   * \sa aWB_TIMER
 **/
-int CreateTimer(Display *pDisplay, Window wID, unsigned long lInterval, long lID, int iPeriodic);
+int CreateTimer(WB_DISPLAY pDisplay, Window wID, unsigned long lInterval, long lID, int iPeriodic);
   // NOTE:  'iPeriodic' non-zero for periodic, zero for one-shot.  'lInterval' is in microseconds
   //        Assign 'lID' to a unique value for the specified pDisplay and wID
 
@@ -3632,7 +3785,7 @@ int CreateTimer(Display *pDisplay, Window wID, unsigned long lInterval, long lID
   *
   * \sa aWB_TIMER
 **/
-void DeleteTimer(Display *pDisplay, Window wID, long lID);  // deletes entry with matching Display, Window, ID
+void DeleteTimer(WB_DISPLAY pDisplay, Window wID, long lID);  // deletes entry with matching Display, Window, ID
 
 
 
@@ -3642,6 +3795,9 @@ void DeleteTimer(Display *pDisplay, Window wID, long lID);  // deletes entry wit
 //
 // ****************************************************
 
+#ifdef WIN32
+#error see if I need to implement this
+#else // WIN32
 /** \struct s_WB_ERROR_INFO
   * \ingroup error
   * \copydoc WB_ERROR_INFO
@@ -3678,6 +3834,7 @@ typedef struct s_WB_ERROR_INFO
   XID resourceid;        ///< resource ID (usually a Window) from XErrorEvent
 } WB_ERROR_INFO;
 
+#endif // WIN32
 
 
 /** \ingroup error
