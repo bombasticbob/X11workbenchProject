@@ -160,3 +160,12 @@ toolkit_doc.log: $(TOOLKIT_DOCDEPENDS) Makefile $(libX11workbenchToolkit_DOCDEPE
 	@doxygen doxy.txt >toolkit_doc.log 2>&1
 
 
+.PHONY: toolkit_doc.clean
+
+toolkit_doc.clean:
+	@echo cleaning toolkit docs
+	@-rm -f doc/html/*
+	@-rm toolkit_doc.log
+
+clean-generic:	toolkit_doc.clean
+
