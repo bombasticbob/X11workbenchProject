@@ -93,7 +93,7 @@ typedef Display * WB_DISPLAY; // forward reference on WB_DISPLAY
 /** \ingroup wbdefaults
   * \brief The default X11 font size (currently 13)
 **/
-#define WB_DEFAULT_FONT_SIZE 14 /* override via settings */
+#define WB_DEFAULT_FONT_SIZE 15 /* override via settings */
 
 /** \ingroup font
   * @{

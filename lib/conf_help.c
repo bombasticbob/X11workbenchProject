@@ -197,7 +197,7 @@ void CHOnExit(void)
 
 
 
-// OLD version - uses XResourceManagerSring and XScreenResourceString (deprecated)
+// OLD version - uses XResourceManagerString and XScreenResourceString (deprecated)
 // this version typically won't return anything useful any more.
 
 int CHGetResourceString_Old(WB_DISPLAY pDisplay, const char *szIdentifier, char *szData, int cbData)

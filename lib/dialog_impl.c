@@ -2096,7 +2096,7 @@ static int splash_callback(Window wID, XEvent *pEvent);
 static int SplashDoExposeEvent(XExposeEvent *pEvent, WB_DISPLAY pDisplay,
                                Window wID, struct _SPLASH_ *pData);
 
-#define SPLASH_FRAMERATE 30 /* make this configurable? */
+#define SPLASH_FRAMERATE 40 /* make this configurable? */
 #define SPLASH_TIME 1500 /* milliseconds */
 #define SPLASH_FONT_SIZE 13
 
@@ -2575,11 +2575,11 @@ int iX, iY, iTimeStart, iTimeEnd;
 
   if(pData->nIter >= SPLASH_FRAMERATE / 2) // after first half second
   {
-    iTimeStart = 1250 * SPLASH_FRAMERATE;                     // 1.5 seconds' worth in msecs, not seconds
+    iTimeStart = 1250 * SPLASH_FRAMERATE;                     // 1.25 seconds' worth in msecs, not seconds
     iTimeEnd = (SPLASH_TIME + 1000) * SPLASH_FRAMERATE
              - 500 * SPLASH_FRAMERATE;                        // 1/2 sec before end
 
-    if(iTimeStart + 1000 * SPLASH_FRAMERATE / 2 > iTimeEnd)
+    if(iTimeStart + (1000 * SPLASH_FRAMERATE / 2) > iTimeEnd) // value out of range
     {
       iTimeStart = iTimeEnd - SPLASH_FRAMERATE / 2;
     }

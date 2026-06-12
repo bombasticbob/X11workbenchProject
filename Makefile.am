@@ -33,7 +33,7 @@ endif
 
 # presence of libXft library.  use --disble-libXft in configure to disable it
 if HAVE_XFT_LIB
-  X_EXTRA_LIBS += $(FT2_LIBS) -lXft
+  X_EXTRA_LIBS += $(FT2_LIBS)
 #  X_EXTRA_LIBS += -lXft
 endif
 

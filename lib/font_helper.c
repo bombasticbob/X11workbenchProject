@@ -69,10 +69,18 @@
 #include "window_helper.h" // for debug output; also includes platform.h and font_helper.h
 #include "draw_text.h"
 
+//#ifdef X11WORKBENCH_TOOLKIT_HAVE_XFT
+//#include <fontconfig/fontconfig.h>
+//#endif // X11WORKBENCH_TOOLKIT_HAVE_XFT
+
+
 #define FONT_DUMP_DEBUG_LEVEL DebugLevel_Heavy
 
 
 // globals
+
+char szDefaultFontName[PATH_MAX * 2] = WB_DEFAULT_FONT; // allow global scope for now
+int nDefaultFontSize = WB_DEFAULT_FONT_SIZE; // allow global scope for now
 
 static int bDisableAntiAlias = 0;
 static int bEnableTrueTypeFonts = 0;
@@ -96,14 +104,17 @@ void __internal_enable_antialias(void)
 
 void __internal_font_helper_init(void)
 {
+Display *pDisplay = WBGetDefaultDisplay();
+
 #ifdef X11WORKBENCH_TOOLKIT_HAVE_XFT
+
+#if XFT_VERSION < 20000 /* defined in Xft.h */
 
   // see https://www.freedesktop.org/wiki/Software/Xft/
   // and https://cgit.freedesktop.org/xorg/lib/libXft/
   // this software requires libXft2 and is not compatible
   // with any earlier version...
 
-#if XFT_VERSION < 20000
 #warning - You need libXft version 2 or greater - true type fonts disabled
   bInitFtLibOnce = 0;
   bEnableTrueTypeFonts = 0;
@@ -164,9 +175,6 @@ void WBFontSetEnableAntiAlias(int bEnable)
 {
   bDisableAntiAlias = bEnable ? 1 : 0;
 }
-
-char szDefaultFontName[PATH_MAX * 2] = WB_DEFAULT_FONT; // allow global scope for now
-int nDefaultFontSize = WB_DEFAULT_FONT_SIZE; // allow global scope for now
 
 const char *WBGetDefaultFontName(void)
 {

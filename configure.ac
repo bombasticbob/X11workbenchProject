@@ -1,4 +1,4 @@
-AC_INIT(X11workbench, 1.0, bobf@mrp3.com, X11workbench)
+AC_INIT([X11workbench],[1.0],[bobf@mrp3.com],[X11workbench])
 # check/get base source directory based on a single unique file name
 AC_CONFIG_SRCDIR(X11workbench.c)
 # output defines to a header file 'X11workbenchToolkit_config.h'
@@ -8,7 +8,7 @@ AM_INIT_AUTOMAKE
 
 
 # prereq autoconf 2.53 or later
-AC_PREREQ(2.53)
+AC_PREREQ([2.72])
 # FYI assuming automake >= 15
 
 # order of search for CC - use 'cc' first, then 'gcc', then 'cl'
@@ -28,7 +28,6 @@ AM_PROG_CC_C_O
 AC_PROG_RANLIB
 AC_PATH_X
 AC_PATH_XTRA
-AC_TYPE_SIGNAL
 AC_PROG_AWK
 AC_PROG_LN_S
 
@@ -238,76 +237,67 @@ fi
 # First, make sure freetype2 is available.  this also modifies CFLAGS and LDFLAGS
 
 test_have_xft=false
-ifdef([AC_CHECK_FT2],
-# this is complex so I have indented all of the [] sections to make them visible, even if it's a little ugly
-  [
-    if test x$libXft = xtrue ; then
-      AC_CHECK_FT2([7.0.1],,[libXft=false; AC_MSG_WARN([freetype missing or incompatible version; will not link with libXft])])
-    fi
-
-      if test x$libXft = xtrue ; then
-      my_save_CFLAGS="$CFLAGS"
-      my_save_CPPFLAGS="$CPPFLAGS"
-      my_save_LDFLAGS="$LDFLAGS"
-      CFLAGS="$CFLAGS $FT2_CFLAGS"
-      CPPFLAGS="$CPPFLAGS $FT2_CFLAGS"
-      LDFLAGS="$LDFLAGS -L$ac_x_libraries $FT2_LIBS -lXft"
-      AC_CHECK_HEADER(
-        [X11/Xft/Xft.h],
+FT2_CFLAGS="-I/usr/local/include/freetype2 -I/usr/include/freetype2"
+FT2_LIBS="-lXft -lfreetype"
+if test x$libXft = xtrue ; then
+  my_save_CFLAGS="$CFLAGS"
+  my_save_CPPFLAGS="$CPPFLAGS"
+  my_save_LDFLAGS="$LDFLAGS"
+  CFLAGS="$CFLAGS $FT2_CFLAGS"
+  CPPFLAGS="$CPPFLAGS $FT2_CFLAGS"
+  LDFLAGS="$LDFLAGS -L$ac_x_libraries -lXft -lfreetype"
+  AC_CHECK_HEADER(
+    [X11/Xft/Xft.h],
 # if the header exists I need to check the version defined in it with a compile
 # and I might as well do a test-link while I'm at it
+    [
+      AC_LANG_PUSH([C])
+      AC_MSG_CHECKING([if libXft can link ok and is at least version 2.0])
+      AC_LINK_IFELSE(
         [
-          AC_LANG_PUSH([C])
-          AC_MSG_CHECKING([if libXft can link ok and is at least version 2.0])
-          AC_LINK_IFELSE(
-            [
-              AC_LANG_SOURCE([[
-              #include <stdio.h>
-              #include <stdlib.h>
-              #include <X11/Xft/Xft.h> /* required header for Xft definitions */
+          AC_LANG_SOURCE([[
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <X11/Xft/Xft.h> /* required header for Xft definitions */
 
-              #if XFT_VERSION < 20000
-              #error XFT is too old
-              #endif
+          #if XFT_VERSION < 20000
+          #error XFT is too old
+          #endif
 
-              int main()
-              {
-                // note that I don't fail this by running it; if X11 is being
-                // accessed remotely I need to rely on these at run time
-                // but as an example I leave it just like this
-                if(XftInit(0) != FcTrue || XftInitFtLibrary() != FcTrue )
-                {
-                  exit(3);
-                }
+          int main()
+          {
+            // note that I don't fail this by running it; if X11 is being
+            // accessed remotely I need to rely on these at run time
+            // but as an example I leave it just like this
+            if(XftInit(0) != FcTrue || XftInitFtLibrary() != FcTrue )
+            {
+              exit(3);
+            }
 
-                return 0;
-              }]] )
-            ],
-            [
-              AC_MSG_RESULT([yes!!!  w00t!!!])
-              test_have_xft=true
-            ],
-            [
-              AC_MSG_RESULT([no])
-            ] )
-          AC_LANG_POP([C])
+            return 0;
+          }]] )
         ],
         [
-          AC_MSG_WARN([***************************************************************************])
-          AC_MSG_WARN([missing Xft.h - will not be building the toolkit with libXft])
-          AC_MSG_WARN([                you should consider installing the developer libXft package])
-          AC_MSG_WARN([***************************************************************************])
-        ])
+          AC_MSG_RESULT([libXft is here!!!  yes!!!  w00t!!!])
+          test_have_xft=true
+        ],
+        [
+          AC_MSG_RESULT([no])
+        ] )
+      AC_LANG_POP([C])
+    ],
+    [
+      AC_MSG_WARN([***************************************************************************])
+      AC_MSG_WARN([missing Xft.h - will not be building the toolkit with libXft])
+      AC_MSG_WARN([                you should consider installing the developer libXft package])
+      AC_MSG_WARN([***************************************************************************])
+      libXft=false
+    ])
 
-      LDFLAGS="$my_save_LDFLAGS"
-      CFLAGS="$my_save_CFLAGS"
-      CPPFLAGS="$my_save_CPPFLAGS"
-    fi
-  ],
-  [
-    AC_MSG_WARN([Freetype M4 macros not installed - do you need the developer package?])
-  ])
-
+  LDFLAGS="$my_save_LDFLAGS"
+  CFLAGS="$my_save_CFLAGS"
+  CPPFLAGS="$my_save_CPPFLAGS"
+fi
 
 test_have_xext=false
 if test x$libXext = xtrue ; then
@@ -608,12 +598,13 @@ AC_CHECK_FUNC(qsort_r, [AC_DEFINE(HAVE_QSORT_R,[1],[whether or not qsort_r is av
 
 # if it does have qsort_r then make sure it has the BSD-ordered parameters (Linux typically does not)
 # if it doesn't, then I use my already written equivalent version; otherwise use libc's version
-if test "$ac_cv_func_qsort_r" == yes ; then
+
+if test x$ac_cv_func_qsort_r = xyes ; then
   my_save_CFLAGS="$CFLAGS"
   CFLAGS="$CFLAGS -Werror"
 
   # if I have support for the pointer mismatch pragma, add this to CFLAGS
-  if test $compiler_has_pragma_for_incompatible_pointer_types -ne 0 ; then
+  if test x$compiler_has_pragma_for_incompatible_pointer_types = xno ; then
     CFLAGS="$CFLAGS -DCOMPILER_HAS_PRAGMA_FOR_INCOMPATIBLE_POINTER_TYPES"
   fi
   AC_LANG_PUSH([C])
@@ -670,11 +661,11 @@ if test "$ac_cv_func_qsort_r" == yes ; then
     ]] )
   ],
   [
-    AC_MSG_RESULT([yes])
+    AC_MSG_RESULT([yes - using BSD version])
     AC_DEFINE([QSORT_R_BSD],[1],[BSD version of qsort_r])
   ],
   [
-    AC_MSG_RESULT([no])
+    AC_MSG_RESULT([no - using GNUC version])
     AC_DEFINE([QSORT_R_GNUC],[1],[GNUC version of qsort_r])
   ] )
   AC_LANG_POP([C])
@@ -717,7 +708,6 @@ AC_LANG_POP([C])
 
 
 AC_C_CONST
-AC_HEADER_STDC
 
 AC_CANONICAL_HOST
 
@@ -744,7 +734,10 @@ if test x$test_have_xft = xtrue ; then
   CFLAGS="$CFLAGS $FT2_CFLAGS"
   CXXFLAGS="$CXXFLAGS $FT2_CFLAGS"
   CPPFLAGS="$CPPFLAGS $FT2_CFLAGS"
-  LIBS="$LIBS $FT2_LIBS"
+else
+  AC_MSG_RESULT([oops])
+  AC_MSG_RESULT([libXft was not properly detected])
+  FT2_LIBS=""
 fi
 
 if test x$test_have_xext = xtrue ; then
@@ -849,6 +842,7 @@ AC_SUBST([CFLAGS])
 AC_SUBST([CPPFLAGS])
 AC_SUBST([CXXFLAGS])
 AC_SUBST([LIBS])
+AC_SUBST([FT2_LIBS])
 AC_SUBST([AM_MAKEFLAGS])
 
 
