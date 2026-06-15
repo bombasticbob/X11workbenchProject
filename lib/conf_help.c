@@ -1834,6 +1834,13 @@ XSETTINGS_DATAHDR *pDHdr;
 char tbuf[256];
 
 
+#ifdef HAVE_XSETTINGSD
+    /* xsettingsd is available on the build system */
+    // If xsettingsd is NOT running I probably want to start it
+
+    // TODO:  start 'xsettingsd' first time around, tell it to daemonize.
+#endif
+
 //  aTARGET = XInternAtom(pDisplay, "TARGET", False);
 //  a_MANAGER = XInternAtom(pDisplay, "MANAGER", False);
 //  XA_CLIPBOARD=XInternAtom(pDisplay, "CLIPBOARD", False);

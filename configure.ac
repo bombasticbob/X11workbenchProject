@@ -675,6 +675,79 @@ else
   AC_MSG_WARN([qsort_r not compatible; using internal qsort_r implementation])
 fi
 
+
+####################################################################
+#    Check for optional libxsettings-client support - grok code
+####################################################################
+
+AC_ARG_WITH([xsettings],
+  [AS_HELP_STRING([--with-xsettings@<:@=DIR@:>@],
+                  [support for XSettings via libxsettings-client [default=check]])],
+  [],
+  [with_xsettings=check])
+
+AS_IF([test "x$with_xsettings" != xno],
+[
+  PKG_CHECK_MODULES([XSETTINGS], [libxsettings-client],
+    [AC_DEFINE([HAVE_LIBXSETTINGS_CLIENT], [1],
+               [Define to 1 if libxsettings-client is available])
+     have_xsettings_client=yes],
+    [dnl Fallback to manual check if no pkg-config
+     AC_CHECK_HEADER([xsettings-client.h],
+       [AC_CHECK_LIB([xsettings-client], [xsettings_client_new],
+         [XSETTINGS_CFLAGS=""
+          XSETTINGS_LIBS="-lxsettings-client"
+          AC_DEFINE([HAVE_LIBXSETTINGS_CLIENT], [1],
+                    [Define to 1 if libxsettings-client is available])
+          have_xsettings_client=yes],
+         [have_xsettings_client=no])],
+       [have_xsettings_client=no])])
+
+  AS_IF([test "x$have_xsettings_client" = xyes],
+    [AC_MSG_NOTICE([libxsettings-client support enabled])],
+    [AS_IF([test "x$with_xsettings" = xyes],
+      [AC_MSG_ERROR([libxsettings-client requested but not found])],
+      [AC_MSG_WARN([libxsettings-client not found - XSettings support disabled])])])
+],
+[AC_MSG_NOTICE([libxsettings-client support disabled by user])])
+
+
+# XSettings Daemon - check if installed in compile, running in code
+
+####################################################################
+# Optional XSettings daemon (xsettingsd) support / detection - grok
+# This is purely for build-time awareness and optional runtime
+# recommendation.  The core XSettings protocol support is always
+# available via direct property queries on _XSETTINGS_SETTINGS.
+####################################################################
+
+AC_ARG_WITH([xsettingsd],
+  [AS_HELP_STRING([--with-xsettingsd@<:@=PATH@:>@],
+                  [support / recommendation for xsettingsd daemon [default=check]])],
+  [],
+  [with_xsettingsd=check])
+
+AS_IF([test "x$with_xsettingsd" != xno],
+[
+  AC_PATH_PROG([XSETTINGSD], [xsettingsd], [no])
+
+  AS_IF([test "x$XSETTINGSD" != xno],
+    [AC_DEFINE([HAVE_XSETTINGSD], [1],
+               [Define to 1 if xsettingsd daemon is available])
+     have_xsettingsd=yes
+     AC_MSG_NOTICE([xsettingsd found at $XSETTINGSD])],
+    [have_xsettingsd=no
+     AS_IF([test "x$with_xsettingsd" = xyes],
+       [AC_MSG_ERROR([xsettingsd requested but not found in PATH])],
+       [AC_MSG_WARN([xsettingsd not found in PATH - XSettings daemon support disabled])])])
+],
+[AC_MSG_NOTICE([xsettingsd support disabled by user])])
+
+# export the path if needed
+AC_SUBST([XSETTINGSD])
+
+
+
 ############################################################################################
 
 
@@ -778,6 +851,11 @@ AM_CONDITIONAL(HAVE_XFT_LIB, test x$test_have_xft = xtrue )
 
 # XExt library - use libXext for things like XShm API functions
 AM_CONDITIONAL(HAVE_XEXT_LIB, test x$test_have_xext = xtrue)
+
+# libxsettings and xsettingsd
+AM_CONDITIONAL(HAVE_LIBXSETTINGS_CLIENT, test x$have_xsettings_client = xyes)
+AM_CONDITIONAL(HAVE_XSETTINGSD, test x$have_xsettingsd = xyes)
+
 
 # additional library linkages
 AM_CONDITIONAL(NEED_LRT, test x$test_need_lrt = xtrue)

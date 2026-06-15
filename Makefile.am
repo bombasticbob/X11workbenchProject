@@ -25,6 +25,8 @@ AM_CPPFLAGS = $(X_CFLAGS) -DGLOBAL_XPATH="\"$(GLOBAL_XPATH)/etc\"" -DGLOBAL_PATH
 # that are present.  But automake won't ENFORCE them.
 AUTOMAKE_OPTIONS = foreign
 
+# initially, the toolkit library
+LDADD = ./lib/libX11workbenchToolkit.a
 
 # presence of libXpm library.  use --enable-libXpm in configure to enable it
 if HAVE_XPM_LIB
@@ -42,13 +44,21 @@ if HAVE_XEXT_LIB
   X_EXTRA_LIBS += -lXext
 endif
 
+if HAVE_LIBXSETTINGS_CLIENT
+  AM_CPPFLAGS += $(XSETTINGS_CFLAGS)
+  LDADD += $(XSETTINGS_LIBS)
+endif
+
+if HAVE_XSETTINGSD
+# add conditional install rules, man pages, etc. here
+endif
+
 
 # note:  was using AM_LDFLAGS but Ubuntu build borked, so using LIBS instead
 #AM_LDFLAGS = $(X_LIBS) -lm -lX11 $(X_PRE_LIBS) $(X_EXTRA_LIBS)
-LDADD=./lib/libX11workbenchToolkit.a
 LIBS = -L./lib -lX11workbenchToolkit $(X_LIBS) -lm -lX11 $(X_PRE_LIBS) $(X_EXTRA_LIBS)
 
-# any additional libraries go here
+# any additional libraries go here - libm and libpthread deliberately mentioned twice
 LIBS += -lpthread -lm
 
 if NEED_LRT
