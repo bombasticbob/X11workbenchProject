@@ -2062,8 +2062,7 @@ struct _FONT_DIALOG_
   WB_FONT pCurrentFont;          // currently selected font (owned by dialog until OK)
   char *szSelectedFontName;      // font name string (WBAlloc'd, for preview)
   int iSelectedSize;             // current point size
-  int iSelectedStyle;            // e.g., bold/italic flags (future extension)
-  // TODO: add more fields as needed for filtering, etc.
+  // TODO: add more fields for filtering, style flags, etc. as needed
 };
 
 /** \brief Callback for font dialog controls and events */
@@ -2088,7 +2087,11 @@ struct _FONT_DIALOG_ *pUserData = (struct _FONT_DIALOG_ *)(pDlg ? pDlg->pUserDat
     DLGSetControlCaption(pDlg, 1002 /* preview ID */, "The quick brown fox jumps over the lazy dog.");
     // Apply font to preview control via WBDialogControlSetFont or similar
 
-    WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Dialog, "%s - Font dialog initialized\n", __FUNCTION__);
+    /* Set initial size if needed */
+    /* DLGSetControlCaption(pDlg, 1003, "14"); */
+
+    WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Dialog,
+                   "%s - Font dialog initialized\n", __FUNCTION__);
     return 1;
   }
 
@@ -2102,54 +2105,50 @@ struct _FONT_DIALOG_ *pUserData = (struct _FONT_DIALOG_ *)(pDlg ? pDlg->pUserDat
     int iNotify = pEvent->xclient.data.l[0];
     int iCtrlID = pEvent->xclient.data.l[1];
 
-    switch(iCtrlID)
+    if(iCtrlID == 1001 && iNotify == aLIST_NOTIFY)  // list control notification
     {
-      case 1001: // font list
-        if(iNotify == aLIST_NOTIFY)
-        {
-          int iCode = pEvent->xclient.data.l[2];
-          int iSel = pEvent->xclient.data.l[3];
+      int iCode = (int)pEvent->xclient.data.l[2];
+      int iSel = pEvent->xclient.data.l[3];
 
-          if(iCode == WB_LIST_SELCHANGE)
-          {
-            // Update preview font
-            // char *szFont = WBListControlGetSelectedString(...);
-            // WBFree(pUserData->szSelectedFontName);
-            // pUserData->szSelectedFontName = WBCopyString(szFont);
-            // Refresh preview
-            WBInvalidateGeom(DLGGetDialogControl(pDlg, 1002), NULL, 1);
-          }
-          else if(iCode == WB_LIST_DBLCLICK)
-          {
-            WBEndModal(wID, IDOK);
-          }
-        }
-        break;
-
-      case 1003: // size edit or slider
-        // Update iSelectedSize, refresh preview
-        break;
-
-      case IDOK: // Select button
-      case IDCANCEL:
-        if(iNotify == aBUTTON_PRESS)
-        {
-          WBEndModal(wID, iCtrlID);
-        }
-        break;
-
-      default:
-        WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_Dialog,
-                       "%s - unhandled control notify ID %d\n", __FUNCTION__, iCtrlID);
+      if(iCode == WB_LIST_SELCHANGE)
+      {
+        // Update preview font
+        // char *szFont = WBListControlGetSelectedString(...);
+        // WBFree(pUserData->szSelectedFontName);
+        // pUserData->szSelectedFontName = WBCopyString(szFont);
+        // Refresh preview
+        WBInvalidateGeom(DLGGetDialogControl(pDlg, 1002), NULL, 1);
+      }
+      else if(iCode == WB_LIST_DBLCLICK)
+      {
+        WBEndModal(wID, IDOK);  // double-click acts like Select
+      }
+    }
+    else if(iCtrlID == 1003)  /* size edit */
+    {
+      // Parse size, update preview (if TEXT_CHANGED or similar)
+    }
+    else if(iCtrlID == IDOK || iCtrlID == IDCANCEL)
+    {
+      if(iNotify == aBUTTON_PRESS)
+      {
+        WBEndModal(wID, iCtrlID);
+      }
+    }
+    else
+    {
+      WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_Dialog,
+                     "%s - unhandled control notify ID %d notify %d\n",
+                     __FUNCTION__, iCtrlID, iNotify);
     }
   }
 
-  // TODO: Handle Expose for preview redraw with selected font (use DT functions)
+  // TODO: Handle Expose for preview area redraw using selected font (use DT functions)
 
   return 0;
 }
 
-/** \brief Public API implementation (replaces stub in current code) */
+
 WB_FONT DLGFontDialog(WB_DISPLAY pDisplay, Window wIDOwner, WB_FONTC pDefault)
 {
 struct _FONT_DIALOG_ data;
@@ -2187,11 +2186,7 @@ static const char szFontDialogRes[] =
     data.pCurrentFont = WBCopyFont(pDisplay, pDefault);
     // extract name/size
   }
-  else
-  {
-    data.pCurrentFont = NULL;
-  }
-  data.iSelectedSize = WBGetDefaultFontSize(); // or 14 from image
+  data.iSelectedSize = WBGetDefaultFontSize(); // or hardcode 14 to match Mate example
 
   pDlg = DLGCreateDialogWindow(wIDOwner, "Font Chooser", szFontDialogRes,
                                100, 100, 420, 320, FontDialogCallback,
@@ -2200,11 +2195,11 @@ static const char szFontDialogRes[] =
 
   if(pDlg)
   {
-    iRval = WBShowModal(pDlg->wID, 0);  // or handle inside callback
+    iRval = WBShowModal(pDlg->wID, 0);
 
     if(iRval == IDOK && data.pCurrentFont)
     {
-      pRval = data.pCurrentFont;  // transfer ownership
+      pRval = data.pCurrentFont;  // transfer ownership to caller
       data.pCurrentFont = NULL;
     }
   }
