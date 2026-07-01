@@ -1816,39 +1816,17 @@ static CHXSetting defcolorscheme =
   return NULL;
 }
 
-void CHSettingsRefresh(WB_DISPLAY pDisplay)
+
+static int __CHSettingsRefresh(WB_DISPLAY pDisplay, void **ppData, int *piLen, Atom *paType, int *piFormat)
 {
-// TODO:  implement an XSETTINGS (gnome-settings-manager) 'collection' object and query it
-// NOTE:  so far gnome-settings-manager doesn't provide anything really useful except the theme name
-//        and everything else is either cloned from or implemented as the old-style resource manager
-
-int i1, iLen, nLen, iFormat, nItems, cbSize, cbNameLen, cbStrLen;
-//unsigned long cbData0;
-void *pData;
-unsigned long cbLeft, nI;
-char *pCur, *pDataEnd, *pXSCur, *pXSEnd;
-Atom a_XSETTINGS_Sn, a_XSETTINGS_SETTINGS, aType;
 Window wOwn;
-XSETTINGS_HEADER *pHdr;
-XSETTINGS_DATAHDR *pDHdr;
-char tbuf[256];
+Atom a_XSETTINGS_Sn, a_XSETTINGS_SETTINGS;
+unsigned long cbLeft, nI;
+int nLen;
 
 
-#ifdef HAVE_XSETTINGSD
-    /* xsettingsd is available on the build system */
-    // If xsettingsd is NOT running I probably want to start it
-
-    // TODO:  start 'xsettingsd' first time around, tell it to daemonize.
-#endif
-
-//  aTARGET = XInternAtom(pDisplay, "TARGET", False);
-//  a_MANAGER = XInternAtom(pDisplay, "MANAGER", False);
-//  XA_CLIPBOARD=XInternAtom(pDisplay, "CLIPBOARD", False);
-//  XA_CLIPBOARD_MANAGER=XInternAtom(pDisplay, "CLIPBOARD_MANAGER", False);
   a_XSETTINGS_Sn = XInternAtom(pDisplay, "_XSETTINGS_S0", False);
   a_XSETTINGS_SETTINGS = XInternAtom(pDisplay, "_XSETTINGS_SETTINGS", False);
-
-  // see https://specifications.freedesktop.org/xsettings-spec/xsettings-spec-0.5.html
 
   XGrabServer(pDisplay); // required by above documentation
   wOwn = XGetSelectionOwner(pDisplay, a_XSETTINGS_Sn);
@@ -1858,76 +1836,80 @@ char tbuf[256];
     XUngrabServer(pDisplay);
     WB_ERROR_PRINT("%s:%d - %s unable to retrieve XSETTINGS data (no owner)\n",
                    __FILE__, __LINE__, __FUNCTION__);
-    return;
+    return -1;
   }
 
   // read the property now
 
-  pData = NULL;
-  aType = None; //a_MANAGER;
-  iFormat = 32;
+  *ppData = NULL;
+  *paType = None; //a_MANAGER;
+  *piFormat = 32;
+  *piLen = 0;
   nI = 0;
   cbLeft = 0;
 
   if(XGetWindowProperty(pDisplay, wOwn, a_XSETTINGS_SETTINGS, 0, 0, False,
-                        AnyPropertyType, &aType, &iFormat, &nI, &cbLeft, (unsigned char **)&pData))
+                        AnyPropertyType, paType, piFormat, &nI, &cbLeft, (unsigned char **)ppData))
   {
     XUngrabServer(pDisplay);
     WB_ERROR_PRINT("%s:%d - %s unable to retrieve XSETTINGS data (XSETTINGS_SETTINGS)(a)\n",
                    __FILE__, __LINE__, __FUNCTION__);
-    return;
+    return 1;
   }
 
-  if(pData)
+  if(*ppData)
   {
-    XFree(pData);
-    pData = NULL;
+    XFree(*ppData);
+    *ppData = NULL;
   }
 
   // is this the actual data, or a return that says "do it incrementally" ?
 
-  if(aType == aINCR) // incremental
+  if(*paType == aINCR) // incremental
   {
     XUngrabServer(pDisplay);
     WB_ERROR_PRINT("%s:%d - %s unable to retrieve XSETTINGS data (INCR)\n",
                    __FILE__, __LINE__, __FUNCTION__);
-    return;
+    return 2;
   }
 
-  nLen = iLen = cbLeft; // the RAW length (in bytes)
+  *piLen = cbLeft; // the RAW length (in bytes)
 
-  if(iFormat == 16)
+  if(*piFormat == 16)
   {
-    nLen /= 2;
+    nLen = *piLen / 2;
   }
-  else if(iFormat == 32)
+  else if(*piFormat == 32)
   {
-    nLen /= 4;
+    nLen = *piLen / 4;
+  }
+  else
+  {
+    nLen = *piLen; // fallback, unlikely
   }
 
   // now get it for reals
 
   if(XGetWindowProperty(pDisplay, wOwn, a_XSETTINGS_SETTINGS, 0, nLen, False,
-                        AnyPropertyType, &aType, &iFormat, &nI, &cbLeft, (unsigned char **)&pData)
-     || !pData)
+                        AnyPropertyType, paType, piFormat, &nI, &cbLeft, (unsigned char **)ppData)
+     || !*ppData)
   {
     XUngrabServer(pDisplay);
     WB_ERROR_PRINT("%s:%d - %s unable to retrieve XSETTINGS data (XSETTINGS_SETTINGS)(b)\n",
                    __FILE__, __LINE__, __FUNCTION__);
-    return;
+    return 3;
   }
 
   XUngrabServer(pDisplay); // MUST do this or else bad things happen
 
-
-  if(pData)
+  if(*ppData)
   {
-    if(aType != a_XSETTINGS_SETTINGS)
+    if(*paType != a_XSETTINGS_SETTINGS)
     {
 #ifndef NO_DEBUG
-      char *p1 = WBGetAtomName(pDisplay, aType);
+      char *p1 = WBGetAtomName(pDisplay, *paType);
       WB_ERROR_PRINT("TEMPORARY:  %s:%d - %s returned type %d (%s)\n",
-                     __FILE__, __LINE__, __FUNCTION__, (int)aType, p1);
+                     __FILE__, __LINE__, __FUNCTION__, (int)*paType, p1);
       if(p1)
       {
         WBFree(p1);
@@ -1935,15 +1917,68 @@ char tbuf[256];
 #endif // NO_DEBUG
 
       // TODO:  is this an error??
+
+      XFree(*ppData);
+      *ppData = NULL;
+
+      return 4; // assume it is an error
     }
-  }
-  else
-  {
-    WB_ERROR_PRINT("%s:%d - %s unable to retrieve XSETTINGS data\n",
-                   __FILE__, __LINE__, __FUNCTION__);
-    return;
+
+    return 0;
   }
 
+  // TODO:  anything else?
+
+  WB_WARN_PRINT("TEMPORARY:  %s:%d - %s returned NULL XSETTINGS pointer\n",
+                __FILE__, __LINE__, __FUNCTION__);
+  return 0;  // NULL data poiner returned, for now is OK
+}
+
+void CHSettingsRefresh(WB_DISPLAY pDisplay)
+{
+// TODO:  implement an XSETTINGS (gnome-settings-manager) 'collection' object and query it
+// NOTE:  so far gnome-settings-manager doesn't provide anything really useful except the theme name
+//        and everything else is either cloned from or implemented as the old-style resource manager
+
+int i1, iLen, /*nLen,*/ iFormat, nItems, cbSize, cbNameLen, cbStrLen;
+//unsigned long cbData0;
+void *pData;
+//unsigned long cbLeft, nI;
+char *pCur, *pDataEnd, *pXSCur, *pXSEnd;
+//Atom a_XSETTINGS_Sn, a_XSETTINGS_SETTINGS;
+Atom aType;
+//Window wOwn;
+XSETTINGS_HEADER *pHdr;
+XSETTINGS_DATAHDR *pDHdr;
+char tbuf[256];
+
+
+//  aTARGET = XInternAtom(pDisplay, "TARGET", False);
+//  a_MANAGER = XInternAtom(pDisplay, "MANAGER", False);
+//  XA_CLIPBOARD=XInternAtom(pDisplay, "CLIPBOARD", False);
+//  XA_CLIPBOARD_MANAGER=XInternAtom(pDisplay, "CLIPBOARD_MANAGER", False);
+//  a_XSETTINGS_Sn = XInternAtom(pDisplay, "_XSETTINGS_S0", False);
+//  a_XSETTINGS_SETTINGS = XInternAtom(pDisplay, "_XSETTINGS_SETTINGS", False);
+
+  // see https://specifications.freedesktop.org/xsettings-spec/xsettings-spec-0.5.html
+
+
+  if(__CHSettingsRefresh(pDisplay, &pData, &iLen, &aType, &iFormat))
+    return;
+
+#ifdef HAVE_XSETTINGSD
+  if(!pData) // no XSETTINGS data
+  {
+    /* xsettingsd is available on the build system */
+    // If xsettingsd is NOT running I probably want to start it
+    //         xsettingsd -c "configfilename" &
+
+    // TODO:  start 'xsettingsd' first time around, tell it to daemonize?
+    //        for now just assume I put it into .xinitrc or similar
+
+
+  }
+#endif
 
   // first part is __XSETTINGS_HEADER__ header
   pHdr = (XSETTINGS_HEADER *)pData;

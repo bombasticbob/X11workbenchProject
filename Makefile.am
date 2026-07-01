@@ -13,7 +13,11 @@ if HAVE_DOXYGEN
 endif
 
 # allow multiple simultaneous jobs to speed up automake process
-AUTOMAKE_JOBS = 4
+if MULTIPLE_CORES
+  AUTOMAKE_JOBS = ${NUM_CORES}
+else
+  AUTOMAKE_JOBS = 2
+endif
 
 # This next thing is needed for conf_help.h so it doesn't gripe at me
 # NOTE:  GLOBAL_XPATH and GLOBAL_PATH need the embedded escaped quotes
@@ -51,6 +55,7 @@ endif
 
 if HAVE_XSETTINGSD
 # add conditional install rules, man pages, etc. here
+  AM_CPPFLAGS += -DXSETTINGSD_PATH="${XSETTINGSD}"
 endif
 
 

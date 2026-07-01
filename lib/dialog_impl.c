@@ -2056,12 +2056,171 @@ WB_GEOM geomParent;
 // FONT DIALOG
 //////////////
 
-
-WB_FONT DLGFontDialog(WB_DISPLAY pDisplay, Window wIDOwner, WB_FONTC pDefault)
+/** \brief Internal user data structure for the font dialog callback */
+struct _FONT_DIALOG_
 {
-  return None;
+  WB_FONT pCurrentFont;          // currently selected font (owned by dialog until OK)
+  char *szSelectedFontName;      // font name string (WBAlloc'd, for preview)
+  int iSelectedSize;             // current point size
+  int iSelectedStyle;            // e.g., bold/italic flags (future extension)
+  // TODO: add more fields as needed for filtering, etc.
+};
+
+/** \brief Callback for font dialog controls and events */
+static int FontDialogCallback(Window wID, XEvent *pEvent)
+{
+WBDialogWindow *pDlg = DLGGetDialogWindowStruct(wID);
+struct _FONT_DIALOG_ *pUserData = (struct _FONT_DIALOG_ *)(pDlg ? pDlg->pUserData : NULL);
+
+  if(pEvent->type == ClientMessage && pEvent->xclient.message_type == aDIALOG_INIT)
+  {
+    if(!pDlg || !pUserData)
+    {
+      WB_ERROR_PRINT("%s - no WBDialogWindow or user data in DIALOG_INIT\n", __FUNCTION__);
+      return 0;
+    }
+
+    // TODO: Populate font list control (ID e.g. 1001)
+    // Use WBFont enumeration helpers from font_helper.c to fill list
+    // Example: WBListControlAddString(DLGGetDialogControl(pDlg, 1001), "Luxi Mono Regular");
+
+    // Set initial preview and size
+    DLGSetControlCaption(pDlg, 1002 /* preview ID */, "The quick brown fox jumps over the lazy dog.");
+    // Apply font to preview control via WBDialogControlSetFont or similar
+
+    WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Dialog, "%s - Font dialog initialized\n", __FUNCTION__);
+    return 1;
+  }
+
+  if(!pDlg || !pUserData)
+  {
+    return 0;
+  }
+
+  if(pEvent->type == ClientMessage && pEvent->xclient.message_type == aCONTROL_NOTIFY)
+  {
+    int iNotify = pEvent->xclient.data.l[0];
+    int iCtrlID = pEvent->xclient.data.l[1];
+
+    switch(iCtrlID)
+    {
+      case 1001: // font list
+        if(iNotify == aLIST_NOTIFY)
+        {
+          int iCode = pEvent->xclient.data.l[2];
+          int iSel = pEvent->xclient.data.l[3];
+
+          if(iCode == WB_LIST_SELCHANGE)
+          {
+            // Update preview font
+            // char *szFont = WBListControlGetSelectedString(...);
+            // WBFree(pUserData->szSelectedFontName);
+            // pUserData->szSelectedFontName = WBCopyString(szFont);
+            // Refresh preview
+            WBInvalidateGeom(DLGGetDialogControl(pDlg, 1002), NULL, 1);
+          }
+          else if(iCode == WB_LIST_DBLCLICK)
+          {
+            WBEndModal(wID, IDOK);
+          }
+        }
+        break;
+
+      case 1003: // size edit or slider
+        // Update iSelectedSize, refresh preview
+        break;
+
+      case IDOK: // Select button
+      case IDCANCEL:
+        if(iNotify == aBUTTON_PRESS)
+        {
+          WBEndModal(wID, iCtrlID);
+        }
+        break;
+
+      default:
+        WB_DEBUG_PRINT(DebugLevel_Chatty | DebugSubSystem_Dialog,
+                       "%s - unhandled control notify ID %d\n", __FUNCTION__, iCtrlID);
+    }
+  }
+
+  // TODO: Handle Expose for preview redraw with selected font (use DT functions)
+
+  return 0;
 }
 
+/** \brief Public API implementation (replaces stub in current code) */
+WB_FONT DLGFontDialog(WB_DISPLAY pDisplay, Window wIDOwner, WB_FONTC pDefault)
+{
+struct _FONT_DIALOG_ data;
+WBDialogWindow *pDlg;
+WB_FONT pRval = None;
+int iRval;
+static const char szFontDialogRes[] =
+  "BEGIN_DIALOG FONT:Variable HEIGHT:280 WIDTH:260 TITLE:\"Choose A Font\"\n"
+  "  CONTROL:Edit ID:1000 X:10 Y:10 HEIGHT:14 WIDTH:240 VISIBLE BORDER\n"  // search/filter
+  "  CONTROL:List ID:1001 X:10 Y:26 HEIGHT:150 WIDTH:240 VISIBLE BORDER\n" // font list
+  "  CONTROL:Text ID:1002 X:10 Y:180 HEIGHT:28 WIDTH:240 VISIBLE BORDER HALIGN_TEXT_CENTER\n" // preview
+  "  CONTROL:Text ID:1010 X:80 Y:210 HEIGHT:15 WIDTH:48 VISIBLE NOBORDER TITLE:\"Size:\" HALIGN_TEXT_RIGHT\n"
+  "  CONTROL:Edit ID:1003 X:130 Y:210 HEIGHT:15 WIDTH:50 VISIBLE\n" // size
+//  "  CONTROL:Slider ID:1004 X:20 Y:230 HEIGHT:18 WIDTH:220 VISIBLE\n" // size slider - TODO
+  "  CONTROL:DefPushButton ID:IDOK TITLE:Select X:40 Y:252 WIDTH:70 HEIGHT:20 VISIBLE\n"
+  "  CONTROL:CancelButton ID:IDCANCEL TITLE:Cancel X:150 Y:252 WIDTH:70 HEIGHT:20 VISIBLE\n"
+  "END_DIALOG\n";
+
+
+  if(!pDisplay)
+  {
+    if(wIDOwner != None)
+    {
+      pDisplay = WBGetWindowDisplay(wIDOwner);
+    }
+
+    pDisplay = WBGetDefaultDisplay();
+  }
+
+  bzero(&data, sizeof(data));
+
+  // Initialize from pDefault if provided
+  if(pDefault)
+  {
+    data.pCurrentFont = WBCopyFont(pDisplay, pDefault);
+    // extract name/size
+  }
+  else
+  {
+    data.pCurrentFont = NULL;
+  }
+  data.iSelectedSize = WBGetDefaultFontSize(); // or 14 from image
+
+  pDlg = DLGCreateDialogWindow(wIDOwner, "Font Chooser", szFontDialogRes,
+                               100, 100, 420, 320, FontDialogCallback,
+                               WBDialogWindow_VISIBLE | WBDialogWindow_DOMODAL,
+                               &data);
+
+  if(pDlg)
+  {
+    iRval = WBShowModal(pDlg->wID, 0);  // or handle inside callback
+
+    if(iRval == IDOK && data.pCurrentFont)
+    {
+      pRval = data.pCurrentFont;  // transfer ownership
+      data.pCurrentFont = NULL;
+    }
+  }
+
+  // Cleanup
+  if(data.pCurrentFont)
+  {
+    WBFreeFont(pDisplay, data.pCurrentFont);
+  }
+  if(data.szSelectedFontName)
+  {
+    WBFree(data.szSelectedFontName);
+  }
+
+  return pRval;
+}
 
 
 

@@ -25,11 +25,13 @@ AM_PROG_CC_C_O
 # see https://www.gnu.org/software/autoconf-archive/ax_am_jobserver.html
 # this will enable the '--enable-jobserver' configure parameter
 
+
 AC_PROG_RANLIB
 AC_PATH_X
 AC_PATH_XTRA
 AC_PROG_AWK
 AC_PROG_LN_S
+
 
 # check for presence of doxygen
 ifdef([XORG_WITH_DOXYGEN],
@@ -66,6 +68,10 @@ else
   ac_num_cores=1
   echo "cannot determine; assuming 1"
 fi
+
+# make sure 'NUM_CORES' goes into Makefile
+AM_CONDITIONAL([MULTIPLE_CORES], [test $ac_num_cores -gt 1])
+AC_SUBST([NUM_CORES])
 
 
 # --enable-release (default has debugging enabled)
@@ -729,7 +735,11 @@ AC_ARG_WITH([xsettingsd],
 
 AS_IF([test "x$with_xsettingsd" != xno],
 [
-  AC_PATH_PROG([XSETTINGSD], [xsettingsd], [no])
+#  AC_CHECK_PROG([XSETTINGSD], [xsettingsd], [yes], [no],
+#                [/usr/local/bin${PATH_SEPARATOR}/usr/local/sbin${PATH_SEPARATOR}${PATH}])
+
+  AC_PATH_PROG([XSETTINGSD], [xsettingsd], [no],
+               [/usr/local/bin${PATH_SEPARATOR}/usr/local/sbin${PATH_SEPARATOR}${PATH}])
 
   AS_IF([test "x$XSETTINGSD" != xno],
     [AC_DEFINE([HAVE_XSETTINGSD], [1],
@@ -899,6 +909,8 @@ fi
 
 #################################################################
 # Makefile variable SUBSTITUTIONS (so they go into Makefile)
+
+
 
 # After all of that, I need the variable substitutions.  They go here.
 # This is for stuff I did not actually create a var already for, that

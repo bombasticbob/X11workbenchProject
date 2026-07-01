@@ -1232,7 +1232,14 @@ XColor clr; // temporary
 
   clr.pixel = clrGreen.pixel; // temporary
 
-  DLGColorDialog(pMainFrame->wID, NULL, &clr); // for now...
+//  DLGColorDialog(pMainFrame->wID, NULL, &clr); // for now...
+  WB_FONT fntTest = DLGFontDialog(NULL, pMainFrame->wID, NULL);
+
+  if(fntTest)
+  {
+    WBFreeFont(WBGetWindowDisplay(pMainFrame->wID), fntTest);
+    fntTest = NULL;
+  }
 
   return 1; // handled
 }
