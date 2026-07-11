@@ -1469,25 +1469,107 @@ BEGIN_CREATE_CONTROL(TRISTATEBUTTON_CONTROL);
 }
 
 
-IMPLEMENT_CREATE_CONTROL(HSCROLL_CONTROL)
-{
-BEGIN_CREATE_CONTROL(HSCROLL_CONTROL);
-
-
-
-  return NULL;  // for now
-}
-
+static int vscroll_callback(Window wID, XEvent *pEvent);
 
 IMPLEMENT_CREATE_CONTROL(VSCROLL_CONTROL)
 {
 BEGIN_CREATE_CONTROL(VSCROLL_CONTROL);
 
+  WB_DISPLAY pDisplay = dialog_control_get_display(pDialogControl);
 
+  // TODO:  set up any specific flags for VSCROLL (similar to LIST or others)
+  // pDialogControl->ulFlags |= ... ;  // e.g. for scrollbar-specific behavior
 
-  return NULL;  // for now
+  // focus - scrollbars typically take focus as separate controls
+  pDialogControl->pDlgControlEntry->iFlags |= WBDialogEntry_CAN_HAVE_FOCUS;
+
+  // color information for border, foreground, background
+  // use scrollbar-specific colors from window_dressing if available, else generic
+  alloc_control_colors(pDialogControl, 0);  // non-static for interactive control
+
+  if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width 0 for custom drawing
+                                szClassName, szTitle, vscroll_callback)  // TODO: define vscroll_callback
+     == None)
+  {
+    if(pDialogControl->pPropList)
+    {
+      DLGCDestroyProperties(pDialogControl->pPropList);
+      pDialogControl->pPropList = NULL; // as a matter of course
+    }
+
+    WBDestroyPointerHashPtr(pDialogControl);
+    WBFree(pDialogControl);
+    return NULL;
+  }
+
+  // TODO:  initialize scrollbar-specific data (e.g. WB_SCROLLINFO if embedded)
+  // For now, basic setup.  Integrate with window_dressing.c functions as needed.
+
+  // now allow certain kinds of input messages
+  XSelectInput(pDisplay, pDialogControl->wID,
+               WB_STANDARD_INPUT_MASK | WB_MOUSE_INPUT_MASK | WB_KEYBOARD_INPUT_MASK);
+
+  if(pDialogControl->pDlgControlEntry &&
+     (pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_VISIBLE))
+  {
+    XMapWindow(pDisplay, pDialogControl->wID);
+  }
+
+  return pDialogControl;
 }
 
+
+static int hscroll_callback(Window wID, XEvent *pEvent);
+
+IMPLEMENT_CREATE_CONTROL(HSCROLL_CONTROL)
+{
+BEGIN_CREATE_CONTROL(HSCROLL_CONTROL);
+
+  WB_DISPLAY pDisplay = dialog_control_get_display(pDialogControl);
+
+  // TODO:  set up any specific flags for VSCROLL (similar to LIST or others)
+  // pDialogControl->ulFlags |= ... ;  // e.g. for scrollbar-specific behavior
+
+  // focus - scrollbars typically take focus as separate controls
+  pDialogControl->pDlgControlEntry->iFlags |= WBDialogEntry_CAN_HAVE_FOCUS;
+
+  // color information for border, foreground, background
+  // use scrollbar-specific colors from window_dressing if available, else generic
+  alloc_control_colors(pDialogControl, 0);  // non-static for interactive control
+
+  if(standard_do_create_control(pDialogControl, iX, iY, iWidth, iHeight, 0, // border width 0 for custom drawing
+                                szClassName, szTitle, hscroll_callback)  // TODO: define hscroll_callback
+     == None)
+  {
+    if(pDialogControl->pPropList)
+    {
+      DLGCDestroyProperties(pDialogControl->pPropList);
+      pDialogControl->pPropList = NULL; // as a matter of course
+    }
+
+    WBDestroyPointerHashPtr(pDialogControl);
+    WBFree(pDialogControl);
+    return NULL;
+  }
+
+  // TODO:  initialize scrollbar-specific data (e.g. WB_SCROLLINFO if embedded)
+  // For now, basic setup.  Integrate with window_dressing.c functions as needed.
+
+  // now allow certain kinds of input messages
+  XSelectInput(pDisplay, pDialogControl->wID,
+               WB_STANDARD_INPUT_MASK | WB_MOUSE_INPUT_MASK | WB_KEYBOARD_INPUT_MASK);
+
+  if(pDialogControl->pDlgControlEntry &&
+     (pDialogControl->pDlgControlEntry->iFlags & WBDialogEntry_VISIBLE))
+  {
+    XMapWindow(pDisplay, pDialogControl->wID);
+  }
+
+  return pDialogControl;
+}
+
+
+static int slider_callback(Window wID, XEvent *pEvent);
 
 IMPLEMENT_CREATE_CONTROL(SLIDER_CONTROL)
 {
@@ -1498,6 +1580,8 @@ BEGIN_CREATE_CONTROL(SLIDER_CONTROL);
   return NULL;  // for now
 }
 
+
+static int knob_callback(Window wID, XEvent *pEvent);
 
 IMPLEMENT_CREATE_CONTROL(KNOB_CONTROL)
 {
@@ -2706,6 +2790,877 @@ int iType = pDialogControl->ulFlags & BUTTON_TYPEMASK;  // TODO: use the class o
       break; // start of new group.  end of previous one.  bail.
     }
   }
+}
+
+
+static int VScrollDoExposeEvent(XExposeEvent *pEvent, WB_DISPLAY pDisplay,
+                                Window wID, WBDialogControl *pSelf);
+
+static int vscroll_callback(Window wID, XEvent *pEvent)
+{
+  int i1, iRval = 0;
+  Atom aNotification = None;
+  WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
+  WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
+//  LISTINFO *pListInfo = NULL;
+//  WB_DIALOG_PROP *pProp;
+
+  if(pDialogControl && pEvent->type == Expose)
+  {
+    return VScrollDoExposeEvent(&(pEvent->xexpose), pDisplay, wID, pDialogControl);
+  }
+
+//  pProp = (WB_DIALOG_PROP *)WBDialogControlGetDialogProp(pDialogControl, aDLGC_LISTINFO);
+//
+//  if(pProp)
+//  {
+//    pListInfo = (LISTINFO *)pProp->pVal;
+//  }
+
+
+  // special handling for 'destroy'
+  if(pEvent->type == DestroyNotify &&
+     pEvent->xdestroywindow.window == wID)
+  {
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
+                   "%s - DestroyNotify\n", __FUNCTION__);
+
+//    if(((WBListControl *)pDialogControl)->pBold)
+//    {
+//      // free up the allocated font set, if there is one
+//      WBFreeFont(pDisplay, ((WBListControl *)pDialogControl)->pBold);
+//
+//      ((WBListControl *)pDialogControl)->pBold = NULL;
+ //   }
+
+    WBSetWindowData(wID, 0, NULL);
+
+    if(pDialogControl)
+    {
+      if(pDialogControl->pCaption)
+      {
+        WBFree(pDialogControl->pCaption);
+      }
+
+      if(pDialogControl->pPropList)
+      {
+        DLGCDestroyProperties(pDialogControl->pPropList);
+        pDialogControl->pPropList = NULL; // as a matter of course
+      }
+
+      WBDestroyPointerHashPtr(pDialogControl);
+      WBFree(pDialogControl);
+    }
+
+    return 1;
+  }
+
+  // handle scroll bars (mousie-clickie and keystrokes)
+  // this will generate 'scroll notify' events (as appropriate)
+  i1 = DLGScrollBarHandler(wID, pDialogControl, pEvent);
+
+  if(i1)
+  {
+    WBInvalidateGeom(wID, NULL, 0); // lazy re-paint
+    return i1;
+  }
+
+  // processing notifications sent to me
+
+  if(pEvent->type == ClientMessage &&
+     pEvent->xclient.message_type == aCONTROL_NOTIFY)
+  {
+    char *p1 = WBGetAtomName(pDisplay,(Atom)pEvent->xclient.data.l[0]);
+    WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DialogCtrl | DebugSubSystem_Dialog,
+                   "%s - CONTROL_NOTIFY for window %d (%08xH) - %s %ld\n", __FUNCTION__,
+                   (int)wID, (int)wID, p1, pEvent->xclient.data.l[1]);
+    if(p1)
+    {
+      WBFree(p1);
+    }
+  }
+  else if(pEvent->type == ClientMessage &&
+          pEvent->xclient.message_type == aWB_CHAR)
+  {
+//    iRval = ListDoCharEvent(&(pEvent->xclient), pDisplay, wID, pDialogControl);
+//
+//    if(iRval > 0)
+//    {
+//      DLGNotifyOwner(pDialogControl, aCONTROL_NOTIFY, aLIST_NOTIFY,
+//                     pDialogControl->pDlgControlEntry->iID,
+//                     WB_LIST_SELCHANGE, pListInfo->nPos, 0); // synchronous notification
+//
+//      return 1; // "handled"
+//    }
+
+    iRval = 0; // "not handled"
+  }
+  else if(pEvent->type == ClientMessage &&
+          pEvent->xclient.message_type == aWB_POINTER)
+  {
+    if(pEvent->xclient.data.l[0] == WB_POINTER_CLICK)
+    {
+      // TODO:  handle shift-click, ctrl-click, alt-click
+
+      if(pEvent->xclient.data.l[1] == WB_POINTER_BUTTON1 && // left button
+         !pEvent->xclient.data.l[2])
+      {
+        int iX = pEvent->xclient.data.l[3];
+        int iY = pEvent->xclient.data.l[4];
+
+        WB_SCROLLINFO *pScrollInfo = (WB_SCROLLINFO *)WBDialogControlGetProperty2(pDialogControl, aDLGC_SCROLLINFO);
+
+        if(WB_LIKELY(pScrollInfo != NULL) &&
+           WB_UNLIKELY(WBPointInGeom(iX, iY, pScrollInfo->geomVBar) != 0))
+        {
+          // mouse click was INSIDE of the scroll bar area - this should have already been handled
+
+          WB_ERROR_PRINT("UNHANDLED SCROLL BAR mouse message inside VBAR %d %d %d %d %d\n",
+                          (int)pEvent->xclient.data.l[0],
+                          (int)pEvent->xclient.data.l[1],
+                          (int)pEvent->xclient.data.l[2],
+                          (int)pEvent->xclient.data.l[3],
+                          (int)pEvent->xclient.data.l[4]);
+
+          return 0;
+        }
+
+        WBUpdateWindow(wID);  // posts expose event
+
+        return 1;  // handled
+      }
+    }
+#if 0
+    else if(pEvent->xclient.data.l[0] == WB_POINTER_DBLCLICK)
+    {
+      if(pEvent->xclient.data.l[1] == WB_POINTER_BUTTON1 && // left button
+         !pEvent->xclient.data.l[2])
+      {
+        int iX = pEvent->xclient.data.l[3];
+        int iY = pEvent->xclient.data.l[4];
+
+        // NOTE:  no need to notify selection (would have already been done)
+
+        WB_SCROLLINFO *pScrollInfo = (WB_SCROLLINFO *)WBDialogControlGetProperty2(pDialogControl, aDLGC_SCROLLINFO);
+
+        if(WB_LIKELY(pScrollInfo != NULL) &&
+           WB_UNLIKELY(WBPointInGeom(iX, iY, pScrollInfo->geomVBar) != 0))
+        {
+          WB_ERROR_PRINT("UNHANDLED SCROLL BAR mouse message %d %d %d %d %d\n",
+                          (int)pEvent->xclient.data.l[0],
+                          (int)pEvent->xclient.data.l[1],
+                          (int)pEvent->xclient.data.l[2],
+                          (int)pEvent->xclient.data.l[3],
+                          (int)pEvent->xclient.data.l[4]);
+
+          return 0;
+        }
+
+        // for now assume selection hasn't changed, and post a double-click notification
+        // back to the list control's owner so that appropriate action will be taken
+
+        DLGNotifyOwner(pDialogControl, aCONTROL_NOTIFY, aLIST_NOTIFY,
+                       pDialogControl->pDlgControlEntry->iID,
+                       WB_LIST_DBLCLICK, pListInfo->nPos, 0); // synchronous notification
+
+        return 1;
+      }
+
+      return 0;  // so no further processing happens
+    }
+#endif // 0
+    else if(pEvent->xclient.data.l[0] == WB_POINTER_CANCEL)
+    {
+      // canceling drag (as appropriate)
+
+      WB_SCROLLINFO *pScrollInfo = (WB_SCROLLINFO *)WBDialogControlGetProperty2(pDialogControl, aDLGC_SCROLLINFO);
+
+      if(pScrollInfo &&
+         pEvent->xclient.data.l[1] == WB_POINTER_BUTTON1 && // left button
+         !pEvent->xclient.data.l[2])
+      {
+        WB_ERROR_PRINT("UNHANDLED SCROLL BAR mouse message %d %d %d %d %d\n",
+                        (int)pEvent->xclient.data.l[0],
+                        (int)pEvent->xclient.data.l[1],
+                        (int)pEvent->xclient.data.l[2],
+                        (int)pEvent->xclient.data.l[3],
+                        (int)pEvent->xclient.data.l[4]);
+
+        pScrollInfo->iScrollState &= ~WBScrollState_LDRAG;
+      }
+
+      return 1;
+    }
+    else if(pEvent->xclient.data.l[0] == WB_POINTER_DRAG ||
+            pEvent->xclient.data.l[0] == WB_POINTER_MOVE)
+    {
+      if(pEvent->xclient.data.l[1] == WB_POINTER_BUTTON1 && // left button
+         !pEvent->xclient.data.l[2])
+      {
+        int iX = pEvent->xclient.data.l[3];
+        int iY = pEvent->xclient.data.l[4];
+
+        WB_SCROLLINFO *pScrollInfo = (WB_SCROLLINFO *)WBDialogControlGetProperty2(pDialogControl, aDLGC_SCROLLINFO);
+
+        if(WB_LIKELY(pScrollInfo != NULL) &&
+           WB_UNLIKELY(WBPointInGeom(iX, iY, pScrollInfo->geomVBar) != 0))
+        {
+          WB_ERROR_PRINT("UNHANDLED SCROLL BAR mouse message %d %d %d %d %d\n",
+                          (int)pEvent->xclient.data.l[0],
+                          (int)pEvent->xclient.data.l[1],
+                          (int)pEvent->xclient.data.l[2],
+                          (int)pEvent->xclient.data.l[3],
+                          (int)pEvent->xclient.data.l[4]);
+        }
+      }
+
+      return 0;  // for now (to enforce 'NOT HANDLED')
+    }
+    else if(pEvent->xclient.data.l[0] == WB_POINTER_DROP)
+    {
+      return 1;  // "handled" (just a notification anyway)
+    }
+  }
+  else if(pEvent->type == ClientMessage &&
+          pEvent->xclient.message_type == aSCROLL_NOTIFY)
+  {
+    WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Dialog,
+                   "%s - SCROLL_NOTIFY for window %d (%08xH) - %ld %ld %ld\n", __FUNCTION__,
+                   (int)wID, (int)wID, pEvent->xclient.data.l[0],
+                   pEvent->xclient.data.l[1], pEvent->xclient.data.l[2]);
+#if 0  // this is tracked in SCROLL_INFO, no need to track it HERE
+    if(pEvent->xclient.data.l[0] == WB_SCROLL_VERTICAL)
+    {
+      int iOldTop = pListInfo->nTop;
+      int iOldPos = pListInfo->nPos;
+
+      switch(pEvent->xclient.data.l[1])
+      {
+        case WB_SCROLL_FORWARD:
+          pListInfo->nPos ++;
+
+          if(pListInfo->nPos >= pListInfo->nItems)
+          {
+            pListInfo->nPos = pListInfo->nItems - 1;
+          }
+
+          break;
+        case WB_SCROLL_BACKWARD:
+          pListInfo->nPos --;
+
+          if(pListInfo->nPos < 0)
+          {
+            pListInfo->nPos = 0;
+          }
+
+          break;
+        case WB_SCROLL_PAGEFWD:
+          pListInfo->nTop += pListInfo->nHeight;
+
+          if(pListInfo->nTop + pListInfo->nHeight > pListInfo->nItems)
+          {
+            pListInfo->nTop = pListInfo->nItems - pListInfo->nHeight;
+          }
+
+          if(pListInfo->nPos < pListInfo->nTop)
+          {
+            pListInfo->nPos = pListInfo->nTop;
+          }
+
+          break;
+        case WB_SCROLL_PAGEBACK:
+          pListInfo->nTop -= pListInfo->nHeight;
+
+          if(pListInfo->nTop < 0)
+          {
+            pListInfo->nTop = 0;
+          }
+          if(pListInfo->nPos >= pListInfo->nTop + pListInfo->nHeight)
+          {
+            pListInfo->nPos = pListInfo->nTop + pListInfo->nHeight - 1;
+            if(pListInfo->nPos >= pListInfo->nItems)
+            {
+              pListInfo->nPos = pListInfo->nItems - 1;
+            }
+          }
+
+          break;
+        case WB_SCROLL_FIRST:
+          pListInfo->nPos = 0;
+          pListInfo->nTop = 0;
+          break;
+        case WB_SCROLL_LAST:
+          pListInfo->nPos = pListInfo->nItems - 1;
+          pListInfo->nTop = pListInfo->nItems - pListInfo->nHeight - 1;
+          break;
+        case WB_SCROLL_KNOB:
+          pListInfo->nTop = pEvent->xclient.data.l[2];
+          pListInfo->nPos += pListInfo->nTop - iOldTop;
+
+          goto scroll_sanity;
+
+        case WB_SCROLL_RELATIVE:
+          pListInfo->nTop += pEvent->xclient.data.l[2];
+          pListInfo->nPos += pEvent->xclient.data.l[2];
+          goto scroll_sanity;
+
+        case WB_SCROLL_ABSOLUTE:
+          pListInfo->nPos = pEvent->xclient.data.l[2];
+          pListInfo->nTop = pEvent->xclient.data.l[2];
+          goto scroll_sanity;
+
+        default:
+
+scroll_sanity: // placed here for convenience
+          if(pListInfo->nTop < 0)
+          {
+            pListInfo->nTop = 0;
+          }
+          else if(pListInfo->nTop + pListInfo->nHeight > pListInfo->nItems)
+          {
+            pListInfo->nTop = pListInfo->nItems - pListInfo->nHeight;
+          }
+
+          if(pListInfo->nPos < pListInfo->nTop)
+          {
+            pListInfo->nPos = pListInfo->nTop;
+          }
+          else if(pListInfo->nPos >= pListInfo->nTop + pListInfo->nHeight)
+          {
+            pListInfo->nPos = pListInfo->nTop + pListInfo->nHeight;
+
+            if(pListInfo->nPos >= pListInfo->nItems)
+            {
+              pListInfo->nPos = pListInfo->nItems - 1;
+            }
+          }
+      }
+
+      if(iOldTop != pListInfo->nTop || iOldPos != pListInfo->nPos)
+      {
+        // sanity checks
+        if(pListInfo->nPos < 0)
+        {
+          pListInfo->nPos = 0;
+        }
+        else if(pListInfo->nPos >= pListInfo->nItems)
+        {
+          pListInfo->nPos = pListInfo->nItems - 1;
+        }
+        if(pListInfo->nTop > pListInfo->nPos)
+        {
+          pListInfo->nTop = pListInfo->nPos;
+        }
+        else if(pListInfo->nTop + pListInfo->nHeight <= pListInfo->nPos)
+        {
+          pListInfo->nTop = pListInfo->nPos - pListInfo->nHeight + 1;
+        }
+
+        if(iOldTop != pListInfo->nTop || iOldPos != pListInfo->nPos)
+        {
+          if(iOldTop != pListInfo->nTop)
+          {
+            WB_SCROLLINFO *pScrollInfo = (WB_SCROLLINFO *)WBDialogControlGetProperty2(pDialogControl, aDLGC_SCROLLINFO);
+
+            if(pListInfo->nItemHeight > 0 && pScrollInfo)
+            {
+              if(pEvent->xclient.data.l[1] == WB_SCROLL_KNOB)
+              {
+                WBValidateGeom(wID, &(pListInfo->geomDisplay)); // don't re-paint this yet
+              }
+
+              WBInvalidateVScrollGeom(wID, pScrollInfo, 0, 0);
+
+              if(pEvent->xclient.data.l[1] == WB_SCROLL_KNOB)
+              {
+                WBUpdateWindowImmediately(wID); // re-paint scroll area first
+              }
+
+              WBInvalidateGeom(wID, &(pListInfo->geomDisplay), 0);
+            }
+            else
+            {
+              WBInvalidateGeom(wID, NULL, 0);
+            }
+          }
+          else
+          {
+            ListInvalidateItemRect(wID, pListInfo, iOldPos);
+            ListInvalidateItemRect(wID, pListInfo, pListInfo->nPos);
+          }
+
+          if(pEvent->xclient.data.l[1] == WB_SCROLL_KNOB)
+          {
+            WBUpdateWindowImmediately(wID);
+          }
+          else
+          {
+            WBUpdateWindow(wID);
+          }
+        }
+      }
+      return 1;
+    }
+#endif // 0
+
+    return 1;
+  }
+
+
+
+  // CONTROL NOTIFICATIONS to OWNER
+
+  if(iRval && aNotification != None &&
+     pDialogControl->pOwner &&
+     pDialogControl->pDlgControlEntry)
+  {
+    DLGNotifyOwnerAsync(pDialogControl, aCONTROL_NOTIFY, aNotification,
+                        pDialogControl->pDlgControlEntry->iID,
+                        WBCreatePointerHash(pDialogControl), 0, 0);
+
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                   "%s:%d - Post Event: %08xH %08xH %08xH %pH\n", __FUNCTION__, __LINE__,
+                   (int)aCONTROL_NOTIFY, (int)aNotification,
+                   (int)pDialogControl->pDlgControlEntry->iID, pDialogControl);
+  }
+
+  return iRval;  // 0 if not handled, 1 if handled
+}
+
+
+
+static int HScrollDoExposeEvent(XExposeEvent *pEvent, WB_DISPLAY pDisplay,
+                                Window wID, WBDialogControl *pSelf);
+
+static int hscroll_callback(Window wID, XEvent *pEvent)
+{
+  int i1, iRval = 0;
+  Atom aNotification = None;
+  WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
+  WBDialogControl *pDialogControl = DLGGetDialogControlStruct(wID);
+//  LISTINFO *pListInfo = NULL;
+//  WB_DIALOG_PROP *pProp;
+
+  if(pDialogControl && pEvent->type == Expose)
+  {
+    return HScrollDoExposeEvent(&(pEvent->xexpose), pDisplay, wID, pDialogControl);
+  }
+
+//  pProp = (WB_DIALOG_PROP *)WBDialogControlGetDialogProp(pDialogControl, aDLGC_LISTINFO);
+//
+//  if(pProp)
+//  {
+//    pListInfo = (LISTINFO *)pProp->pVal;
+//  }
+
+
+  // special handling for 'destroy'
+  if(pEvent->type == DestroyNotify &&
+     pEvent->xdestroywindow.window == wID)
+  {
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
+                   "%s - DestroyNotify\n", __FUNCTION__);
+
+//    if(((WBListControl *)pDialogControl)->pBold)
+//    {
+//      // free up the allocated font set, if there is one
+//      WBFreeFont(pDisplay, ((WBListControl *)pDialogControl)->pBold);
+//
+//      ((WBListControl *)pDialogControl)->pBold = NULL;
+ //   }
+
+    WBSetWindowData(wID, 0, NULL);
+
+    if(pDialogControl)
+    {
+      if(pDialogControl->pCaption)
+      {
+        WBFree(pDialogControl->pCaption);
+      }
+
+      if(pDialogControl->pPropList)
+      {
+        DLGCDestroyProperties(pDialogControl->pPropList);
+        pDialogControl->pPropList = NULL; // as a matter of course
+      }
+
+      WBDestroyPointerHashPtr(pDialogControl);
+      WBFree(pDialogControl);
+    }
+
+    return 1;
+  }
+
+  // handle scroll bars (mousie-clickie and keystrokes)
+  // this will generate 'scroll notify' events (as appropriate)
+  i1 = DLGScrollBarHandler(wID, pDialogControl, pEvent);
+
+  if(i1)
+  {
+    WBInvalidateGeom(wID, NULL, 0); // lazy re-paint
+    return i1;
+  }
+
+  // processing notifications sent to me
+
+  if(pEvent->type == ClientMessage &&
+     pEvent->xclient.message_type == aCONTROL_NOTIFY)
+  {
+    char *p1 = WBGetAtomName(pDisplay,(Atom)pEvent->xclient.data.l[0]);
+    WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DialogCtrl | DebugSubSystem_Dialog,
+                   "%s - CONTROL_NOTIFY for window %d (%08xH) - %s %ld\n", __FUNCTION__,
+                   (int)wID, (int)wID, p1, pEvent->xclient.data.l[1]);
+    if(p1)
+    {
+      WBFree(p1);
+    }
+  }
+  else if(pEvent->type == ClientMessage &&
+          pEvent->xclient.message_type == aWB_CHAR)
+  {
+//    iRval = ListDoCharEvent(&(pEvent->xclient), pDisplay, wID, pDialogControl);
+//
+//    if(iRval > 0)
+//    {
+//      DLGNotifyOwner(pDialogControl, aCONTROL_NOTIFY, aLIST_NOTIFY,
+//                     pDialogControl->pDlgControlEntry->iID,
+//                     WB_LIST_SELCHANGE, pListInfo->nPos, 0); // synchronous notification
+//
+//      return 1; // "handled"
+//    }
+
+    iRval = 0; // "not handled"
+  }
+  else if(pEvent->type == ClientMessage &&
+          pEvent->xclient.message_type == aWB_POINTER)
+  {
+    if(pEvent->xclient.data.l[0] == WB_POINTER_CLICK)
+    {
+      // TODO:  handle shift-click, ctrl-click, alt-click
+
+      if(pEvent->xclient.data.l[1] == WB_POINTER_BUTTON1 && // left button
+         !pEvent->xclient.data.l[2])
+      {
+        int iX = pEvent->xclient.data.l[3];
+        int iY = pEvent->xclient.data.l[4];
+
+        WB_SCROLLINFO *pScrollInfo = (WB_SCROLLINFO *)WBDialogControlGetProperty2(pDialogControl, aDLGC_SCROLLINFO);
+
+        if(WB_LIKELY(pScrollInfo != NULL) &&
+           WB_UNLIKELY(WBPointInGeom(iX, iY, pScrollInfo->geomVBar) != 0))
+        {
+          // mouse click was INSIDE of the scroll bar area - this should have already been handled
+
+          WB_ERROR_PRINT("UNHANDLED SCROLL BAR mouse message inside VBAR %d %d %d %d %d\n",
+                          (int)pEvent->xclient.data.l[0],
+                          (int)pEvent->xclient.data.l[1],
+                          (int)pEvent->xclient.data.l[2],
+                          (int)pEvent->xclient.data.l[3],
+                          (int)pEvent->xclient.data.l[4]);
+
+          return 0;
+        }
+
+        WBUpdateWindow(wID);  // posts expose event
+
+        return 1;  // handled
+      }
+    }
+#if 0
+    else if(pEvent->xclient.data.l[0] == WB_POINTER_DBLCLICK)
+    {
+      if(pEvent->xclient.data.l[1] == WB_POINTER_BUTTON1 && // left button
+         !pEvent->xclient.data.l[2])
+      {
+        int iX = pEvent->xclient.data.l[3];
+        int iY = pEvent->xclient.data.l[4];
+
+        // NOTE:  no need to notify selection (would have already been done)
+
+        WB_SCROLLINFO *pScrollInfo = (WB_SCROLLINFO *)WBDialogControlGetProperty2(pDialogControl, aDLGC_SCROLLINFO);
+
+        if(WB_LIKELY(pScrollInfo != NULL) &&
+           WB_UNLIKELY(WBPointInGeom(iX, iY, pScrollInfo->geomVBar) != 0))
+        {
+          WB_ERROR_PRINT("UNHANDLED SCROLL BAR mouse message %d %d %d %d %d\n",
+                          (int)pEvent->xclient.data.l[0],
+                          (int)pEvent->xclient.data.l[1],
+                          (int)pEvent->xclient.data.l[2],
+                          (int)pEvent->xclient.data.l[3],
+                          (int)pEvent->xclient.data.l[4]);
+
+          return 0;
+        }
+
+        // for now assume selection hasn't changed, and post a double-click notification
+        // back to the list control's owner so that appropriate action will be taken
+
+        DLGNotifyOwner(pDialogControl, aCONTROL_NOTIFY, aLIST_NOTIFY,
+                       pDialogControl->pDlgControlEntry->iID,
+                       WB_LIST_DBLCLICK, pListInfo->nPos, 0); // synchronous notification
+
+        return 1;
+      }
+
+      return 0;  // so no further processing happens
+    }
+#endif // 0
+    else if(pEvent->xclient.data.l[0] == WB_POINTER_CANCEL)
+    {
+      // canceling drag (as appropriate)
+
+      WB_SCROLLINFO *pScrollInfo = (WB_SCROLLINFO *)WBDialogControlGetProperty2(pDialogControl, aDLGC_SCROLLINFO);
+
+      if(pScrollInfo &&
+         pEvent->xclient.data.l[1] == WB_POINTER_BUTTON1 && // left button
+         !pEvent->xclient.data.l[2])
+      {
+        WB_ERROR_PRINT("UNHANDLED SCROLL BAR mouse message %d %d %d %d %d\n",
+                        (int)pEvent->xclient.data.l[0],
+                        (int)pEvent->xclient.data.l[1],
+                        (int)pEvent->xclient.data.l[2],
+                        (int)pEvent->xclient.data.l[3],
+                        (int)pEvent->xclient.data.l[4]);
+
+        pScrollInfo->iScrollState &= ~WBScrollState_LDRAG;
+      }
+
+      return 1;
+    }
+    else if(pEvent->xclient.data.l[0] == WB_POINTER_DRAG ||
+            pEvent->xclient.data.l[0] == WB_POINTER_MOVE)
+    {
+      if(pEvent->xclient.data.l[1] == WB_POINTER_BUTTON1 && // left button
+         !pEvent->xclient.data.l[2])
+      {
+        int iX = pEvent->xclient.data.l[3];
+        int iY = pEvent->xclient.data.l[4];
+
+        WB_SCROLLINFO *pScrollInfo = (WB_SCROLLINFO *)WBDialogControlGetProperty2(pDialogControl, aDLGC_SCROLLINFO);
+
+        if(WB_LIKELY(pScrollInfo != NULL) &&
+           WB_UNLIKELY(WBPointInGeom(iX, iY, pScrollInfo->geomVBar) != 0))
+        {
+          WB_ERROR_PRINT("UNHANDLED SCROLL BAR mouse message %d %d %d %d %d\n",
+                          (int)pEvent->xclient.data.l[0],
+                          (int)pEvent->xclient.data.l[1],
+                          (int)pEvent->xclient.data.l[2],
+                          (int)pEvent->xclient.data.l[3],
+                          (int)pEvent->xclient.data.l[4]);
+        }
+      }
+
+      return 0;  // for now (to enforce 'NOT HANDLED')
+    }
+    else if(pEvent->xclient.data.l[0] == WB_POINTER_DROP)
+    {
+      return 1;  // "handled" (just a notification anyway)
+    }
+  }
+  else if(pEvent->type == ClientMessage &&
+          pEvent->xclient.message_type == aSCROLL_NOTIFY)
+  {
+    WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Dialog,
+                   "%s - SCROLL_NOTIFY for window %d (%08xH) - %ld %ld %ld\n", __FUNCTION__,
+                   (int)wID, (int)wID, pEvent->xclient.data.l[0],
+                   pEvent->xclient.data.l[1], pEvent->xclient.data.l[2]);
+#if 0  // this is tracked in SCROLL_INFO, no need to track it HERE
+    if(pEvent->xclient.data.l[0] == WB_SCROLL_VERTICAL)
+    {
+      int iOldTop = pListInfo->nTop;
+      int iOldPos = pListInfo->nPos;
+
+      switch(pEvent->xclient.data.l[1])
+      {
+        case WB_SCROLL_FORWARD:
+          pListInfo->nPos ++;
+
+          if(pListInfo->nPos >= pListInfo->nItems)
+          {
+            pListInfo->nPos = pListInfo->nItems - 1;
+          }
+
+          break;
+        case WB_SCROLL_BACKWARD:
+          pListInfo->nPos --;
+
+          if(pListInfo->nPos < 0)
+          {
+            pListInfo->nPos = 0;
+          }
+
+          break;
+        case WB_SCROLL_PAGEFWD:
+          pListInfo->nTop += pListInfo->nHeight;
+
+          if(pListInfo->nTop + pListInfo->nHeight > pListInfo->nItems)
+          {
+            pListInfo->nTop = pListInfo->nItems - pListInfo->nHeight;
+          }
+
+          if(pListInfo->nPos < pListInfo->nTop)
+          {
+            pListInfo->nPos = pListInfo->nTop;
+          }
+
+          break;
+        case WB_SCROLL_PAGEBACK:
+          pListInfo->nTop -= pListInfo->nHeight;
+
+          if(pListInfo->nTop < 0)
+          {
+            pListInfo->nTop = 0;
+          }
+          if(pListInfo->nPos >= pListInfo->nTop + pListInfo->nHeight)
+          {
+            pListInfo->nPos = pListInfo->nTop + pListInfo->nHeight - 1;
+            if(pListInfo->nPos >= pListInfo->nItems)
+            {
+              pListInfo->nPos = pListInfo->nItems - 1;
+            }
+          }
+
+          break;
+        case WB_SCROLL_FIRST:
+          pListInfo->nPos = 0;
+          pListInfo->nTop = 0;
+          break;
+        case WB_SCROLL_LAST:
+          pListInfo->nPos = pListInfo->nItems - 1;
+          pListInfo->nTop = pListInfo->nItems - pListInfo->nHeight - 1;
+          break;
+        case WB_SCROLL_KNOB:
+          pListInfo->nTop = pEvent->xclient.data.l[2];
+          pListInfo->nPos += pListInfo->nTop - iOldTop;
+
+          goto scroll_sanity;
+
+        case WB_SCROLL_RELATIVE:
+          pListInfo->nTop += pEvent->xclient.data.l[2];
+          pListInfo->nPos += pEvent->xclient.data.l[2];
+          goto scroll_sanity;
+
+        case WB_SCROLL_ABSOLUTE:
+          pListInfo->nPos = pEvent->xclient.data.l[2];
+          pListInfo->nTop = pEvent->xclient.data.l[2];
+          goto scroll_sanity;
+
+        default:
+
+scroll_sanity: // placed here for convenience
+          if(pListInfo->nTop < 0)
+          {
+            pListInfo->nTop = 0;
+          }
+          else if(pListInfo->nTop + pListInfo->nHeight > pListInfo->nItems)
+          {
+            pListInfo->nTop = pListInfo->nItems - pListInfo->nHeight;
+          }
+
+          if(pListInfo->nPos < pListInfo->nTop)
+          {
+            pListInfo->nPos = pListInfo->nTop;
+          }
+          else if(pListInfo->nPos >= pListInfo->nTop + pListInfo->nHeight)
+          {
+            pListInfo->nPos = pListInfo->nTop + pListInfo->nHeight;
+
+            if(pListInfo->nPos >= pListInfo->nItems)
+            {
+              pListInfo->nPos = pListInfo->nItems - 1;
+            }
+          }
+      }
+
+      if(iOldTop != pListInfo->nTop || iOldPos != pListInfo->nPos)
+      {
+        // sanity checks
+        if(pListInfo->nPos < 0)
+        {
+          pListInfo->nPos = 0;
+        }
+        else if(pListInfo->nPos >= pListInfo->nItems)
+        {
+          pListInfo->nPos = pListInfo->nItems - 1;
+        }
+        if(pListInfo->nTop > pListInfo->nPos)
+        {
+          pListInfo->nTop = pListInfo->nPos;
+        }
+        else if(pListInfo->nTop + pListInfo->nHeight <= pListInfo->nPos)
+        {
+          pListInfo->nTop = pListInfo->nPos - pListInfo->nHeight + 1;
+        }
+
+        if(iOldTop != pListInfo->nTop || iOldPos != pListInfo->nPos)
+        {
+          if(iOldTop != pListInfo->nTop)
+          {
+            WB_SCROLLINFO *pScrollInfo = (WB_SCROLLINFO *)WBDialogControlGetProperty2(pDialogControl, aDLGC_SCROLLINFO);
+
+            if(pListInfo->nItemHeight > 0 && pScrollInfo)
+            {
+              if(pEvent->xclient.data.l[1] == WB_SCROLL_KNOB)
+              {
+                WBValidateGeom(wID, &(pListInfo->geomDisplay)); // don't re-paint this yet
+              }
+
+              WBInvalidateHScrollGeom(wID, pScrollInfo, 0, 0);
+
+              if(pEvent->xclient.data.l[1] == WB_SCROLL_KNOB)
+              {
+                WBUpdateWindowImmediately(wID); // re-paint scroll area first
+              }
+
+              WBInvalidateGeom(wID, &(pListInfo->geomDisplay), 0);
+            }
+            else
+            {
+              WBInvalidateGeom(wID, NULL, 0);
+            }
+          }
+          else
+          {
+            ListInvalidateItemRect(wID, pListInfo, iOldPos);
+            ListInvalidateItemRect(wID, pListInfo, pListInfo->nPos);
+          }
+
+          if(pEvent->xclient.data.l[1] == WB_SCROLL_KNOB)
+          {
+            WBUpdateWindowImmediately(wID);
+          }
+          else
+          {
+            WBUpdateWindow(wID);
+          }
+        }
+      }
+      return 1;
+    }
+#endif // 0
+
+    return 1;
+  }
+
+
+
+  // CONTROL NOTIFICATIONS to OWNER
+
+  if(iRval && aNotification != None &&
+     pDialogControl->pOwner &&
+     pDialogControl->pDlgControlEntry)
+  {
+    DLGNotifyOwnerAsync(pDialogControl, aCONTROL_NOTIFY, aNotification,
+                        pDialogControl->pDlgControlEntry->iID,
+                        WBCreatePointerHash(pDialogControl), 0, 0);
+
+    WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl | DebugSubSystem_Keyboard,
+                   "%s:%d - Post Event: %08xH %08xH %08xH %pH\n", __FUNCTION__, __LINE__,
+                   (int)aCONTROL_NOTIFY, (int)aNotification,
+                   (int)pDialogControl->pDlgControlEntry->iID, pDialogControl);
+  }
+
+  return iRval;  // 0 if not handled, 1 if handled
 }
 
 
@@ -5391,6 +6346,202 @@ WB_GEOM geomPaint, geomBorder;
                         DTAlignment_UNDERSCORE | DTAlignment_VCENTER | DTAlignment_HCENTER);
   }
 
+  // by convention, restore original objects/state
+
+  BEGIN_XCALL_DEBUG_WRAPPER
+  WBSetForeground(gc, WBGetWindowFGColor(wID));  // restore it at the end
+  END_XCALL_DEBUG_WRAPPER
+
+  WBEndPaint(wID, gc);
+
+  return 1;  // processed
+}
+
+
+static int VScrollDoExposeEvent(XExposeEvent *pEvent, WB_DISPLAY pDisplay,
+                                Window wID, WBDialogControl *pSelf)
+{
+XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
+WBGC gc;
+WB_GEOM geomPaint, geomBorder;
+WB_SCROLLINFO *pScrollInfo;
+
+
+  WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
+                 "%s - Expose %d (%08xH)\n", __FUNCTION__, (int)wID, (int)wID);
+
+  if(XGetWindowAttributes(pDisplay, wID, &xwa) == 0)
+  {
+    WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
+    return 0;
+  }
+
+  // get graphics context copy and begin painting
+  gc = WBBeginPaint(wID, pEvent, &geomPaint);
+  if(!gc)
+  {
+    WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
+    return 0;
+  }
+
+
+  geomBorder.x = 0;
+  geomBorder.y = 0;
+  geomBorder.width = xwa.width - geomBorder.x;
+  geomBorder.height = xwa.height - geomBorder.y;
+  geomBorder.border = 0; // no additional window border [this MUST be assigned]
+
+  if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_HAS_FOCUS)
+  {
+    WBDrawBorderRect(pDisplay, wID, gc, &geomBorder,
+                     BlackPixel(pDisplay, DefaultScreen(pDisplay)));
+  }
+  else
+  {
+    // use the background color for the dialog window itself
+    WBDrawBorderRect(pDisplay, wID, gc, &geomBorder,
+                     pSelf->pOwner ? pSelf->pOwner->clrBG.pixel : pSelf->clrABG.pixel);
+  }
+
+  geomBorder.x++;
+  geomBorder.y++;
+  geomBorder.height -= 2;
+  geomBorder.width -= 2;
+
+  // calculate a few things
+
+  // border
+  WBDraw3DBorderRect(pDisplay, wID, gc, &geomBorder,
+                     pSelf->clrBD2.pixel, pSelf->clrBD3.pixel);
+
+  // again reduce the size of the border rectangle by 2 pixel2 on all sides
+  geomBorder.x+= 2;
+  geomBorder.y+= 2;
+  geomBorder.height -= 4;
+  geomBorder.width -= 4;
+
+  // painting the scrollbar (assume vertical only)
+
+  pScrollInfo = (WB_SCROLLINFO *)WBDialogControlGetProperty2(pSelf, aDLGC_SCROLLINFO);
+  if(!pScrollInfo)
+  {
+    pScrollInfo = (WB_SCROLLINFO *)WBAlloc(sizeof(*pScrollInfo));
+    if(!pScrollInfo)
+    {
+      WB_ERROR_PRINT("%s:%d Out Of Memory\n", __FUNCTION__, __LINE__);
+      return -1;
+    }
+
+    bzero(pScrollInfo, sizeof(*pScrollInfo));
+    WBDialogControlSetProperty2(pSelf, aDLGC_SCROLLINFO, pScrollInfo); // store scroll info
+  }
+
+//  if(!pListInfo || !pListInfo->nItems)
+//  {
+//    WBCalcVScrollBar(pScrollInfo, &geomBorder, iVScrollWidth, iHScrollHeight, 0, -1);
+//  }
+//
+//  WBDialogControlSetProperty2(pSelf, aDLGC_SCROLLINFO, pScrollInfo); // store updated scroll info (in case it changed)
+
+  WBPaintVScrollBar(pScrollInfo, pDisplay, wID, gc, &geomBorder); // for now use 'border' geometry, later fix?
+  // by convention, restore original objects/state
+
+  BEGIN_XCALL_DEBUG_WRAPPER
+  WBSetForeground(gc, WBGetWindowFGColor(wID));  // restore it at the end
+  END_XCALL_DEBUG_WRAPPER
+
+  WBEndPaint(wID, gc);
+
+  return 1;  // processed
+}
+
+
+static int HScrollDoExposeEvent(XExposeEvent *pEvent, WB_DISPLAY pDisplay,
+                                Window wID, WBDialogControl *pSelf)
+{
+XWindowAttributes xwa;      /* Temp Get Window Attribute struct */
+WBGC gc;
+WB_GEOM geomPaint, geomBorder;
+WB_SCROLLINFO *pScrollInfo;
+
+
+  WB_DEBUG_PRINT(DebugLevel_Heavy | DebugSubSystem_Event | DebugSubSystem_DialogCtrl,
+                 "%s - Expose %d (%08xH)\n", __FUNCTION__, (int)wID, (int)wID);
+
+  if(XGetWindowAttributes(pDisplay, wID, &xwa) == 0)
+  {
+    WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
+    return 0;
+  }
+
+  // get graphics context copy and begin painting
+  gc = WBBeginPaint(wID, pEvent, &geomPaint);
+  if(!gc)
+  {
+    WB_WARN_PRINT("%s - * BUG *  line %d\n", __FUNCTION__, __LINE__);
+    return 0;
+  }
+
+
+  geomBorder.x = 0;
+  geomBorder.y = 0;
+  geomBorder.width = xwa.width - geomBorder.x;
+  geomBorder.height = xwa.height - geomBorder.y;
+  geomBorder.border = 0; // no additional window border [this MUST be assigned]
+
+  if(pSelf->pDlgControlEntry->iFlags & WBDialogEntry_HAS_FOCUS)
+  {
+    WBDrawBorderRect(pDisplay, wID, gc, &geomBorder,
+                     BlackPixel(pDisplay, DefaultScreen(pDisplay)));
+  }
+  else
+  {
+    // use the background color for the dialog window itself
+    WBDrawBorderRect(pDisplay, wID, gc, &geomBorder,
+                     pSelf->pOwner ? pSelf->pOwner->clrBG.pixel : pSelf->clrABG.pixel);
+  }
+
+  geomBorder.x++;
+  geomBorder.y++;
+  geomBorder.height -= 2;
+  geomBorder.width -= 2;
+
+  // calculate a few things
+
+  // border
+  WBDraw3DBorderRect(pDisplay, wID, gc, &geomBorder,
+                     pSelf->clrBD2.pixel, pSelf->clrBD3.pixel);
+
+  // again reduce the size of the border rectangle by 2 pixel2 on all sides
+  geomBorder.x+= 2;
+  geomBorder.y+= 2;
+  geomBorder.height -= 4;
+  geomBorder.width -= 4;
+
+  // painting the scrollbar (assume vertical only)
+
+  pScrollInfo = (WB_SCROLLINFO *)WBDialogControlGetProperty2(pSelf, aDLGC_SCROLLINFO);
+  if(!pScrollInfo)
+  {
+    pScrollInfo = (WB_SCROLLINFO *)WBAlloc(sizeof(*pScrollInfo));
+    if(!pScrollInfo)
+    {
+      WB_ERROR_PRINT("%s:%d Out Of Memory\n", __FUNCTION__, __LINE__);
+      return -1;
+    }
+
+    bzero(pScrollInfo, sizeof(*pScrollInfo));
+    WBDialogControlSetProperty2(pSelf, aDLGC_SCROLLINFO, pScrollInfo); // store scroll info
+  }
+
+//  if(!pListInfo || !pListInfo->nItems)
+//  {
+//    WBCalcHScrollBar(pScrollInfo, &geomBorder, iHScrollWidth, iHScrollHeight, 0, -1);
+//  }
+//
+//  WBDialogControlSetProperty2(pSelf, aDLGC_SCROLLINFO, pScrollInfo); // store updated scroll info (in case it changed)
+
+  WBPaintHScrollBar(pScrollInfo, pDisplay, wID, gc, &geomBorder); // for now use 'border' geometry, later fix?
   // by convention, restore original objects/state
 
   BEGIN_XCALL_DEBUG_WRAPPER

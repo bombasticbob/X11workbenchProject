@@ -1890,7 +1890,7 @@ char tbuf[256];
 }
 
 
-
+/** \brief Creates individual dialog child windows **/
 static int InternalCreateChildWindowsSub(DIALOG_WINDOW *pDlg, const char **pszDialogResource)
 {
 const char *p1, *p2, *p3;

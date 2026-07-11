@@ -1863,7 +1863,8 @@ WB_SCROLLINFO *pScrollInfo;
   if(pEvent->xclient.message_type == aWB_POINTER)
   {
     // pointer messages - cooked mousie clickie
-    WB_ERROR_PRINT("TEMPORARY:  %s mouse message %d (%08xH) %d %d %d %d %d\n",
+    WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DialogCtrl | DebugSubSystem_Dialog,
+                   "%s mouse message %d (%08xH) %d %d %d %d %d\n",
                    __FUNCTION__,
                    (int)pEvent->xclient.window, (int)pEvent->xclient.window,
                    (int)pEvent->xclient.data.l[0],
@@ -1877,6 +1878,11 @@ WB_SCROLLINFO *pScrollInfo;
     iRval = WBScrollBarEvent(wID, pEvent, pScrollInfo);
     if(pScrollInfo && iRval)
     {
+       if(iRval)
+          WB_DEBUG_PRINT(DebugLevel_Verbose | DebugSubSystem_DialogCtrl | DebugSubSystem_Dialog,
+                         "%s - Scroll Bar Event for window %d (%08xH) - %ld\n", __FUNCTION__,
+                         (int)wID, (int)wID, pEvent->xclient.data.l[1]);
+
       return iRval; // return whatever 'WBScrollBarEvent' says to return
     }
   }
