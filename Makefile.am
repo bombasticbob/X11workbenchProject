@@ -1,11 +1,14 @@
 bin_PROGRAMS = X11workbench
+
+BUILT_SOURCES = include/X11workbenchToolkit_install_config.h
+
 X11workbench_SOURCES = X11workbench.c X11workbench.h main_frame.c main_frame.h refactor.c refactor.h
 X11workbench_SOURCES += gizzard.c gizzard.h gdb_helper.c gdb_helper.h resource_edit.c resource_edit.h
 X11workbench_SOURCES += context_help.c context_help.h
 X11workbench_SOURCES += application_icon.xpm splash.xpm textfiledoc.xpm newdoc.xpm clangdoc.xpm makefiledoc.xpm
 X11workbench_SOURCES += doxy_comments.dox doxy.txt doxy_footer.html doxy_header.html doxy_stylesheet.css
 
-X11workbench_DEPENDENCIES = toolkit_lib
+X11workbench_DEPENDENCIES = include/X11workbenchToolkit_install_config.h toolkit_lib
 TOOLKIT_DOCDEPENDS = doxy.txt doxy_comments.dox doxy_footer.html doxy_header.html doxy_stylesheet.css
 
 if HAVE_DOXYGEN
@@ -137,7 +140,9 @@ endif
 # subdirectories containing additional sources
 SUBDIRS = lib
 
-
+# make sure autoheader runs when it needs to
+include/X11workbenchToolkit_config.h:
+	autoheader
 
 # pseudo target for building the library
 
@@ -145,7 +150,12 @@ SUBDIRS = lib
 
 lib/libX11workbenchToolkit.a: toolkit_lib
 
-toolkit_lib:
+include/X11workbenchToolkit_install_config.h: include/X11workbenchToolkit_config.h
+	@echo forcing build of include/X11workbenchToolkit_install_config.h
+	$(MAKE) -j 1 -C lib ../include/X11workbenchToolkit_config.h
+
+toolkit_lib: include/X11workbenchToolkit_install_config.h
+	@echo Building X11workbench Toolkit Libraries
 	$(MAKE) -j $(NUM_CORES) -C lib libX11workbenchToolkit.a
 
 

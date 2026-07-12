@@ -77,11 +77,34 @@
 
 static int MBMenuPopupEvent(Window wID, XEvent *pEvent);
 
-#define HEIGHT_SPACING 4    /* pixels between menu items */
+#define MIN_HEIGHT_SPACING 4    /* pixels between menu items */
 #define SEPARATOR_HEIGHT 5  /* height of menu item separator */
 #define SEPARATOR_POS 2 /* position of separator from 'iPosition' */
 
 #define WB_MOUSE_FAR 24 /* 24 pixels, about 2 'W' characters on hi-res display */
+
+#define CALC_POPUP_ITEM_HEIGHT(X) __internalCalcPopupItemHeight(X)
+#define CALC_POPUP_ITEM_SPACING(X) __internalCalcPopupItemSpacing(X)
+
+
+
+static __inline__ int __internalCalcPopupItemSpacing(int nH)
+{
+  int nP = (nH + 1) / 3 + 1;
+
+  if(nP < MIN_HEIGHT_SPACING)
+    nP = MIN_HEIGHT_SPACING;
+
+  return nP;
+}
+
+static __inline__ int __internalCalcPopupItemHeight(WB_FONTC pF)
+{
+  int nH = WBFontHeight(pF);
+  int nP = __internalCalcPopupItemSpacing(nH);
+
+  return nH + nP;
+}
 
 static void __SetFirstSelection(WBMenuPopupWindow *pSelf, WBMenu *pMenu)
 {
@@ -334,7 +357,7 @@ WBMenuPopupWindow *MBCreateMenuPopupWindow(Window wIDBar, Window wIDOwner, WBMen
     pItem->iPosition = iVPos;  // also needed for mousie/clickie
     pItem->iTextWidth = WBTextWidth(pFS, tbuf, strlen(tbuf));
 
-    iVPos += WBFontHeight(pFS) + HEIGHT_SPACING;
+    iVPos += CALC_POPUP_ITEM_HEIGHT(pFS); // WBFontHeight(pFS) + HEIGHT_SPACING;
 
     if(iHPos < 2 * iHBorder + pItem->iTextWidth)
       iHPos = 2 * iHBorder + pItem->iTextWidth;
@@ -741,7 +764,7 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
 
     if(i1 == pSelf->iSelected)  // selected item
     {
-      int iItemHeight = WBFontHeight(pFont) + HEIGHT_SPACING;
+      int iItemHeight = CALC_POPUP_ITEM_HEIGHT(pFont); //WBFontHeight(pFont) + HEIGHT_SPACING;
 
       WBSetForeground(gc, clrMenuActiveBG.pixel);
       WBSetBackground(gc, clrMenuActiveBG.pixel);
@@ -890,7 +913,7 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
       WBSetBackground(gc, clrMenuBG.pixel);
     }
 
-    iVPos += iHeight + HEIGHT_SPACING;
+    iVPos += iHeight + CALC_POPUP_ITEM_SPACING(iHeight);
   }
 
   // by convention, restore original objects/state

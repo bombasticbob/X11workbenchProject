@@ -107,7 +107,20 @@ static int MenuBarDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu, WB_DISPLAY 
 #define BORDER  32 /* was 1 */
 #define MENU_FONT    "fixed"
 #define MENU_ALT_FONT "*-fixed-*"
-#define MENU_FONT_SIZE 13
+#define MIN_MENU_FONT_SIZE 13
+#define MENU_FONT_SIZE (__internal_get_menu_font_size())
+#define MENU_BAR_WINDOW_PADDING 4 /* pixel padding around menu bar */
+
+
+// Fonts for menus - TODO use separate setting??
+static __inline__ int __internal_get_menu_font_size(void)
+{
+  int nRet = WBGetDefaultFontSize();
+
+  return nRet < MIN_MENU_FONT_SIZE ? MENU_FONT_SIZE : nRet;
+}
+
+
 
 // global color definitions
 XColor clrMenuFG, clrMenuBG, clrMenuActiveFG, clrMenuActiveBG, clrMenuBorder1, clrMenuBorder2, clrMenuBorder3,
@@ -391,7 +404,7 @@ WBMenuBarWindow *MBCreateMenuBarWindow(Window wIDParent, const char *pszResource
   if(!pFS)
     xsh.height = 32;
   else
-    xsh.height = 2 * WBFontAscent(pFS) + WBFontDescent(pFS);
+    xsh.height = 2 * (WBFontAscent(pFS) + WBFontDescent(pFS));
 
   if(xsh.height > (rct.bottom - rct.top))
     xsh.height = rct.bottom - rct.top;
@@ -434,10 +447,10 @@ WBMenuBarWindow *MBCreateMenuBarWindow(Window wIDParent, const char *pszResource
   pRval->iFlags = iFlags;  // make a copy of them (for now)
 
   // calculate the initial position and height of the menu bar within the window
-  pRval->iX = xsh.x + 4;
-  pRval->iY = xsh.y + 4;
-  pRval->iWidth = xsh.width - 8;
-  pRval->iHeight = xsh.height - 8;
+  pRval->iX = xsh.x + MENU_BAR_WINDOW_PADDING;
+  pRval->iY = xsh.y + MENU_BAR_WINDOW_PADDING;
+  pRval->iWidth = xsh.width - (MENU_BAR_WINDOW_PADDING * 2);
+  pRval->iHeight = xsh.height - (MENU_BAR_WINDOW_PADDING * 2);
 
   // establish this window as NEVER getting the input focus
   bzero(&xwmh, sizeof(xwmh));
