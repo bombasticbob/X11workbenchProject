@@ -9,7 +9,7 @@
 //                                                                                                             //
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                                                                                                             //
-//                                      Copyright (c) 2025 by S.F.T. Inc.                                      //
+//                                   Copyright (c) 2010-2026 by S.F.T. Inc.                                    //
 //                    Use, copying, and distribution of this software are licensed according                   //
 //                      to the GPLv2, LGPLv2, or BSD license, as appropriate (see COPYING)                     //
 //                                                                                                             //

@@ -12,7 +12,7 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+    Copyright (c) 2010-2026 by Bob Frazier (aka 'Big Bad Bombastic Bob')
                            all rights reserved
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
@@ -143,7 +143,7 @@ int nCPU = 0;
 
 void WBUsage(void)
 {
-  fputs("X11workbench - Copyright (c) 2010-2019 by S.F.T. Inc. - all rights reserved\n\n"
+  fputs("X11workbench - Copyright (c) 2010-2026 by S.F.T. Inc. - all rights reserved\n\n"
         "Usage:      X11workbench [options] filename [filename [...]]\n"
         "  where     'filename' represents one or more files or workspaces to be opened on startup\n"
         "\n"
@@ -356,7 +356,7 @@ next_argument:
 #ifdef UTF8_COPYRIGHT
                                     "Copyright " UTF8_COPYRIGHT " 2010-2019 by Big Bad Bombastic Bob\nwww.mrp3.com"  // text string with unicode char in it U+00A9
 #else // UTF8_COPYRIGHT
-                                    "Copyright (c) 2010-2019 by Big Bad Bombastic Bob\nwww.mrp3.com"
+                                    "Copyright (c) 2010-2026 by Big Bad Bombastic Bob\nwww.mrp3.com"
 #endif // UTF8_COPYRIGHT
                                    );
 
@@ -382,7 +382,7 @@ next_argument:
     else
     {
       DLGSplashScreen(splash_xpm,
-                      "Copyright (c) 2010-2019 by Big Bad Bombastic Bob\nwww.mrp3.com", // 1 or 2 lines only
+                      "Copyright (c) 2010-2026 by Big Bad Bombastic Bob\nwww.mrp3.com", // 1 or 2 lines only
                       WhitePixel(pX11Display, DefaultScreen(pX11Display))); // white text
     }
   }

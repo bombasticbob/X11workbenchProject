@@ -13,7 +13,7 @@
 /*****************************************************************************
 
     X11workbench - X11 programmer's 'work bench' application and toolkit
-    Copyright (c) 2010-2019 by Bob Frazier (aka 'Big Bad Bombastic Bob')
+    Copyright (c) 2010-2026 by Bob Frazier (aka 'Big Bad Bombastic Bob')
 
 
   DISCLAIMER:  The X11workbench application and toolkit software are supplied
@@ -2157,11 +2157,12 @@ WB_FONT pRval = None;
 int iRval;
 static const char szFontDialogRes[] =
   "BEGIN_DIALOG FONT:Variable HEIGHT:280 WIDTH:260 TITLE:\"Choose A Font\"\n"
-  "  CONTROL:Edit ID:1000 X:10 Y:10 HEIGHT:14 WIDTH:240 VISIBLE BORDER\n"  // search/filter
-  "  CONTROL:List ID:1001 X:10 Y:26 HEIGHT:150 WIDTH:240 VISIBLE BORDER\n" // font list
-  "  CONTROL:Text ID:1002 X:10 Y:180 HEIGHT:28 WIDTH:240 VISIBLE BORDER HALIGN_TEXT_CENTER\n" // preview
+  "  CONTROL:Edit ID:1000 X:20 Y:10 HEIGHT:14 WIDTH:220 VISIBLE BORDER\n"  // search/filter
+  "  CONTROL:List ID:1001 X:20 Y:26 HEIGHT:150 WIDTH:220 VISIBLE BORDER\n" // font list
+  "  CONTROL:Text ID:1002 X:20 Y:180 HEIGHT:28 WIDTH:220 VISIBLE BORDER HALIGN_TEXT_CENTER\n" // preview
   "  CONTROL:Text ID:1010 X:80 Y:210 HEIGHT:15 WIDTH:48 VISIBLE NOBORDER TITLE:\"Size:\" HALIGN_TEXT_RIGHT\n"
   "  CONTROL:Edit ID:1003 X:130 Y:210 HEIGHT:15 WIDTH:50 VISIBLE\n" // size
+  "  CONTROL:VScroll ID:1004 X:5 Y:10 HEIGHT:240 WIDTH:15 VISIBLE BORDER\n"
 //  "  CONTROL:Slider ID:1004 X:20 Y:230 HEIGHT:18 WIDTH:220 VISIBLE\n" // size slider - TODO
   "  CONTROL:DefPushButton ID:IDOK TITLE:Select X:40 Y:252 WIDTH:70 HEIGHT:20 VISIBLE\n"
   "  CONTROL:CancelButton ID:IDCANCEL TITLE:Cancel X:150 Y:252 WIDTH:70 HEIGHT:20 VISIBLE\n"
