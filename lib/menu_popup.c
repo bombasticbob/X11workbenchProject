@@ -831,7 +831,7 @@ static int MenuPopupDoExposeEvent(XExposeEvent *pEvent, WBMenu *pMenu,
         }
         else
         {
-          iU2 = iU2 = WBTextWidth(pFont, " ", 1); // should not happen [width of a space]
+          iU2 = WBTextWidth(pFont, " ", 1); // should not happen [width of a space]
         }
       }
       else

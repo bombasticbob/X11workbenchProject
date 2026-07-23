@@ -644,9 +644,10 @@ int iBarHeight, iBarWidth;
      pScrollInfo->iHBarWidth == iBarWidth &&
      pScrollInfo->iVKnob >= 0 &&
      pScrollInfo->iVKnobSize >= 0 &&
-     pScrollInfo->iVPos == nPos &&
-     pScrollInfo->iVMin == 0 &&
-     pScrollInfo->iVMax == (nListItems - 1))
+     (pScrollInfo->iVPos == nPos || (nListItems == -1 && nPos == -1)) &&
+     ((pScrollInfo->iVMin == 0 &&
+       pScrollInfo->iVMax == (nListItems - 1)) ||
+      (nListItems == -1 && nPos == -1)))
   {
     // assume it's set up correctly
 
@@ -666,17 +667,20 @@ int iBarHeight, iBarWidth;
                  "%s.%d -  %d %d %d %d %d\n", __FUNCTION__, __LINE__,
                  iBarHeight, iVScrollWidth, iHScrollHeight, nListItems, nPos);
 
-  pScrollInfo->iVMin = 0;
-  pScrollInfo->iVMax = nListItems - 1;
+  if(nListItems != -1 || nPos != -1)
+  {
+    pScrollInfo->iVMin = 0;
+    pScrollInfo->iVMax = nListItems - 1;
 
-  if(nPos == -1 ||
-     (nPos >= pScrollInfo->iVMin && nPos <= pScrollInfo->iVMax))
-  {
-    pScrollInfo->iVPos = nPos;
-  }
-  else
-  {
-    pScrollInfo->iVPos = nPos = -1;
+    if(nPos == -1 ||
+       (nPos >= pScrollInfo->iVMin && nPos <= pScrollInfo->iVMax))
+    {
+      pScrollInfo->iVPos = nPos;
+    }
+    else
+    {
+      pScrollInfo->iVPos = nPos = -1;
+    }
   }
 
   InternalCalcVScrollBar(pScrollInfo, pgeomClient, iVScrollWidth, iHScrollHeight);
@@ -701,11 +705,12 @@ int /*iKnobSize, iKnobPos,*/ iBarHeight, iBarWidth;
 
   if(pScrollInfo->iVBarHeight == iBarHeight &&
      pScrollInfo->iHBarWidth == iBarWidth &&
-     pScrollInfo->iVKnob >= 0 &&
-     pScrollInfo->iVKnobSize >= 0 &&
-     pScrollInfo->iVPos == nPos &&
-     pScrollInfo->iVMin == 0 &&
-     pScrollInfo->iVMax == (nListItems - 1))
+     pScrollInfo->iHKnob >= 0 &&
+     pScrollInfo->iHKnobSize >= 0 &&
+     (pScrollInfo->iHPos == nPos || (nListItems == -1 && nPos == -1)) &&
+     ((pScrollInfo->iHMin == 0 &&
+       pScrollInfo->iHMax == (nListItems - 1)) ||
+      (nListItems == -1 && nPos == -1)))
   {
     // assume it's set up correctly
 
@@ -725,18 +730,20 @@ int /*iKnobSize, iKnobPos,*/ iBarHeight, iBarWidth;
                  "%s.%d -  %d %d %d %d %d\n", __FUNCTION__, __LINE__,
                  iBarWidth, iVScrollWidth, iHScrollHeight, nListItems, nPos);
 
-  pScrollInfo->iHMin = 0;
-  pScrollInfo->iHMax = nListItems - 1;
-
-
-  if(nPos == -1 ||
-     (nPos >= 0 && nPos < nListItems))
+  if(nListItems != -1 || nPos != -1)
   {
-    pScrollInfo->iHPos = nPos;
-  }
-  else
-  {
-    pScrollInfo->iHPos = nPos = -1;
+    pScrollInfo->iHMin = 0;
+    pScrollInfo->iHMax = nListItems - 1;
+
+    if(nPos == -1 ||
+       (nPos >= 0 && nPos < nListItems))
+    {
+      pScrollInfo->iHPos = nPos;
+    }
+    else
+    {
+      pScrollInfo->iHPos = nPos = -1;
+    }
   }
 
   InternalCalcHScrollBar(pScrollInfo, pgeomClient, iVScrollWidth, iHScrollHeight);

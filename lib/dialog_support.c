@@ -959,7 +959,7 @@ Atom aProp;
       }
     }
 
-    pProp->pVal = pPropVal->pVal;
+    pProp->pVal = pPropVal->pVal;  // direct assignment, WBAlloc'd pointers only!!!
   }
 
   // last but not least, tell the dialog control its properties were altered
@@ -1834,6 +1834,50 @@ WB_DISPLAY pDisplay = WBGetWindowDisplay(wID);
   BEGIN_XCALL_DEBUG_WRAPPER
   WBSetForeground(gc, WBGetWindowFGColor(wID));  // restore it at the end
   END_XCALL_DEBUG_WRAPPER
+}
+
+
+
+
+/////////////////////
+// SCROLL BAR INFO //
+/////////////////////
+
+WB_SCROLLINFO *DLGGetControlScrollInfo(WBDialogControl *pControl)
+{
+WB_SCROLLINFO *pScrollInfo = (WB_SCROLLINFO *)WBDialogControlGetProperty2(pControl, aDLGC_SCROLLINFO);
+
+  if(!pScrollInfo)
+  {
+    pScrollInfo = (WB_SCROLLINFO *)WBAlloc(sizeof(*pScrollInfo));
+    if(!pScrollInfo)
+    {
+      WB_ERROR_PRINT("%s:%d Out Of Memory\n", __FUNCTION__, __LINE__);
+      return NULL;
+    }
+
+    WBInitScrollInfo(pScrollInfo);
+    WBDialogControlSetProperty2(pControl, aDLGC_SCROLLINFO, pScrollInfo);
+  }
+
+  return pScrollInfo;
+}
+
+
+void DLGSetControlScrollInfo(WBDialogControl *pControl, const WB_SCROLLINFO *pScrollInfo)
+{
+WB_SCROLLINFO *pSI = DLGGetControlScrollInfo(pControl);
+
+  if(!pSI) // only really bad errors do this
+  {
+    WB_ERROR_PRINT("%s:%d No Scroll Info for Control\n", __FUNCTION__, __LINE__);
+    return;
+  }
+
+  if((const WB_SCROLLINFO *)pSI != pScrollInfo)
+    memcpy(pSI, pScrollInfo, sizeof(*pSI));  // make a copy
+
+  //WBDialogControlSetProperty2(pControl, aDLGC_SCROLLINFO, pSl);
 }
 
 

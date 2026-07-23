@@ -272,8 +272,10 @@ int WBCalcHScrollDragPos(WB_SCROLLINFO *pScrollInfo, int iX); // 'iX' is the 'x'
   * \param nPos The current position within the list of scrollable items
   *
   * Use this function to re-calculate the parameters associated with a vertical scroll bar
+  * Setting both nListItens and nPos to '-1' leaves scale and position unchanged.
   *
   * Header File:  window_dressing.h
+  * \sa \ref WBSetVScrollPos(), \ref WBSetVScrollRange(), \ref WBInvalidateVScrollGeom()
 **/
 void WBCalcVScrollBar(WB_SCROLLINFO *pScrollInfo, WB_GEOM *pgeomClient, int iVScrollWidth,
                       int iHScrollHeight, int nListItems, int nPos);  // calculates V scroll geometry for paint
@@ -289,8 +291,10 @@ void WBCalcVScrollBar(WB_SCROLLINFO *pScrollInfo, WB_GEOM *pgeomClient, int iVSc
   * \param nPos The current position within the list of scrollable items
   *
   * Use this function to re-calculate the parameters associated with a horizontal scroll bar
+  * Setting both nListItens and nPos to '-1' leaves scale and position unchanged.
   *
   * Header File:  window_dressing.h
+  * \sa \ref WBSetHScrollPos(), \ref WBSetHScrollRange(), \ref WBInvalidateHScrollGeom()
 **/
 void WBCalcHScrollBar(WB_SCROLLINFO *pScrollInfo, WB_GEOM *pgeomClient, int iVScrollWidth,
                       int iHScrollHeight, int nListItems, int nPos);  // calculates H scroll geometry for paint

@@ -60,6 +60,10 @@ extern "C" {
 #endif // __cplusplus
 
 
+// forward reference from window_dressing.h
+typedef struct tagWB_SCROLL_INFO WB_SCROLLINFO;
+
+
 /** \file dialog_controls.h definitions for dialog control structures and APIs */
 
 /** \defgroup dlgctrl_atom 'Standard Control Name' Atoms
@@ -366,7 +370,7 @@ static __inline__ void WBDialogControlInvalidateRegion(WBDialogControl *pDialogC
 
 // generic property list helpers (low level)
 /** \ingroup dlgctrl
-  * \brief Low-level dialog control property assignment
+  * \brief Low-level dialog control property assignment.
   *
   * Header File:  dialog_controls.h
 **/
@@ -378,7 +382,7 @@ int WBDialogControlSetDialogProp(WBDialogControl *pCtrl, WB_DIALOG_PROP *pPropVa
 **/
 void WBDialogControlDelDialogProp(WBDialogControl *pCtrl, Atom aProp);
 /** \ingroup dlgctrl
-  * \brief Low-level dialog control property retrieval
+  * \brief Low-level dialog control property retrieval (the actual pointer, not a copy)
   *
   * Header File:  dialog_controls.h
 **/
@@ -1649,6 +1653,30 @@ int DLGGetControlListSelectionBits(WBDialogControl *pCtrl, unsigned int *piBits,
 char * DLGGetControlListSelectionText(WBDialogControl *pCtrl); // caller must 'WBFree()' non-NULL returned pointer
   // this returns TEXT elements (separated by line feeds) for corresponding selected LB entries
   // use this for multi-selection listboxes with unique text entries for which the list text is desired
+
+// SCROLL BARS and SCROLL INFO
+
+/** \ingroup dlgctrl
+  * \brief Retrieve Scroll Info \ref WB_SCROLLINFO structure for the specified control
+  *
+  * \param pControl A pointer to the WBDialogControl structure for the dialog control
+  * \returns The actual pointer containing the WB_SCROLLINFO for this control, NULL on error.
+  *
+  * NOTE:  Do NOT free the pointer returned by this function.
+  *
+  * Header File:  dialog_controls.h
+**/
+WB_SCROLLINFO *DLGGetControlScrollInfo(WBDialogControl *pControl);
+
+/** \ingroup dlgctrl
+  * \brief Scroll bar event filter for dialog control callback function.  Generates scroll events
+  *
+  * \param pControl A pointer to the WBDialogControl structure for the dialog control
+  * \param A const pointer to a WB_SCROLLINFO structure to assign to ther control.  Data is copied.
+  *
+  * Header File:  dialog_controls.h
+**/
+void DLGSetControlScrollInfo(WBDialogControl *pControl, const WB_SCROLLINFO *pScrollInfo);
 
 
 // SCROLL NOTIFICATION GENERATOR - generic pre-filter / handler for embedded scroll bars

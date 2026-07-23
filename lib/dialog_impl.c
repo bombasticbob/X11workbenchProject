@@ -69,6 +69,7 @@
 #endif // XK_Delete
 
 #include "window_helper.h"
+#include "window_dressing.h"
 #include "pixmap_helper.h"  // pixmap helpers, including pre-defined icons
 #include "dialog_window.h"
 #include "dialog_controls.h"
@@ -2089,6 +2090,20 @@ struct _FONT_DIALOG_ *pUserData = (struct _FONT_DIALOG_ *)(pDlg ? pDlg->pUserDat
 
     /* Set initial size if needed */
     /* DLGSetControlCaption(pDlg, 1003, "14"); */
+
+    // set scroll position to font size with reasonable range
+    WB_SCROLLINFO *pSI = DLGGetControlScrollInfo(DLGGetDialogControlStructFromID(pDlg, 1004));
+    if(pSI)
+    {
+      WBSetVScrollRange(pSI, 1, 128);
+      WBSetVScrollPos(pSI, 14); // hard code for now
+    }
+    pSI = DLGGetControlScrollInfo(DLGGetDialogControlStructFromID(pDlg, 1005));
+    if(pSI)
+    {
+      WBSetHScrollRange(pSI, 1, 128);
+      WBSetHScrollPos(pSI, 14); // hard code for now
+    }
 
     WB_DEBUG_PRINT(DebugLevel_Light | DebugSubSystem_Dialog,
                    "%s - Font dialog initialized\n", __FUNCTION__);

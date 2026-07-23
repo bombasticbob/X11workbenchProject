@@ -6517,7 +6517,7 @@ WB_SCROLLINFO *pScrollInfo;
   geomBorder.height -= 4;
   geomBorder.width -= 4;
 
-  // painting the scrollbar (assume vertical only)
+  // painting the scrollbar (assume horizontal only)
 
   pScrollInfo = (WB_SCROLLINFO *)WBDialogControlGetProperty2(pSelf, aDLGC_SCROLLINFO);
   if(!pScrollInfo)
