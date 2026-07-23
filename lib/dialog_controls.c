@@ -6414,7 +6414,7 @@ WB_SCROLLINFO *pScrollInfo;
   WBDraw3DBorderRect(pDisplay, wID, gc, &geomBorder,
                      pSelf->clrBD2.pixel, pSelf->clrBD3.pixel);
 
-  // again reduce the size of the border rectangle by 2 pixel2 on all sides
+  // again reduce the size of the border rectangle by 2 pixels on all sides
   geomBorder.x+= 2;
   geomBorder.y+= 2;
   geomBorder.height -= 4;
@@ -6433,15 +6433,14 @@ WB_SCROLLINFO *pScrollInfo;
     }
 
     bzero(pScrollInfo, sizeof(*pScrollInfo));
+    WBCalcVScrollBar(pScrollInfo, &geomBorder, geomBorder.width - 2, 0, 0, -1);
     WBDialogControlSetProperty2(pSelf, aDLGC_SCROLLINFO, pScrollInfo); // store scroll info
   }
-
-//  if(!pListInfo || !pListInfo->nItems)
-//  {
-//    WBCalcVScrollBar(pScrollInfo, &geomBorder, iVScrollWidth, iHScrollHeight, 0, -1);
-//  }
-//
-//  WBDialogControlSetProperty2(pSelf, aDLGC_SCROLLINFO, pScrollInfo); // store updated scroll info (in case it changed)
+  else
+  {
+    WBCalcVScrollBar(pScrollInfo, &geomBorder, geomBorder.width - 2, 0, -1, -1);
+    WBDialogControlSetProperty2(pSelf, aDLGC_SCROLLINFO, pScrollInfo); // store scroll info
+  }
 
   WBPaintVScrollBar(pScrollInfo, pDisplay, wID, gc, &geomBorder); // for now use 'border' geometry, later fix?
   // by convention, restore original objects/state
@@ -6531,15 +6530,14 @@ WB_SCROLLINFO *pScrollInfo;
     }
 
     bzero(pScrollInfo, sizeof(*pScrollInfo));
+    WBCalcHScrollBar(pScrollInfo, &geomBorder, 0, geomBorder.height - 2, 0, -1);
     WBDialogControlSetProperty2(pSelf, aDLGC_SCROLLINFO, pScrollInfo); // store scroll info
   }
-
-//  if(!pListInfo || !pListInfo->nItems)
-//  {
-//    WBCalcHScrollBar(pScrollInfo, &geomBorder, iHScrollWidth, iHScrollHeight, 0, -1);
-//  }
-//
-//  WBDialogControlSetProperty2(pSelf, aDLGC_SCROLLINFO, pScrollInfo); // store updated scroll info (in case it changed)
+  else
+  {
+    WBCalcHScrollBar(pScrollInfo, &geomBorder, 0, geomBorder.height - 2, -1, -1);
+    WBDialogControlSetProperty2(pSelf, aDLGC_SCROLLINFO, pScrollInfo); // store scroll info
+  }
 
   WBPaintHScrollBar(pScrollInfo, pDisplay, wID, gc, &geomBorder); // for now use 'border' geometry, later fix?
   // by convention, restore original objects/state

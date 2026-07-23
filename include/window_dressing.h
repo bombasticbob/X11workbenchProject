@@ -267,7 +267,7 @@ int WBCalcHScrollDragPos(WB_SCROLLINFO *pScrollInfo, int iX); // 'iX' is the 'x'
   * \param pScrollInfo A pointer to the WB_SCROLLINFO structure to be initialized
   * \param pgeomClient A pointer to the WB_GEOM for the client area
   * \param iVScrollWidth The width of the vertical scroll bar in pixels
-  * \param iHScrollHeight The height of the horizontal scroll bar in pixels
+  * \param iHScrollHeight The height of the horizontal scroll bar in pixels (exclusion zone)
   * \param nListItems The number of items in a list of scrollable items
   * \param nPos The current position within the list of scrollable items
   *
@@ -283,7 +283,7 @@ void WBCalcVScrollBar(WB_SCROLLINFO *pScrollInfo, WB_GEOM *pgeomClient, int iVSc
   *
   * \param pScrollInfo A pointer to the WB_SCROLLINFO structure to be initialized
   * \param pgeomClient A pointer to the WB_GEOM for the client area
-  * \param iVScrollWidth The width of the vertical scroll bar in pixels
+  * \param iVScrollWidth The width of the vertical scroll bar in pixels (exclusion zone)
   * \param iHScrollHeight The height of the horizontal scroll bar in pixels
   * \param nListItems The number of items in a list of scrollable items
   * \param nPos The current position within the list of scrollable items
